@@ -1,0 +1,34 @@
+/*
+ * NOTE — deviation from legacy, flagging per CLAUDE.md:
+ * Legacy #map used `left: var(--sidebar-total-w)` (with a
+ * `body.sidebar-collapsed` variant at `--sidebar-rail-w`) to leave
+ * room for the persistent desktop sidebar. That sidebar doesn't exist
+ * yet in this migration (it's implied across the legend/GPS/search
+ * panel slices, not built in Slice 1), so this is full-bleed for now.
+ * Once the sidebar shell lands, change `left: 0` below to
+ * `left: var(--sidebar-total-w)` and reintroduce the
+ * `:global(.sidebar-collapsed) &` variant.
+ */
+.map {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  transform: translateZ(0);
+  contain: strict;
+}
+
+/*
+ * The zoom-state classes (zoom-far / zoom-mid / zoom-near / zoom-close)
+ * are added to this element via plain classList.add() calls in
+ * MapShell.jsx, matching the legacy string literals exactly. CSS
+ * Modules hashes class names referenced in this file but NOT strings
+ * added imperatively in JS — so any future slice styling those states
+ * (e.g. Slice 2's pin label visibility) must target them as global
+ * selectors, e.g. `:global(.zoom-far) .someLocalClass`, not
+ * `.zoom-far` directly in a module file.
+ */

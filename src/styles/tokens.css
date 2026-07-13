@@ -1,0 +1,93 @@
+/* ─────────────────────────────────────────────────────────────
+   Maps By FUTA — design tokens
+   Ported verbatim from legacy `style.css` (feature/login2), both
+   :root blocks merged (main tokens ~line 42, font tokens ~line 945).
+   Do not edit values here — this is the single source of truth,
+   copied byte-for-byte. Change brand values in BRAND_GUIDELINES.md
+   first, then re-sync this file.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surface (backgrounds by elevation) */
+  --surface:           #0b1326;
+  --surface-dim:       #0b1326;
+  --surface-bright:    #31394d;
+  --surface-low:       #131b2e;
+  --surface-container: #171f33;
+  --surface-high:      #222a3d;
+  --surface-highest:   #2d3449;
+
+  /* On-surface (text) */
+  --text:              #dae2fd;
+  --text-variant:      #cfc2d6;
+  --muted:             rgba(218, 226, 253, 0.45);
+
+  /* Outline */
+  --outline:           #988d9f;
+  --outline-dim:       #4d4354;
+  --border:            rgba(77, 67, 84, 0.6);
+
+  /* Primary — Electric Violet */
+  --primary:              #ddb7ff;
+  --primary-container:    #b76dff;
+  --on-primary:           #490080;
+  --primary-glow:         rgba(221, 183, 255, 0.22);
+  --primary-glow-strong:  rgba(183, 109, 255, 0.35);
+
+  /* Secondary — Cyan/Teal */
+  --secondary:            #44e2cd;
+  --secondary-container:  #03c6b2;
+  --on-secondary:         #003731;
+
+  /* Tertiary — Amber */
+  --tertiary:             #ffb95f;
+  --tertiary-container:   #ca8100;
+
+  /* Status */
+  --error:             #ffb4ab;
+  --error-container:   #93000a;
+
+  /* Legacy aliases (used in JS-injected content — keep these too,
+     several inline styles / dynamically built markup reference
+     them directly by name) */
+  --green:   #44e2cd;
+  --yellow:  #ffb95f;
+  --red:     #ffb4ab;
+  --blue:    #ddb7ff;
+  --dark:    #0b1326;
+  --panel:     rgba(11, 19, 38, 0.92);
+  --input-bg:  rgba(255, 255, 255, 0.04);
+
+  /* Radii */
+  --r-sm:   0.25rem;
+  --r-md:   0.5rem;
+  --r-lg:   0.75rem;
+  --r-xl:   1rem;
+  --r-2xl:  1.5rem;
+  --r-full: 9999px;
+
+  /* Spacing / layout */
+  --gap:              0.75rem;
+  --pad:               1rem;
+  --pad-lg:            1.5rem;
+  --header-h:          72px;
+  --sidebar-rail-w:    64px;
+  --sidebar-panel-w:   240px;
+  --sidebar-total-w:   304px;
+
+  /* Mobile-specific layout tokens */
+  --mob-search-h:      56px;
+  --mob-sheet-peek:    76px;
+  --mob-sheet-half:    50vh;
+  --mob-sheet-full:    92vh;
+  --mob-sheet-radius:  20px;
+  --mob-safe-bottom:   env(safe-area-inset-bottom, 0px);
+  --mob-safe-top:      env(safe-area-inset-top, 0px);
+
+  /* Typography */
+  --font-display: 'Bricolage Grotesque', 'Poppins', sans-serif;
+  --font-ui:      'Inter', system-ui, -apple-system, sans-serif;
+  --font-label:   'Montserrat', 'Poppins', sans-serif;
+  --font-body:    'Poppins', 'Inter', sans-serif;
+  --font-mono:    'DM Mono', 'Courier New', monospace;
+}
