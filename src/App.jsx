@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import './index.css'
-import MapShell from './features/map/MapShell'
+import MapPage from './pages/MapPage'
 import LoadingScreen from './pages/LoadingScreen'
 import NotFoundPage from './pages/NotFoundPage'
 
@@ -12,7 +12,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MapShell />} />
+        <Route path="/" element={<MapPage />} />
         <Route path="/loadingscreen" element={<LoadingScreen />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

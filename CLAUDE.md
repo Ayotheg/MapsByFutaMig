@@ -160,16 +160,36 @@ Don't scaffold it early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** None active — Slice 1 (base map shell) is
-  done. Next up per `MIGRATION_PLAN.md` order: Slice 2 (waypoint
-  markers & popups) — but check its "Depends on" first (needs
-  Supabase `waypoints`/`waypoint_images` tables live; confirm with the
-  backend track before starting).
-- **Legacy line ranges read so far:** `app.js` lines ~55–98 (Slice 1).
+- **Slice being worked on:** None active — Slice 2 (waypoint markers &
+  popups) is code-complete and builds/lints clean, but hasn't been run
+  live end-to-end by a human yet against the real Supabase project. Do
+  that first before starting Slice 3. Next up per `MIGRATION_PLAN.md`
+  order after that: Slice 3 (legend/filter panel).
+- **Legacy line ranges read so far:** `app.js` lines ~55–98 (Slice 1);
+  ~2280–2560, ~2592–2790, ~5995–6140 (Slice 2 — waypoint markers,
+  `loadSavedWaypoints`, place-card controller); `index.html` ~1155–1216
+  (Slice 2 — place-card markup); `style.css` ~2690–2820, ~3900–4130
+  (Slice 2 — wp-popup/gm-pin/place-card CSS).
 - **Dependencies confirmed done:** Slice 0 is partial — tokens, Tailwind
-  theme, fonts, and icons are done; Supabase client wiring (`src/lib/supabase.js`)
-  is a separate track/session and not yet confirmed done. Don't build
-  anything that reads/writes Supabase until that's confirmed.
+  theme, fonts, and icons are done. Supabase client wiring
+  (`src/lib/supabase.js`) is now done as part of Slice 2 — created
+  reading `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` from `.env.local`
+  (see `.env.example`); `@supabase/supabase-js` added to
+  `package.json`. RLS SELECT policies for `waypoints`/`waypoint_images`
+  and a public-read policy on the `place-images` storage bucket were
+  added directly in the Supabase dashboard (not tracked in this repo —
+  no migrations-as-code yet; consider adding that if the schema keeps
+  changing by hand).
+- **Schema note for whoever builds Slice 4/8:** the live Supabase schema
+  normalizes images into their own tables (`waypoint_images`,
+  presumably `segment_images` too) instead of Firestore's embedded
+  `imageUrls` arrays, and `waypoints` has no `avg_rating`/`review_count`
+  columns — those need adding as part of Slice 8 alongside a `reviews`
+  table and a recompute trigger (replacing legacy's client-side
+  rolling-average `tx.update(wpRef, {avgRating, reviewCount})`, which
+  was correctly flagged as race-prone during backend planning).
+  `numeric` columns (`lat`/`lng` etc.) come back as strings over
+  PostgREST — always `Number()`-coerce before using them.
 - **Anything unusual carried over from the last session:**
   - **Icon library changed from the original plan.** `BRAND_GUIDELINES.md`
     originally specified Bootstrap Icons (self-hosted npm package); this

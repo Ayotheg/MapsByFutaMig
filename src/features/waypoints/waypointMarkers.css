@@ -1,0 +1,73 @@
+/* ── WAYPOINT MARKER — Google Maps style ──────────────────────────────────
+   Ported verbatim from legacy style.css (feature/login2), lines ~2745–2817.
+
+   Deliberately a plain global .css file, not a CSS Module — see the comment
+   in waypointMarkers.js for why (Leaflet injects this HTML directly, so
+   CSS-Module class-name hashing would never match it).
+
+   zoom-far  (z≤14) → 5px dot only
+   zoom-mid  (z=15) → 7px dot only
+   zoom-near (z≤17) → dot only, no label yet
+   zoom-close (z≥18)→ dot + inline label
+   No backdrop-filter anywhere — zero GPU composite cost (this was a
+   deliberate mobile-perf fix in the legacy app; don't reintroduce it).
+   ────────────────────────────────────────────────────────────────────── */
+
+.gm-pin-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+  pointer-events: auto;
+  isolation: isolate;
+}
+
+.gm-pin-label {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #1a1a2e;
+  max-width: 120px;
+  line-height: 1.2;
+  text-shadow:
+    0 0 3px rgba(255, 255, 255, 1),
+    0 0 6px rgba(255, 255, 255, 0.9),
+    0 1px 0 rgba(255, 255, 255, 0.95),
+    0 -1px 0 rgba(255, 255, 255, 0.95);
+  transition: opacity 0.18s ease;
+}
+
+.gm-pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--pin-color, #00c896);
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  flex-shrink: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.gm-pin-wrap:hover .gm-pin-dot {
+  transform: scale(1.15);
+}
+
+/* ── Zoom-tier overrides — classes are stamped on the map container by
+   MapShell.jsx's updateZoomClass(); these cascade down to any marker
+   descendant regardless of the container's own (module-hashed) class. ── */
+
+.zoom-far .gm-pin-label { opacity: 0; pointer-events: none; }
+.zoom-far .gm-pin-dot   { transform: scale(0.6); opacity: 0.7; }
+.zoom-far .gm-pin-wrap  { opacity: 0.65; }
+
+.zoom-mid .gm-pin-label { opacity: 0; pointer-events: none; }
+.zoom-mid .gm-pin-dot   { transform: scale(0.8); opacity: 0.88; }
+.zoom-mid .gm-pin-wrap  { opacity: 0.88; }
+
+.zoom-near .gm-pin-label { opacity: 0; pointer-events: none; }
+.zoom-near .gm-pin-dot   { transform: scale(1); opacity: 1; }
+.zoom-near .gm-pin-wrap  { opacity: 1; }
+
+.zoom-close .gm-pin-label { opacity: 1; }
+.zoom-close .gm-pin-dot   { transform: scale(1); opacity: 1; }
+.zoom-close .gm-pin-wrap  { opacity: 1; }

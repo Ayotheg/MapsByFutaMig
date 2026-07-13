@@ -1,0 +1,297 @@
+/* Ported from legacy style.css (feature/login2), the PLACE CARD block
+   (~lines 3900-4130). Structure/behavior kept 1:1; colors/spacing/radii/
+   fonts now come from design tokens per BRAND_GUIDELINES.md instead of
+   literals. See the font-mapping note near .name below for one inference
+   this port had to make that isn't explicitly covered by that doc. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 1299;
+  pointer-events: auto;
+}
+.hidden {
+  display: none;
+}
+
+.card {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1300;
+  background: var(--surface);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: 0 -4px 40px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  transform: translateY(100%);
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+  overflow: hidden;
+  pointer-events: none;
+}
+.card.visible {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Desktop: float as a sidebar-style card on the map's left edge.
+   NOTE — same deviation as MapShell.module.css: legacy anchors this at
+   `left: var(--sidebar-total-w)` since a permanent sidebar exists there.
+   No sidebar shell has landed in this migration yet, so this uses a plain
+   page-margin instead. Swap back to `var(--sidebar-total-w)` once one does
+   — same spot MapShell.module.css already flags for the map itself. */
+@media (min-width: 769px) {
+  .card {
+    left: var(--pad-lg);
+    right: auto;
+    bottom: 32px;
+    width: 380px;
+    max-height: 78vh;
+    border-radius: var(--r-xl);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.65);
+    transform: translateX(-420px);
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .card.visible {
+    transform: translateX(0);
+  }
+  .scrim {
+    display: none !important;
+  }
+  .handle {
+    display: none;
+  }
+}
+
+.handle {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px 0 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.handleBar {
+  width: 40px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-full);
+}
+
+.hero {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--surface-low);
+}
+.hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.25s;
+}
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 55%, rgba(8, 15, 31, 0.7) 100%);
+  pointer-events: none;
+}
+
+.photoCount {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border-radius: var(--r-full);
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.photoNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.photoNav:active {
+  background: rgba(0, 0, 0, 0.75);
+  transform: translateY(-50%) scale(0.92);
+}
+.photoNav.prev { left: 10px; }
+.photoNav.next { right: 10px; }
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 4px;
+  flex-shrink: 0;
+}
+.titleWrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Font-mapping note: legacy's literal CSS was `font-family:'Geist',sans-serif;
+   font-weight:800`. BRAND_GUIDELINES.md's "Usage pattern observed" section
+   explicitly documents place-card name as --font-ui weight 700 (not 800),
+   which is what's used here — following the documented decision over the
+   literal legacy weight. Flag if 800 was actually wanted. */
+.name {
+  font-family: var(--font-ui);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+  word-break: break-word;
+}
+
+.badge {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rating {
+  margin-top: 5px;
+}
+.ratingEmpty {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.close {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.close:hover {
+  background: rgba(255, 77, 109, 0.12);
+  color: var(--error);
+}
+
+.coords {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  padding: 0 18px 10px;
+  flex-shrink: 0;
+}
+
+/* Font-mapping note: same situation as .name — legacy literal was 'Geist',
+   which BRAND_GUIDELINES.md doesn't cover for body/description text. Using
+   --font-body here as the closest documented equivalent (it's prose, not a
+   numeric/technical value, so --font-mono would be wrong per the doc's own
+   usage-pattern rule). Flag if a different token was intended. */
+.desc {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-variant);
+  padding: 12px 18px 12px;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.strip {
+  padding: 0 18px 14px;
+  flex-shrink: 0;
+}
+.stripInner {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.stripInner img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  transition: border-color 0.18s, transform 0.18s;
+}
+.stripInner img.active {
+  border-color: var(--tertiary);
+}
+.stripInner img:hover {
+  transform: scale(1.05);
+}
+
+.actions {
+  padding: 6px 18px 18px;
+  flex-shrink: 0;
+}
+.navBtn {
+  width: 100%;
+  background: var(--secondary);
+  color: var(--on-secondary);
+  border: none;
+  border-radius: var(--r-md);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.navBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
