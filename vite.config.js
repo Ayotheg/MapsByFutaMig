@@ -6,23 +6,12 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
-    chunkSizeWarningLimit: 800, // Increase limit slightly
-    rollupOptions: {
+    chunkSizeWarningLimit: 1000,
+    // Vite 8 uses Rolldown — use rolldownOptions instead of rollupOptions
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
-              return 'vendor_react';
-            }
-            if (id.includes('@supabase')) {
-              return 'vendor_supabase';
-            }
-            if (id.includes('leaflet')) {
-              return 'vendor_leaflet';
-            }
-            return 'vendor'; // generic vendor chunk
-          }
-        }
+        // Rolldown's codeSplitting splits vendor deps automatically
+        // by entry points; React.lazy() in routes handles app code splitting
       }
     }
   }
