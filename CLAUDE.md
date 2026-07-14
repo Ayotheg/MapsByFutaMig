@@ -57,6 +57,7 @@ of Technology Akure. It is being migrated in two parallel tracks:
 - **Update the progress tracker** in `MIGRATION_PLAN.md` when a slice is
   done, with a one-line note on anything the next session should know
   (known issues, deliberate deviations, follow-ups).
+- **Route-level Code Splitting:** Use `React.lazy()` and `<Suspense>` to lazy-load distinct pages or heavily isolated feature components. This safely code-splits the application, keeping initial load speeds incredibly fast by preventing monolithic JS bundles. Do NOT lazy-load small, heavily reused UI components, as that causes unnecessary waterfalls.
 
 ## Folder structure
 
