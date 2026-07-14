@@ -9,11 +9,19 @@ export default defineConfig({
     chunkSizeWarningLimit: 800, // Increase limit slightly
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split vendor code into separate chunks
-          vendor_react: ['react', 'react-dom', 'react-router-dom'],
-          vendor_supabase: ['@supabase/supabase-js'],
-          vendor_leaflet: ['leaflet'],
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router-dom')) {
+              return 'vendor_react';
+            }
+            if (id.includes('@supabase')) {
+              return 'vendor_supabase';
+            }
+            if (id.includes('leaflet')) {
+              return 'vendor_leaflet';
+            }
+            return 'vendor'; // generic vendor chunk
+          }
         }
       }
     }
