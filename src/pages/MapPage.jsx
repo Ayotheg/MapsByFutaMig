@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import MapShell from '../features/map/MapShell';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
@@ -6,6 +6,13 @@ import { useWaypoints } from '../features/waypoints/useWaypoints';
 import { useTypeVisibility } from '../features/legend/useTypeVisibility';
 import Sidebar from '../features/legend/Sidebar';
 import MobileSheet from '../features/legend/MobileSheet';
+import SegmentsLayer from '../features/segments/SegmentsLayer';
+import { useSegments } from '../features/segments/useSegments';
+
+// Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
+// DetailModal isn't needed for first paint, only mounts on a click, so it's
+// lazy-loaded per the exact pattern the policy specifies.
+const DetailModal = lazy(() => import('../features/segments/DetailModal'));
 
 /**
  * First page-level composition of the map with feature chrome around it.
@@ -28,9 +35,12 @@ export default function MapPage() {
   const [map, setMap] = useState(null);
   const [selected, setSelected] = useState(null);
   const [isMobile] = useState(() => window.innerWidth <= 768);
+  const [selectedSegmentId, setSelectedSegmentId] = useState(null);
 
   const { waypoints } = useWaypoints();
   const typeVisibilityProps = useTypeVisibility(waypoints);
+  const { segments } = useSegments();
+  const selectedSegment = segments.find((s) => s.id === selectedSegmentId) || null;
 
   // Legacy: `map.on('click', function() { if (_isOpen) closeCard(); })` —
   // a click on the map background (not a marker, which already stops
@@ -53,7 +63,15 @@ export default function MapPage() {
           onSelect={setSelected}
         />
       )}
+      {map && (
+        <SegmentsLayer map={map} segments={segments} onViewDetails={setSelectedSegmentId} />
+      )}
       <PlaceCard data={selected} onClose={() => setSelected(null)} />
+      {selectedSegment && (
+        <Suspense fallback={null}>
+          <DetailModal segment={selectedSegment} onClose={() => setSelectedSegmentId(null)} />
+        </Suspense>
+      )}
       {isMobile ? (
         <MobileSheet map={map} typeVisibilityProps={typeVisibilityProps} />
       ) : (

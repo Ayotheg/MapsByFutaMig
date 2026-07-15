@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
 
@@ -56,6 +56,17 @@ const RAIL_ITEMS = [
 export default function Sidebar({ map, typeVisibilityProps }) {
   const [activeKey, setActiveKey] = useState('layers');
   const [collapsed, setCollapsed] = useState(false);
+
+  // Slice 4: reflect collapsed state onto document.body, same
+  // classList.toggle('sidebar-collapsed') approach legacy uses
+  // (app.js ~3309/3320), so MapShell.module.css can react to it via a
+  // global selector without Sidebar needing to know about MapShell.
+  // Cleanup on unmount matters here — Sidebar unmounts on mobile
+  // (MobileSheet renders instead), so a stale class shouldn't linger.
+  useEffect(() => {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    return () => document.body.classList.remove('sidebar-collapsed');
+  }, [collapsed]);
 
   function handleRailClick(item) {
     const isAlreadyActive = activeKey === item.key && !collapsed;

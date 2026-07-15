@@ -264,13 +264,30 @@ early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** None active. Slice 3 (legend/filter/layers
-  panel) is done and verified live by a human — full details in
-  `MIGRATION_PLAN.md`'s progress tracker. **Slice 4 (saved segments/routes)
-  is cleared to start next.**
-- **Bundle-size policy reminder:** new as of this update, effective starting
-  Slice 4 (see the dedicated section above). Slices 1–3 don't need
-  retrofitting.
+- **Slice being worked on:** Slice 4 (saved segments/routes) — **partially
+  done this session**, see `MIGRATION_PLAN.md`'s progress tracker for full
+  detail. Not yet verified live by a human against real Supabase data
+  (built + `npm run build`/`npm run lint` clean against a placeholder
+  `.env.local`, same caveat Slice 2 flagged for itself). **Slice 5 (KML
+  import/export) is cleared to start next** once Slice 4 gets a live-data
+  pass; Slice 5 now also owns the save modal + export builders originally
+  miscategorized under Slice 4's line range — see below.
+- **Scope correction made this session — read before trusting the plan's
+  line ranges blindly elsewhere:** `MIGRATION_PLAN.md`'s Slice 4 entry
+  originally pointed at `app.js` ~2033–2306 for "save modal" + export
+  builders. Tracing actual call sites showed `openSaveModal()` is only ever
+  invoked from inside `processImportPipeline` (Slice 5), and its save
+  button writes directly to Firebase — porting it under Slice 4 would have
+  meant building unreachable, rule-violating code. Flagged to the person,
+  who confirmed: build only what's genuinely Slice 4 (segment viewer),
+  leave the save modal for Slice 5. Point of this note: the plan's legacy
+  line ranges are a starting pointer, not gospel — still read the actual
+  code and check call sites before trusting a range's boundaries.
+- **Bundle-size policy reminder:** effective starting Slice 4. Applied this
+  session: `DetailModal` is lazy-loaded (`React.lazy`/`Suspense`, confirmed
+  via `npm run build` splitting it into its own chunk); `SegmentsLayer` is
+  not (first-paint tier, same as `WaypointLayer`). `vite.config.js` still
+  untouched — no need yet.
 - **Legacy line ranges read so far:** `app.js` lines ~55–98 (Slice 1);
   ~2280–2560, ~2592–2790, ~5995–6140 (Slice 2 — waypoint markers,
   `loadSavedWaypoints`, place-card controller); `index.html` ~1155–1216
@@ -278,7 +295,13 @@ early "just in case."
   (Slice 2 — wp-popup/gm-pin/place-card CSS); `index.html` ~79–630,
   ~1133–1154; `app.js` ~3296–3324, ~5320–5760, ~6140–6301; `style.css`
   ~155–440, ~935–1360, ~3250–3620, ~4290–4680 (Slice 3 — sidebar shell,
-  layer panel, place-type filter, mobile sheet).
+  layer panel, place-type filter, mobile sheet); `app.js` ~1592–1895
+  (traced only to find `openSaveModal`'s call site — not ported),
+  ~2548–2852 (Slice 4 — `drawSavedSegment`, `loadSavedSegments`,
+  `openDetailModal`); `index.html` ~757–765 (Slice 4 — detail modal
+  markup); `style.css` ~127–144 (`#map` sidebar-offset rules, now ported),
+  ~1406–1449, ~1603–1632, ~2669–2684, ~2925–2926, ~3274–3280, ~3646–3652
+  (Slice 4 — modal shell, detail-*, seg-popup, mobile #map/modal overrides).
 - **Dependencies confirmed done:** Slice 0 is partial — tokens, Tailwind
   theme, and icons are done; fonts are self-hosted but still on static
   per-weight packages, not yet switched to variable-font packages (see
@@ -290,16 +313,27 @@ early "just in case."
   policy on the `place-images` storage bucket were added directly in the
   Supabase dashboard (not tracked in this repo — no migrations-as-code yet;
   consider adding that if the schema keeps changing by hand).
-- **Schema note for whoever builds Slice 4/8:** the live Supabase schema
-  normalizes images into their own tables (`waypoint_images`,
-  presumably `segment_images` too) instead of Firestore's embedded
-  `imageUrls` arrays, and `waypoints` has no `avg_rating`/`review_count`
-  columns — those need adding as part of Slice 8 alongside a `reviews`
-  table and a recompute trigger (replacing legacy's client-side
-  rolling-average `tx.update(wpRef, {avgRating, reviewCount})`, which
-  was correctly flagged as race-prone during backend planning).
-  `numeric` columns (`lat`/`lng` etc.) come back as strings over
-  PostgREST — always `Number()`-coerce before using them.
+- **Schema note for whoever builds Slice 5/8, and whoever verifies Slice
+  4's assumption:** the live Supabase schema normalizes images into their
+  own tables (`waypoint_images`, confirmed; `segment_images` — **assumed
+  by Slice 4, not yet confirmed live**, same shape: `segment_id`,
+  `storage_path`, `position`) instead of Firestore's embedded `imageUrls`
+  arrays. Slice 4 also assumed a `segments` table
+  (`id, name, description, category, points jsonb, distance, duration`)
+  and — deliberately deviating from legacy's embedded `seg.waypoints`
+  array — reads a segment's waypoints via `waypoints WHERE segment_id =
+  seg.id` instead, since that FK already exists live. **None of this is
+  confirmed against a real schema doc** ("link to be added once Phase 1
+  backend work ships" still hasn't happened) — `useSegments.js` will
+  throw/error at runtime if the actual table/column names differ. Verify
+  before Slice 5 builds the save-flow insert on top of it. Separately:
+  `waypoints` has no `avg_rating`/`review_count` columns — those need
+  adding as part of Slice 8 alongside a `reviews` table and a recompute
+  trigger (replacing legacy's client-side rolling-average
+  `tx.update(wpRef, {avgRating, reviewCount})`, which was correctly
+  flagged as race-prone during backend planning).
+  `numeric` columns (`lat`/`lng`/`distance`/`duration` etc.) come back as
+  strings over PostgREST — always `Number()`-coerce before using them.
 - **Anything unusual carried over from earlier sessions:**
   - **Icon library changed from the original plan.** `BRAND_GUIDELINES.md`
     originally specified Bootstrap Icons (self-hosted npm package); this
