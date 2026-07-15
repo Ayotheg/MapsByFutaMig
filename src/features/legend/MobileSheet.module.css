@@ -1,0 +1,119 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1199;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.backdropVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--mob-sheet-full);
+  background: var(--surface-bright);
+  border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
+  z-index: 1200;
+  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.4), 0 -1px 0 rgba(255, 255, 255, 0.06);
+  transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.statePeek {
+  transform: translateY(calc(100% - var(--mob-sheet-peek) - var(--mob-safe-bottom)));
+}
+.stateHalf {
+  transform: translateY(calc(100% - var(--mob-sheet-half) - var(--mob-safe-bottom)));
+}
+.stateFull {
+  transform: translateY(calc(100% - var(--mob-sheet-full) - var(--mob-safe-bottom)));
+}
+
+.handleWrap {
+  flex-shrink: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+  border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+}
+.handleWrap:active {
+  cursor: grabbing;
+}
+.handleBar {
+  width: 40px;
+  height: 4px;
+  background: var(--outline);
+  border-radius: 2px;
+  opacity: 0.45;
+  transition: opacity 0.2s, width 0.2s;
+}
+.handleWrap:active .handleBar {
+  opacity: 0.8;
+  width: 52px;
+}
+
+.header {
+  flex-shrink: 0;
+  padding: 0 8px 8px;
+  border-bottom: 1px solid var(--border);
+  touch-action: none;
+  cursor: grab;
+}
+.tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  border-radius: 20px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  min-height: 44px;
+}
+.tabActive {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  color: var(--primary);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(16px + var(--mob-safe-bottom));
+}

@@ -1,0 +1,196 @@
+/* ── Ported from legacy style.css: two cascading rule blocks apply to
+   #placeTypeFilter — a "base" block (~4294–4499) and a later "Place-type
+   layout overrides to keep legend visible" block (~4501–4634) that wins
+   on every property it touches (later source order and/or !important).
+   The classes below encode the COMPUTED result of that cascade, not
+   just the base block, so this faithfully matches what actually renders
+   in legacy today.
+
+   ⚠️ FLAGGED FOR THE PERSON: the override block gives group headers/
+   bodies solid white backgrounds (#fff) while leaving their text at the
+   original dark-theme light colors (var(--text) ≈ #dae2fd, and other
+   near-white rgba values) — this reads as a genuine legibility bug in
+   the live legacy app (pale text on white cards), not a deliberate
+   redesign. Ported exactly as computed rather than silently "fixed" —
+   flag to the person if this should be corrected instead of matched. */
+
+.sectionLabel {
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(218, 226, 253, 0.42);
+  padding: 10px 14px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.resetBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 86px;
+  padding: 6px 12px;
+  background: rgba(183, 109, 255, 0.12);
+  border: 1px solid rgba(183, 109, 255, 0.24);
+  border-radius: var(--r-full);
+  color: var(--primary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.18s;
+}
+.resetBtn:hover {
+  background: rgba(183, 109, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.group {
+  margin: 0 0 14px;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--dark);
+  transition: opacity 0.22s;
+}
+.group:last-child {
+  margin-bottom: 0;
+}
+.group:hover {
+  border-color: #000;
+}
+.groupOff {
+  opacity: 0.45;
+}
+
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: default;
+  background: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
+}
+
+.groupSwatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.groupName {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(218, 226, 253, 0.9);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.groupCount {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(218, 226, 253, 0.7);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-full);
+  padding: 1px 6px;
+  min-width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.groupBody {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+  gap: 10px;
+  padding: 14px;
+  background: #fff;
+}
+
+.typeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-xl);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, opacity 0.2s, transform 0.18s;
+}
+.typeRow:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(183, 109, 255, 0.16);
+  transform: translateY(-1px);
+}
+.typeOff {
+  opacity: 0.5;
+}
+.typeOff .typeName {
+  text-decoration: line-through;
+}
+
+.pin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.typeName {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.typeCount {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(218, 226, 253, 0.42);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--r-full);
+  padding: 3px 8px;
+  flex-shrink: 0;
+}
+
+.typeCb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.typeCb:checked {
+  background: var(--secondary);
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(0, 200, 150, 0.12);
+}
+.typeCb:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(183, 109, 255, 0.22);
+}

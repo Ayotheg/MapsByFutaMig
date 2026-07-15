@@ -38,15 +38,13 @@
   pointer-events: auto;
 }
 
-/* Desktop: float as a sidebar-style card on the map's left edge.
-   NOTE — same deviation as MapShell.module.css: legacy anchors this at
-   `left: var(--sidebar-total-w)` since a permanent sidebar exists there.
-   No sidebar shell has landed in this migration yet, so this uses a plain
-   page-margin instead. Swap back to `var(--sidebar-total-w)` once one does
-   — same spot MapShell.module.css already flags for the map itself. */
+/* Desktop: float as a sidebar-style card on the map's left edge,
+   anchored past the permanent sidebar (features/legend/Sidebar.jsx,
+   Slice 3) so it doesn't overlap the rail/panel — matches legacy's
+   `left: var(--sidebar-total-w)` exactly (style.css ~3949–3955). */
 @media (min-width: 769px) {
   .card {
-    left: var(--pad-lg);
+    left: var(--sidebar-total-w);
     right: auto;
     bottom: 32px;
     width: 380px;

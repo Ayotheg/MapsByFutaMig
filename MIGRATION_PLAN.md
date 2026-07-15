@@ -7,6 +7,8 @@
 ## How to use this document
 Each slice below is a self-contained unit of work you can hand to a fresh LLM session. Work top to bottom — later slices assume earlier ones exist in the new repo. Don't skip ahead; several features quietly depend on ones above them (noted under "Depends on").
 
+**Bundle-size & code-splitting policy** (see `CLAUDE.md`) is effective **starting Slice 4**. Slices 1–3 predate it and don't need retrofitting.
+
 ---
 
 ## Slice order (easiest/cheapest → hardest/most token-hungry)
@@ -15,7 +17,7 @@ Each slice below is a self-contained unit of work you can hand to a fresh LLM se
 Not a "feature," but required before anything else:
 - Port design tokens (`BRAND_GUIDELINES.md`) into `src/styles/tokens.css`
 - Wire tokens into Tailwind via `@theme` in `index.css`
-- Self-hosted fonts (`@fontsource` packages) + `bootstrap-icons` npm package
+- Self-hosted fonts (variable-font `@fontsource-variable` packages where available — see `BRAND_GUIDELINES.md`; **not yet switched over as of Slice 3, still on static per-weight packages**) + `lucide-react`
 - Confirm Supabase client is wired up (`src/lib/supabase.js`)
 - **Depends on:** nothing
 
@@ -48,6 +50,10 @@ Not a "feature," but required before anything else:
 - Export builders: `buildGPX`, `buildKML`, `buildGeoJSON`, `downloadFile`
 - **Legacy source:** `app.js` lines ~2033–2306, 2548–2891
 - **Depends on:** Slice 1, Supabase `segments`/`segment_images` tables live
+- **Also pick up while here:** the `#map` sidebar-offset gap flagged in
+  `CLAUDE.md` Session Context (full-bleed map needs to react to the
+  Slice-3 sidebar's collapsed state) — small, real, unresolved since
+  Slice 3.
 
 ### Slice 5 — KML import/export pipeline *(medium)*
 - Generic import pipeline (`processImportPipeline`), parsers for KML/GPX/GeoJSON text
@@ -55,6 +61,7 @@ Not a "feature," but required before anything else:
 - Static KML file loading (`loadKML`, `bindKmlPopup`)
 - **Legacy source:** `app.js` lines ~99–658, 1696–2032
 - **Depends on:** Slice 2, Slice 4
+- **Bundle-size note:** the admin-only KML upload sub-panel is a lazy-load candidate (see `CLAUDE.md`); the always-on static KML layer loading is NOT — that's needed on initial load.
 
 ### Slice 6 — OSM annotations *(medium)*
 - `loadOSMAnnotations`, viewport-based rendering, dedup against your own waypoints (`_metersApart`, `_dedupNormName`, `_findDuplicate`)
@@ -84,6 +91,7 @@ Not a "feature," but required before anything else:
 - Arrival detection → triggers Slice 8's review modal
 - **Legacy source:** `app.js` lines ~1221–1696, ~4333–4650ish (nav HUD/voice block)
 - **Depends on:** Slices 2, 4, 7, 8 — largest single feature, most interdependent state (position, route, HUD, voice, arrival). Budget the most tokens here.
+- **Bundle-size note:** lazy-load candidate (see `CLAUDE.md`) — only mounts once navigation actually starts. This is also the slice where the `manualChunks` vendor-splitting config and the `chunkSizeWarningLimit` revert (from 1000 back to default 500) should both land.
 
 ### Slice 10 — Auth *(high)*
 - Login/Signup/Profile tabbed modal, Google OAuth + email/password (via Supabase Auth)
@@ -92,6 +100,8 @@ Not a "feature," but required before anything else:
 - Separate PIN-gate for admin panel entry
 - **Legacy source:** `app.js` lines ~2744–3095ish (auth IIFE), PIN hash ~3569
 - **Depends on:** Supabase Auth configured (Google OAuth client re-registered); ideally after Slice 8/9 since profile shows review/nav counts
+- **Bundle-size note:** lazy-load candidate (see `CLAUDE.md`) — the auth modal only mounts when opened.
+- **Also needed here:** the sidebar footer's Sign In button already exists as inert chrome (added during Slice 3) — this slice wires up its actual behavior.
 
 ### Slice 11 — Admin panel *(highest)*
 - Waypoint + segment CRUD lists with search-filter
@@ -100,6 +110,8 @@ Not a "feature," but required before anything else:
 - Manual "sync" refresh
 - **Legacy source:** `app.js` lines ~3692–4333ish
 - **Depends on:** everything above — touches waypoints, segments, KML, images, auth (PIN gate). Do this last; it's the biggest and most stateful single piece, and benefits from every other data-layer pattern already being proven out.
+- **Bundle-size note:** the single most important lazy-load candidate (see `CLAUDE.md`) — most campus users never open this at all.
+- **Also needed here:** the sidebar footer's Admin toggle already exists as inert chrome (added during Slice 3) — this slice wires up its actual behavior.
 
 ### Slice 12 — Mobile-specific chrome *(cross-cutting, weave in per slice, don't do standalone)*
 - Bottom sheet (peek/expanded, tabs), mobile FABs, mobile menu
@@ -125,15 +137,15 @@ Update this after each slice ships — future LLM sessions should read this befo
 
 | Slice | Status | Notes |
 |---|---|---|
-| 0 — Foundation | 🟨 Partial | Tokens, Tailwind `@theme` wiring, self-hosted fonts done. Icon library changed from Bootstrap Icons to `lucide-react` — see `BRAND_GUIDELINES.md` Icons section and `src/lib/legacyIconMap.js`. Supabase client wiring (`src/lib/supabase.js`) is a separate track/session, not yet confirmed done — don't build on it until it is. |
-| 1 — Base map | ✅ Done | Mounted directly at `/` in `App.jsx` (no `pages/` wrapper — see `CLAUDE.md` Folder structure note on when to introduce `pages/MapPage.jsx`). Full-bleed for now, no sidebar shell exists yet — swap `left: 0` back to `left: var(--sidebar-total-w)` in `MapShell.module.css` once one lands. `html`/`body` font-family uses `--font-ui`, deviating from a dead literal in legacy CSS — see `CLAUDE.md` Session Context if this needs revisiting. |
-| 2 — Waypoints | 🟨 Partial | Code written, builds clean (`npx vite build`), lints clean — not yet run live end-to-end by a human against the real Supabase project. `src/lib/supabase.js` added (needs `.env.local`, see `.env.example`). `pages/MapPage.jsx` introduced (composes MapShell + WaypointLayer + PlaceCard) — this is the "chrome around the map" CLAUDE.md flagged as the trigger for that file to exist; `App.jsx`'s `/` route now points there instead of MapShell directly. **Deferred to Slice 4:** waypoint→segment photo fallback (a waypoint with no photos of its own no longer borrows its parent segment's photos — needs `segments`/`segment_images` join). **Deferred to Slice 8:** rating badge always renders its empty state — `waypoints` has no `avg_rating`/`review_count` columns; that data will come from a `reviews` table + Postgres trigger that doesn't exist yet. **Deviation:** legacy's photo-thumbnail click called a segment-scoped `openPhoto(idx, segId)` lightbox; since waypoint photos aren't segment-scoped, thumbnails/hero here just `window.open()` the full-res URL directly instead — same end-user result, no Slice-4 dependency. **Deviation:** legacy's plan description said "canvas CircleMarker at low zoom → CSS-dot divIcon at high zoom," but the actual legacy code only ever builds a single `L.divIcon` per waypoint and fakes the zoom-tier look entirely with CSS (`.zoom-far/mid/near/close` opacity/scale rules) — ported what the code does, not the plan's paraphrase. **Deviation:** `PlaceCard.module.css` desktop anchor uses `left: var(--pad-lg)` instead of `var(--sidebar-total-w)` — same placeholder MapShell already uses, since no sidebar shell exists yet; swap both together when one lands. **Font-mapping inference:** `.name` uses `--font-ui`/700 per `BRAND_GUIDELINES.md`'s documented decision (legacy's literal CSS said `'Geist'`/800); `.desc` uses `--font-body` as the closest documented token for prose, since that doc's "Usage pattern" section doesn't explicitly cover the description field — flag if either should be different. |
-| 3 — Legend/filter | ⬜ Not started | |
-| 4 — Saved segments | ⬜ Not started | |
-| 5 — KML import/export | ⬜ Not started | |
+| 0 — Foundation | 🟨 Partial | Tokens, Tailwind `@theme` wiring done. Icon library changed from Bootstrap Icons to `lucide-react` — see `BRAND_GUIDELINES.md` Icons section and `src/lib/legacyIconMap.js`. Fonts are self-hosted but still on static per-weight `@fontsource/*` packages — switch to `@fontsource-variable/*` where available per `BRAND_GUIDELINES.md`, not yet done as of Slice 3. Supabase client wiring (`src/lib/supabase.js`) done as of Slice 2. |
+| 1 — Base map | ✅ Done | `MapPage.jsx` now composes it (introduced in Slice 2). Full-bleed for now — real, unresolved gap: `#map` needs to react to the Slice 3 sidebar's collapsed state, see `CLAUDE.md` Session Context. `html`/`body` font-family uses `--font-ui`, deviating from a dead literal in legacy CSS. |
+| 2 — Waypoints | 🟨 Partial | Code written, builds/lints clean — not yet run live end-to-end by a human against the real Supabase project (Slice 3's live test implies the data pipeline works, but that's inferred, not an explicit sign-off on this row — worth a direct pass). `pages/MapPage.jsx` introduced, composing MapShell + WaypointLayer + PlaceCard. **Deferred to Slice 4:** waypoint→segment photo fallback. **Deferred to Slice 8:** rating badge always renders its empty state (no `avg_rating`/`review_count` columns yet). **Deviation:** photo thumbnails/hero use `window.open()` on the full-res URL directly (legacy's segment-scoped lightbox doesn't apply — waypoint photos aren't segment-scoped). **Deviation:** legacy only ever builds a single `L.divIcon` per waypoint and fakes zoom-tier appearance entirely with CSS (`.zoom-far/mid/near/close`) — ported what the code does, not the plan's "canvas CircleMarker" paraphrase. **Font-mapping inference:** `.name` uses `--font-ui`/700 (legacy's literal CSS said `'Geist'`/800, treated as dead code); `.desc` uses `--font-body` as the closest documented token for prose. **Refactor for Slice 3:** `WaypointLayer` no longer calls `useWaypoints()` itself — `waypoints` is now a prop from `MapPage`, shared with the legend's filter counts, avoiding a duplicate Supabase read. |
+| 3 — Legend/filter | ✅ Done | **Verified live by a human.** Legacy source: `index.html` ~79–522, 611–630, 1133–1154; `app.js` ~3296–3324 (rail), ~5320–5536 (layer panel/opacity/basemap), ~5542–5760 (mobile sheet), ~6154–6301 (place-type filter). New: `src/features/legend/` (`placeTypeGroups.js`, `useTypeVisibility.js`, `PlaceTypeFilter.jsx`, `LayersPanel.jsx`, `Sidebar.jsx`, `MobileSheet.jsx` + `.module.css` each). `PlaceCard.module.css` desktop anchor now correctly `left: var(--sidebar-total-w)` (was a Slice-2 placeholder pending this). **Added:** `.sidebar-footer` (Sign In + Admin toggle) as real-but-inert chrome — Sign In wires up in Slice 10, Admin toggle in Slice 11. GPS/Nav rail buttons + mobile tabs not opening anything yet is expected (Slice 9). **Flagged, ported as-is:** place-type filter's white-background/light-text low-contrast issue (a legacy CSS override conflict) — needs a decision on whether to actually fix or keep matching legacy. **Confirmed pre-existing legacy quirk, not a bug:** legend swatch colors ≠ actual marker pin colors for 8 place types — two separate color maps preserve this faithfully. **Correctly NOT ported (dead code in legacy):** group-header collapse/expand, group-level toggle checkboxes, legend stats strip/ALL-toggle/active-dot. **UI-only for now:** GPS Trail toggle dims its row but controls nothing (trail layer doesn't exist until Slice 9). **Basemap:** only "Light" renders, matching legacy's actual current HTML (no second `.basemap-thumb` exists to select "Dark"). **Deviation:** mobile sheet drag uses Pointer Events instead of legacy's touch/mouse listener pairs; sheet state is component-local instead of `body.mob-sheet-*` classes. **Still open:** the `#map` sidebar-offset gap — see `CLAUDE.md` Session Context, picking this up is now assigned to Slice 4. |
+| 4 — Saved segments | ⬜ Not started | Bundle-size policy (see `CLAUDE.md`) is effective starting this slice. Also owns the `#map` sidebar-offset fix carried over from Slice 3. |
+| 5 — KML import/export | ⬜ Not started | Admin KML upload sub-panel is a lazy-load candidate. |
 | 6 — OSM annotations | ⬜ Not started | |
 | 7 — Search + chips | ⬜ Not started | |
 | 8 — Reviews | ⬜ Not started | |
-| 9 — GPS & Nav | ⬜ Not started | |
-| 10 — Auth | ⬜ Not started | |
-| 11 — Admin panel | ⬜ Not started | |
+| 9 — GPS & Nav | ⬜ Not started | Lazy-load candidate. Also where `manualChunks` vendor-splitting and the `chunkSizeWarningLimit` revert (1000 → 500) land — see `CLAUDE.md`. |
+| 10 — Auth | ⬜ Not started | Lazy-load candidate (auth modal). Wires up the inert Sign In button added in Slice 3. |
+| 11 — Admin panel | ⬜ Not started | Highest-priority lazy-load candidate. Wires up the inert Admin toggle added in Slice 3. |

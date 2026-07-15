@@ -110,6 +110,13 @@ export default function MapShell({ onMapReady }) {
       fillOpacity: 0.04,
     }).addTo(map);
 
+    // Exposed for Slice 3's legend "Campus Bounds" toggle + zoom-to button
+    // (features/legend/LayersPanel.jsx) — same imperative-Leaflet pattern
+    // as legacy's plain top-level `campusBoundaryRect` var, just hung off
+    // the map instance instead of module scope so it travels with
+    // `onMapReady` rather than needing a second callback prop.
+    map._campusBoundaryLayer = campusBoundaryRect;
+
     onMapReady?.(map);
 
     return () => {

@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import './waypointMarkers.css';
 import { buildWaypointMarker } from './waypointMarkers';
-import { useWaypoints } from './useWaypoints';
 import { WP_TYPE_LABELS } from './wpTypeMeta';
 
 /**
@@ -11,17 +10,26 @@ import { WP_TYPE_LABELS } from './wpTypeMeta';
  * `_setupViewportListener`/`_renderViewportMarkers` pair (app.js ~2592–2780,
  * ~3227–3243): only viewport-visible markers get added to the map up front;
  * the rest are lazily added the first time a pan/zoom brings them into view.
- * Markers are never removed once added, same as legacy.
+ * Markers are never removed once added, same as legacy — EXCEPT now that
+ * Slice 3's place-type filter exists, a rendered marker can still be
+ * removed/re-added by `isTypeVisible`, same as legacy's own `_applyVisibility`
+ * (app.js ~6183–6190) toggling `map.hasLayer`/`addTo`/`removeLayer` on
+ * `window._waypointLayers` independently of the viewport-lazy-load pass.
  *
  * TODO Slice 6: legacy gates this whole thing behind `_infoMode` (an
  * information/raw view-mode toggle that doesn't exist yet in this port).
  * Until that toggle lands, waypoints always render.
  *
- * No props needed beyond `map` + `onSelect` — this is a plain feature
- * component, not a route, per CLAUDE.md's folder-structure rule.
+ * `waypoints` is now a prop instead of this component calling
+ * `useWaypoints()` itself — Slice 3's legend needs the same list (for
+ * per-type/per-group counts), and fetching it twice would double the
+ * Supabase read. MapPage now owns the single `useWaypoints()` call.
+ *
+ * `isTypeVisible(type)` comes from Slice 3's `useTypeVisibility` hook
+ * (features/legend), also lifted to MapPage so the legend panel and this
+ * layer share one visibility state instead of drifting out of sync.
  */
-export default function WaypointLayer({ map, onSelect }) {
-  const { waypoints } = useWaypoints();
+export default function WaypointLayer({ map, waypoints, isTypeVisible, onSelect }) {
   const markersRef = useRef([]); // [{ marker, wp }]
 
   // Build markers once per waypoints load and attach them to the map.
@@ -53,14 +61,13 @@ export default function WaypointLayer({ map, onSelect }) {
     });
     markersRef.current = entries;
 
-    // ── Initial paint: only what's in view (+ 20% padding), same as legacy.
+    // ── Initial paint: only what's in view (+ 20% padding) AND type-visible,
+    // same as legacy.
     const bounds = map.getBounds().pad(0.2);
-    let addedCount = 0;
-    for (const { marker } of entries) {
+    for (const { marker, wp } of entries) {
       if (bounds.contains(marker.getLatLng())) {
         marker._rendered = true;
-        marker.addTo(map);
-        addedCount++;
+        if (isTypeVisible(wp.type)) marker.addTo(map);
       }
     }
 
@@ -68,11 +75,11 @@ export default function WaypointLayer({ map, onSelect }) {
     function renderViewportMarkers() {
       const b = map.getBounds().pad(0.3); // legacy uses a wider pad here than the initial paint
       const toAdd = [];
-      for (const { marker } of markersRef.current) {
+      for (const { marker, wp } of markersRef.current) {
         if (marker._rendered) continue;
         if (b.contains(marker.getLatLng())) {
           marker._rendered = true;
-          toAdd.push(marker);
+          if (isTypeVisible(wp.type)) toAdd.push(marker);
         }
       }
       toAdd.forEach((m) => m.addTo(map));
@@ -86,7 +93,22 @@ export default function WaypointLayer({ map, onSelect }) {
       }
       markersRef.current = [];
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, waypoints, onSelect]);
+
+  // ── Re-apply the place-type filter to already-rendered markers whenever
+  // it changes, without touching markers that haven't entered the
+  // viewport yet (those pick up the current filter state the first time
+  // renderViewportMarkers reaches them, above).
+  useEffect(() => {
+    if (!map) return;
+    for (const { marker, wp } of markersRef.current) {
+      if (!marker._rendered) continue;
+      const visible = isTypeVisible(wp.type);
+      if (visible && !map.hasLayer(marker)) marker.addTo(map);
+      else if (!visible && map.hasLayer(marker)) map.removeLayer(marker);
+    }
+  }, [map, isTypeVisible, waypoints]);
 
   return null; // this feature only manipulates the Leaflet map imperatively
 }

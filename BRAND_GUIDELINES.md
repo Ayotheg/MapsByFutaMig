@@ -114,13 +114,36 @@ porting components):
   values, distance/ETA values — anything numeric/technical-looking
 - Place-card name is force-set to `--font-ui`, weight 700
 
-**Exact weights needed (from the Google Fonts import — replicate this list
-when moving to self-hosted `@fontsource` packages):**
-- Inter: 300, 400, 500, 600, 700, 800 (variable, opsz 14–32)
-- Bricolage Grotesque: 400, 500, 600, 700, 800 (variable, opsz 12–96)
-- Poppins: 300, 400, 500, 600, 700, 800
-- Montserrat: 400, 500, 600, 700, 800, 900
-- DM Mono: 400, 500, 600
+**Packages — use the variable-font versions, not per-weight static ones.**
+A variable font ships every weight of a family in a single file, instead of
+downloading a separate static file per weight — same visual result,
+meaningfully smaller payload and fewer network requests. **Not yet applied
+as of Slice 3** — the app currently self-hosts via the static per-weight
+`@fontsource/*` packages; switch to the following next time `index.css`'s
+font imports are touched:
+
+```bash
+npm install @fontsource-variable/inter
+npm install @fontsource-variable/bricolage-grotesque
+npm install @fontsource-variable/montserrat
+# Poppins and DM Mono don't ship variable-font versions on @fontsource —
+# use the standard static packages for just the weights actually used:
+npm install @fontsource/poppins    # weights: 300 400 500 600 700 800
+npm install @fontsource/dm-mono    # weights: 400 500 600
+```
+
+Import only the weight range actually needed, e.g.
+`import '@fontsource-variable/inter/wght.css'` rather than importing every
+static style file individually — check the package's own docs for the exact
+import path, since this differs slightly per package.
+
+**Full weight range needed per family** (for reference/verification against
+whatever's imported):
+- Inter: 300–800 (variable, opsz 14–32)
+- Bricolage Grotesque: 400–800 (variable, opsz 12–96)
+- Montserrat: 400–900 (variable)
+- Poppins: 300, 400, 500, 600, 700, 800 (static — no variable version)
+- DM Mono: 400, 500, 600 (static — no variable version)
 
 ## Icons
 
@@ -133,12 +156,24 @@ is a better fit for the brand's minimal/consistent aesthetic (it's the
 spiritual successor to Feather Icons — strict 24×24 grid, fixed 2px
 stroke, round caps — enforced across ~1,700 icons) while also covering
 more of the campus-specific place-type icons (church, mosque, scooter,
-football, bank) than Heroicons' smaller generic set would.
+football, bank) than Heroicons' smaller generic set would. It's also the
+better choice for bundle size specifically: `lucide-react` is tree-shaken,
+so only the ~26 icons actually imported ship in the final bundle, versus
+an icon-font approach shipping every icon in the library regardless of
+how many are used.
 
 See `src/lib/legacyIconMap.js` in the new repo for the full `bi-name →
 LucideIcon` table. Two icons (`football`, `mosque`) have no confirmed
 Lucide equivalent and need a custom SVG matching Lucide's stroke spec,
 or a decision before they're used in a slice.
+
+**Note from Slice 3:** legend swatch colors and actual marker pin colors
+diverge for several place types (`printing_shop`, `cafe`, `restaurant`,
+`pharmacy`, `barber`, `laundry`, `fuel`, `security_post`) — this is a
+pre-existing legacy inconsistency (distinct legend swatch color, but the
+map pin itself falls back to default teal), not a porting error. Two
+separate color maps exist to preserve this faithfully: `placeTypeGroups.js`
+(legend) vs `wpTypeMeta.js` (map pins).
 
 ## Recurring structural patterns (for shared components, once you hit a second usage)
 
