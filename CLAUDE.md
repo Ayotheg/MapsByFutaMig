@@ -264,16 +264,27 @@ early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** Slice 5 (KML import/export pipeline) —
-  **built this session**, see `MIGRATION_PLAN.md`'s progress tracker for
-  full detail. Builds/lints clean (`npm run build`/`npm run lint`) against
-  a placeholder `.env.local`; **not yet verified live** — see the schema/RLS
-  and admin-trigger-placement flags in that same row, both worth resolving
-  before treating this as done-done. **Slice 6 (OSM annotations) is cleared
-  to start next**, but note it inherits an open item from this session: the
-  KML→OSM dedup block legacy has was intentionally left as a no-op here
-  (nothing to dedupe against yet) — wire it in once Slice 6's OSM layer
-  exists.
+- **Slice being worked on:** Slice 6 (OSM annotations + dedup) — **built
+  this session**, see `MIGRATION_PLAN.md`'s progress tracker for full
+  detail. Builds/lints clean (`npm run build`/`npm run lint`, 0 errors/0
+  warnings) against a placeholder `.env.local`; **not yet run live in a
+  browser** (the Overpass API call itself is untested against a real
+  network response). New folder: `src/features/osm-annotations/`.
+  **Slice 5's KML→OSM dedup no-op is now wired in** — `StaticKmlLayer.jsx`
+  reports its loaded named annotations up via a new `onAnnotationsChange`
+  prop, and receives `dedupSnaps`/`dedupBadges` back down. See the tracker
+  row for the architectural deviation (one reactive dedup direction instead
+  of legacy's two one-shot, load-order-dependent checks) and two
+  pre-existing doc/reality mismatches found (not fixed, out of scope) along
+  the way: the `#map` sidebar-offset gap Slice 3/4 marked "fixed" but isn't
+  actually wired up in `MapShell.module.css`, and `vite.config.js` not
+  actually containing the `chunkSizeWarningLimit: 1000` override this
+  file's Bundle-size section describes. **Slice 7 (Search + Quick Chips) is
+  cleared to start next** (depends on Slices 2, 3, 6 — all now done); its
+  `FUTA_SEARCH` index, once built, is a natural place to eventually fold in
+  the ad-hoc `dedupIndex` this slice builds in `MapPage.jsx` from
+  `waypoints` + `kmlAnnotations` props — not required, but worth a look
+  since it's the same `{id, lat, lng, name, source}` shape.
 - **Schema doc found and linked this session — read before assuming it's
   still "TBD":** `FIREBASE_TO_SUPABASE_MIGRATION.md` has been sitting in
   the repo since the Slice 2 commit with the real target schema, but this

@@ -71,3 +71,14 @@
 .zoom-close .gm-pin-label { opacity: 1; }
 .zoom-close .gm-pin-dot   { transform: scale(1); opacity: 1; }
 .zoom-close .gm-pin-wrap  { opacity: 1; }
+
+/* ── RAW mode kill-switch (Slice 6) ────────────────────────────────────────
+   Ported verbatim from legacy style.css ~2817. Hides every marker built via
+   buildWaypointMarker — waypoints (WaypointLayer), named KML annotations
+   (StaticKmlLayer), and OSM annotations (OSMAnnotationLayer) — since all
+   three render through this same .gm-pin-wrap divIcon. display:none also
+   drops pointer-event interaction, so this alone reproduces legacy's
+   combined CSS+JS-removal raw-mode behavior; see useViewMode.js for why the
+   JS removal half wasn't ported. Unnamed KML dots (plain L.circleMarker,
+   not gm-pin-wrap) are correctly NOT hidden by this rule — same as legacy. */
+:global(body.raw-mode) .gm-pin-wrap { display: none !important; }

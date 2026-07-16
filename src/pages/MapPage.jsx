@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import MapShell from '../features/map/MapShell';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
@@ -10,6 +10,10 @@ import SegmentsLayer from '../features/segments/SegmentsLayer';
 import { useSegments } from '../features/segments/useSegments';
 import StaticKmlLayer from '../features/kml/StaticKmlLayer';
 import ImportTrigger from '../features/kml/ImportTrigger';
+import { useOSMAnnotations } from '../features/osm-annotations/useOSMAnnotations';
+import { useViewMode } from '../features/osm-annotations/useViewMode';
+import OSMAnnotationLayer from '../features/osm-annotations/OSMAnnotationLayer';
+import ViewModeToggle from '../features/osm-annotations/ViewModeToggle';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -44,6 +48,23 @@ export default function MapPage() {
   const { segments, refetch: refetchSegments } = useSegments();
   const selectedSegment = segments.find((s) => s.id === selectedSegmentId) || null;
 
+  // ── Slice 6: OSM annotations + dedup ──────────────────────────────────
+  // `kmlAnnotations` is reported up by StaticKmlLayer as it loads (named
+  // points only); combined with `waypoints` into the live dedup index
+  // `useOSMAnnotations` checks each fetched OSM POI against. See
+  // useOSMAnnotations.js's header comment for why this is reactive rather
+  // than a one-shot check like legacy's.
+  const [kmlAnnotations, setKmlAnnotations] = useState([]);
+  const dedupIndex = useMemo(
+    () => [
+      ...waypoints.map((wp) => ({ id: wp.id, lat: wp.lat, lng: wp.lng, name: wp.name, source: 'waypoint' })),
+      ...kmlAnnotations.map((a) => ({ ...a, source: 'kml' })),
+    ],
+    [waypoints, kmlAnnotations]
+  );
+  const { items: osmItems, snaps: osmSnaps, badgeMerges: osmBadgeMerges } = useOSMAnnotations(dedupIndex);
+  const { viewMode, toggle: toggleViewMode } = useViewMode();
+
   // Legacy: `map.on('click', function() { if (_isOpen) closeCard(); })` —
   // a click on the map background (not a marker, which already stops
   // propagation in WaypointLayer) dismisses the open place card.
@@ -63,12 +84,24 @@ export default function MapPage() {
           waypoints={waypoints}
           isTypeVisible={typeVisibilityProps.isVisible}
           onSelect={setSelected}
+          snaps={osmSnaps}
+          badgeMerges={osmBadgeMerges}
         />
       )}
       {map && (
         <SegmentsLayer map={map} segments={segments} onViewDetails={setSelectedSegmentId} />
       )}
-      {map && <StaticKmlLayer map={map} onSelect={setSelected} />}
+      {map && (
+        <StaticKmlLayer
+          map={map}
+          onSelect={setSelected}
+          onAnnotationsChange={setKmlAnnotations}
+          dedupSnaps={osmSnaps}
+          dedupBadges={osmBadgeMerges}
+        />
+      )}
+      {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={setSelected} />}
+      {!isMobile && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
       <ImportTrigger
         waypoints={waypoints}
         segments={segments}

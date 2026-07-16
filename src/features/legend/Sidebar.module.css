@@ -191,6 +191,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Slice 6: RAW mode dims the Layers panel, ported from legacy's
+   `document.getElementById('panelLayers').style.opacity = '0.3'`
+   (app.js ~3272/3281, applyViewMode). `.panel` is this sidebar's whole
+   #panelLayers equivalent (header + body). */
+:global(body.raw-mode) .panel {
+  opacity: 0.3;
+  transition: opacity 0.2s;
+}
+
 .sidebarFooter {
   position: absolute;
   bottom: 0;
