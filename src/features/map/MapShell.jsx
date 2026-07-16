@@ -7,7 +7,8 @@ import styles from './MapShell.module.css';
 // interaction start/end handling. No other legacy feature (markers,
 // panels, search, etc.) is wired in here — those are separate slices.
 
-const CAMPUS_BOUNDS = L.latLngBounds([7.2820, 5.1080], [7.3120, 5.1680]);
+import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
+
 const CAMPUS_CENTER = [7.2980, 5.1380];
 
 const IS_SAFARI_IOS =

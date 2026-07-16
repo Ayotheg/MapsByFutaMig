@@ -240,7 +240,7 @@ early "just in case."
 | New React app | `github.com/Ayotheg/MapsByFutaMig`, branch `main` |
 | Full feature list + slice order | `MIGRATION_PLAN.md` |
 | Design tokens / brand system | `BRAND_GUIDELINES.md` |
-| Supabase schema/RLS | (link to be added once Phase 1 backend work ships) |
+| Supabase schema/RLS | `FIREBASE_TO_SUPABASE_MIGRATION.md` — its Step 0 SQL is the real target schema. Landed in the Slice 2 commit but sat unlinked here until Slice 5 actually cross-checked `useSegments.js` against it and found real mismatches — see MIGRATION_PLAN.md's Slice 5 row. Still not confirmed against a *live* database (RLS policy state in particular — see that same row). |
 
 ## How to work a slice
 
@@ -264,14 +264,26 @@ early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** Slice 4 (saved segments/routes) — **partially
-  done this session**, see `MIGRATION_PLAN.md`'s progress tracker for full
-  detail. Not yet verified live by a human against real Supabase data
-  (built + `npm run build`/`npm run lint` clean against a placeholder
-  `.env.local`, same caveat Slice 2 flagged for itself). **Slice 5 (KML
-  import/export) is cleared to start next** once Slice 4 gets a live-data
-  pass; Slice 5 now also owns the save modal + export builders originally
-  miscategorized under Slice 4's line range — see below.
+- **Slice being worked on:** Slice 5 (KML import/export pipeline) —
+  **built this session**, see `MIGRATION_PLAN.md`'s progress tracker for
+  full detail. Builds/lints clean (`npm run build`/`npm run lint`) against
+  a placeholder `.env.local`; **not yet verified live** — see the schema/RLS
+  and admin-trigger-placement flags in that same row, both worth resolving
+  before treating this as done-done. **Slice 6 (OSM annotations) is cleared
+  to start next**, but note it inherits an open item from this session: the
+  KML→OSM dedup block legacy has was intentionally left as a no-op here
+  (nothing to dedupe against yet) — wire it in once Slice 6's OSM layer
+  exists.
+- **Schema doc found and linked this session — read before assuming it's
+  still "TBD":** `FIREBASE_TO_SUPABASE_MIGRATION.md` has been sitting in
+  the repo since the Slice 2 commit with the real target schema, but this
+  doc's own "Supabase schema/RLS" link said "TBD" the whole time — nobody
+  had connected the two. Slice 4's `segments`/`segment_images` guess turned
+  out to be *close* but not exact once actually checked against it — see
+  `useSegments.js`'s header comment and the Slice 5 tracker row for the
+  full diff. Lesson for future sessions: check the repo root for a schema
+  doc under any plausible name before assuming one doesn't exist just
+  because this table says so.
 - **Scope correction made this session — read before trusting the plan's
   line ranges blindly elsewhere:** `MIGRATION_PLAN.md`'s Slice 4 entry
   originally pointed at `app.js` ~2033–2306 for "save modal" + export
@@ -301,7 +313,26 @@ early "just in case."
   `openDetailModal`); `index.html` ~757–765 (Slice 4 — detail modal
   markup); `style.css` ~127–144 (`#map` sidebar-offset rules, now ported),
   ~1406–1449, ~1603–1632, ~2669–2684, ~2925–2926, ~3274–3280, ~3646–3652
-  (Slice 4 — modal shell, detail-*, seg-popup, mobile #map/modal overrides).
+  (Slice 4 — modal shell, detail-*, seg-popup, mobile #map/modal overrides);
+  `app.js` ~99–658 (Slice 5 — read in full; only ~99–380 (KML sanitizing
+  helpers + `loadKML`/`bindKmlPopup`/`loadKmlsStaggered`) turned out to be
+  this slice, the rest is debug console/toast/`FUTA_SEARCH` — not ported,
+  see tracker row), ~1696–2306 (Slice 5 — `processImportPipeline`,
+  `parseKMLText`/`parseGPXText`, `openSaveModal`, image handling,
+  `buildGPX`/`buildKML`/`buildGeoJSON`, `saveToFbBtn`), ~1592–1696 (Slice 5
+  — `haversine`/`simplifyPath` Douglas-Peucker helpers, also needed by the
+  not-yet-built Slice 9); `index.html` ~695–757 (Slice 5 — save modal
+  markup); `style.css` ~1450–1601 (Slice 5 — field-group/waypoint-item/
+  image-upload-zone/export-toggle/save-status).
+- **Flagged, not silently decided: where does the KML import trigger live?**
+  Legacy's `#adminImportBtn` sits inside the not-yet-built admin overlay
+  (Slice 11); `Sidebar.jsx`'s `.adminBtn` is reserved chrome for that same
+  slice. This session shipped a standalone floating "Import" button
+  (`features/kml/ImportTrigger.jsx`) as a working stand-in so the pipeline
+  is actually reachable/testable now, rather than blocking the whole slice
+  on Slice 11 or reaching into its reserved chrome. **This needs a decision
+  from the person, or a relocation once Slice 11 lands** — it's not meant
+  to be the final placement.
 - **Dependencies confirmed done:** Slice 0 is partial — tokens, Tailwind
   theme, and icons are done; fonts are self-hosted but still on static
   per-weight packages, not yet switched to variable-font packages (see

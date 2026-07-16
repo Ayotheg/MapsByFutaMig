@@ -1,14 +1,12 @@
-import styles from './DetailModal.module.css';
+import Modal from '../../components/ui/Modal';
+import styles from './Detailmodal.module.css';
 
 /**
  * Ported from legacy `openDetailModal` (app.js ~2797–2852) + `#detailModal`
  * markup (index.html ~757–765).
  *
  * `segment` is the shaped object from useSegments.js, or `null` to render
- * closed. Only the ✕ button dismisses it — legacy never wires a
- * backdrop-click handler for any modal (checked: no `modal-overlay`
- * listener anywhere in app.js), so that's intentionally not added here
- * either.
+ * closed.
  *
  * Photo click: legacy's `onclick="openPhoto(i, seg.id)"` (app.js ~2828)
  * resolves `window.__segments[segId].imageUrls[idx]` and calls
@@ -22,6 +20,11 @@ import styles from './DetailModal.module.css';
  * `.modal-footer` at all (unlike `#saveModal`), confirmed against
  * index.html. Exporting an already-saved segment isn't a legacy feature to
  * port, not an omission here.
+ *
+ * As of Slice 5: overlay/header/close/body-wrapper markup now comes from
+ * the shared `components/ui/Modal` shell (see that file's comment for why
+ * this was the trigger to extract it). Only the body content below is
+ * this component's own.
  */
 export default function DetailModal({ segment, onClose }) {
   if (!segment) return null;
@@ -37,69 +40,58 @@ export default function DetailModal({ segment, onClose }) {
   } = segment;
 
   return (
-    <div className={styles.overlay}>
-      <div className={styles.modal}>
-        <div className={styles.header}>
-          <div className={styles.title}>{name?.toUpperCase()}</div>
-          <button type="button" className={styles.close} onClick={onClose}>
-            ✕
-          </button>
+    <Modal title={name?.toUpperCase()} onClose={onClose}>
+      <div className={styles.section}>
+        <div className={styles.sectionLabel}>Category</div>
+        <span className={styles.badge}>{category}</span>
+      </div>
+
+      {description && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Description</div>
+          <div className={styles.text}>{description}</div>
         </div>
+      )}
 
-        <div className={styles.body}>
-          <div className={styles.section}>
-            <div className={styles.sectionLabel}>Category</div>
-            <span className={styles.badge}>{category}</span>
-          </div>
-
-          {description && (
-            <div className={styles.section}>
-              <div className={styles.sectionLabel}>Description</div>
-              <div className={styles.text}>{description}</div>
-            </div>
-          )}
-
-          <div className={styles.section}>
-            <div className={styles.sectionLabel}>Stats</div>
-            <div className={styles.text}>
-              {((distance || 0) / 1000).toFixed(2)} km · {(points || []).length} GPS points
-            </div>
-          </div>
-
-          {waypoints?.length > 0 && (
-            <div className={styles.section}>
-              <div className={styles.sectionLabel}>Waypoints ({waypoints.length})</div>
-              <div className={styles.waypoints}>
-                {waypoints.map((w) => (
-                  <div key={w.id} className={styles.waypoint}>
-                    <div className={styles.wpName}>📍 {w.name}</div>
-                    {w.desc && <div className={styles.wpDesc}>{w.desc}</div>}
-                    <div className={styles.wpCoord}>
-                      {Number(w.lat).toFixed(6)}, {Number(w.lng).toFixed(6)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {imageUrls?.length > 0 && (
-            <div className={styles.section}>
-              <div className={styles.sectionLabel}>Photos</div>
-              <div className={styles.images}>
-                {imageUrls.map((url) => (
-                  <img
-                    key={url}
-                    src={url}
-                    alt=""
-                    onClick={() => window.open(url, '_blank')}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+      <div className={styles.section}>
+        <div className={styles.sectionLabel}>Stats</div>
+        <div className={styles.text}>
+          {((distance || 0) / 1000).toFixed(2)} km · {(points || []).length} GPS points
         </div>
       </div>
-    </div>
+
+      {waypoints?.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Waypoints ({waypoints.length})</div>
+          <div className={styles.waypoints}>
+            {waypoints.map((w) => (
+              <div key={w.id} className={styles.waypoint}>
+                <div className={styles.wpName}>📍 {w.name}</div>
+                {w.desc && <div className={styles.wpDesc}>{w.desc}</div>}
+                <div className={styles.wpCoord}>
+                  {Number(w.lat).toFixed(6)}, {Number(w.lng).toFixed(6)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {imageUrls?.length > 0 && (
+        <div className={styles.section}>
+          <div className={styles.sectionLabel}>Photos</div>
+          <div className={styles.images}>
+            {imageUrls.map((url) => (
+              <img
+                key={url}
+                src={url}
+                alt=""
+                onClick={() => window.open(url, '_blank')}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

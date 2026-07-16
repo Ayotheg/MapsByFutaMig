@@ -8,6 +8,8 @@ import Sidebar from '../features/legend/Sidebar';
 import MobileSheet from '../features/legend/MobileSheet';
 import SegmentsLayer from '../features/segments/SegmentsLayer';
 import { useSegments } from '../features/segments/useSegments';
+import StaticKmlLayer from '../features/kml/StaticKmlLayer';
+import ImportTrigger from '../features/kml/ImportTrigger';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -37,9 +39,9 @@ export default function MapPage() {
   const [isMobile] = useState(() => window.innerWidth <= 768);
   const [selectedSegmentId, setSelectedSegmentId] = useState(null);
 
-  const { waypoints } = useWaypoints();
+  const { waypoints, refetch: refetchWaypoints } = useWaypoints();
   const typeVisibilityProps = useTypeVisibility(waypoints);
-  const { segments } = useSegments();
+  const { segments, refetch: refetchSegments } = useSegments();
   const selectedSegment = segments.find((s) => s.id === selectedSegmentId) || null;
 
   // Legacy: `map.on('click', function() { if (_isOpen) closeCard(); })` —
@@ -66,6 +68,14 @@ export default function MapPage() {
       {map && (
         <SegmentsLayer map={map} segments={segments} onViewDetails={setSelectedSegmentId} />
       )}
+      {map && <StaticKmlLayer map={map} onSelect={setSelected} />}
+      <ImportTrigger
+        waypoints={waypoints}
+        segments={segments}
+        onSaved={async () => {
+          await Promise.all([refetchWaypoints(), refetchSegments()]);
+        }}
+      />
       <PlaceCard data={selected} onClose={() => setSelected(null)} />
       {selectedSegment && (
         <Suspense fallback={null}>
