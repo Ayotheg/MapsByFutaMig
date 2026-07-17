@@ -52,10 +52,15 @@ const RAIL_ITEMS = [
  * so the rail just collapses to icon-only width, same as if you re-click
  * the already-active tab. Nothing here should be built out further until
  * Slice 9 actually lands their panels.
+ *
+ * `collapsed` was promoted from local state to a controlled prop in
+ * Slice 7: the new floating `DesktopSearchBar`/`QuickChips` need to shift
+ * left in lockstep with the sidebar collapsing (legacy's
+ * `body.sidebar-collapsed .desk-search-bar` rule), so MapPage now owns
+ * this value and passes it down to all three.
  */
-export default function Sidebar({ map, typeVisibilityProps }) {
+export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange }) {
   const [activeKey, setActiveKey] = useState('layers');
-  const [collapsed, setCollapsed] = useState(false);
 
   // Slice 4: reflect collapsed state onto document.body, same
   // classList.toggle('sidebar-collapsed') approach legacy uses
@@ -71,17 +76,17 @@ export default function Sidebar({ map, typeVisibilityProps }) {
   function handleRailClick(item) {
     const isAlreadyActive = activeKey === item.key && !collapsed;
     if (isAlreadyActive) {
-      setCollapsed(true);
+      onCollapsedChange(true);
       return;
     }
     if (!item.hasPanel) {
       // Mirrors legacy: no matching panel element → rail collapses,
       // nothing activates (app.js ~3317: `if (targetPanel) { ... }`).
-      setCollapsed(true);
+      onCollapsedChange(true);
       return;
     }
     setActiveKey(item.key);
-    setCollapsed(false);
+    onCollapsedChange(false);
   }
 
   return (

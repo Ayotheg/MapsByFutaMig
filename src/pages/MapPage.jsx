@@ -14,6 +14,12 @@ import { useOSMAnnotations } from '../features/osm-annotations/useOSMAnnotations
 import { useViewMode } from '../features/osm-annotations/useViewMode';
 import OSMAnnotationLayer from '../features/osm-annotations/OSMAnnotationLayer';
 import ViewModeToggle from '../features/osm-annotations/ViewModeToggle';
+import { useSearchIndex } from '../features/search/useSearchIndex';
+import DesktopSearchBar from '../features/search/DesktopSearchBar';
+import MobileSearchBar from '../features/search/MobileSearchBar';
+import MobileSearchOverlay from '../features/search/MobileSearchOverlay';
+import QuickChips from '../features/search/QuickChips';
+import ChipResultsPanel from '../features/search/ChipResultsPanel';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -43,10 +49,20 @@ export default function MapPage() {
   const [isMobile] = useState(() => window.innerWidth <= 768);
   const [selectedSegmentId, setSelectedSegmentId] = useState(null);
 
-  const { waypoints, refetch: refetchWaypoints } = useWaypoints();
+  const { waypoints, loading: waypointsLoading, refetch: refetchWaypoints } = useWaypoints();
   const typeVisibilityProps = useTypeVisibility(waypoints);
   const { segments, refetch: refetchSegments } = useSegments();
   const selectedSegment = segments.find((s) => s.id === selectedSegmentId) || null;
+
+  // ── Slice 7: search ─────────────────────────────────────────────────
+  // `collapsed`/`sheetState` were promoted out of Sidebar/MobileSheet
+  // (see their own header comments) so the floating search chrome can
+  // shift/collapse in step with them, matching legacy's body-class-driven
+  // CSS coupling without reaching for globals.
+  const [collapsed, setCollapsed] = useState(false);
+  const [sheetState, setSheetState] = useState('peek');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [activeChip, setActiveChip] = useState(null);
 
   // ── Slice 6: OSM annotations + dedup ──────────────────────────────────
   // `kmlAnnotations` is reported up by StaticKmlLayer as it loads (named
@@ -65,6 +81,19 @@ export default function MapPage() {
   const { items: osmItems, snaps: osmSnaps, badgeMerges: osmBadgeMerges } = useOSMAnnotations(dedupIndex);
   const { viewMode, toggle: toggleViewMode } = useViewMode();
 
+  const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations });
+
+  // Legacy: `map.on('click', function() { if (_activeChip) closeResultsPanel(); })`
+  // (app.js ~6857–6859) — a map click also dismisses the place card
+  // (handled by the effect just below); both listen independently, same
+  // as legacy's two separate `map.on('click', ...)` registrations.
+  useEffect(() => {
+    if (!map) return;
+    const handler = () => setActiveChip(null);
+    map.on('click', handler);
+    return () => map.off('click', handler);
+  }, [map]);
+
   // Legacy: `map.on('click', function() { if (_isOpen) closeCard(); })` —
   // a click on the map background (not a marker, which already stops
   // propagation in WaypointLayer) dismisses the open place card.
@@ -74,6 +103,10 @@ export default function MapPage() {
     map.on('click', handler);
     return () => map.off('click', handler);
   }, [map]);
+
+  function handleChipClick(chip) {
+    setActiveChip((prev) => (prev?.label === chip.label ? null : chip));
+  }
 
   return (
     <>
@@ -116,10 +149,58 @@ export default function MapPage() {
         </Suspense>
       )}
       {isMobile ? (
-        <MobileSheet map={map} typeVisibilityProps={typeVisibilityProps} />
+        <MobileSheet
+          map={map}
+          typeVisibilityProps={typeVisibilityProps}
+          sheetState={sheetState}
+          onSheetStateChange={setSheetState}
+        />
       ) : (
-        <Sidebar map={map} typeVisibilityProps={typeVisibilityProps} />
+        <Sidebar map={map} typeVisibilityProps={typeVisibilityProps} collapsed={collapsed} onCollapsedChange={setCollapsed} />
       )}
+
+      {/* ── Slice 7: search ─────────────────────────────────────────── */}
+      {isMobile ? (
+        <>
+          <MobileSearchBar
+            onOpenSearch={() => {
+              setMobileSearchOpen(true);
+              setSheetState('peek');
+            }}
+            onToggleSheet={() => setSheetState((s) => (s === 'peek' ? 'half' : 'peek'))}
+            activeChipLabel={activeChip?.label}
+          />
+          <MobileSearchOverlay
+            open={mobileSearchOpen}
+            map={map}
+            searchIndex={searchIndex}
+            onSelect={setSelected}
+            onClose={() => setMobileSearchOpen(false)}
+          />
+        </>
+      ) : (
+        <DesktopSearchBar
+          map={map}
+          searchIndex={searchIndex}
+          onSelect={setSelected}
+          collapsed={collapsed}
+          onToggleCollapsed={setCollapsed}
+          onManualType={() => setActiveChip(null)}
+          activeChipLabel={activeChip?.label}
+        />
+      )}
+      <QuickChips activeChip={activeChip} onChipClick={handleChipClick} collapsed={collapsed} isMobile={isMobile} />
+      <ChipResultsPanel
+        activeChip={activeChip}
+        waypoints={waypoints}
+        waypointsLoaded={!waypointsLoading}
+        searchIndex={searchIndex}
+        map={map}
+        onSelect={setSelected}
+        onClose={() => setActiveChip(null)}
+        isMobile={isMobile}
+        collapsed={collapsed}
+      />
     </>
   );
 }

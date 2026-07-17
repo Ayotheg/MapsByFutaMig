@@ -16,10 +16,11 @@
  *   const Icon = LEGACY_ICON_MAP['church'];
  *   <Icon size={18} />
  *
- * Two entries are NOT resolved yet — see FLAGGED_ICONS below. Don't
- * guess a substitute when you hit them in a slice; drop in a custom
- * SVG (24x24 viewBox, 2px stroke, round caps/joins, no fill — matches
- * Lucide's spec) or ask before picking a stand-in.
+ * `football` and `mosque` had no confirmed direct Lucide equivalent —
+ * resolved in Slice 7 (at the person's request) with hand-drawn custom
+ * SVGs (`MosqueIcon.jsx`/`FootballIcon.jsx`, same folder) matching
+ * Lucide's own spec (24x24 viewBox, 2px stroke, round caps/joins, no
+ * fill), so they drop into `LEGACY_ICON_MAP` exactly like the rest.
  */
 
 import {
@@ -55,6 +56,8 @@ import {
   Store,          // shop
   X,              // x-lg
 } from 'lucide-react';
+import MosqueIcon from './MosqueIcon';
+import FootballIcon from './FootballIcon';
 
 export const LEGACY_ICON_MAP = {
   'arrow-left': ArrowLeft,
@@ -82,19 +85,15 @@ export const LEGACY_ICON_MAP = {
   'send-fill': Send,
   'shop': Store,
   'x-lg': X,
-  // 'football': FLAGGED — see below
-  // 'mosque':   FLAGGED — see below
+  'football': FootballIcon,
+  'mosque': MosqueIcon,
 };
 
 /**
- * No confirmed direct Lucide equivalent for these two — don't pick a
- * stand-in silently when a slice needs them. Either commission/draw a
- * custom SVG (24x24, 2px stroke, round caps, no fill, matching
- * Lucide's visual spec) or flag it to the person before deciding:
- *
- * - 'football'  (bi-football — soccer ball, used for sports facility
- *   category marker)
- * - 'mosque'    (bi-mosque — used for the mosque place-type marker,
- *   alongside 'church' for the church marker)
+ * Historical note: this used to list 'football'/'mosque' as unresolved —
+ * both now have custom SVGs (see header comment) and are in
+ * LEGACY_ICON_MAP above like everything else. Kept as an empty export
+ * rather than deleted in case a future slice needs the same
+ * flag-before-guessing pattern for a different icon.
  */
-export const FLAGGED_ICONS = ['football', 'mosque'];
+export const FLAGGED_ICONS = [];

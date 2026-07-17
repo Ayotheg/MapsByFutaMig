@@ -1,0 +1,210 @@
+.bar {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .bar {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    top: 14px;
+    left: calc(var(--sidebar-total-w) + 16px);
+    right: 16px;
+    max-width: 580px;
+    margin-left: auto;
+    margin-right: auto;
+    z-index: 1100;
+  }
+  /* NOTE: legacy shifts this with `body.sidebar-collapsed .desk-search-bar
+     { left: calc(--sidebar-rail-w + 16px) }`. Sidebar.jsx's `collapsed`
+     state is passed straight into this component as a prop instead of a
+     body-class global selector — same visual result, React-idiomatic. */
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 52px;
+  background: rgba(11, 19, 38, 0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(77, 67, 84, 0.55);
+  border-radius: 28px;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 6px 22px rgba(0, 0, 0, 0.32),
+    0 14px 48px rgba(0, 0, 0, 0.26),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+  transition:
+    max-width 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+  position: relative;
+}
+.pill:focus-within {
+  border-color: rgba(183, 109, 255, 0.45);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 6px 22px rgba(0, 0, 0, 0.32),
+    0 14px 48px rgba(0, 0, 0, 0.26),
+    0 0 0 2.5px rgba(183, 109, 255, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.logoBtn {
+  flex-shrink: 0;
+  width: 52px;
+  height: 100%;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 28px 0 0 28px;
+  transition: background 0.15s;
+  color: var(--text);
+}
+.logoBtn:hover {
+  background: rgba(183, 109, 255, 0.08);
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  flex-shrink: 0;
+  background: rgba(77, 67, 84, 0.55);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 66px;
+  color: rgba(218, 226, 253, 0.38);
+  pointer-events: none;
+  transition: color 0.2s;
+  z-index: 1;
+}
+.pill:focus-within .searchIcon {
+  color: var(--primary);
+}
+
+.input {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 400;
+  padding: 0 8px 0 40px;
+  caret-color: var(--primary);
+}
+.input::placeholder {
+  color: rgba(218, 226, 253, 0.38);
+}
+
+.clearBtn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  border: none;
+  color: rgba(218, 226, 253, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 4px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.clearBtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--text);
+}
+
+.actionDivider {
+  width: 0;
+}
+
+.navBtn {
+  flex-shrink: 0;
+  width: 42px;
+  height: 38px;
+  margin: 0 7px;
+  background: var(--primary-container);
+  border: none;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(183, 109, 255, 0.45);
+  transition:
+    opacity 0.15s,
+    transform 0.12s,
+    box-shadow 0.2s;
+}
+.navBtn:hover {
+  opacity: 0.9;
+  transform: scale(1.07);
+  box-shadow: 0 4px 18px rgba(183, 109, 255, 0.6);
+}
+.navBtn:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+.dropdown {
+  /* Minor deviation: legacy bleeds this wider than the pill
+     (`left:-53px; right:-57px`) to compensate for the logo/nav button
+     widths eating into the input's horizontal space. Flush edges here
+     read just as well and are simpler to keep in sync with the pill's
+     own border-radius — flag if the wider bleed is wanted back. */
+  position: absolute;
+  top: calc(100% + 10px);
+  left: -1px;
+  right: -1px;
+  background: rgba(11, 19, 38, 0.98);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(77, 67, 84, 0.55);
+  border-radius: 18px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    0 24px 64px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(183, 109, 255, 0.07);
+  z-index: 9999;
+  max-height: 380px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(77, 67, 84, 0.6) transparent;
+  transform-origin: top center;
+  animation: dropIn 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: scaleY(0.91) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
+
+.noResults {
+  text-align: center;
+  padding: 16px 14px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}

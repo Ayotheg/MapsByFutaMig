@@ -264,27 +264,36 @@ early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** Slice 6 (OSM annotations + dedup) — **built
-  this session**, see `MIGRATION_PLAN.md`'s progress tracker for full
-  detail. Builds/lints clean (`npm run build`/`npm run lint`, 0 errors/0
-  warnings) against a placeholder `.env.local`; **not yet run live in a
-  browser** (the Overpass API call itself is untested against a real
-  network response). New folder: `src/features/osm-annotations/`.
-  **Slice 5's KML→OSM dedup no-op is now wired in** — `StaticKmlLayer.jsx`
-  reports its loaded named annotations up via a new `onAnnotationsChange`
-  prop, and receives `dedupSnaps`/`dedupBadges` back down. See the tracker
-  row for the architectural deviation (one reactive dedup direction instead
-  of legacy's two one-shot, load-order-dependent checks) and two
-  pre-existing doc/reality mismatches found (not fixed, out of scope) along
-  the way: the `#map` sidebar-offset gap Slice 3/4 marked "fixed" but isn't
-  actually wired up in `MapShell.module.css`, and `vite.config.js` not
-  actually containing the `chunkSizeWarningLimit: 1000` override this
-  file's Bundle-size section describes. **Slice 7 (Search + Quick Chips) is
-  cleared to start next** (depends on Slices 2, 3, 6 — all now done); its
-  `FUTA_SEARCH` index, once built, is a natural place to eventually fold in
-  the ad-hoc `dedupIndex` this slice builds in `MapPage.jsx` from
-  `waypoints` + `kmlAnnotations` props — not required, but worth a look
-  since it's the same `{id, lat, lng, name, source}` shape.
+- **Slice being worked on:** Slice 7 (Search + Quick Chips) — **built this
+  session**, see `MIGRATION_PLAN.md`'s progress tracker for full detail.
+  Builds/lints clean (`npm run build`/`npm run lint`, 0 errors/0 warnings);
+  **not yet run live in a browser.** New folder: `src/features/search/`.
+  Picked up three deferrals flagged in earlier slices (Slice 4's segment
+  registration, Slice 5/6's waypoint/KML registration) into one
+  `useSearchIndex` hook. Confirmed and skipped two dead-code UI paths
+  (sidebar's invisible `#panelSearch`, and `bindRouteInput`/
+  `#routePlannerBar` which nothing in legacy ever un-hides) — see the
+  tracker row for the call-site tracing behind both. **Slices 8/9/10/11 are
+  now unblocked** (8 depended on 2; 9 depended on 2/3/6 and was already
+  clear; 10/11 are independent of this slice).
+- **Flag for whoever picks up Slice 9 (GPS & Navigation) — a real gap, not
+  this session's job to fix:** mobile has no working view-mode toggle.
+  `ViewModeToggle` (Slice 6) is desktop-only by design, matching legacy's
+  `≤768px{display:none}}` — legacy's mobile equivalent is `#mobViewToggleBtn`
+  inside `.mob-fab-cluster` (style.css ~3352–3411), a floating button
+  cluster that also holds the locate/auth FABs and doesn't exist in this
+  migration yet. It fell through every slice so far because it isn't
+  specific to any one of them. Slice 9 (which needs the locate FAB anyway)
+  is the natural place to build `.mob-fab-cluster` as the shared container
+  and wire `mobViewToggleBtn` into it — don't leave it stranded again.
+- **`lib/legacyIconMap.js`'s `FLAGGED_ICONS` resolved this session** — both
+  `football` and `mosque` (no confirmed Lucide equivalent, open since
+  Slice 2/6) now have hand-drawn custom SVGs (`lib/MosqueIcon.jsx`/
+  `FootballIcon.jsx`, 24×24/2px-stroke/round-caps/no-fill, matching
+  Lucide's own spec) at the person's explicit request. `FLAGGED_ICONS` is
+  now `[]`; if a future slice hits a *different* unmapped `bi-*` icon,
+  same rule still applies — flag before guessing, don't assume this list
+  staying empty means every icon is covered.
 - **Schema doc found and linked this session — read before assuming it's
   still "TBD":** `FIREBASE_TO_SUPABASE_MIGRATION.md` has been sitting in
   the repo since the Slice 2 commit with the real target schema, but this

@@ -24,11 +24,13 @@ import LayersPanel from './LayersPanel';
  *    Pointer Events API (`onPointerDown/Move/Up`) to unify both, same as
  *    the original's own "desktop debugging" mouse fallback intent.
  *  - Legacy toggles `body.mob-sheet-*` classes so OTHER mobile chrome
- *    (FAB cluster, search bar) can react to sheet state too — none of
- *    that exists yet in this migration, so state stays local to this
- *    component for now. If Slice 7 (search)/Slice 9 (GPS FABs) need to
- *    react to sheet position, promote this state up at that point rather
- *    than reaching for body classes.
+ *    (FAB cluster, search bar) can react to sheet state too. Slice 7
+ *    picks this up: `sheetState` is now an optional controlled prop —
+ *    MapPage owns it and passes it down so MobileSearchBar/
+ *    MobileSearchOverlay can collapse/raise the sheet (mirrors
+ *    `#mobMenuBtn` and `openMobSearch()`'s `setSheetState('peek')` in
+ *    app.js ~5838/~5960–5998). Falls back to internal state if unused,
+ *    so nothing else calling this component needs to change.
  *
  * Not ported: GPS/Navigate/Admin tabs are rendered (real legacy chrome)
  * but inert — their panels don't exist until Slice 9/Slice 11. Tapping
@@ -41,8 +43,10 @@ const TABS = [
   { key: 'navigate', label: 'Nav', hasPanel: false },
 ];
 
-export default function MobileSheet({ map, typeVisibilityProps }) {
-  const [sheetState, setSheetState] = useState('peek');
+export default function MobileSheet({ map, typeVisibilityProps, sheetState: controlledSheetState, onSheetStateChange }) {
+  const [internalSheetState, setInternalSheetState] = useState('peek');
+  const sheetState = controlledSheetState ?? internalSheetState;
+  const setSheetState = onSheetStateChange ?? setInternalSheetState;
   const [activeTab, setActiveTab] = useState('layers');
   const [dragTranslate, setDragTranslate] = useState(null); // px, while dragging
   const sheetRef = useRef(null);
@@ -107,7 +111,7 @@ export default function MobileSheet({ map, typeVisibilityProps }) {
       else if (dy > 60) next = sheetState === 'full' ? 'half' : 'peek';
       setSheetState(next);
     },
-    [sheetState]
+    [sheetState, setSheetState]
   );
 
   const handleTabClick = useCallback(
@@ -121,12 +125,12 @@ export default function MobileSheet({ map, typeVisibilityProps }) {
       setActiveTab(tab.key);
       if (sheetState === 'peek') setSheetState('half');
     },
-    [activeTab, sheetState]
+    [activeTab, sheetState, setSheetState]
   );
 
   const handleTap = useCallback(() => {
     setSheetState((s) => (s === 'peek' ? 'half' : s === 'half' ? 'full' : 'peek'));
-  }, []);
+  }, [setSheetState]);
 
   const style =
     dragTranslate != null
