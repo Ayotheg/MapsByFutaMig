@@ -191,6 +191,32 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Generic `.panel-header`/`.panel-title` shell (style.css ~296–309) —
+   distinct from `.panelHeader` above, which is the Layers-only override.
+   Used by the GPS Signal + Navigate panels (Slice 9), which use legacy's
+   plain shared header, not Layers' bespoke one. */
+.panelHeaderGeneric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 14px 14px;
+  border-bottom: 1px solid rgba(77, 67, 84, 0.35);
+  flex-shrink: 0;
+  margin-top: 76px;
+}
+.panelTitleGeneric {
+  font-family: 'Geist', var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.panelHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Slice 6: RAW mode dims the Layers panel, ported from legacy's
    `document.getElementById('panelLayers').style.opacity = '0.3'`
    (app.js ~3272/3281, applyViewMode). `.panel` is this sidebar's whole

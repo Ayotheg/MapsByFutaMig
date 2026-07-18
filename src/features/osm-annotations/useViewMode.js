@@ -28,5 +28,10 @@ export function useViewMode() {
     setViewMode((m) => (m === 'info' ? 'raw' : 'info'));
   }, []);
 
-  return { viewMode, toggle };
+  // Direct setter — Slice 9's navigation feature needs to force RAW mode
+  // when navigation starts and restore whatever mode was active before,
+  // matching legacy's `window._prevInfoMode = _infoMode; _infoMode = false;`
+  // / restore-on-stop (app.js ~5059–5061, ~5160–5161). `toggle()` alone
+  // can't express "set to a specific mode."
+  return { viewMode, toggle, setViewMode };
 }

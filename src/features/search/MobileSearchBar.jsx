@@ -13,8 +13,14 @@ import styles from './MobileSearchBar.module.css';
  * the bottom sheet between peek/half. Reproduced here via `onToggleSheet`,
  * since MobileSheet.jsx's `sheetState` had to be lifted to MapPage anyway
  * for this slice (its own header comment anticipated this).
+ *
+ * `onNavigate` (Slice 9): legacy's `mobNavTrig` click handler (app.js
+ * ~5560ish, wired alongside the other mobile FABs) just switches the
+ * bottom sheet to its "navigate" tab and opens it half-height — it does
+ * NOT itself start navigation, that's what `#panelNavigate`'s own
+ * "START NAVIGATION" button inside that tab is for.
  */
-export default function MobileSearchBar({ onOpenSearch, onToggleSheet, activeChipLabel }) {
+export default function MobileSearchBar({ onOpenSearch, onToggleSheet, onNavigate, activeChipLabel }) {
   return (
     <div className={styles.bar}>
       <button className={styles.logoBtn} onClick={onToggleSheet} title="Menu" type="button">
@@ -24,7 +30,7 @@ export default function MobileSearchBar({ onOpenSearch, onToggleSheet, activeChi
         <Search size={14} className={styles.icon} />
         <span className={styles.placeholder}>{activeChipLabel || 'Search FUTA campus…'}</span>
       </button>
-      <button className={styles.navBtn} title="Navigate" type="button">
+      <button className={styles.navBtn} title="Navigate" type="button" onClick={onNavigate}>
         <Navigation size={16} />
       </button>
     </div>

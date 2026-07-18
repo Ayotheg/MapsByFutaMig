@@ -1,18 +1,20 @@
-/*
- * NOTE — deviation from legacy, flagging per CLAUDE.md:
- * Legacy #map used `left: var(--sidebar-total-w)` (with a
- * `body.sidebar-collapsed` variant at `--sidebar-rail-w`) to leave
- * room for the persistent desktop sidebar. That sidebar doesn't exist
- * yet in this migration (it's implied across the legend/GPS/search
- * panel slices, not built in Slice 1), so this is full-bleed for now.
- * Once the sidebar shell lands, change `left: 0` below to
- * `left: var(--sidebar-total-w)` and reintroduce the
- * `:global(.sidebar-collapsed) &` variant.
+/**
+ * `.map`'s sidebar-offset — genuinely unwired until now. This comment
+ * block (above) had claimed since Slice 1 that "once the sidebar shell
+ * lands, change left: 0 ... to left: var(--sidebar-total-w)" — Slice 4's
+ * tracker entry then claimed that was done, and Slice 6's tracker flagged
+ * that claim as inaccurate after finding `left: 0` still hardcoded here.
+ * Confirmed still true at the start of this session. Fixing it now since
+ * Slice 9 needs to add its own `nav-panel-open` offset to this exact rule
+ * anyway, and layering a second real offset on top of a broken first one
+ * isn't a sane way to do that. Ported from legacy style.css ~86–125
+ * (`#map` + `body.nav-panel-open #map` / `body.nav-panel-
+ * open.sidebar-collapsed #map`).
  */
 .map {
   position: absolute;
   top: 0;
-  left: 0;
+  left: var(--sidebar-total-w);
   right: 0;
   bottom: 0;
   touch-action: none;
@@ -20,6 +22,26 @@
   -webkit-user-select: none;
   transform: translateZ(0);
   contain: strict;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+:global(.sidebar-collapsed) .map {
+  left: var(--sidebar-rail-w);
+}
+:global(.nav-panel-open) .map {
+  left: calc(var(--sidebar-total-w) + 320px);
+}
+:global(.nav-panel-open.sidebar-collapsed) .map {
+  left: calc(var(--sidebar-rail-w) + 320px);
+}
+
+/* Mobile: map is always full-screen — there's no persistent sidebar on
+   mobile at all (Sidebar.jsx doesn't render there), and NavDestPanel
+   becomes a bottom sheet instead of a side panel. */
+@media (max-width: 768px) {
+  .map {
+    left: 0 !important;
+    transition: none !important;
+  }
 }
 
 /*

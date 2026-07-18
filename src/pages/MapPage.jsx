@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import MapShell from '../features/map/MapShell';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
@@ -20,11 +20,28 @@ import MobileSearchBar from '../features/search/MobileSearchBar';
 import MobileSearchOverlay from '../features/search/MobileSearchOverlay';
 import QuickChips from '../features/search/QuickChips';
 import ChipResultsPanel from '../features/search/ChipResultsPanel';
+import { useGpsTracking } from '../features/navigation/useGpsTracking';
+import MobFabCluster from '../features/navigation/MobFabCluster';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
 // lazy-loaded per the exact pattern the policy specifies.
 const DetailModal = lazy(() => import('../features/segments/DetailModal'));
+
+// Slice 9: the actual reason this slice is a lazy-load candidate — OSRM
+// routing, the "Where to?" panel, turn-by-turn HUD, and voice only mount
+// once the user actually opens/starts navigation, matching CLAUDE.md's own
+// bundle-size note for this slice. `useGpsTracking` (imported directly
+// above, NOT lazy) is a deliberately different call — see its own header
+// comment for why the accuracy-gauge/tracking logic has to warm up
+// unconditionally on first paint, matching legacy exactly, while the much
+// heavier Navigation feature behind it does not.
+const NavigationController = lazy(() => import('../features/navigation/NavigationController'));
+
+// Slice 9: ReviewModal was built in Slice 8 with nothing to trigger it —
+// this is that trigger landing. Same lazy tier as DetailModal/SaveModal
+// per ReviewModal.jsx's own wiring instructions.
+const ReviewModal = lazy(() => import('../features/reviews/ReviewModal'));
 
 /**
  * First page-level composition of the map with feature chrome around it.
@@ -42,6 +59,15 @@ const DetailModal = lazy(() => import('../features/segments/DetailModal'));
  * `isMobile()` check (app.js ~5546) — that check also only runs once at
  * script load, not on every resize. Kept as an intentional 1:1 match
  * rather than "improving" it into a resize listener.
+ *
+ * Slice 9 (GPS + Navigation) lands two genuinely different-tier pieces
+ * here: `useGpsTracking` is called directly (non-lazy — its warm-up
+ * watcher has to start on first paint, matching legacy exactly, and its
+ * live state feeds both the sidebar/sheet's GPS panel and the mobile FAB
+ * cluster's locate button), while `NavigationController` (OSRM routing +
+ * the "Where to?" panel + turn-by-turn HUD + voice) is lazy and only
+ * mounted once `navOpen` is set — see its own import comment for why
+ * that split, not "the whole slice," is the real lazy-load boundary.
  */
 export default function MapPage() {
   const [map, setMap] = useState(null);
@@ -61,6 +87,7 @@ export default function MapPage() {
   // CSS coupling without reaching for globals.
   const [collapsed, setCollapsed] = useState(false);
   const [sheetState, setSheetState] = useState('peek');
+  const [sheetActiveTab, setSheetActiveTab] = useState('layers');
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [activeChip, setActiveChip] = useState(null);
 
@@ -79,9 +106,54 @@ export default function MapPage() {
     [waypoints, kmlAnnotations]
   );
   const { items: osmItems, snaps: osmSnaps, badgeMerges: osmBadgeMerges } = useOSMAnnotations(dedupIndex);
-  const { viewMode, toggle: toggleViewMode } = useViewMode();
+  const { viewMode, toggle: toggleViewMode, setViewMode } = useViewMode();
 
   const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations });
+
+  // ── Slice 9: GPS + Navigation ──────────────────────────────────────
+  // `navOpen` gates whether <NavigationController> is mounted at all
+  // (the actual lazy-load boundary — see its import comment above).
+  // `navActive` mirrors legacy's `navActive` flag (true only once a route
+  // is found and turn-by-turn has started, not just while "Where to?" is
+  // open) and is what forces RAW view mode / hides the GPS dot, matching
+  // legacy's `_prevInfoMode` save-restore (app.js ~5058–5063, ~5160–5163).
+  const [navOpen, setNavOpen] = useState(false);
+  const [navActive, setNavActive] = useState(false);
+  const [navSeedDest, setNavSeedDest] = useState(null);
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const navControllerRef = useRef(null);
+  const prevViewModeRef = useRef(null);
+
+  const gps = useGpsTracking(map, { hidden: navActive });
+
+  useEffect(() => {
+    if (navActive) {
+      if (prevViewModeRef.current === null) prevViewModeRef.current = viewMode;
+      if (viewMode !== 'raw') setViewMode('raw');
+    } else if (prevViewModeRef.current !== null) {
+      setViewMode(prevViewModeRef.current);
+      prevViewModeRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navActive]);
+
+  function handleNavLaunch() {
+    if (navOpen) {
+      navControllerRef.current?.requestLaunchToggle();
+    } else {
+      setNavOpen(true);
+    }
+  }
+
+  function handlePlaceCardNavigate(entry) {
+    setNavSeedDest(entry);
+    setNavOpen(true);
+  }
+
+  function handleMobNavTrigger() {
+    setSheetActiveTab('navigate');
+    setSheetState((s) => (s === 'peek' ? 'half' : s));
+  }
 
   // Legacy: `map.on('click', function() { if (_activeChip) closeResultsPanel(); })`
   // (app.js ~6857–6859) — a map click also dismisses the place card
@@ -134,7 +206,7 @@ export default function MapPage() {
         />
       )}
       {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={setSelected} />}
-      {!isMobile && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
+      {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
       <ImportTrigger
         waypoints={waypoints}
         segments={segments}
@@ -142,7 +214,7 @@ export default function MapPage() {
           await Promise.all([refetchWaypoints(), refetchSegments()]);
         }}
       />
-      <PlaceCard data={selected} onClose={() => setSelected(null)} />
+      <PlaceCard data={selected} onClose={() => setSelected(null)} onNavigate={handlePlaceCardNavigate} />
       {selectedSegment && (
         <Suspense fallback={null}>
           <DetailModal segment={selectedSegment} onClose={() => setSelectedSegmentId(null)} />
@@ -154,9 +226,22 @@ export default function MapPage() {
           typeVisibilityProps={typeVisibilityProps}
           sheetState={sheetState}
           onSheetStateChange={setSheetState}
+          activeTab={sheetActiveTab}
+          onActiveTabChange={setSheetActiveTab}
+          gps={gps}
+          navActive={navActive}
+          onNavLaunch={handleNavLaunch}
         />
       ) : (
-        <Sidebar map={map} typeVisibilityProps={typeVisibilityProps} collapsed={collapsed} onCollapsedChange={setCollapsed} />
+        <Sidebar
+          map={map}
+          typeVisibilityProps={typeVisibilityProps}
+          collapsed={collapsed}
+          onCollapsedChange={setCollapsed}
+          gps={gps}
+          navActive={navActive}
+          onNavLaunch={handleNavLaunch}
+        />
       )}
 
       {/* ── Slice 7: search ─────────────────────────────────────────── */}
@@ -168,6 +253,7 @@ export default function MapPage() {
               setSheetState('peek');
             }}
             onToggleSheet={() => setSheetState((s) => (s === 'peek' ? 'half' : 'peek'))}
+            onNavigate={handleMobNavTrigger}
             activeChipLabel={activeChip?.label}
           />
           <MobileSearchOverlay
@@ -201,6 +287,41 @@ export default function MapPage() {
         isMobile={isMobile}
         collapsed={collapsed}
       />
+
+      {/* ── Slice 9: GPS + Navigation ────────────────────────────────── */}
+      {isMobile && (
+        <MobFabCluster
+          sheetState={sheetState}
+          tracking={gps.isTracking}
+          onLocateClick={gps.toggleTracking}
+          onViewToggleClick={toggleViewMode}
+          onAuthClick={() => {
+            /* Slice 10 — auth modal, same inert stub as Sidebar's Sign In */
+          }}
+        />
+      )}
+      {map && navOpen && (
+        <Suspense fallback={null}>
+          <NavigationController
+            ref={navControllerRef}
+            map={map}
+            gps={gps}
+            searchIndex={searchIndex}
+            initialDest={navSeedDest}
+            onRequestClose={() => {
+              setNavOpen(false);
+              setNavSeedDest(null);
+            }}
+            onActiveChange={setNavActive}
+            onArrival={setReviewTarget}
+          />
+        </Suspense>
+      )}
+      {reviewTarget && (
+        <Suspense fallback={null}>
+          <ReviewModal dest={reviewTarget} onClose={() => setReviewTarget(null)} onSubmitted={refetchWaypoints} />
+        </Suspense>
+      )}
     </>
   );
 }

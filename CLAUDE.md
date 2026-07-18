@@ -264,47 +264,49 @@ early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** Slice 8 (Reviews & ratings) — **built this
+- **Slice being worked on:** Slice 9 (GPS & Navigation) — **built this
   session**, see `MIGRATION_PLAN.md`'s progress tracker for full detail.
-  **Build/lint could not be run this session — the sandbox had no network
-  access to `npm install`.** Run `npm run build`/`npm run lint` before
-  trusting this is clean the way Slices 4–7 could confirm live. New
-  folder: `src/features/reviews/`. Real scope correction (same pattern as
-  every slice since 4): the plan's `app.js` ~2613–2743 range for the
-  review modal doesn't actually contain it — that's `loadSavedWaypoints`'s
-  caching helpers; the real modal (`initPoiReview`) is at ~6944–7066.
-  **Schema added to `FIREBASE_TO_SUPABASE_MIGRATION.md`'s new "Step 6"**
-  (`reviews` table + `waypoints.avg_rating`/`review_count` + a recompute
-  trigger) — not yet applied to the live database, and needs an INSERT
-  RLS policy added before submissions will work. **Real, flagged
-  decision:** `ReviewModal` is built but not wired into `MapPage.jsx` —
-  legacy's only trigger is nav arrival (Slice 9, doesn't exist), so
-  there's nothing to hang a provisional button off unlike Slice 5's KML
-  import. `ReviewModal.jsx`'s own header comment has exact wiring
-  instructions for whoever builds Slice 9. **Slice 10 is still blocked on
-  nothing from this slice** (it was already independent); Slice 9 is now
-  the one with real work waiting on this session's schema/component.
-- **Slice 7 (Search + Quick Chips)** — see `MIGRATION_PLAN.md`'s tracker
-  row for full detail. Builds/lints clean (`npm run build`/`npm run
-  lint`, 0 errors/0 warnings) as of that session; **not yet run live in a
-  browser.** Picked up three deferrals flagged in earlier slices (Slice
-  4's segment registration, Slice 5/6's waypoint/KML registration) into
-  one `useSearchIndex` hook. Confirmed and skipped two dead-code UI paths
-  (sidebar's invisible `#panelSearch`, and `bindRouteInput`/
-  `#routePlannerBar` which nothing in legacy ever un-hides) — see the
-  tracker row for the call-site tracing behind both. **Slices 8/9/10/11
-  were unblocked** (8 depended on 2; 9 depended on 2/3/6 and was already
-  clear; 10/11 are independent of this slice).
-- **Flag for whoever picks up Slice 9 (GPS & Navigation) — a real gap, not
-  this session's job to fix:** mobile has no working view-mode toggle.
-  `ViewModeToggle` (Slice 6) is desktop-only by design, matching legacy's
-  `≤768px{display:none}}` — legacy's mobile equivalent is `#mobViewToggleBtn`
-  inside `.mob-fab-cluster` (style.css ~3352–3411), a floating button
-  cluster that also holds the locate/auth FABs and doesn't exist in this
-  migration yet. It fell through every slice so far because it isn't
-  specific to any one of them. Slice 9 (which needs the locate FAB anyway)
-  is the natural place to build `.mob-fab-cluster` as the shared container
-  and wire `mobViewToggleBtn` into it — don't leave it stranded again.
+  Build/lint both run clean this session (`npm run build`/`npm run lint`,
+  0 errors/0 warnings) — sandbox had network access this time. **Not yet
+  run live against real GPS hardware or real OSRM responses.** New
+  folder: `src/features/navigation/` (12 files — see tracker row).
+  `src/features/kml/geoUtils.js` promoted to `src/lib/geoUtils.js` (the
+  "second real usage" its own Slice 5 comment predicted). `ReviewModal`
+  (built Slice 8, unwired) is now actually rendered from `MapPage.jsx`,
+  triggered by nav arrival. `PlaceCard`'s "Navigate Here" button and
+  `MobileSearchBar`'s nav trigger (both inert stubs since Slice 2/7) are
+  now wired. **Two real doc/reality mismatches found and fixed in
+  `vite.config.js` itself, not silently worked around:** (1) no
+  `chunkSizeWarningLimit` override has ever actually existed in this repo
+  (same finding as Slice 6) — nothing to revert; (2) `CLAUDE.md`'s
+  `manualChunks` snippet's object-map form **fails a real `npm run
+  build`** on this repo's actual bundler (Vite 8 + Rolldown, confirmed —
+  `rolldownOptions` is not a typo for `rollupOptions`) — rewritten as the
+  function form Rolldown actually requires, confirmed working via a real
+  build. **Also fixed, `MapShell.module.css`:** the `#map` sidebar-offset
+  gap Slice 4 claimed fixed and Slice 6 confirmed was still actually
+  broken — genuinely wired now (see tracker row for why this session
+  didn't leave it as a third flag-without-fixing). Full detail,
+  rationale, and every other flagged decision (dead-CSS findings, the
+  `useGpsTracking`-vs-`NavigationController` lazy-boundary split, icon
+  choices, the `SearchResultItem`-reuse trade-off) in the tracker row —
+  this slice touched enough files that the tracker row is the source of
+  truth, not this bullet.
+- **Slice 8 (Reviews & ratings)** — see `MIGRATION_PLAN.md`'s tracker row
+  for full detail. Build/lint could not be run in that session (no
+  network); confirmed clean now, in this session, before Slice 9 code was
+  added on top. New folder: `src/features/reviews/`. Schema added to
+  `FIREBASE_TO_SUPABASE_MIGRATION.md`'s "Step 6" — not yet applied to the
+  live database, still needs an INSERT RLS policy added before
+  submissions will actually work. `ReviewModal` was built but deliberately
+  left unwired that session (no trigger existed yet) — Slice 9 (above) is
+  what wired it.
+- **Mobile view-mode toggle gap — resolved this session, not still open.**
+  Slice 7 flagged that mobile had no way to toggle view mode
+  (`ViewModeToggle` is desktop-only by design) and assigned building
+  `.mob-fab-cluster` to whoever picked up Slice 9. Done: `MobFabCluster.jsx`
+  now holds the locate/view-toggle/auth FABs, `#mobViewToggleBtn`'s
+  equivalent wired to the same `toggleViewMode` desktop uses.
 - **`lib/legacyIconMap.js`'s `FLAGGED_ICONS` resolved this session** — both
   `football` and `mosque` (no confirmed Lucide equivalent, open since
   Slice 2/6) now have hand-drawn custom SVGs (`lib/MosqueIcon.jsx`/
@@ -375,7 +377,20 @@ early "just in case."
   only to confirm `patchReviewWithAuth`/`patchNavCountWithAuth` are
   Slice-10-only, not this slice); `index.html` ~1338–1365 (Slice 8 —
   `#reviewModal` markup); `style.css` ~2605–2645, ~4070–4095 (Slice 8 —
-  review modal + rating badge CSS).
+  review modal + rating badge CSS); `app.js` ~1–13 (Slice 9 — top-of-file
+  GPS/nav constants), ~1195–1700 (Slice 9 — accuracy gauge, dead
+  reckoning, warm-up watcher, `onPositionUpdate`), ~4364–5330 (Slice 9 —
+  full Navigation module: OSRM routing, HUD, voice, arrival detection,
+  destination search, mode selector — read in full, not just the plan's
+  narrower ~4333–4650 pointer), ~5556–5840, ~7124, ~7342–7356 (Slice 9 —
+  mobile FAB cluster wiring, `mobAuthBtn` confirmed Slice-10-only),
+  ~5995–6140 (Slice 9 — re-read place-card controller's `onNavigate` opt
+  to confirm the reachable "Navigate Here" call site vs. the KML-preview
+  popup's near-identical one at ~2280–2345, which is Slice 5's); `index.html`
+  ~540–700, ~1110–1155 (Slice 9 — GPS panel/nav dest panel/nav HUD/mobile
+  FAB markup); `style.css` ~86–130, ~414–425, ~610–650, ~804–935,
+  ~2091–2650, ~3250–3410 (Slice 9 — `#map` offset, nav-panel-hint,
+  nav-launch-btn, GPS panel, nav dest panel/HUD, mobile FAB cluster).
 - **Flagged, not silently decided: where does the KML import trigger live?**
   Legacy's `#adminImportBtn` sits inside the not-yet-built admin overlay
   (Slice 11); `Sidebar.jsx`'s `.adminBtn` is reserved chrome for that same

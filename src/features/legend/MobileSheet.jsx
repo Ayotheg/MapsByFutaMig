@@ -1,6 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import styles from './MobileSheet.module.css';
 import LayersPanel from './LayersPanel';
+import NavPanel from '../navigation/NavPanel';
+
+const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
 
 /**
  * Mobile bottom sheet — draggable peek/half/full states with a tab strip,
@@ -32,22 +35,37 @@ import LayersPanel from './LayersPanel';
  *    app.js ~5838/~5960–5998). Falls back to internal state if unused,
  *    so nothing else calling this component needs to change.
  *
- * Not ported: GPS/Navigate/Admin tabs are rendered (real legacy chrome)
- * but inert — their panels don't exist until Slice 9/Slice 11. Tapping
- * them does nothing, matching Sidebar's same rail-button fallback.
+ * GPS Signal and Navigate tabs now render real panels (Slice 9) — same
+ * `GpsPanel`/`NavPanel` desktop's Sidebar uses, same lifted `gps` state.
+ * `activeTab` is now also an optional controlled prop, same pattern as
+ * `sheetState` (Slice 7's own precedent) — needed so `MobileSearchBar`'s
+ * nav trigger can force this sheet onto the "navigate" tab, matching
+ * legacy's `mobNavTrig` handler.
  */
 
 const TABS = [
   { key: 'layers', label: 'Layers', hasPanel: true },
-  { key: 'gps', label: 'Signal', hasPanel: false },
-  { key: 'navigate', label: 'Nav', hasPanel: false },
+  { key: 'gps', label: 'Signal', hasPanel: true },
+  { key: 'navigate', label: 'Nav', hasPanel: true },
 ];
 
-export default function MobileSheet({ map, typeVisibilityProps, sheetState: controlledSheetState, onSheetStateChange }) {
+export default function MobileSheet({
+  map,
+  typeVisibilityProps,
+  sheetState: controlledSheetState,
+  onSheetStateChange,
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
+  gps,
+  navActive,
+  onNavLaunch,
+}) {
   const [internalSheetState, setInternalSheetState] = useState('peek');
   const sheetState = controlledSheetState ?? internalSheetState;
   const setSheetState = onSheetStateChange ?? setInternalSheetState;
-  const [activeTab, setActiveTab] = useState('layers');
+  const [internalActiveTab, setInternalActiveTab] = useState('layers');
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+  const setActiveTab = onActiveTabChange ?? setInternalActiveTab;
   const [dragTranslate, setDragTranslate] = useState(null); // px, while dragging
   const sheetRef = useRef(null);
   const dragRef = useRef(null); // { startY, startTranslate, lastY, lastT, velocity }
@@ -125,7 +143,7 @@ export default function MobileSheet({ map, typeVisibilityProps, sheetState: cont
       setActiveTab(tab.key);
       if (sheetState === 'peek') setSheetState('half');
     },
-    [activeTab, sheetState, setSheetState]
+    [activeTab, sheetState, setSheetState, setActiveTab]
   );
 
   const handleTap = useCallback(() => {
@@ -182,6 +200,12 @@ export default function MobileSheet({ map, typeVisibilityProps, sheetState: cont
           {activeTab === 'layers' && (
             <LayersPanel map={map} typeVisibilityProps={typeVisibilityProps} />
           )}
+          {activeTab === 'gps' && (
+            <Suspense fallback={null}>
+              <GpsPanel gps={gps} embedded />
+            </Suspense>
+          )}
+          {activeTab === 'navigate' && <NavPanel navActive={navActive} onLaunch={onNavLaunch} />}
         </div>
       </div>
     </>

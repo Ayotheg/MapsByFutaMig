@@ -1,0 +1,153 @@
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2200;
+  background: #080f1f;
+  border-bottom: 3px solid var(--primary-container);
+  box-shadow: 0 4px 30px rgba(183, 109, 255, 0.2);
+  animation: navSlideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+  will-change: transform;
+  isolation: isolate;
+}
+@keyframes navSlideDown {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.hud.arriving {
+  border-bottom-color: var(--tertiary);
+}
+.hud.arrived {
+  border-bottom-color: var(--secondary);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.turnIcon {
+  width: 44px;
+  height: 44px;
+  background: rgba(183, 109, 255, 0.12);
+  border: 2px solid var(--primary-container);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  transition: all 0.3s;
+  box-shadow: 0 0 16px rgba(183, 109, 255, 0.2);
+}
+.turnInfo {
+  flex: 1;
+  min-width: 0;
+}
+.turnInstruction {
+  font-family: 'Geist', var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.turnDist {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--primary);
+  margin-top: 2px;
+}
+.voiceBtn {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px 9px;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.closeBtn {
+  background: rgba(255, 180, 171, 0.1);
+  border: 1px solid rgba(255, 180, 171, 0.3);
+  color: var(--error);
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  flex-shrink: 0;
+  letter-spacing: 0.08em;
+}
+.closeBtn:hover {
+  background: rgba(255, 180, 171, 0.22);
+}
+
+.nextPreview {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 2px 16px 6px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats {
+  display: flex;
+  padding: 8px 16px;
+}
+.stat {
+  flex: 1;
+  text-align: center;
+  padding: 4px 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+.stat:last-child {
+  border-right: none;
+}
+.statSingle {
+  border-right: none;
+  padding: 4px 0 6px;
+}
+.statSingle .statVal {
+  font-size: 18px;
+  color: var(--primary);
+}
+.statLabel {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: rgba(218, 226, 253, 0.35);
+  letter-spacing: 0.12em;
+  margin-bottom: 2px;
+}
+.statVal {
+  font-family: 'Geist', var(--font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.destName {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: rgba(218, 226, 253, 0.3);
+  text-align: center;
+  padding: 4px 16px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

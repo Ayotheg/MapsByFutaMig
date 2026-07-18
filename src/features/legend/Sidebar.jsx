@@ -1,6 +1,14 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
+import NavPanel from '../navigation/NavPanel';
+
+// Slice 9: GPS Signal isn't open by default (only Layers is), so per
+// CLAUDE.md's bundle-size policy it's lazy-loaded like DetailModal/
+// SaveModal — the always-on tracking logic itself (`useGpsTracking`) is
+// a different concern and stays non-lazy in MapPage, see its own header
+// comment for why.
+const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
 
 // ── Rail button icons, copied verbatim from legacy index.html inline SVGs
 // (~96–119) rather than swapped for a lucide-react equivalent, since these
@@ -34,8 +42,8 @@ function NavigateIcon() {
 
 const RAIL_ITEMS = [
   { key: 'layers', label: 'Layers', title: 'Layers', Icon: LayersIcon, hasPanel: true },
-  { key: 'gps', label: 'Signal', title: 'GPS Signal', Icon: SignalIcon, hasPanel: false },
-  { key: 'navigate', label: 'Nav', title: 'Navigate', Icon: NavigateIcon, hasPanel: false },
+  { key: 'gps', label: 'Signal', title: 'GPS Signal', Icon: SignalIcon, hasPanel: true },
+  { key: 'navigate', label: 'Nav', title: 'Navigate', Icon: NavigateIcon, hasPanel: true },
 ];
 
 /**
@@ -45,13 +53,10 @@ const RAIL_ITEMS = [
  * through the open of `#panelLayers`) and `app.js`'s `initSidebarRail`
  * IIFE (~3296–3324) for the rail's click/collapse behavior.
  *
- * Only the Layers panel has content this slice — GPS Signal (Slice 9) and
- * Navigate (Slice 9) rail buttons are rendered (they're real chrome in
- * legacy, not invented) but `hasPanel: false` for both, so clicking them
- * reproduces legacy's exact fallback: `targetPanel` resolves to nothing,
- * so the rail just collapses to icon-only width, same as if you re-click
- * the already-active tab. Nothing here should be built out further until
- * Slice 9 actually lands their panels.
+ * Only the Layers panel had content before Slice 9 — GPS Signal and
+ * Navigate now render real panels too (`GpsPanel`/`NavPanel`), wired to
+ * the `gps`/nav-launch state MapPage lifts from `useGpsTracking` and
+ * `NavigationController`.
  *
  * `collapsed` was promoted from local state to a controlled prop in
  * Slice 7: the new floating `DesktopSearchBar`/`QuickChips` need to shift
@@ -59,7 +64,7 @@ const RAIL_ITEMS = [
  * `body.sidebar-collapsed .desk-search-bar` rule), so MapPage now owns
  * this value and passes it down to all three.
  */
-export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange }) {
+export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch }) {
   const [activeKey, setActiveKey] = useState('layers');
 
   // Slice 4: reflect collapsed state onto document.body, same
@@ -134,6 +139,25 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
           </div>
           <div className={styles.panelBody}>
             <LayersPanel map={map} typeVisibilityProps={typeVisibilityProps} />
+          </div>
+        </div>
+      )}
+
+      {!collapsed && activeKey === 'gps' && (
+        <div className={styles.panel}>
+          <Suspense fallback={null}>
+            <GpsPanel gps={gps} />
+          </Suspense>
+        </div>
+      )}
+
+      {!collapsed && activeKey === 'navigate' && (
+        <div className={styles.panel}>
+          <div className={styles.panelHeaderGeneric}>
+            <span className={styles.panelTitleGeneric}>Navigate</span>
+          </div>
+          <div className={styles.panelBody}>
+            <NavPanel navActive={navActive} onLaunch={onNavLaunch} />
           </div>
         </div>
       )}

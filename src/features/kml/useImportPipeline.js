@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
-import { haversine, simplifyPath } from './geoUtils';
+import { haversine, simplifyPath } from '../../lib/geoUtils';
 import { parseKMLText, parseGPXText } from './parsers';
 
 /**

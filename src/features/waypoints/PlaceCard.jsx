@@ -40,7 +40,7 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  * full-res image in a new tab directly — same end result, no dependency on
  * Slice 4's segment registry. Revisit if a proper in-app lightbox is wanted.
  */
-export default function PlaceCard({ data, onClose }) {
+export default function PlaceCard({ data, onClose, onNavigate }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [dragY, setDragY] = useState(0);
   const dragging = useRef(false);
@@ -172,9 +172,19 @@ export default function PlaceCard({ data, onClose }) {
         )}
 
         <div className={styles.actions}>
-          {/* TODO Slice 9: legacy wires this to window.NAV.navigateTo(...);
-              no navigation module exists yet, so it's a no-op for now. */}
-          <button className={styles.navBtn} disabled title="Navigation lands in Slice 9">
+          {/* Ported from legacy's live place-card controller
+              (app.js ~5995–6140, `onNavigate` opt): `window.openPlaceCard({
+              ..., onNavigate: () => window.NAV.navigateTo({lat,lng,name,id,type}) })`.
+              MapPage wires this to NavigationController's seed-destination
+              path (the same one `window.NAV.navigateTo` fed in legacy). */}
+          <button
+            className={styles.navBtn}
+            title="Navigate here"
+            onClick={() => {
+              onNavigate?.({ lat: data.lat, lng: data.lng, name: data.name, id: data.id, type: data.type });
+              onClose();
+            }}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="3 11 22 2 13 21 11 13 3 11" />
             </svg>
