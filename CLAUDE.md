@@ -264,17 +264,36 @@ early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** Slice 7 (Search + Quick Chips) — **built this
+- **Slice being worked on:** Slice 8 (Reviews & ratings) — **built this
   session**, see `MIGRATION_PLAN.md`'s progress tracker for full detail.
-  Builds/lints clean (`npm run build`/`npm run lint`, 0 errors/0 warnings);
-  **not yet run live in a browser.** New folder: `src/features/search/`.
-  Picked up three deferrals flagged in earlier slices (Slice 4's segment
-  registration, Slice 5/6's waypoint/KML registration) into one
-  `useSearchIndex` hook. Confirmed and skipped two dead-code UI paths
+  **Build/lint could not be run this session — the sandbox had no network
+  access to `npm install`.** Run `npm run build`/`npm run lint` before
+  trusting this is clean the way Slices 4–7 could confirm live. New
+  folder: `src/features/reviews/`. Real scope correction (same pattern as
+  every slice since 4): the plan's `app.js` ~2613–2743 range for the
+  review modal doesn't actually contain it — that's `loadSavedWaypoints`'s
+  caching helpers; the real modal (`initPoiReview`) is at ~6944–7066.
+  **Schema added to `FIREBASE_TO_SUPABASE_MIGRATION.md`'s new "Step 6"**
+  (`reviews` table + `waypoints.avg_rating`/`review_count` + a recompute
+  trigger) — not yet applied to the live database, and needs an INSERT
+  RLS policy added before submissions will work. **Real, flagged
+  decision:** `ReviewModal` is built but not wired into `MapPage.jsx` —
+  legacy's only trigger is nav arrival (Slice 9, doesn't exist), so
+  there's nothing to hang a provisional button off unlike Slice 5's KML
+  import. `ReviewModal.jsx`'s own header comment has exact wiring
+  instructions for whoever builds Slice 9. **Slice 10 is still blocked on
+  nothing from this slice** (it was already independent); Slice 9 is now
+  the one with real work waiting on this session's schema/component.
+- **Slice 7 (Search + Quick Chips)** — see `MIGRATION_PLAN.md`'s tracker
+  row for full detail. Builds/lints clean (`npm run build`/`npm run
+  lint`, 0 errors/0 warnings) as of that session; **not yet run live in a
+  browser.** Picked up three deferrals flagged in earlier slices (Slice
+  4's segment registration, Slice 5/6's waypoint/KML registration) into
+  one `useSearchIndex` hook. Confirmed and skipped two dead-code UI paths
   (sidebar's invisible `#panelSearch`, and `bindRouteInput`/
   `#routePlannerBar` which nothing in legacy ever un-hides) — see the
-  tracker row for the call-site tracing behind both. **Slices 8/9/10/11 are
-  now unblocked** (8 depended on 2; 9 depended on 2/3/6 and was already
+  tracker row for the call-site tracing behind both. **Slices 8/9/10/11
+  were unblocked** (8 depended on 2; 9 depended on 2/3/6 and was already
   clear; 10/11 are independent of this slice).
 - **Flag for whoever picks up Slice 9 (GPS & Navigation) — a real gap, not
   this session's job to fix:** mobile has no working view-mode toggle.
@@ -343,7 +362,20 @@ early "just in case."
   — `haversine`/`simplifyPath` Douglas-Peucker helpers, also needed by the
   not-yet-built Slice 9); `index.html` ~695–757 (Slice 5 — save modal
   markup); `style.css` ~1450–1601 (Slice 5 — field-group/waypoint-item/
-  image-upload-zone/export-toggle/save-status).
+  image-upload-zone/export-toggle/save-status); `app.js` ~2420–2456
+  (Slice 8 — `POI_RATEABLE_TYPES`/`isRateablePOI`/`_ratingBadgeHtml`,
+  matched the plan's line range fine), ~2590–2760 (Slice 8 — traced to
+  confirm the plan's "~2613–2743 review modal" range was actually
+  `loadSavedWaypoints`/cache helpers, not reviews — already covered by
+  Slice 2, not re-ported here), ~4930–4975 (Slice 8 — read only to
+  confirm `arrivedAtDestination`/`finishArrival`'s `POI_REVIEW.open(...)`
+  call site; not ported, that's Slice 9), ~6934–7066 (Slice 8 — the real
+  `initPoiReview()` review modal, found via `grep -n -i review app.js`
+  after the plan's own range came up empty), ~7423–7484 (Slice 8 — read
+  only to confirm `patchReviewWithAuth`/`patchNavCountWithAuth` are
+  Slice-10-only, not this slice); `index.html` ~1338–1365 (Slice 8 —
+  `#reviewModal` markup); `style.css` ~2605–2645, ~4070–4095 (Slice 8 —
+  review modal + rating badge CSS).
 - **Flagged, not silently decided: where does the KML import trigger live?**
   Legacy's `#adminImportBtn` sits inside the not-yet-built admin overlay
   (Slice 11); `Sidebar.jsx`'s `.adminBtn` is reserved chrome for that same
@@ -378,11 +410,13 @@ early "just in case."
   backend work ships" still hasn't happened) — `useSegments.js` will
   throw/error at runtime if the actual table/column names differ. Verify
   before Slice 5 builds the save-flow insert on top of it. Separately:
-  `waypoints` has no `avg_rating`/`review_count` columns — those need
-  adding as part of Slice 8 alongside a `reviews` table and a recompute
-  trigger (replacing legacy's client-side rolling-average
-  `tx.update(wpRef, {avgRating, reviewCount})`, which was correctly
-  flagged as race-prone during backend planning).
+  `waypoints`' `avg_rating`/`review_count` columns + a `reviews` table +
+  recompute trigger (replacing legacy's client-side rolling-average
+  `tx.update(wpRef, {avgRating, reviewCount})`, correctly flagged as
+  race-prone during backend planning) are now **designed** by Slice 8 —
+  see `FIREBASE_TO_SUPABASE_MIGRATION.md`'s "Step 6" for the actual SQL —
+  but **not yet run against the live database**, same "designed, not
+  applied" situation Slice 4/5 already flagged for their own tables.
   `numeric` columns (`lat`/`lng`/`distance`/`duration` etc.) come back as
   strings over PostgREST — always `Number()`-coerce before using them.
 - **Anything unusual carried over from earlier sessions:**

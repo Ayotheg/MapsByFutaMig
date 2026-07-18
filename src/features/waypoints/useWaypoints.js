@@ -29,7 +29,9 @@ export function useWaypoints() {
       await Promise.all([
         supabase
           .from('waypoints')
-          .select('id, name, description, type, lat, lng, source_type, segment_id'),
+          .select(
+            'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count'
+          ),
         supabase
           .from('waypoint_images')
           .select('waypoint_id, storage_path, position')
@@ -82,6 +84,13 @@ export function useWaypoints() {
         sourceType: wp.source_type,
         segmentId: wp.segment_id,
         imageUrls: imagesByWaypoint[wp.id] || [],
+        // Slice 8: `avg_rating` is a nullable `numeric` column — no reviews
+        // yet means `null`, not `0`, same as legacy's Firestore doc simply
+        // not having an `avgRating` field until the first review lands.
+        // PostgREST returns numeric columns as strings — coerce here, same
+        // rule as lat/lng above.
+        avgRating: wp.avg_rating != null ? Number(wp.avg_rating) : null,
+        reviewCount: Number(wp.review_count) || 0,
       });
     }
 

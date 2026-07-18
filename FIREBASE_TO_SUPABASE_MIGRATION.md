@@ -422,6 +422,84 @@ just need the Google OAuth client re-registered under Supabase Auth
 
 ---
 
+## Step 6 — Slice 8: reviews table + rating rollup
+
+Not part of the original Firestore migration (`reviews` didn't exist as a
+collection until legacy's `initPoiReview()`, app.js ~6944 — it wrote
+directly into a Firestore `reviews` collection with no matching Step 0
+table here). Added now because Slice 8 needs it. Run this in the Supabase
+SQL Editor:
+
+```sql
+create table reviews (
+  id           bigserial primary key,
+  waypoint_id  text not null references waypoints(id) on delete cascade,
+  rating       smallint not null check (rating between 1 and 5),
+  comment      text,
+  created_at   timestamptz not null default now()
+);
+
+alter table waypoints
+  add column avg_rating   numeric(3,2),
+  add column review_count integer not null default 0;
+
+-- Replaces legacy's client-side `db.runTransaction(...)` rolling average
+-- (app.js ~7033–7043) — flagged during backend planning as race-prone
+-- under concurrent submissions. A trigger recomputes both columns from
+-- the actual row count/average every time a review is inserted, so it
+-- can never drift from the underlying data regardless of how many
+-- reviews land concurrently.
+create or replace function recompute_waypoint_rating() returns trigger as $$
+begin
+  update waypoints
+  set
+    review_count = (select count(*) from reviews where waypoint_id = new.waypoint_id),
+    avg_rating   = (select round(avg(rating)::numeric, 2) from reviews where waypoint_id = new.waypoint_id)
+  where id = new.waypoint_id;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger reviews_after_insert
+  after insert on reviews
+  for each row execute function recompute_waypoint_rating();
+
+alter table reviews enable row level security;
+```
+
+**Deliberate deviation from the Step 0 table's shape, flagged:** no
+`place_name`/`place_type` columns on `reviews`, even though legacy's
+Firestore doc stored both (`placeName`/`placeType`, app.js
+~7019–7020) alongside `waypointId`. Same reasoning this doc already
+applied to segments' denormalized `segmentName` (see "Decision to
+confirm" note near the top) — join to `waypoints` via `waypoint_id`
+instead of duplicating data that can drift. Flag if the denormalized
+copy was actually wanted (e.g. so a review survives its waypoint being
+deleted) — `on delete cascade` above means a deleted waypoint takes its
+reviews with it, matching legacy having no independent way to look up a
+review once its waypoint doc was gone either.
+
+**Not carried over, out of scope for Slice 8 — see `patchReviewWithAuth`,
+app.js ~7426–7471:** legacy also bumps a `users/{uid}.reviewCount` field
+on submit, but only once `window.FUTA_USER` exists (Slice 10's auth
+module). No `user_id` column is added to `reviews` here — there's no
+`auth.users` row to reference yet, and guessing at that shape now risks
+being wrong once Slice 10 actually designs auth. Slice 10 should `alter
+table reviews add column user_id uuid references auth.users(id)`
+(nullable, so existing anonymous rows stay valid) when it actually
+builds that hook.
+
+**RLS — needs a real policy before the submit flow will work, same
+caveat as Slice 5's segment inserts:** `reviews` has RLS enabled above
+but no policies yet. Add a public **INSERT** policy (anon key, no
+Slice-10 auth exists yet to gate it further) in the dashboard before
+testing live. No **SELECT** policy is needed for this slice — legacy
+never renders individual review rows/comments anywhere, only the
+aggregate `avgRating`/`reviewCount` badge, and those two columns live on
+`waypoints`, which already has a public SELECT policy from Slice 2.
+
+---
+
 ## Verification checklist
 
 - [ ] Row counts match: Firestore collection doc count == Postgres table row count (`select count(*) from segments;` vs. Firestore console's collection count)

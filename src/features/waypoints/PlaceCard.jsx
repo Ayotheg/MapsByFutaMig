@@ -3,21 +3,36 @@ import styles from './PlaceCard.module.css';
 import { isRateablePOI } from './wpTypeMeta';
 
 // ── Rating badge ─────────────────────────────────────────────────────────
-// TODO Slice 8: `waypoints` has no avg_rating/review_count columns yet —
-// that data lives in a `reviews` table + Postgres trigger that hasn't been
-// built. Every rateable POI shows the empty state until then; non-rateable
-// types show nothing at all, matching legacy `_ratingBadgeHtml`.
-function RatingBadge({ type }) {
+// Ported from legacy `_ratingBadgeHtml` (app.js ~2450–2456), now that
+// Slice 8 added `avg_rating`/`review_count` (via `useWaypoints.js` reading
+// the new columns) + the `reviews` table/trigger that populates them (see
+// FIREBASE_TO_SUPABASE_MIGRATION.md's "Step 6"). Non-rateable types render
+// nothing at all, matching legacy exactly.
+function RatingBadge({ type, avgRating, reviewCount }) {
   if (!isRateablePOI(type)) return null;
+  const count = reviewCount || 0;
+  if (!count) {
+    return (
+      <span className={styles.ratingEmpty}>☆ No reviews yet — be the first!</span>
+    );
+  }
+  const avg = (avgRating || 0).toFixed(1);
   return (
-    <span className={styles.ratingEmpty}>☆ No reviews yet — be the first!</span>
+    <span className={styles.ratingFilled}>
+      ★ {avg}{' '}
+      <span className={styles.ratingCount}>
+        ({count} review{count === 1 ? '' : 's'})
+      </span>
+    </span>
   );
 }
 
 /**
  * Google Maps-style place card. `data` is the same shape legacy's
  * `window.openPlaceCard(opts)` accepted: { name, badge, description, lat,
- * lng, imageUrls, id, type }. Pass `data={null}` to render closed.
+ * lng, imageUrls, id, type }, plus Slice 8's { avgRating, reviewCount }
+ * (from `useWaypoints.js`'s `avg_rating`/`review_count` columns) for the
+ * rating badge. Pass `data={null}` to render closed.
  *
  * Photo full-view: legacy's thumbnail click called a segment-scoped
  * `openPhoto(idx, segmentId)` lightbox. Waypoint photos aren't
@@ -119,7 +134,7 @@ export default function PlaceCard({ data, onClose }) {
             <h2 className={styles.name}>{data?.name || 'Location'}</h2>
             {data?.badge && <div className={styles.badge}>{data.badge}</div>}
             <div className={styles.rating}>
-              <RatingBadge type={data?.type} />
+              <RatingBadge type={data?.type} avgRating={data?.avgRating} reviewCount={data?.reviewCount} />
             </div>
           </div>
           <button className={styles.close} aria-label="Close" onClick={onClose}>

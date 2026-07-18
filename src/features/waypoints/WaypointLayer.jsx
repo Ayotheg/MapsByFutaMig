@@ -58,6 +58,9 @@ export default function WaypointLayer({ map, waypoints, isTypeVisible, onSelect,
         imageUrls: wp.imageUrls,
         id: wp.id,
         type: wp.type,
+        // Slice 8: rating badge data — see PlaceCard.jsx's RatingBadge.
+        avgRating: wp.avgRating,
+        reviewCount: wp.reviewCount,
       };
       marker.on('click', (e) => {
         // Leaflet bubbles marker clicks up to the map's own 'click' event

@@ -200,6 +200,27 @@
   letter-spacing: 0.08em;
 }
 
+/* Slice 8: legacy's literal `#FFC857` (style.css ~4081, ~2626) — a star
+   gold that isn't one of BRAND_GUIDELINES.md's documented tokens (closest
+   is --tertiary at #ffb95f, a visibly different amber). Kept as a literal
+   here rather than substituting the nearest token, same call this file's
+   .name/.desc font-mapping notes already made for undocumented legacy
+   values — flag if a token should be added for this instead. */
+.ratingFilled {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffc857;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ratingCount {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 9px;
+}
+
 .close {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
