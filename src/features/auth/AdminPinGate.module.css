@@ -1,0 +1,153 @@
+/*
+ * Legacy source: style.css ~3792–3899 (`.admin-pin-modal`/`.pin-*`),
+ * `#adminPinOverlay { z-index: 10001 }`. Reuses `components/ui/Modal`'s
+ * generic `.overlay` positioning values (fixed/inset/flex-center) since
+ * legacy's `#adminPinOverlay` shares that same base — but z-index is
+ * bumped above the shared Modal's 2000 and above the auth modal's 9100,
+ * matching legacy exactly (this pad has to sit on top of everything,
+ * including a possible auth modal underneath it during the "sign in
+ * first" flow in useAdminPin.js).
+ *
+ * `.pin-key`'s legacy `color: var(--text-primary)` referenced a token
+ * that's never defined anywhere in style.css (grep-confirmed) and has no
+ * inline fallback — per CSS spec an undefined var() with no fallback
+ * computes to the property's inherited value, which for `color` resolves
+ * up to `body`'s `--text` (src/index.css). Ported as `var(--text)`
+ * directly — this is the actual pixel-accurate rendered color, not a
+ * substitution guess.
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  outline: none;
+}
+
+.modal {
+  background: #0e1628;
+  border-radius: var(--r-xl);
+  width: 100%;
+}
+
+.pinModal {
+  max-width: 320px;
+  padding: 0;
+  border: 1px solid rgba(183, 109, 255, 0.2);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(221, 183, 255, 0.06);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  padding: 24px 24px 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--primary);
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding-bottom: 20px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+}
+
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding-bottom: 10px;
+}
+
+.dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(183, 109, 255, 0.4);
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.dot.filled {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.dot.error {
+  border-color: #ff4d6d;
+  background: #ff4d6d;
+  animation: pinShake 0.35s ease;
+}
+@keyframes pinShake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-4px); }
+  40%      { transform: translateX(4px); }
+  60%      { transform: translateX(-4px); }
+  80%      { transform: translateX(4px); }
+}
+
+.errorMsg {
+  text-align: center;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: #ff4d6d;
+  padding: 6px 0 4px;
+  letter-spacing: 0.04em;
+  min-height: 22px;
+}
+.errorMsg.hidden {
+  visibility: hidden;
+}
+
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: rgba(183, 109, 255, 0.08);
+  border-top: 1px solid rgba(183, 109, 255, 0.1);
+  margin-top: 12px;
+}
+
+.key {
+  background: #0e1628;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  padding: 18px;
+  cursor: pointer;
+  transition: background 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.key:hover,
+.key:active {
+  background: rgba(183, 109, 255, 0.15);
+  color: var(--primary);
+}
+.cancel,
+.back {
+  font-size: 16px;
+  color: var(--muted);
+}
+.cancel:hover,
+.cancel:active {
+  background: rgba(255, 77, 109, 0.12);
+  color: #ff4d6d;
+}

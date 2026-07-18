@@ -64,6 +64,19 @@
   box-shadow: 0 3px 12px rgba(183, 109, 255, 0.45);
 }
 
+/* ── Auth FAB signed-in state (Slice 10), legacy style.css ~3399–3410 ── */
+.signedIn {
+  background: rgba(183, 109, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(183, 109, 255, 0.35);
+}
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--primary);
+}
+
 @media (min-width: 769px) {
   .cluster {
     display: none;

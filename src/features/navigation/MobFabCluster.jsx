@@ -11,16 +11,31 @@ import styles from './MobFabCluster.module.css';
  * established this "controlled prop, not body class" convention for
  * sheet state).
  *
- * `onAuthClick` is inert for now — Slice 10's job (legacy opens the auth
- * modal / toggles a signed-in avatar here, app.js ~5765–5783, ~7342–7356).
- * Sidebar.jsx's `SIDEBAR_FOOTER_ACTIONS`/"Sign In" button is the same
- * kind of intentional stub; kept consistent with that precedent.
+ * `onAuthClick`/`user` (Slice 10): wired now — legacy's
+ * `updateSidebarBtn`'s mobile-FAB mirror (app.js ~7341–7360) swaps the
+ * plain icon for the user's avatar (or initials, no avatar case) once
+ * signed in, matching `.mob-fab--auth.signed-in`/`.mob-auth-avatar`
+ * (style.css ~3399–3410). `onAuthClick` opens `AuthModal` — same handler
+ * regardless of signed-in/out, matching legacy's single `mobAuthBtn`
+ * click listener (app.js ~5765–5769) which always calls
+ * `FUTA_AUTH.openModal()` and lets the modal itself decide login vs
+ * profile tab.
  */
-export default function MobFabCluster({ sheetState, tracking, onLocateClick, onViewToggleClick, onAuthClick }) {
+export default function MobFabCluster({ sheetState, tracking, onLocateClick, onViewToggleClick, onAuthClick, user }) {
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
   return (
     <div className={`${styles.cluster} ${styles[sheetState] || ''}`}>
-      <button type="button" className={styles.fab} title="Sign In" onClick={onAuthClick}>
-        <User size={18} />
+      <button
+        type="button"
+        className={`${styles.fab} ${user ? styles.signedIn : ''}`}
+        title={user ? 'Account' : 'Sign In'}
+        onClick={onAuthClick}
+      >
+        {user && avatarUrl ? (
+          <img className={styles.avatar} src={avatarUrl} alt="" />
+        ) : (
+          <User size={18} />
+        )}
       </button>
       <button type="button" className={styles.fab} title="Toggle view mode" onClick={onViewToggleClick}>
         <Eye size={18} />

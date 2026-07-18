@@ -500,6 +500,103 @@ aggregate `avgRating`/`reviewCount` badge, and those two columns live on
 
 ---
 
+## Step 7 — Slice 10: user_id on reviews + profiles table
+
+Picks up exactly where Step 6's own note left off ("Slice 10 should
+`alter table reviews add column user_id...` when it actually builds
+that hook" — that's now). Run this in the Supabase SQL Editor:
+
+```sql
+alter table reviews
+  add column user_id uuid references auth.users(id);
+
+-- Legacy's Firestore `users/{uid}` doc (displayName/photoURL/reviewCount/
+-- navCount, app.js ~7287–7303) doesn't map to one Postgres table 1:1:
+-- displayName/photoURL are Supabase Auth user metadata already (no
+-- extra table needed, see useAuth.js's `displayName()`/`initials()`);
+-- review_count/nav_count are the derived counters that still need a
+-- home, kept in their own `profiles` table rather than duplicated
+-- Auth-adjacent columns.
+create table profiles (
+  id            uuid primary key references auth.users(id) on delete cascade,
+  review_count  integer not null default 0,
+  nav_count     integer not null default 0
+);
+
+-- Every new Supabase Auth user gets a matching `profiles` row
+-- automatically — the standard Supabase pattern for this (`security
+-- definer` is required here: this fires from an insert into
+-- `auth.users`, a table the inserting session has no direct RLS-level
+-- write access to on `profiles` otherwise).
+create or replace function handle_new_user() returns trigger as $$
+begin
+  insert into profiles (id) values (new.id);
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
+
+-- Same "trigger recomputes so it can never drift" pattern Step 6 used
+-- for waypoints.avg_rating/review_count — replaces legacy's
+-- `patchReviewWithAuth` (app.js ~7426–7471), which bumped the counter
+-- via a poll-for-"Thanks"-text hack after the fact rather than at
+-- insert time.
+create or replace function recompute_profile_review_count() returns trigger as $$
+begin
+  if new.user_id is not null then
+    update profiles
+    set review_count = (select count(*) from reviews where user_id = new.user_id)
+    where id = new.user_id;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger reviews_after_insert_profile_count
+  after insert on reviews
+  for each row execute function recompute_profile_review_count();
+
+alter table profiles enable row level security;
+
+create policy "profiles_select_own" on profiles
+  for select using (auth.uid() = id);
+```
+
+**`nav_count` has no writer wired this slice — flagged, not an
+oversight.** Legacy's own signal for it (`patchNavCountWithAuth`, app.js
+~7474–7488) increments on every `navHudClose` click, regardless of
+whether navigation actually reached the destination — it's a dismissal
+counter, not a completion counter, and would over-count relative to what
+"navigations" implies. Porting that faithfully means porting a bug;
+building a correct replacement means wiring a general (not
+rateable-POI-gated, unlike `NavigationController`'s current `onArrival`)
+arrival signal, which is out of scope for this slice. `profiles.nav_count`
+exists and defaults to `0`, which reads correctly (zero tracked so far)
+rather than incorrectly — `AuthModal.jsx`'s profile tab displays it as-is.
+Flagged here for whichever future slice decides how navigations should
+actually be counted.
+
+**RLS on `profiles`:** only a `select`-own policy is added above —
+nothing needs to `insert`/`update` it directly from the client (the
+`handle_new_user`/`recompute_profile_review_count` triggers do both,
+running as the function owner via `security definer`/definer-context,
+not the requesting user's role).
+
+**Not yet confirmed against a live database** — same caveat as every
+other schema block in this doc (Steps 0/4/6): written from the legacy
+source and this repo's existing schema, not run against Supabase yet.
+
+**External prerequisite, not verifiable from the repo:** the Google
+OAuth client re-registration under Supabase Auth that Step 5 already
+flagged. `useAuth.js`'s `signInWithGoogle` assumes it's done; if it
+isn't, Google sign-in will fail at the redirect step (email/password
+sign-in and signup are unaffected either way).
+
+---
+
 ## Verification checklist
 
 - [ ] Row counts match: Firestore collection doc count == Postgres table row count (`select count(*) from segments;` vs. Firestore console's collection count)
@@ -508,6 +605,9 @@ aggregate `avgRating`/`reviewCount` badge, and those two columns live on
 - [ ] A handful of `segment_images`/`waypoint_images` open correctly from their Storage URL
 - [ ] `waypoints.segment_id` correctly links back for the ones that came from a route recording; the rest are `null`
 - [ ] RLS is enabled on all five tables (queries from the anon/authenticated key should currently return nothing until Slice 2/10 add real policies — that's expected, not a bug)
+- [ ] Google OAuth client is actually re-registered under Supabase Auth (Step 5) — Google sign-in will silently fail at redirect otherwise
+- [ ] `profiles` row is created automatically on signup (check the table after a test signup) — confirms `handle_new_user` fired
+- [ ] Submitting a review while signed in increments that user's `profiles.review_count` (confirms `recompute_profile_review_count` fired) and does *not* error for an anonymous submission (`user_id` staying `null` is valid)
 
 ## Reference links
 

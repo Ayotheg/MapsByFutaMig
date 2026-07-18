@@ -39,7 +39,11 @@ import { submitReview } from './submitReview';
  * before `open()` is ever invoked. Matched here on purpose rather than
  * adding a redundant internal check.
  */
-export default function ReviewModal({ dest, onClose, onSubmitted }) {
+// `user` (Slice 10, optional): when signed in, attributes the review via
+// `submitReview`'s `userId` so it counts toward the signer's profile
+// stats — see `submitReview.js`'s header comment. Anonymous submission
+// (no `user` passed) still works exactly as it did before this slice.
+export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -67,7 +71,7 @@ export default function ReviewModal({ dest, onClose, onSubmitted }) {
     setStatus(null);
 
     try {
-      await submitReview({ waypointId: dest.id, rating, comment });
+      await submitReview({ waypointId: dest.id, rating, comment, userId: user?.id });
       setStatus({ kind: 'success', text: '✅ Thanks for helping fellow students!' });
       await onSubmitted?.();
       setTimeout(onClose, 1200);

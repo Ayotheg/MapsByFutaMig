@@ -264,34 +264,52 @@ early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** Slice 9 (GPS & Navigation) — **built this
-  session**, see `MIGRATION_PLAN.md`'s progress tracker for full detail.
-  Build/lint both run clean this session (`npm run build`/`npm run lint`,
-  0 errors/0 warnings) — sandbox had network access this time. **Not yet
-  run live against real GPS hardware or real OSRM responses.** New
-  folder: `src/features/navigation/` (12 files — see tracker row).
-  `src/features/kml/geoUtils.js` promoted to `src/lib/geoUtils.js` (the
-  "second real usage" its own Slice 5 comment predicted). `ReviewModal`
-  (built Slice 8, unwired) is now actually rendered from `MapPage.jsx`,
-  triggered by nav arrival. `PlaceCard`'s "Navigate Here" button and
-  `MobileSearchBar`'s nav trigger (both inert stubs since Slice 2/7) are
-  now wired. **Two real doc/reality mismatches found and fixed in
-  `vite.config.js` itself, not silently worked around:** (1) no
-  `chunkSizeWarningLimit` override has ever actually existed in this repo
-  (same finding as Slice 6) — nothing to revert; (2) `CLAUDE.md`'s
-  `manualChunks` snippet's object-map form **fails a real `npm run
-  build`** on this repo's actual bundler (Vite 8 + Rolldown, confirmed —
-  `rolldownOptions` is not a typo for `rollupOptions`) — rewritten as the
-  function form Rolldown actually requires, confirmed working via a real
-  build. **Also fixed, `MapShell.module.css`:** the `#map` sidebar-offset
-  gap Slice 4 claimed fixed and Slice 6 confirmed was still actually
-  broken — genuinely wired now (see tracker row for why this session
-  didn't leave it as a third flag-without-fixing). Full detail,
-  rationale, and every other flagged decision (dead-CSS findings, the
-  `useGpsTracking`-vs-`NavigationController` lazy-boundary split, icon
-  choices, the `SearchResultItem`-reuse trade-off) in the tracker row —
-  this slice touched enough files that the tracker row is the source of
-  truth, not this bullet.
+- **Slice being worked on:** Slice 10 (Auth) — **built this session**, see
+  `MIGRATION_PLAN.md`'s progress tracker for full detail. Build/lint both
+  run clean this session (`npm run build`/`npm run lint`, 0 errors/0
+  warnings, network access available). **Not yet run live** — Google
+  OAuth especially needs its client re-registered under Supabase Auth
+  first (external, not verifiable from the repo — `FIREBASE_TO_SUPABASE_
+  MIGRATION.md`'s Step 5 already flagged this). New folder:
+  `src/features/auth/` (`useAuth.js`, `adminPin.js`, `useAdminPin.js`,
+  `AuthModal.jsx`+`.module.css`, `AdminPinGate.jsx`+`.module.css`).
+  **Scope correction, same discipline as every slice since 4:** the
+  plan's `app.js` ~2744–3095 range for the auth IIFE was wrong (that's
+  `_cacheRead`/OSM-dedup code) — real `initFutaAuth()` is ~7073–7421,
+  corrected in the plan's own Slice 10 entry. **No React Context added**
+  — `useAuth()` called once in `MapPage.jsx`, passed down as props, same
+  convention as `gps`/`viewMode`. `AuthModal`/`AdminPinGate` are both
+  deliberately bespoke, not built on `components/ui/Modal.jsx` — legacy's
+  own DOM structure for both genuinely doesn't fit Modal's enforced
+  header+body(+footer) shape. `AdminPinGate`/`useAdminPin.js` are built
+  but **not called from anywhere yet** — same "machinery built, next
+  slice wires it" call Slice 8 made for `ReviewModal`; Slice 11 wires
+  `Sidebar.jsx`'s Admin toggle to actually call `requestAdminAccess()`.
+  Schema: `FIREBASE_TO_SUPABASE_MIGRATION.md`'s new "Step 7"
+  (`reviews.user_id` + a `profiles` table for review/nav counts, not yet
+  applied to the live database). `nav_count` has no writer wired this
+  session — flagged deliberately, legacy's own signal for it is a
+  dismissal counter, not a completion counter, porting it faithfully
+  means porting a bug. Also created `.env.example` (referenced by
+  `README.md`/`src/lib/supabase.js` since Slice 2, never actually
+  committed — an unrelated pre-existing gap, fixed in passing since its
+  contents were unambiguous). Full detail + every flagged decision (the
+  two dead-CSS-variable findings, the PIN hash port, the profile-stats
+  query design) in the tracker row.
+- **Slice 9 (GPS & Navigation)** — see `MIGRATION_PLAN.md`'s tracker row
+  for full detail. Build/lint both run clean that session (network access
+  was available then too). New folder: `src/features/navigation/` (12
+  files). `src/features/kml/geoUtils.js` promoted to
+  `src/lib/geoUtils.js`. `ReviewModal` (built Slice 8, unwired) was wired
+  up that session, triggered by nav arrival — this session (10) adds
+  `user_id` attribution to it. `PlaceCard`'s "Navigate Here" and
+  `MobileSearchBar`'s nav trigger were wired. Two real doc/reality
+  mismatches were found and fixed in `vite.config.js` itself (no
+  `chunkSizeWarningLimit` override ever existed; `manualChunks`'s
+  object-map form fails on this repo's actual Vite 8 + Rolldown bundler,
+  rewritten as the function form). The `#map` sidebar-offset gap (Slice 4
+  claimed fixed, Slice 6 found still broken) was genuinely fixed that
+  session.
 - **Slice 8 (Reviews & ratings)** — see `MIGRATION_PLAN.md`'s tracker row
   for full detail. Build/lint could not be run in that session (no
   network); confirmed clean now, in this session, before Slice 9 code was

@@ -275,3 +275,24 @@
   font-size: 7px;
   letter-spacing: 0.06em;
 }
+
+/* Slice 10: signed-in state, legacy style.css ~7660–7677 (`.auth-avatar`/
+   `.auth-display-name`) */
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--primary);
+}
+.displayName {
+  font-size: 6.5px;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  font-weight: 600;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+}

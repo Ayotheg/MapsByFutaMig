@@ -20,7 +20,17 @@ import { supabase } from '../../lib/supabase';
 //   `useWaypoints()`'s `refetch()` so the place card picks up the trigger's
 //   real `avg_rating`/`review_count` on next read, same refetch-after-write
 //   pattern Slice 4/5 already established for segments/waypoints.
-export async function submitReview({ waypointId, rating, comment }) {
+// `userId` (Slice 10): legacy's `patchReviewWithAuth` (app.js ~7426–7471)
+// bumps `users/{uid}.reviewCount` after the fact via a fragile
+// poll-for-"Thanks"-text hack, once `window.FUTA_USER` exists. This port
+// does it properly at insert time instead — `reviews.user_id` (added in
+// FIREBASE_TO_SUPABASE_MIGRATION.md's "Step 7") is nullable, so an
+// anonymous review still works exactly as before if `userId` is omitted;
+// when it's set, the same `recompute_profile_review_count` trigger that
+// Step 7 adds keeps `profiles.review_count` accurate without any
+// client-side polling or increment call. Caller (`ReviewModal`) is
+// responsible for passing the current `user?.id`.
+export async function submitReview({ waypointId, rating, comment, userId }) {
   if (!waypointId || !(rating >= 1 && rating <= 5)) {
     throw new Error('submitReview: waypointId and a 1–5 rating are required.');
   }
@@ -32,6 +42,7 @@ export async function submitReview({ waypointId, rating, comment }) {
     waypoint_id: waypointId,
     rating,
     comment: trimmedComment || null,
+    user_id: userId || null,
   });
 
   if (error) throw error;

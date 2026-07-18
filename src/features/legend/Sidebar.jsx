@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
 import NavPanel from '../navigation/NavPanel';
+import { displayName } from '../auth/useAuth';
 
 // Slice 9: GPS Signal isn't open by default (only Layers is), so per
 // CLAUDE.md's bundle-size policy it's lazy-loaded like DetailModal/
@@ -64,7 +65,7 @@ const RAIL_ITEMS = [
  * `body.sidebar-collapsed .desk-search-bar` rule), so MapPage now owns
  * this value and passes it down to all three.
  */
-export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch }) {
+export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick }) {
   const [activeKey, setActiveKey] = useState('layers');
 
   // Slice 4: reflect collapsed state onto document.body, same
@@ -163,18 +164,33 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
       )}
 
       {/* Ported from legacy index.html ~611–630 (`.sidebar-footer`) — sits
-          below the rail, same width. Both buttons are real legacy chrome,
-          rendered here but inert: the Sign In flow is Slice 10 (Auth) and
-          the admin toggle is Slice 11 (Admin panel). Only the signed-out
-          state is ported — `#authBtnSignedIn`'s avatar/display-name swap
-          needs actual auth state that doesn't exist yet. */}
+          below the rail, same width. Sign In is wired for real now
+          (Slice 10) — signed-in state swaps to avatar + first name,
+          matching legacy's `updateSidebarBtn` (app.js ~7324–7339). Admin
+          toggle stays inert — wiring it (PIN gate + panel) is Slice 11's
+          job per its own tracker row. */}
       <div className={styles.sidebarFooter}>
-        <button type="button" className={styles.authBtn} title="Sign In">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-          </svg>
-          <span>Sign In</span>
+        <button type="button" className={styles.authBtn} title={user ? 'Account' : 'Sign In'} onClick={onAuthClick}>
+          {user ? (
+            <>
+              {/* Legacy shows the avatar only if photoURL exists; no icon
+                  fallback when signed in without one — just the name
+                  (app.js ~7329–7335's `sidebarAvatar.classList.add('hidden')`
+                  else-branch has no icon swap-in). */}
+              {(user.user_metadata?.avatar_url || user.user_metadata?.picture) && (
+                <img className={styles.avatar} src={user.user_metadata.avatar_url || user.user_metadata.picture} alt="" />
+              )}
+              <span className={styles.displayName}>{displayName(user).split(' ')[0]}</span>
+            </>
+          ) : (
+            <>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+              </svg>
+              <span>Sign In</span>
+            </>
+          )}
         </button>
         <button type="button" className={styles.adminBtn} title="Admin Panel">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

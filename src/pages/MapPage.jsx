@@ -22,6 +22,7 @@ import QuickChips from '../features/search/QuickChips';
 import ChipResultsPanel from '../features/search/ChipResultsPanel';
 import { useGpsTracking } from '../features/navigation/useGpsTracking';
 import MobFabCluster from '../features/navigation/MobFabCluster';
+import { useAuth, friendlyError } from '../features/auth/useAuth';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -42,6 +43,11 @@ const NavigationController = lazy(() => import('../features/navigation/Navigatio
 // this is that trigger landing. Same lazy tier as DetailModal/SaveModal
 // per ReviewModal.jsx's own wiring instructions.
 const ReviewModal = lazy(() => import('../features/reviews/ReviewModal'));
+
+// Slice 10: explicit "known candidate" in CLAUDE.md's bundle-size policy
+// — the auth modal only mounts once opened, same lazy tier as the other
+// modals above.
+const AuthModal = lazy(() => import('../features/auth/AuthModal'));
 
 /**
  * First page-level composition of the map with feature chrome around it.
@@ -125,6 +131,23 @@ export default function MapPage() {
   const prevViewModeRef = useRef(null);
 
   const gps = useGpsTracking(map, { hidden: navActive });
+
+  // ── Slice 10: Auth ────────────────────────────────────────────────
+  // Called once here, same "lift shared state up, pass down as props"
+  // convention `gps`/`viewMode`/`waypoints` already use in this file —
+  // this codebase has no React Context anywhere (grep-confirmed), so
+  // this doesn't introduce a new pattern for a value only a few
+  // components need (Sidebar's footer, the mobile auth FAB, ReviewModal
+  // for attribution, and later Slice 11's PIN gate).
+  const auth = useAuth();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState('login');
+  // Legacy's `openModal(tab)` (app.js ~7185–7189): always lands on the
+  // profile tab if already signed in, regardless of the tab requested.
+  function openAuthModal(tab) {
+    setAuthModalTab(auth.user ? 'profile' : (tab || 'login'));
+    setAuthModalOpen(true);
+  }
 
   useEffect(() => {
     if (navActive) {
@@ -241,6 +264,8 @@ export default function MapPage() {
           gps={gps}
           navActive={navActive}
           onNavLaunch={handleNavLaunch}
+          user={auth.user}
+          onAuthClick={() => openAuthModal('login')}
         />
       )}
 
@@ -295,9 +320,8 @@ export default function MapPage() {
           tracking={gps.isTracking}
           onLocateClick={gps.toggleTracking}
           onViewToggleClick={toggleViewMode}
-          onAuthClick={() => {
-            /* Slice 10 — auth modal, same inert stub as Sidebar's Sign In */
-          }}
+          onAuthClick={() => openAuthModal('login')}
+          user={auth.user}
         />
       )}
       {map && navOpen && (
@@ -319,7 +343,22 @@ export default function MapPage() {
       )}
       {reviewTarget && (
         <Suspense fallback={null}>
-          <ReviewModal dest={reviewTarget} onClose={() => setReviewTarget(null)} onSubmitted={refetchWaypoints} />
+          <ReviewModal dest={reviewTarget} onClose={() => setReviewTarget(null)} onSubmitted={refetchWaypoints} user={auth.user} />
+        </Suspense>
+      )}
+      {authModalOpen && (
+        <Suspense fallback={null}>
+          <AuthModal
+            initialTab={authModalTab}
+            user={auth.user}
+            onClose={() => setAuthModalOpen(false)}
+            signInWithGoogle={auth.signInWithGoogle}
+            signInWithEmail={auth.signInWithEmail}
+            signUpWithEmail={auth.signUpWithEmail}
+            resetPassword={auth.resetPassword}
+            signOut={auth.signOut}
+            friendlyError={friendlyError}
+          />
         </Suspense>
       )}
     </>
