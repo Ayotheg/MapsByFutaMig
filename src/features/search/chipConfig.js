@@ -114,6 +114,16 @@ function distanceTo(uLat, uLng, lat, lng) {
  * and — faithfully, rarely — segments) queries the shared `searchIndex`
  * exactly as legacy queries `FUTA_SEARCH`.
  */
+/** Normalises a stored `type` value for comparison against `KW_MAP`'s
+ * lowercase snake_case vocabulary. Chip matching is exact-string
+ * (`types.has(t)`), so a single row saved as `"Kiosk"` or `"kiosk "` (easy
+ * to end up with after manual entry or a Firebase->Supabase migration)
+ * would silently never match any chip — this makes that class of mismatch
+ * a non-issue without changing what actually counts as a match. */
+function normType(t) {
+  return (t || '').trim().toLowerCase();
+}
+
 export function gatherResults(query, { waypoints, searchIndex }) {
   const types = queryToTypes(query);
   const words = queryWords(query);
@@ -122,7 +132,7 @@ export function gatherResults(query, { waypoints, searchIndex }) {
   const out = [];
 
   (waypoints || []).forEach((wp) => {
-    const t = wp.type || '';
+    const t = normType(wp.type);
     if (!wp.lat || !wp.lng) return;
     const raw = (wp.name || '').trim();
     if (!raw) return;
@@ -149,7 +159,7 @@ export function gatherResults(query, { waypoints, searchIndex }) {
   words.forEach((w) => {
     if (w.length < 2) return;
     searchIndex.query(w, 30).forEach((r) => {
-      const t = r.subtype || r.type || 'poi';
+      const t = normType(r.subtype || r.type) || 'poi';
       const typeMatch = types.has(t);
       const nameStrong = (r._score || 0) >= 40;
       if (!typeMatch && !nameStrong) return;

@@ -29,7 +29,7 @@ import styles from './ChipResultsPanel.module.css';
  * button (`rBack`) is wired, and the panel that button would close is
  * itself never opened by anything. Not ported.
  */
-export default function ChipResultsPanel({ activeChip, waypoints, waypointsLoaded, searchIndex, map, onSelect, onClose, isMobile, collapsed }) {
+export default function ChipResultsPanel({ activeChip, waypoints, waypointsLoaded, searchIndex, map, onSelect, onNavigate, onClose, isMobile, collapsed }) {
   const results = useMemo(() => {
     if (!activeChip) return [];
     return gatherResults(activeChip.query, { waypoints, searchIndex });
@@ -57,6 +57,11 @@ export default function ChipResultsPanel({ activeChip, waypoints, waypointsLoade
     }, 450);
   }
 
+  function handleNavigate(r) {
+    onNavigate?.({ lat: r.lat, lng: r.lng, name: r.name, id: r.id, type: r.type });
+    onClose?.();
+  }
+
   const body = loading ? (
     <div className={styles.empty}>
       <div className={styles.loadingDots}>
@@ -78,6 +83,7 @@ export default function ChipResultsPanel({ activeChip, waypoints, waypointsLoade
         result={r}
         iconText={activeChip.emoji}
         onOpen={handleOpen}
+        onNavigate={handleNavigate}
         style={{ animationDelay: Math.min(i * 0.035, 0.4) + 's' }}
       />
     ))

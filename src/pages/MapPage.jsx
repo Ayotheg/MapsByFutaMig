@@ -23,6 +23,7 @@ import ChipResultsPanel from '../features/search/ChipResultsPanel';
 import { useGpsTracking } from '../features/navigation/useGpsTracking';
 import MobFabCluster from '../features/navigation/MobFabCluster';
 import { useAuth, friendlyError } from '../features/auth/useAuth';
+import { useAdminPin } from '../features/auth/useAdminPin';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -48,6 +49,12 @@ const ReviewModal = lazy(() => import('../features/reviews/ReviewModal'));
 // — the auth modal only mounts once opened, same lazy tier as the other
 // modals above.
 const AuthModal = lazy(() => import('../features/auth/AuthModal'));
+
+// AdminPinGate was previously built (Slice 10) but never rendered anywhere
+// — the Sidebar's Admin button had no onClick at all. Wired up here: same
+// lazy tier as the other on-demand modals, only mounted once the Admin
+// button is actually clicked.
+const AdminPinGate = lazy(() => import('../features/auth/AdminPinGate'));
 
 /**
  * First page-level composition of the map with feature chrome around it.
@@ -160,6 +167,20 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navActive]);
 
+  // ── Admin button fix ─────────────────────────────────────────────────
+  // Sidebar's Admin button previously had no onClick handler at all — the
+  // PIN-gate machinery (`useAdminPin`/`AdminPinGate`) existed but was never
+  // called from anywhere. Wired here: clicking Admin requires being signed
+  // in (prompts sign-in otherwise), then the 6-digit PIN pad, then opens
+  // the same KML/GPX import panel the standalone floating "⬆ Import"
+  // button already used (the only real admin capability currently built).
+  const [importPanelOpen, setImportPanelOpen] = useState(false);
+  const adminPin = useAdminPin(auth.user, openAuthModal);
+
+  function handleAdminClick() {
+    adminPin.requestAdminAccess(() => setImportPanelOpen(true));
+  }
+
   function handleNavLaunch() {
     if (navOpen) {
       navControllerRef.current?.requestLaunchToggle();
@@ -236,8 +257,15 @@ export default function MapPage() {
         onSaved={async () => {
           await Promise.all([refetchWaypoints(), refetchSegments()]);
         }}
+        open={importPanelOpen}
+        onOpenChange={setImportPanelOpen}
       />
-      <PlaceCard data={selected} onClose={() => setSelected(null)} onNavigate={handlePlaceCardNavigate} />
+      <PlaceCard
+        data={selected}
+        onClose={() => setSelected(null)}
+        onNavigate={handlePlaceCardNavigate}
+        collapsed={!isMobile && collapsed}
+      />
       {selectedSegment && (
         <Suspense fallback={null}>
           <DetailModal segment={selectedSegment} onClose={() => setSelectedSegmentId(null)} />
@@ -266,6 +294,7 @@ export default function MapPage() {
           onNavLaunch={handleNavLaunch}
           user={auth.user}
           onAuthClick={() => openAuthModal('login')}
+          onAdminClick={handleAdminClick}
         />
       )}
 
@@ -298,6 +327,7 @@ export default function MapPage() {
           onToggleCollapsed={setCollapsed}
           onManualType={() => setActiveChip(null)}
           activeChipLabel={activeChip?.label}
+          onNavigateClick={handleNavLaunch}
         />
       )}
       <QuickChips activeChip={activeChip} onChipClick={handleChipClick} collapsed={collapsed} isMobile={isMobile} />
@@ -308,6 +338,7 @@ export default function MapPage() {
         searchIndex={searchIndex}
         map={map}
         onSelect={setSelected}
+        onNavigate={handlePlaceCardNavigate}
         onClose={() => setActiveChip(null)}
         isMobile={isMobile}
         collapsed={collapsed}
@@ -358,6 +389,15 @@ export default function MapPage() {
             resetPassword={auth.resetPassword}
             signOut={auth.signOut}
             friendlyError={friendlyError}
+          />
+        </Suspense>
+      )}
+      {adminPin.pinOpen && (
+        <Suspense fallback={null}>
+          <AdminPinGate
+            open={adminPin.pinOpen}
+            onSuccess={adminPin.handleSuccess}
+            onClose={adminPin.closePinGate}
           />
         </Suspense>
       )}

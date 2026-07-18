@@ -27,9 +27,23 @@ const KmlImportPanel = lazy(() => import('./KmlImportPanel'));
  * This placement is a deliberate stand-in, not a final design decision —
  * flagged for confirmation, and Slice 11 should relocate/re-gate it behind
  * real admin auth once that panel exists, per legacy's actual structure.
+ *
+ * UPDATE: Sidebar's Admin button is now wired (PIN-gated via
+ * `useAdminPin`/`AdminPinGate`, see MapPage.jsx) and opens this same
+ * panel instead of duplicating it — `open`/`onOpenChange` let that second
+ * entry point drive this component's panel from outside. Falls back to
+ * fully self-contained local state when those aren't passed, so the
+ * floating button below still works standalone either way.
  */
-export default function ImportTrigger({ waypoints, segments, onSaved }) {
-  const [open, setOpen] = useState(false);
+export default function ImportTrigger({ waypoints, segments, onSaved, open: openProp, onOpenChange }) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : localOpen;
+
+  function setOpen(next) {
+    if (isControlled) onOpenChange?.(next);
+    else setLocalOpen(next);
+  }
 
   return (
     <>

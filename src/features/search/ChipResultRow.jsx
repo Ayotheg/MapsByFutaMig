@@ -7,11 +7,13 @@ import styles from './ChipResultRow.module.css';
  * desktop floating panel and the mobile card (legacy literally reuses the
  * same `.dcr-row` markup/class for both, built once, not two functions).
  *
- * `onNavigate` is left as a no-op stub with a comment — Slice 9's
- * territory (`window.NAV.navigateTo`), same treatment as the other
- * Navigate-button stubs in this slice.
+ * `onNavigate` was left as a no-op stub with a comment ("Slice 9's
+ * territory") — Slice 9 (navigation) is built now, so this wires it up
+ * for real: bubbles the click up through ChipResultsPanel to MapPage's
+ * `handlePlaceCardNavigate`, same "Where to?" seeding the place card's
+ * own Navigate button already uses.
  */
-export default function ChipResultRow({ result, iconText, onOpen, style }) {
+export default function ChipResultRow({ result, iconText, onOpen, onNavigate, style }) {
   const handleRowClick = (e) => {
     if (e.target.closest('[data-nav-btn]')) return;
     onOpen(result);
@@ -19,7 +21,7 @@ export default function ChipResultRow({ result, iconText, onOpen, style }) {
 
   const handleNavClick = (e) => {
     e.stopPropagation();
-    // Inert until Slice 9 — mirrors legacy's `window.NAV.navigateTo(...)`.
+    onNavigate?.(result);
   };
 
   return (

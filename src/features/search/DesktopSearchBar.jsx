@@ -28,7 +28,7 @@ import styles from './DesktopSearchBar.module.css';
  * → `panelNavigate`). Flagging rather than guessing a trigger or inventing
  * new UI not present in legacy; revisit if Slice 9 turns out to need it.
  */
-export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed, onToggleCollapsed, onManualType, activeChipLabel }) {
+export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed, onToggleCollapsed, onManualType, activeChipLabel, onNavigateClick }) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [osmResults, setOsmResults] = useState(null);
@@ -151,9 +151,11 @@ export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed
   }
 
   function handleNavClick() {
-    // Inert until Slice 9 — mirrors legacy's own `railNavigate.click()`
-    // forward, which is itself a no-op today since Sidebar's "navigate"
-    // rail item has no panel yet (see Sidebar.jsx).
+    // Was a no-op stub left over from before Slice 9's navigation feature
+    // was built (comment said "inert until Slice 9" — Slice 9 is done now,
+    // this just never got wired up). Opens the same "Where to?" flow as
+    // the sidebar's Navigate rail item / mobile FAB.
+    onNavigateClick?.();
   }
 
   const noResultsMsg =

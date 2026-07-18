@@ -6,6 +6,20 @@ import { osmBadge, findDuplicate } from './osmAnnotationUtils';
 const OSM_CACHE_KEY = 'futa_osm_annotations_v1';
 const OSM_CACHE_TTL = 5 * 60 * 1000;
 
+// overpass-api.de is the canonical instance but occasionally answers with a
+// non-2xx (e.g. 406/429 under load) response that omits CORS headers
+// entirely, which the browser then reports as a same-origin-policy/CORS
+// failure rather than the underlying HTTP error — that's what produced the
+// "Cross-Origin Request Blocked ... 406" + "NetworkError when attempting to
+// fetch resource" pair in the reported bug. Retrying against community
+// mirrors that run the same Overpass QL API keeps this feature working
+// without standing up our own proxy.
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+];
+
 /**
  * Fetches named OSM POIs within campus bounds (via Overpass), caches them in
  * sessionStorage (same 5-min TTL as legacy), and dedups against `dedupIndex`
@@ -70,12 +84,27 @@ export function useOSMAnnotations(dedupIndex) {
         ');\nout center;';
 
       try {
-        const res = await fetch('https://overpass-api.de/api/interpreter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: 'data=' + encodeURIComponent(query),
-        });
-        const data = await res.json();
+        let data = null;
+        let lastErr = null;
+        for (const endpoint of OVERPASS_ENDPOINTS) {
+          try {
+            const res = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                Accept: 'application/json',
+              },
+              body: 'data=' + encodeURIComponent(query),
+            });
+            if (!res.ok) throw new Error(`${endpoint} responded ${res.status}`);
+            data = await res.json();
+            break; // success — stop trying further mirrors
+          } catch (err) {
+            lastErr = err;
+            // try the next mirror
+          }
+        }
+        if (!data) throw lastErr || new Error('all Overpass endpoints failed');
         const elements = data.elements || [];
         const seen = new Set();
         const items = [];

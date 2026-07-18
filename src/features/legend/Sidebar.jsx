@@ -65,7 +65,7 @@ const RAIL_ITEMS = [
  * `body.sidebar-collapsed .desk-search-bar` rule), so MapPage now owns
  * this value and passes it down to all three.
  */
-export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick }) {
+export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick, onAdminClick }) {
   const [activeKey, setActiveKey] = useState('layers');
 
   // Slice 4: reflect collapsed state onto document.body, same
@@ -192,7 +192,7 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
             </>
           )}
         </button>
-        <button type="button" className={styles.adminBtn} title="Admin Panel">
+        <button type="button" className={styles.adminBtn} title="Admin Panel" onClick={onAdminClick}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="8" r="4" />
             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />

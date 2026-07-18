@@ -32,10 +32,27 @@ export function isUnknownAnnotationName(name) {
   return false;
 }
 
+/** Normalises a togeojson `description` property to a plain string.
+ *
+ * @tmcw/togeojson v7+ no longer always returns `description` as a raw
+ * string: when a KML `<description>` contains HTML/CDATA (as BasicAirData
+ * GPS Logger's track descriptions do — see test1-12.kml), it's returned as
+ * `{ '@type': 'html', value: '<b>...</b>' }` instead. Every caller here
+ * used to call `.replace()`/`.match()` directly on `desc`, which threw
+ * "(intermediate value).match is not a function" for exactly those files.
+ * This unwraps that shape; plain strings (and anything else) pass through
+ * unchanged (falling back to '' for non-string, non-html-object values). */
+function kmlDescriptionToString(desc) {
+  if (typeof desc === 'string') return desc;
+  if (desc && typeof desc === 'object' && typeof desc.value === 'string') return desc.value;
+  return '';
+}
+
 /** Strips HTML tags and collapses whitespace in a KML `<description>`. */
 export function cleanKmlDescription(desc) {
-  if (!desc) return '';
-  return desc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const str = kmlDescriptionToString(desc);
+  if (!str) return '';
+  return str.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Resolves a display name for a KML/GPX point: the raw name if it's
@@ -56,7 +73,7 @@ export function sanitiseAnnotationName(rawName, lat, lng, kmlLabel, rawDesc) {
  * fallback prefix for unnamed points from that file. */
 export function extractKmlLabel(geo) {
   for (const f of geo.features || []) {
-    const desc = f.properties?.description || '';
+    const desc = kmlDescriptionToString(f.properties?.description);
     const m = desc.match(/<b>([^<]+)<\/b>/i);
     if (m && m[1]) return m[1].trim();
   }

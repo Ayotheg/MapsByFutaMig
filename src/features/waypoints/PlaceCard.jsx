@@ -40,7 +40,7 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  * full-res image in a new tab directly — same end result, no dependency on
  * Slice 4's segment registry. Revisit if a proper in-app lightbox is wanted.
  */
-export default function PlaceCard({ data, onClose, onNavigate }) {
+export default function PlaceCard({ data, onClose, onNavigate, collapsed }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [dragY, setDragY] = useState(0);
   const dragging = useRef(false);
@@ -72,6 +72,23 @@ export default function PlaceCard({ data, onClose, onNavigate }) {
     if (dy > 80) onClose();
   }
 
+  // Fix: the desktop card is anchored past the *full* sidebar
+  // (`left: var(--sidebar-total-w)`, ~304px) unconditionally. Every other
+  // floating panel (QuickChips, DesktopSearchBar, ChipResultsPanel,
+  // ViewModeToggle) shifts left when the sidebar collapses to its
+  // ~64px icon rail, but this one never did — so collapsing the sidebar
+  // left the card stranded with a ~240px gap of bare map between the rail
+  // and the card instead of sliding over to meet it. Same fix pattern as
+  // those other components: swap the anchor via inline style.
+  const cardStyle = {};
+  if (dragY) {
+    cardStyle.transform = `translateY(${dragY}px)`;
+    cardStyle.transition = 'none';
+  }
+  if (collapsed) {
+    cardStyle.left = 'calc(var(--sidebar-rail-w) + 16px)';
+  }
+
   return (
     <>
       <div
@@ -80,7 +97,7 @@ export default function PlaceCard({ data, onClose, onNavigate }) {
       />
       <div
         className={`${styles.card} ${isOpen ? styles.visible : ''}`}
-        style={dragY ? { transform: `translateY(${dragY}px)`, transition: 'none' } : undefined}
+        style={Object.keys(cardStyle).length ? cardStyle : undefined}
       >
         <div
           className={styles.handle}
