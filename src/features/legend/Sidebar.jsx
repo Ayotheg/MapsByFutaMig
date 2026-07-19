@@ -167,8 +167,9 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
           below the rail, same width. Sign In is wired for real now
           (Slice 10) — signed-in state swaps to avatar + first name,
           matching legacy's `updateSidebarBtn` (app.js ~7324–7339). Admin
-          toggle stays inert — wiring it (PIN gate + panel) is Slice 11's
-          job per its own tracker row. */}
+          toggle (`onAdminClick`) is PIN-gated (`useAdminPin`/
+          `AdminPinGate`, Slice 10) and, as of Slice 11, opens the real
+          ported admin panel — see MapPage.jsx's `handleAdminClick`. */}
       <div className={styles.sidebarFooter}>
         <button type="button" className={styles.authBtn} title={user ? 'Account' : 'Sign In'} onClick={onAuthClick}>
           {user ? (

@@ -41,12 +41,19 @@ const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
  * `sheetState` (Slice 7's own precedent) — needed so `MobileSearchBar`'s
  * nav trigger can force this sheet onto the "navigate" tab, matching
  * legacy's `mobNavTrig` handler.
+ *
+ * Slice 11: adds the `mobTabAdmin` tab (index.html ~1149, app.js
+ * ~5752–5759) — unlike the other three, clicking it doesn't switch this
+ * sheet to an in-sheet body; it collapses the sheet to 'peek' and hands
+ * off to `onAdminClick` (the same PIN-gated handler desktop's Sidebar
+ * Admin button already uses), which opens the real `AdminPanel` overlay.
  */
 
 const TABS = [
   { key: 'layers', label: 'Layers', hasPanel: true },
   { key: 'gps', label: 'Signal', hasPanel: true },
   { key: 'navigate', label: 'Nav', hasPanel: true },
+  { key: 'admin', label: 'Admin', hasPanel: false, isAction: true },
 ];
 
 export default function MobileSheet({
@@ -59,6 +66,7 @@ export default function MobileSheet({
   gps,
   navActive,
   onNavLaunch,
+  onAdminClick,
 }) {
   const [internalSheetState, setInternalSheetState] = useState('peek');
   const sheetState = controlledSheetState ?? internalSheetState;
@@ -134,6 +142,21 @@ export default function MobileSheet({
 
   const handleTabClick = useCallback(
     (tab) => {
+      if (tab.isAction) {
+        // Legacy: `mobTabAdmin` is caught by *two* listeners — the generic
+        // `.mob-tab` loop (which strips `active` off every tab first, then
+        // no-ops since this tab has no `data-panel`) and its own dedicated
+        // handler (app.js ~5753–5758) that collapses the sheet and opens
+        // the admin overlay. Net effect: no tab stays highlighted, and the
+        // panel opens. `setActiveTab(null)` reproduces the "nothing stays
+        // highlighted" half; the highlighted-tab's own panel content stays
+        // mounted underneath (matches legacy — the sheet body was never
+        // touched, only its tab-strip highlight).
+        setActiveTab(null);
+        setSheetState('peek');
+        onAdminClick?.();
+        return;
+      }
       if (!tab.hasPanel) return; // matches Sidebar's inert-tab fallback
       const isActive = activeTab === tab.key && sheetState !== 'peek';
       if (isActive) {
@@ -143,7 +166,7 @@ export default function MobileSheet({
       setActiveTab(tab.key);
       if (sheetState === 'peek') setSheetState('half');
     },
-    [activeTab, sheetState, setSheetState, setActiveTab]
+    [activeTab, sheetState, setSheetState, setActiveTab, onAdminClick]
   );
 
   const handleTap = useCallback(() => {

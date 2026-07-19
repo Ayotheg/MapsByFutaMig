@@ -264,33 +264,91 @@ early "just in case."
 
 ## Session Context *(fill in before starting a new session)*
 
-- **Slice being worked on:** Slice 10 (Auth) — **built this session**, see
-  `MIGRATION_PLAN.md`'s progress tracker for full detail. Build/lint both
-  run clean this session (`npm run build`/`npm run lint`, 0 errors/0
-  warnings, network access available). **Not yet run live** — Google
-  OAuth especially needs its client re-registered under Supabase Auth
-  first (external, not verifiable from the repo — `FIREBASE_TO_SUPABASE_
-  MIGRATION.md`'s Step 5 already flagged this). New folder:
-  `src/features/auth/` (`useAuth.js`, `adminPin.js`, `useAdminPin.js`,
-  `AuthModal.jsx`+`.module.css`, `AdminPinGate.jsx`+`.module.css`).
+- **Slice being worked on:** Slice 11 (Admin panel) — **built this
+  session**, see `MIGRATION_PLAN.md`'s progress tracker for full detail.
+  **Build/lint could not be run this session (sandbox had no network
+  access to `npm install`)** — run `npm run build`/`npm run lint` before
+  trusting this the way earlier sessions with network access could
+  confirm live. New folder: `src/features/admin/` (`adminSave.js`,
+  `useAdminKml.js`, `adminTypeOptions.js`, `adminBadgeColors.js`,
+  `AdminEditModal.jsx`+`.module.css`, `PointsTab.jsx`, `RoutesTab.jsx`,
+  `KmlTab.jsx`, `AdminPanel.jsx`+`.module.css`). **Required uploading
+  both the legacy repo (`Ayotheg/MapsByFuta` @ `feature/login2`) and this
+  migration repo as zips** — neither was reachable via `web_fetch`
+  (`github.com` blocks robots, and neither repo surfaced via
+  `web_search`, so they're presumably private) — worth remembering for
+  whichever slice is picked up next, since the same wall will be hit
+  again without an upload.
   **Scope correction, same discipline as every slice since 4:** the
-  plan's `app.js` ~2744–3095 range for the auth IIFE was wrong (that's
-  `_cacheRead`/OSM-dedup code) — real `initFutaAuth()` is ~7073–7421,
-  corrected in the plan's own Slice 10 entry. **No React Context added**
-  — `useAuth()` called once in `MapPage.jsx`, passed down as props, same
-  convention as `gps`/`viewMode`. `AuthModal`/`AdminPinGate` are both
-  deliberately bespoke, not built on `components/ui/Modal.jsx` — legacy's
-  own DOM structure for both genuinely doesn't fit Modal's enforced
-  header+body(+footer) shape. `AdminPinGate`/`useAdminPin.js` are built
-  but **not called from anywhere yet** — same "machinery built, next
-  slice wires it" call Slice 8 made for `ReviewModal`; Slice 11 wires
-  `Sidebar.jsx`'s Admin toggle to actually call `requestAdminAccess()`.
-  Schema: `FIREBASE_TO_SUPABASE_MIGRATION.md`'s new "Step 7"
-  (`reviews.user_id` + a `profiles` table for review/nav counts, not yet
-  applied to the live database). `nav_count` has no writer wired this
-  session — flagged deliberately, legacy's own signal for it is a
-  dismissal counter, not a completion counter, porting it faithfully
-  means porting a bug. Also created `.env.example` (referenced by
+  plan's `app.js` ~3692–4333ish range starts a little late — the real
+  block (`openAdminPanel`, tab switching, pick-coordinate flow) begins at
+  ~3326, corrected in the plan's own Slice 11 entry. **Real correction to
+  a Slice 5 assumption:** `ImportTrigger.jsx`'s comment claiming
+  `#adminImportBtn` "lives inside the admin overlay, reserved for Slice
+  11" was wrong — that element doesn't exist anywhere in legacy's actual
+  `index.html`; `processImportPipeline`'s wiring at app.js ~1838–1846 is
+  silently dead code there (both `getElementById` calls return `null`).
+  Comment corrected in `ImportTrigger.jsx` itself rather than inventing a
+  relocation that has no real legacy placement to land in. Two
+  genuinely-different "KML" features clarified: this slice's KML tab
+  (session-only overlay loading, `_kmlRegistry`) vs. Slice 5's
+  import-and-save-a-segment pipeline. Full detail — the confirmed-dead
+  line/segment import branch ported faithfully anyway, the normalized-
+  image-tables deviation, the `useSearchIndex.js`/refetch-instead-of-
+  imperative-patching deviations, the mobile `mobTabAdmin` tab and its
+  active-highlight-stripping quirk — all in the tracker row.
+- **Slice 11 — two real gaps found and fixed live, after the person
+  actually ran this against their Supabase project:**
+  1. **`useAdminPin.js` was missing the resume-after-sign-in effect**
+     entirely — clicking Admin while signed out opened the sign-in modal
+     but never automatically retried the PIN flow afterward (legacy's own
+     one-shot `futa:authchange` listener, app.js ~3676–3683, was never
+     reproduced). Fixed: a `useEffect` watching `user` now resumes with
+     the original callback once sign-in completes, matching legacy.
+  2. **`waypoints.avg_rating`/`review_count` (added in Slice 8's schema)
+     were never actually run against the live database** — every
+     `waypoints` read failed with a 400 ("column does not exist"),
+     silently breaking the map's own waypoint layer too, not just the
+     admin panel (traced live via a temporary debug log + the person's
+     own DevTools Network tab, added and then removed again from
+     `AdminPanel.jsx` this session). Fixed by the person running the
+     `alter table` from `FIREBASE_TO_SUPABASE_MIGRATION.md`'s Step 6.
+  3. **`segments`/`segment_points`/`segment_images` never had real SELECT
+     policies** — confirmed exactly what Slice 5's own flag predicted
+     ("reads may currently come back silently empty rather than
+     erroring"): `count(*)` in the SQL editor found 12 real rows, but the
+     app's own requests returned 200 with an empty `[]` body (visible in
+     the Network tab, 2-byte responses). Fixed with `public_read` SELECT
+     policies on all three; `authenticated_write` policies for all
+     five admin-touched tables (`waypoints`/`waypoint_images`/
+     `segments`/`segment_points`/`segment_images`) were added at the
+     same time, since the admin panel's actual save/delete flow needs
+     them and they were flagged missing since Slice 5 but never added.
+  Both root causes were pre-existing gaps this session's own code
+  correctly surfaced (a 400/empty-array bug in the person's database, not
+  in the admin panel's React code) — worth remembering if a future
+  session sees "some feature loads 0 rows" again: check RLS policies and
+  actual live schema before assuming it's a props/rendering bug.
+  detail. Build/lint both ran clean that session (network access was
+  available then). New folder: `src/features/auth/` (`useAuth.js`,
+  `adminPin.js`, `useAdminPin.js`, `AuthModal.jsx`+`.module.css`,
+  `AdminPinGate.jsx`+`.module.css`). **Scope correction, same discipline
+  as every slice since 4:** the plan's `app.js` ~2744–3095 range for the
+  auth IIFE was wrong (that's `_cacheRead`/OSM-dedup code) — real
+  `initFutaAuth()` is ~7073–7421, corrected in the plan's own Slice 10
+  entry. **No React Context added** — `useAuth()` called once in
+  `MapPage.jsx`, passed down as props, same convention as
+  `gps`/`viewMode`. `AuthModal`/`AdminPinGate` are both deliberately
+  bespoke, not built on `components/ui/Modal.jsx` — legacy's own DOM
+  structure for both genuinely doesn't fit Modal's enforced
+  header+body(+footer) shape. `AdminPinGate`/`useAdminPin.js` were built
+  but not called from anywhere that session — Slice 11 (above) is what
+  wired them up. Schema: `FIREBASE_TO_SUPABASE_MIGRATION.md`'s new "Step
+  7" (`reviews.user_id` + a `profiles` table for review/nav counts, not
+  yet applied to the live database). `nav_count` has no writer wired —
+  flagged deliberately, legacy's own signal for it is a dismissal
+  counter, not a completion counter, porting it faithfully means porting
+  a bug. Also created `.env.example` (referenced by
   `README.md`/`src/lib/supabase.js` since Slice 2, never actually
   committed — an unrelated pre-existing gap, fixed in passing since its
   contents were unambiguous). Full detail + every flagged decision (the

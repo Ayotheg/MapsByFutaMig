@@ -11,29 +11,27 @@ const KmlImportPanel = lazy(() => import('./KmlImportPanel'));
  * ... must be lazy-loaded" — this file is the small eager half of that
  * split, `KmlImportPanel.jsx` is the lazy half.
  *
- * ── Flagging a real placement ambiguity, not guessing past it ─────────
- * In legacy, this trigger (`#adminImportBtn`) lives INSIDE the admin
- * overlay (`#adminOverlay`) — i.e. it's already gated behind the admin
- * panel that doesn't exist in this port yet (Slice 11, "Not started" in
- * the progress tracker). Sidebar.jsx's `.adminBtn` is explicitly reserved,
- * inert chrome for Slice 11 to wire up ("the admin toggle is Slice 11") —
- * so this can't just hang off that button without reaching into a slice
- * that isn't built.
+ * ── Placement, corrected against legacy's real markup (Slice 11) ──────
+ * Slice 5's original comment here assumed `#adminImportBtn` "lives INSIDE
+ * the admin overlay" and was just waiting on Slice 11 to relocate this
+ * trigger there. Having now actually read legacy's `index.html` while
+ * building that overlay: `#adminImportBtn`/`#adminImportInput` don't
+ * exist anywhere in it. `processImportPipeline` (app.js ~1696) is only
+ * ever wired up at app.js ~1838–1846, guarded by
+ * `if (adminImportBtn && adminImportInput)` — both `getElementById` calls
+ * return null against the real DOM, so that whole block is silently dead
+ * code in the live legacy app, not a feature reserved for the admin panel.
+ * There is no legacy placement to relocate this into.
  *
- * Rather than block this whole slice on Slice 11, or wire into chrome
- * that's reserved for a different slice, this renders as its own small
- * floating button (bottom-left, clear of the existing sidebar/mobile-sheet
- * chrome) so the import pipeline is genuinely reachable and testable now.
- * This placement is a deliberate stand-in, not a final design decision —
- * flagged for confirmation, and Slice 11 should relocate/re-gate it behind
- * real admin auth once that panel exists, per legacy's actual structure.
- *
- * UPDATE: Sidebar's Admin button is now wired (PIN-gated via
- * `useAdminPin`/`AdminPinGate`, see MapPage.jsx) and opens this same
- * panel instead of duplicating it — `open`/`onOpenChange` let that second
- * entry point drive this component's panel from outside. Falls back to
- * fully self-contained local state when those aren't passed, so the
- * floating button below still works standalone either way.
+ * So this stays exactly where Slice 5 put it — a standalone floating
+ * button, independent of admin auth (legacy never gated it either, since
+ * it was never reachable there in the first place) — rather than folding
+ * it into the now-real `AdminPanel.jsx` on a guess about where it
+ * "should" go. `open`/`onOpenChange` (added when Sidebar's Admin button
+ * briefly pointed here as a stopgap, see MapPage.jsx's git history) are
+ * unused by anything now that Admin opens the real panel instead, but are
+ * left in place — harmless, and this component still falls back to fully
+ * self-contained local state when they aren't passed.
  */
 export default function ImportTrigger({ waypoints, segments, onSaved, open: openProp, onOpenChange }) {
   const [localOpen, setLocalOpen] = useState(false);

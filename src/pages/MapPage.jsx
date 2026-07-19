@@ -56,6 +56,11 @@ const AuthModal = lazy(() => import('../features/auth/AuthModal'));
 // button is actually clicked.
 const AdminPinGate = lazy(() => import('../features/auth/AdminPinGate'));
 
+// Slice 11: the real admin panel (waypoint/segment/KML CRUD). Same lazy
+// tier as the rest — a large, admin-only surface with no reason to be in
+// the first-paint bundle.
+const AdminPanel = lazy(() => import('../features/admin/AdminPanel'));
+
 /**
  * First page-level composition of the map with feature chrome around it.
  * Per CLAUDE.md's own note on MapShell being mounted directly at `/`
@@ -167,18 +172,25 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navActive]);
 
-  // ── Admin button fix ─────────────────────────────────────────────────
-  // Sidebar's Admin button previously had no onClick handler at all — the
-  // PIN-gate machinery (`useAdminPin`/`AdminPinGate`) existed but was never
-  // called from anywhere. Wired here: clicking Admin requires being signed
-  // in (prompts sign-in otherwise), then the 6-digit PIN pad, then opens
-  // the same KML/GPX import panel the standalone floating "⬆ Import"
-  // button already used (the only real admin capability currently built).
-  const [importPanelOpen, setImportPanelOpen] = useState(false);
+  // ── Admin panel (Slice 11) ────────────────────────────────────────────
+  // Sidebar's Admin button previously had no onClick handler; a prior
+  // stopgap (superseded here) pointed it at `ImportTrigger`'s KML/GPX
+  // import panel since that was "the only real admin capability currently
+  // built." That stopgap's own premise doesn't hold up against legacy's
+  // actual `index.html`: `#adminImportBtn`/`#adminImportInput` — the
+  // trigger `ImportTrigger.jsx` was built to eventually "relocate inside
+  // the admin overlay" — don't exist anywhere in legacy's real markup.
+  // That whole import flow is dead/unreachable in the live legacy app, not
+  // "reserved for Slice 11." There's no legacy placement to relocate
+  // `ImportTrigger` into, so it's left exactly as-is (a standalone,
+  // ungated floating button — see its own header comment) rather than
+  // folded into this panel on a guess. Clicking Admin now opens the real,
+  // ported `#adminOverlay` (`AdminPanel.jsx`) instead.
+  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const adminPin = useAdminPin(auth.user, openAuthModal);
 
   function handleAdminClick() {
-    adminPin.requestAdminAccess(() => setImportPanelOpen(true));
+    adminPin.requestAdminAccess(() => setAdminPanelOpen(true));
   }
 
   function handleNavLaunch() {
@@ -257,8 +269,6 @@ export default function MapPage() {
         onSaved={async () => {
           await Promise.all([refetchWaypoints(), refetchSegments()]);
         }}
-        open={importPanelOpen}
-        onOpenChange={setImportPanelOpen}
       />
       <PlaceCard
         data={selected}
@@ -282,6 +292,7 @@ export default function MapPage() {
           gps={gps}
           navActive={navActive}
           onNavLaunch={handleNavLaunch}
+          onAdminClick={handleAdminClick}
         />
       ) : (
         <Sidebar
@@ -398,6 +409,20 @@ export default function MapPage() {
             open={adminPin.pinOpen}
             onSuccess={adminPin.handleSuccess}
             onClose={adminPin.closePinGate}
+          />
+        </Suspense>
+      )}
+      {map && adminPanelOpen && (
+        <Suspense fallback={null}>
+          <AdminPanel
+            map={map}
+            waypoints={waypoints}
+            segments={segments}
+            onClose={() => setAdminPanelOpen(false)}
+            onWaypointsChanged={refetchWaypoints}
+            onSegmentsChanged={refetchSegments}
+            onSelect={setSelected}
+            searchRegister={searchIndex.register}
           />
         </Suspense>
       )}
