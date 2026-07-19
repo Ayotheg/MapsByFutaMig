@@ -40,7 +40,7 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  * full-res image in a new tab directly — same end result, no dependency on
  * Slice 4's segment registry. Revisit if a proper in-app lightbox is wanted.
  */
-export default function PlaceCard({ data, onClose, onNavigate, collapsed }) {
+export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobile }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [dragY, setDragY] = useState(0);
   const dragging = useRef(false);
@@ -92,15 +92,15 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed }) {
   return (
     <>
       <div
-        className={`${styles.scrim} ${isOpen ? '' : styles.hidden}`}
+        className={`${styles.scrim} ${isMobile ? '' : styles.desktop} ${isOpen ? '' : styles.hidden}`}
         onClick={onClose}
       />
       <div
-        className={`${styles.card} ${isOpen ? styles.visible : ''}`}
+        className={`${styles.card} ${isMobile ? '' : styles.desktop} ${isOpen ? styles.visible : ''}`}
         style={Object.keys(cardStyle).length ? cardStyle : undefined}
       >
         <div
-          className={styles.handle}
+          className={`${styles.handle} ${isMobile ? '' : styles.desktop}`}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}

@@ -41,28 +41,44 @@
 /* Desktop: float as a sidebar-style card on the map's left edge,
    anchored past the permanent sidebar (features/legend/Sidebar.jsx,
    Slice 3) so it doesn't overlap the rail/panel — matches legacy's
-   `left: var(--sidebar-total-w)` exactly (style.css ~3949–3955). */
-@media (min-width: 769px) {
-  .card {
-    left: var(--sidebar-total-w);
-    right: auto;
-    bottom: 32px;
-    width: 380px;
-    max-height: 78vh;
-    border-radius: var(--r-xl);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.65);
-    transform: translateX(-420px);
-    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
-  }
-  .card.visible {
-    transform: translateX(0);
-  }
-  .scrim {
-    display: none !important;
-  }
-  .handle {
-    display: none;
-  }
+   `left: var(--sidebar-total-w)` exactly (style.css ~3949–3955).
+
+   Was a `@media (min-width: 769px)` block. Converted to a `.desktop`
+   class driven by MapPage's `isMobile` prop instead: MapPage decides
+   `isMobile` once at mount (window.innerWidth <= 768, a deliberate 1:1
+   port of legacy) and never re-checks it, but this media query
+   re-evaluated live — so a resize/zoom/monitor-dock/DevTools toggle
+   after mount could desync the two (React still rendering the desktop
+   <Sidebar>, this card silently flipping into its mobile bottom-sheet
+   layout). Same source of truth for both now. */
+.card.desktop {
+  left: var(--sidebar-total-w);
+  right: auto;
+  bottom: 32px;
+  width: 380px;
+  max-height: 78vh;
+  border-radius: var(--r-xl);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.65);
+  /* Was a hardcoded `translateX(-420px)`. At left: var(--sidebar-total-w)
+     (304px), -420px only clears a card anchored at left:0 — it left the
+     closed card's box spanning roughly -116px to 264px, i.e. still
+     sitting inside the viewport on top of the sidebar. Derive the hide
+     distance from the anchor + the card's own width (100% in a
+     translateX context = this element's width) instead, plus a small
+     buffer, so it stays correct even if --sidebar-total-w or the card's
+     width ever change. Mirrors how the mobile state below already uses
+     a relative unit (translateY(100%)) for the same reason. */
+  transform: translateX(calc(-1 * (var(--sidebar-total-w) + 100% + 24px)));
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.card.desktop.visible {
+  transform: translateX(0);
+}
+.scrim.desktop {
+  display: none !important;
+}
+.handle.desktop {
+  display: none;
 }
 
 .handle {

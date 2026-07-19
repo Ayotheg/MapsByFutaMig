@@ -275,6 +275,7 @@ export default function MapPage() {
         onClose={() => setSelected(null)}
         onNavigate={handlePlaceCardNavigate}
         collapsed={!isMobile && collapsed}
+        isMobile={isMobile}
       />
       {selectedSegment && (
         <Suspense fallback={null}>
