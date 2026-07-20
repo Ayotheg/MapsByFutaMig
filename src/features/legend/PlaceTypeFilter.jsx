@@ -17,6 +17,20 @@ import { GROUP_META, GROUP_ROWS } from './placeTypeGroups';
  * Also not ported: `_setGroupVisible`/`ptfToggle<Group>` — a group-level
  * toggle checkbox legacy's JS supports but no corresponding checkbox
  * exists anywhere in the HTML. Vestigial, skipped for the same reason.
+ *
+ * Visual redesign (this pass): the legacy cascade forced solid white
+ * cards with the dark-theme's light text colors still applied — a
+ * legibility bug, not a style choice. Rebuilt on the brand's solid
+ * token scale from BRAND_GUIDELINES.md (--surface-container/-high/
+ * -highest, --border, --primary-container, --secondary-container) —
+ * no backdrop-filter, no translucent "glass" overlays, flat brand
+ * colors only. One surface per group with a colored spine instead of
+ * nested rounded-card-in-rounded-card, and the same track/knob switch
+ * LayersPanel already uses for GPS Trail / Campus Bounds, so the toggle
+ * affordance is consistent across the whole legend rather than a
+ * one-off circular checkbox just in this section. All props/behavior
+ * unchanged — `typeVisible`, `setTypeVisible`, counts, and group
+ * visibility logic are untouched.
  */
 export default function PlaceTypeFilter({
   typeVisible,
@@ -36,11 +50,11 @@ export default function PlaceTypeFilter({
           title="Show all place types"
           onClick={resetAll}
         >
-          RESET
+          Reset
         </button>
       </div>
 
-      <div>
+      <div className={styles.list}>
         {GROUP_META.map((group) => {
           const rows = GROUP_ROWS[group.key];
           const groupOff = !isGroupFullyVisible(group.key);
@@ -48,9 +62,9 @@ export default function PlaceTypeFilter({
             <div
               key={group.key}
               className={`${styles.group} ${groupOff ? styles.groupOff : ''}`}
+              style={{ '--group-color': group.swatch }}
             >
               <div className={styles.groupHeader}>
-                <span className={styles.groupSwatch} style={{ background: group.swatch }} />
                 <span className={styles.groupName}>{group.name}</span>
                 <span className={styles.groupCount}>{groupCounts[group.key] || ''}</span>
                 {/* Chevron intentionally not rendered: legacy's later CSS
@@ -71,13 +85,16 @@ export default function PlaceTypeFilter({
                       <span className={styles.pin} style={{ background: swatch }} />
                       <span className={styles.typeName}>{name}</span>
                       <span className={styles.typeCount}>{typeCounts[type] || ''}</span>
-                      <input
-                        type="checkbox"
-                        className={styles.typeCb}
-                        checked={visible}
-                        onChange={(e) => setTypeVisible(type, e.target.checked)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
+                      <label className={styles.switch} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={visible}
+                          onChange={(e) => setTypeVisible(type, e.target.checked)}
+                        />
+                        <span className={styles.switchTrack}>
+                          <span className={styles.switchKnob} />
+                        </span>
+                      </label>
                     </div>
                   );
                 })}

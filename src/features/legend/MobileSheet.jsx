@@ -91,6 +91,15 @@ export default function MobileSheet({
 
   const onDragStart = useCallback(
     (e) => {
+      // .header carries touch-action:none so empty header space can be
+      // dragged like the handle — but that same touch-action applies
+      // to its .tab children too (touch-action isn't something a
+      // descendant can opt back out of), so without this guard every
+      // tap on a tab also starts a drag capture. A stray sub-pixel of
+      // finger movement during that tap can then read as a real drag,
+      // occasionally enough to cross a snap threshold and jump the
+      // sheet to 'full' from what looked like a simple tab tap.
+      if (e.target.closest?.('button')) return;
       dragRef.current = {
         startY: e.clientY,
         startTranslate: getSnapPx(sheetState),
@@ -139,6 +148,28 @@ export default function MobileSheet({
     },
     [sheetState, setSheetState]
   );
+
+  // A drag that ends via pointerup is handled above, but a pointer
+  // sequence can also be interrupted without ever firing pointerup —
+  // the browser hands the gesture to something else mid-touch, the OS
+  // shows a system UI, a second touch lands, the tab backgrounds, etc.
+  // `pointercancel`/`lostpointercapture` are how the platform tells us
+  // that happened. Without handling them, `dragRef.current` and
+  // `dragTranslate` are left set from the aborted drag; since `style`
+  // below applies that stale `dragTranslate` as an inline
+  // `transform`+`transition:none`, the sheet stays visually pinned
+  // wherever the gesture broke off — ignoring every subsequent
+  // sheetState change — and no further drag can "grab" it back because
+  // pointer capture was already released elsewhere. That's the stuck-
+  // fullscreen-until-refresh symptom: refreshing works only because it
+  // resets this in-memory state, not because anything on screen was
+  // actually fixed. The fix is to always clear both refs the moment a
+  // sequence ends, cancelled or not, so the CSS class for the current
+  // (unchanged) sheetState immediately takes back over the transform.
+  const onDragCancel = useCallback(() => {
+    dragRef.current = null;
+    setDragTranslate(null);
+  }, []);
 
   const handleTabClick = useCallback(
     (tab) => {
@@ -196,6 +227,8 @@ export default function MobileSheet({
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
+          onPointerCancel={onDragCancel}
+          onLostPointerCapture={onDragCancel}
           onClick={handleTap}
         >
           <div className={styles.handleBar} />
@@ -205,6 +238,8 @@ export default function MobileSheet({
           onPointerDown={onDragStart}
           onPointerMove={onDragMove}
           onPointerUp={onDragEnd}
+          onPointerCancel={onDragCancel}
+          onLostPointerCapture={onDragCancel}
         >
           <div className={styles.tabs}>
             {TABS.map((tab) => (
