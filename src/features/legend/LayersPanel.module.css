@@ -248,6 +248,15 @@
 .previewLight {
   background: linear-gradient(135deg, #e8ecf0 0%, #f4f7fa 50%, #dde3ea 100%);
 }
+.previewDark {
+  background: linear-gradient(135deg, #1a1d29 0%, #23273a 50%, #14161f 100%);
+}
+.previewSatellite {
+  background: linear-gradient(135deg, #2e4a2e 0%, #5c6b3d 45%, #3a5a4a 75%, #6b5a3d 100%);
+}
+.previewTerrain {
+  background: linear-gradient(135deg, #d9c9a3 0%, #b8cfa0 45%, #8fae7a 75%, #e8ddc0 100%);
+}
 
 .opacitySection {
   margin: 8px 10px 8px;

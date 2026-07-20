@@ -8,6 +8,7 @@ import styles from './MapShell.module.css';
 // panels, search, etc.) is wired in here — those are separate slices.
 
 import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
+import { DEFAULT_BASEMAP_ID, getBasemapStyle } from './basemaps';
 
 const CAMPUS_CENTER = [7.2980, 5.1380];
 
@@ -16,6 +17,26 @@ const IS_SAFARI_IOS =
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 const IS_RETINA = window.devicePixelRatio > 1;
+
+// ── Shared tile-layer options, independent of which style is active —
+// same perf tuning (buffer/update behavior) MapShell already used for
+// the single Voyager layer, now applied uniformly whenever the user
+// switches styles via the legend's "Base Map Style" picker.
+function buildTileLayer(style) {
+  const useRetina = style.retina && IS_RETINA;
+  return L.tileLayer(useRetina ? style.urlRetina : style.url, {
+    attribution: style.attribution,
+    subdomains: style.subdomains || 'abc',
+    maxZoom: style.maxZoom,
+    maxNativeZoom: style.maxNativeZoom,
+    tileSize: useRetina ? 512 : 256,
+    zoomOffset: useRetina ? -1 : 0,
+    keepBuffer: IS_SAFARI_IOS ? 2 : 4,
+    updateWhenIdle: IS_SAFARI_IOS,
+    updateWhenZooming: false,
+    crossOrigin: true,
+  });
+}
 
 /**
  * MapShell — owns the Leaflet map instance imperatively via useRef.
@@ -51,25 +72,26 @@ export default function MapShell({ onMapReady }) {
     // ── Hide +/- zoom buttons on mobile (pinch-to-zoom is the native gesture)
     if (window.innerWidth <= 768) map.zoomControl.remove();
 
-    // ── Base tile: CARTO Voyager — matches Google Maps' familiar look
-    const baseMapLayer = L.tileLayer(
-      IS_RETINA
-        ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png'
-        : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-      {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 20,
-        maxNativeZoom: 19,
-        tileSize: IS_RETINA ? 512 : 256,
-        zoomOffset: IS_RETINA ? -1 : 0,
-        keepBuffer: IS_SAFARI_IOS ? 2 : 4,
-        updateWhenIdle: IS_SAFARI_IOS,
-        updateWhenZooming: false,
-        crossOrigin: true,
-      }
-    ).addTo(map);
+    // ── Base tile: CARTO Voyager by default — matches Google Maps'
+    // familiar look. Swappable at runtime via `map.setBaseMapStyle(id)`,
+    // called by the legend's "Base Map Style" picker
+    // (features/legend/LayersPanel.jsx) — same imperative-Leaflet
+    // pattern as `map._campusBoundaryLayer` above: hung off the map
+    // instance so it travels with `onMapReady` instead of needing a
+    // second prop/callback threaded through Sidebar/MobileSheet.
+    let baseMapLayer = buildTileLayer(getBasemapStyle(DEFAULT_BASEMAP_ID)).addTo(map);
+    map._baseMapStyleId = DEFAULT_BASEMAP_ID;
+    map.setBaseMapStyle = (styleId) => {
+      if (styleId === map._baseMapStyleId) return;
+      const style = getBasemapStyle(styleId);
+      const nextLayer = buildTileLayer(style).addTo(map);
+      // Add-before-remove avoids a blank flash while the new provider's
+      // tiles are still loading in.
+      const prevLayer = baseMapLayer;
+      baseMapLayer = nextLayer;
+      map._baseMapStyleId = style.id;
+      map.removeLayer(prevLayer);
+    };
 
     // ── Zoom-class stamped on the container — CSS uses this to show/hide
     // label chips at different zoom levels (consumed by later slices).
