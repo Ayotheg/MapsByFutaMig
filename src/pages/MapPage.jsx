@@ -9,7 +9,6 @@ import MobileSheet from '../features/legend/MobileSheet';
 import SegmentsLayer from '../features/segments/SegmentsLayer';
 import { useSegments } from '../features/segments/useSegments';
 import StaticKmlLayer from '../features/kml/StaticKmlLayer';
-import ImportTrigger from '../features/kml/ImportTrigger';
 import { useOSMAnnotations } from '../features/osm-annotations/useOSMAnnotations';
 import { useViewMode } from '../features/osm-annotations/useViewMode';
 import OSMAnnotationLayer from '../features/osm-annotations/OSMAnnotationLayer';
@@ -87,7 +86,7 @@ const AdminPanel = lazy(() => import('../features/admin/AdminPanel'));
  * mounted once `navOpen` is set — see its own import comment for why
  * that split, not "the whole slice," is the real lazy-load boundary.
  */
-export default function MapPage() {
+export default function MapPage({ onReadinessChange }) {
   const [map, setMap] = useState(null);
   const [selected, setSelected] = useState(null);
   const [isMobile] = useState(() => window.innerWidth <= 768);
@@ -95,7 +94,7 @@ export default function MapPage() {
 
   const { waypoints, loading: waypointsLoading, refetch: refetchWaypoints } = useWaypoints();
   const typeVisibilityProps = useTypeVisibility(waypoints);
-  const { segments, refetch: refetchSegments } = useSegments();
+  const { segments, loading: segmentsLoading, refetch: refetchSegments } = useSegments();
   const selectedSegment = segments.find((s) => s.id === selectedSegmentId) || null;
 
   // ── Slice 7: search ─────────────────────────────────────────────────
@@ -152,6 +151,19 @@ export default function MapPage() {
   // components need (Sidebar's footer, the mobile auth FAB, ReviewModal
   // for attribution, and later Slice 11's PIN gate).
   const auth = useAuth();
+
+  // Real boot-readiness signal for App's loading screen — no fake timer,
+  // just the same loading flags this page already tracks for its own
+  // data hooks (map init, waypoints, segments, session restore).
+  useEffect(() => {
+    onReadinessChange?.({
+      mapReady: !!map,
+      waypointsReady: !waypointsLoading,
+      segmentsReady: !segmentsLoading,
+      authReady: !auth.loading,
+    });
+  }, [map, waypointsLoading, segmentsLoading, auth.loading, onReadinessChange]);
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState('login');
   // Legacy's `openModal(tab)` (app.js ~7185–7189): always lands on the
@@ -181,11 +193,12 @@ export default function MapPage() {
   // trigger `ImportTrigger.jsx` was built to eventually "relocate inside
   // the admin overlay" — don't exist anywhere in legacy's real markup.
   // That whole import flow is dead/unreachable in the live legacy app, not
-  // "reserved for Slice 11." There's no legacy placement to relocate
-  // `ImportTrigger` into, so it's left exactly as-is (a standalone,
-  // ungated floating button — see its own header comment) rather than
-  // folded into this panel on a guess. Clicking Admin now opens the real,
-  // ported `#adminOverlay` (`AdminPanel.jsx`) instead.
+  // "reserved for Slice 11." Clicking Admin now opens the real, ported
+  // `#adminOverlay` (`AdminPanel.jsx`) instead. `ImportTrigger` itself has
+  // since been unmounted from this page entirely (its fixed bottom-left
+  // position overlapped the sidebar rail once collapsed) — its lazy-loaded
+  // `KmlImportPanel.jsx` pipeline is unreached until a real entry point is
+  // decided on, likely inside `AdminPanel.jsx`.
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const adminPin = useAdminPin(auth.user, openAuthModal);
 
@@ -263,13 +276,6 @@ export default function MapPage() {
       )}
       {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={setSelected} />}
       {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
-      <ImportTrigger
-        waypoints={waypoints}
-        segments={segments}
-        onSaved={async () => {
-          await Promise.all([refetchWaypoints(), refetchSegments()]);
-        }}
-      />
       <PlaceCard
         data={selected}
         onClose={() => setSelected(null)}

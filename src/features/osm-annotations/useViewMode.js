@@ -5,16 +5,18 @@ import { useCallback, useEffect, useState } from 'react';
  * `applyViewMode` (app.js ~3249–3294). Default is INFO mode, matching
  * legacy's `let _infoMode = true`.
  *
- * Deviation, flagged: legacy applies RAW mode via two mechanisms — (a) a
+ * Deviation, flagged: legacy hides markers entirely in RAW mode, via (a) a
  * CSS kill-switch (`body.raw-mode .gm-pin-wrap { display:none }`) and (b) an
  * imperative batched `map.removeLayer()` pass over `window._waypointLayers`
  * (a single array legacy pushes ALL waypoint/KML/OSM markers into). This
- * port uses (a) only. `display:none` already drops pointer-event
- * interaction, so the visible/interactive result is identical, and it avoids
- * every marker-owning layer (WaypointLayer, StaticKmlLayer,
- * OSMAnnotationLayer — three separate components in this port, not one
- * shared array) needing its own removal/re-add pass on every toggle.
- * See waypointMarkers.css for the actual kill-switch rule.
+ * port originally used (a) only, verbatim. In practice that hid every real
+ * (named) marker — waypoints, OSM POIs, named KML points — leaving the map
+ * looking empty rather than "raw," since almost none of this app's actual
+ * content falls into legacy's narrow "unnamed GPS dot" category. Changed at
+ * the person's explicit direction: the CSS rule now hides only each pin's
+ * inline `.gm-pin-label`, keeping `.gm-pin-dot` (and its click target)
+ * visible — RAW mode declutters text, it doesn't blank the map. See
+ * waypointMarkers.css for the actual rule.
  */
 export function useViewMode() {
   const [viewMode, setViewMode] = useState('info'); // 'info' | 'raw'

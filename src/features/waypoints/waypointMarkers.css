@@ -72,13 +72,15 @@
 .zoom-close .gm-pin-dot   { transform: scale(1); opacity: 1; }
 .zoom-close .gm-pin-wrap  { opacity: 1; }
 
-/* ── RAW mode kill-switch (Slice 6) ────────────────────────────────────────
-   Ported verbatim from legacy style.css ~2817. Hides every marker built via
-   buildWaypointMarker — waypoints (WaypointLayer), named KML annotations
-   (StaticKmlLayer), and OSM annotations (OSMAnnotationLayer) — since all
-   three render through this same .gm-pin-wrap divIcon. display:none also
-   drops pointer-event interaction, so this alone reproduces legacy's
-   combined CSS+JS-removal raw-mode behavior; see useViewMode.js for why the
-   JS removal half wasn't ported. Unnamed KML dots (plain L.circleMarker,
-   not gm-pin-wrap) are correctly NOT hidden by this rule — same as legacy. */
-:global(body.raw-mode) .gm-pin-wrap { display: none !important; }
+/* ── RAW mode kill-switch (Slice 6, revised) ───────────────────────────────
+   Originally ported verbatim from legacy style.css ~2817 as a full
+   `.gm-pin-wrap { display:none }` — that hid every named marker entirely
+   (waypoints, KML, OSM), which with real content turned out to leave the
+   map looking empty rather than "raw." Changed at the person's explicit
+   direction: RAW mode now hides only the inline label
+   (`.gm-pin-label`), keeping `.gm-pin-dot` visible and clickable — same
+   declutter intent (no text clutter), but the map still shows where
+   every place actually is. Zoom-tier label rules above already hide the
+   label at far/mid/near zoom anyway; this just extends that same
+   "dot-only" look to close zoom too, driven by mode instead of zoom. */
+:global(body.raw-mode) .gm-pin-label { display: none !important; }
