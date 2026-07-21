@@ -90,4 +90,43 @@
   --font-label:   'Montserrat', 'Poppins', sans-serif;
   --font-body:    'Poppins', 'Inter', sans-serif;
   --font-mono:    'DM Mono', 'Courier New', monospace;
+
+  /* ───────────────────────────────────────────────────────────
+     Landing page aliases (LANDING_PAGE_BUILD_PLAN.md Task 1 /
+     conflict #3) — the Figma Make export's index.css redeclared
+     its own :root with the same hex values under friendlier
+     names. Rather than ship two token systems, those names are
+     aliased here to the existing tokens above via var(), so
+     there is exactly one source of truth (this file). When the
+     landing page is ported to JSX (Task 2), it should keep using
+     these names as-is — no find/replace needed in the component
+     code, just delete the landing export's own :root block.
+     ─────────────────────────────────────────────────────────── */
+  --purple-light: var(--primary);
+  --purple-mid:   var(--primary-container);
+  --purple-dark:  var(--on-primary);
+  --teal-dark:    var(--secondary-container);
+  --orange-dark:  var(--tertiary-container);
+  --bg-darkest:   var(--surface-dim);
+  --bg-dark:      var(--surface-low);
+  --bg-mid:       var(--surface-container);
+  --bg-light:     var(--surface-high);
+  --bg-lighter:   var(--surface-highest);
+  /* --teal, --text, and --border are omitted here: the landing
+     export's values for those are byte-identical to --secondary,
+     --text, and --border above, so the existing token already
+     serves both names — no separate alias needed. */
+
+  /* FLAGGED, not silently aliased: the landing export also
+     declares --muted: #cfc2d6, but that's a *different* color
+     from this file's existing --muted (rgba(218,226,253,0.45),
+     used elsewhere in the app today) — #cfc2d6 is actually a
+     byte-for-byte match for --text-variant instead. Redeclaring
+     --muted here would silently overwrite the existing token's
+     value for every current consumer. Left --muted alone; when
+     the landing page is ported (Task 2), point its --muted
+     usages at var(--text-variant) directly rather than
+     reintroducing a colliding name. Flag if a different
+     resolution is wanted.
+  */
 }
