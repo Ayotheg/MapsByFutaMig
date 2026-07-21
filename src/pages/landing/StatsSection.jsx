@@ -16,7 +16,7 @@ function StatCard({ value, label, suffix = '', active }) {
 function StatsSection() {
   const { ref, visible } = useReveal(0.3)
   const stats = [
-    { value: 100, suffix: '+', label: 'Campus Locations' },
+    { value: 475, suffix: '+', label: 'Campus Locations' },
     { value: 20, suffix: '+', label: 'Categories' },
     { value: 1, suffix: '', label: 'Campus. Fully Mapped.' },
     { value: 5000, suffix: '+', label: 'Searches Made' },

@@ -129,7 +129,7 @@ function PhoneMockup() {
         padding: '10px 14px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
         animationDelay: '0.5s',
       }}>
-        <div style={{ fontFamily: 'Inter', fontSize: 18, fontWeight: 700, color: '#44e2cd' }}>100+</div>
+        <div style={{ fontFamily: 'Inter', fontSize: 18, fontWeight: 700, color: '#44e2cd' }}>475+</div>
         <div style={{ fontFamily: 'Poppins', fontSize: 10, color: 'var(--muted)' }}>Locations</div>
       </div>
       <div className="animate-float-card" style={{
@@ -228,7 +228,7 @@ function Hero() {
 
             {/* Mini stats row */}
             <div className="flex flex-wrap gap-6 mt-10">
-              {[['100+', 'Campus Locations'], ['20+', 'Categories'], ['Live', 'GPS Navigation']].map(([val, label]) => (
+              {[['475+', 'Campus Locations'], ['20+', 'Categories'], ['Live', 'GPS Navigation']].map(([val, label]) => (
                 <div key={label}>
                   <div style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 24, fontWeight: 800, color: 'var(--purple-light)' }}>{val}</div>
                   <div style={{ fontFamily: 'Poppins', fontSize: 12, color: 'var(--muted)' }}>{label}</div>

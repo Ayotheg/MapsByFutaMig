@@ -9,7 +9,7 @@ function FAQ() {
     { q: 'What is Maps By FUTA?', a: 'Maps By FUTA is an interactive campus navigation platform built exclusively for the Federal University of Technology, Akure. It helps students, staff, freshers, parents, and visitors navigate the campus using intelligent search, live GPS navigation, and categorized location discovery.' },
     { q: 'Do I need to download an app?', a: 'No. Maps By FUTA is a Progressive Web App (PWA) — it runs entirely in your browser. Just visit mapsbyfuta.xyz on any device and start navigating immediately.' },
     { q: 'Is Maps By FUTA free to use?', a: 'Yes! Maps By FUTA is completely free for all students, staff, and visitors. It will always be free. Community support helps keep it that way.' },
-    { q: 'How accurate is the campus map?', a: 'The map is built specifically for FUTA campus using accurate geographic data with 100+ verified locations. The team continuously updates the map as campus changes.' },
+    { q: 'How accurate is the campus map?', a: 'The map is built specifically for FUTA campus using accurate geographic data with 475+ verified locations. The team continuously updates the map as campus changes.' },
     { q: 'Can I use Maps By FUTA without internet?', a: "Currently Maps By FUTA requires an internet connection. Offline mode is on the roadmap and will be coming soon." },
   ]
 

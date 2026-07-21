@@ -55,7 +55,7 @@ function DiscoverSection() {
 
             {[
               ['Never get lost on campus', 'Accurate, up-to-date campus map always in your pocket'],
-              ['Discover every important location', 'From classrooms to clinics, hostels to fuel stations—100+ places mapped'],
+              ['Discover every important location', 'From classrooms to clinics, hostels to fuel stations—475+ places mapped'],
               ['Navigate confidently with live directions', 'Turn-by-turn GPS routes so you always know where to go'],
             ].map(([title, desc]) => (
               <div key={title} className="flex items-start gap-4" style={{ marginBottom: 20 }}>
@@ -81,4 +81,4 @@ function DiscoverSection() {
   )
 }
 
-export default DiscoverSection
+export default DiscoverSection;

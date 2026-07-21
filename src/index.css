@@ -113,6 +113,17 @@ html, body {
   font-family: var(--font-ui);
   background: var(--surface);
   color: var(--text);
+}
+
+/*
+ * Fixed-viewport lock, needed by the map app (/map) so the page never
+ * scrolls out from under the Leaflet canvas — but NOT wanted on the
+ * landing page (/), which needs normal document scroll. Toggled on
+ * <body> by HomeRoute (src/App.jsx) for the lifetime of the /map
+ * route only; see TASK_3_CHANGES.md for why this moved out of the
+ * global html/body rule.
+ */
+body.map-viewport {
   overflow: hidden;
   position: fixed;
   overscroll-behavior: none;

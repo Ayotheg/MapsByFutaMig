@@ -193,7 +193,7 @@ function ProductFeatures() {
       title: 'Interactive Campus Map',
       emoji: '🗺️',
       tagline: 'Explore every corner of FUTA — lecture halls, hostels, restaurants, ATMs, banks, clinics, bus stops, places of worship, sports centres, shopping areas, and many more campus locations.',
-      bullets: ['100+ mapped locations', 'Categorized by type', 'Regular map updates', 'Detailed location info'],
+      bullets: ['475+ mapped locations', 'Categorized by type', 'Regular map updates', 'Detailed location info'],
       visual: <MapFeatureVisual />,
     },
     {

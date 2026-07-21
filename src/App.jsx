@@ -5,9 +5,7 @@ import MapPage from './pages/MapPage'
 import LoadingScreen from './pages/LoadingScreen'
 import NotFoundPage from './pages/NotFoundPage'
 
-// LandingPage isn't wired into a route yet — earmarked for a future
-// "how the map works" explainer page, not in scope for this slice.
-// import LandingPage from './pages/LandingPage'
+import LandingPage from './pages/LandingPage'
 
 // One entry per real boot milestone tracked below — order matches roughly
 // how they resolve in practice (map init is near-instant; Supabase reads
@@ -56,6 +54,16 @@ function HomeRoute() {
   const fontsReady = useFontsReady();
   const [booted, setBooted] = useState(false);
 
+  // Lock the viewport for the map's fixed-canvas layout, only while
+  // this route is mounted — the landing page at "/" needs normal
+  // document scroll instead. See the .map-viewport rule in index.css.
+  useEffect(() => {
+    document.body.classList.add("map-viewport");
+    return () => {
+      document.body.classList.remove("map-viewport");
+    };
+  }, []);
+
   const completed =
     Number(readiness.mapReady) +
     Number(readiness.waypointsReady) +
@@ -82,7 +90,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<HomeRoute />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/map" element={<HomeRoute />} />
         <Route path="/loadingscreen" element={<LoadingScreen />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
