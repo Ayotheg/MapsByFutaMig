@@ -1,0 +1,302 @@
+/* Landing page styles — plain global CSS, not a CSS Module.
+   Deliberate deviation from the project's CSS Modules convention
+   (LANDING_PAGE_BUILD_PLAN.md conflict #5): this page is almost
+   entirely inline `style={{...}}` per the original Figma Make export,
+   and a CSS-Modules rewrite of that would be a lot of churn for a
+   self-contained marketing page. The className-based pieces below
+   (keyframes, .glass/.btn-primary/.reveal/etc.) are kept as plain
+   utility classes for the same reason, scoped to this file and only
+   imported by LandingPage.jsx.
+
+   The old :root color-token block that used to live here has been
+   removed — those tokens are now aliased in src/styles/tokens.css
+   (Task 1), so every var(--purple-light) etc. reference below
+   resolves from there instead of a second, duplicate declaration.
+
+   NOT resolved by this file: src/index.css's global `html, body`
+   rule sets `position: fixed; overflow: hidden` (tuned for the
+   fixed-viewport map app). A normal scrolling marketing page will
+   not scroll under that rule. This page doesn't override it here —
+   that's a routing-level concern for whoever wires LandingPage into
+   App.jsx (Task 7), not something to patch with a global override
+   from inside one page's stylesheet. Flagging it now so it isn't
+   missed. */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-14px); }
+}
+
+@keyframes floatCard {
+  0%, 100% { transform: translateY(0px) rotate(-1deg); }
+  50% { transform: translateY(-8px) rotate(0deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 24px rgba(183,109,255,0.25), 0 0 60px rgba(183,109,255,0.1); }
+  50% { box-shadow: 0 0 48px rgba(183,109,255,0.5), 0 0 100px rgba(183,109,255,0.2); }
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes drawRoute {
+  from { stroke-dashoffset: 800; opacity: 0.2; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes particle {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  50% { opacity: 0.8; transform: translateY(-30px) scale(1); }
+  100% { opacity: 0; transform: translateY(-60px) scale(0.5); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Utility classes */
+.animate-float { animation: float 5s ease-in-out infinite; }
+.animate-float-card { animation: floatCard 6s ease-in-out infinite; }
+.animate-pulse-glow { animation: pulseGlow 3s ease-in-out infinite; }
+.animate-ticker { animation: ticker 35s linear infinite; }
+.animate-spin-slow { animation: spinSlow 25s linear infinite; }
+
+.reveal {
+  opacity: 0;
+  transform: translateY(36px);
+  transition: opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal-scale.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Glass morphism */
+.glass {
+  background: rgba(19, 27, 46, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border);
+}
+
+.glass-card {
+  background: rgba(34, 42, 61, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(183, 109, 255, 0.18);
+  border-radius: 20px;
+}
+
+.glass-purple {
+  background: rgba(73, 0, 128, 0.2);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(183, 109, 255, 0.3);
+}
+
+/* Glow effects */
+.glow-purple {
+  box-shadow: 0 0 32px rgba(183,109,255,0.25), 0 0 80px rgba(183,109,255,0.1);
+}
+.glow-teal {
+  box-shadow: 0 0 32px rgba(68,226,205,0.25);
+}
+.glow-orange {
+  box-shadow: 0 0 24px rgba(255,185,95,0.3);
+}
+
+/* Text gradient */
+.text-gradient-purple {
+  background: linear-gradient(135deg, var(--purple-light) 0%, var(--purple-mid) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.text-gradient-teal {
+  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.text-gradient-mix {
+  background: linear-gradient(135deg, var(--purple-light) 0%, var(--teal) 60%, var(--orange) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Buttons */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #b76dff 0%, #490080 100%);
+  color: white;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 14px 30px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+  box-shadow: 0 4px 24px rgba(183,109,255,0.35);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn-primary:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 10px 40px rgba(183,109,255,0.55);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(34,42,61,0.6);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 15px;
+  padding: 13px 30px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+}
+.btn-secondary:hover {
+  background: rgba(183,109,255,0.12);
+  border-color: rgba(183,109,255,0.4);
+  transform: translateY(-2px);
+}
+
+/* Shimmer loading effect */
+.shimmer-bg {
+  background: linear-gradient(90deg, var(--bg-light) 25%, var(--bg-lighter) 50%, var(--bg-light) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Nav */
+.nav-link {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-link:hover {
+  color: var(--text);
+}
+
+/* Category card hover */
+.category-card {
+  transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
+  cursor: pointer;
+}
+.category-card:hover {
+  transform: translateY(-4px) scale(1.04);
+  border-color: rgba(183,109,255,0.5) !important;
+  box-shadow: 0 8px 32px rgba(183,109,255,0.2);
+}
+
+/* Feature hover */
+.feature-card-hover {
+  transition: all 0.3s ease;
+}
+.feature-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(183,109,255,0.2) !important;
+}
+
+/* Roadmap card */
+.roadmap-card {
+  transition: all 0.3s ease;
+}
+.roadmap-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(68,226,205,0.4) !important;
+  box-shadow: 0 12px 40px rgba(68,226,205,0.15);
+}
+
+/* Gradient border */
+.gradient-border {
+  position: relative;
+  border-radius: 20px;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 21px;
+  background: linear-gradient(135deg, rgba(183,109,255,0.5), rgba(68,226,205,0.3), rgba(183,109,255,0.5));
+  z-index: -1;
+}
+
+/* Animated gradient background */
+.animated-gradient {
+  background: linear-gradient(135deg, var(--bg-darkest), #1a0d2e, var(--bg-darkest), #0d1a2e);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+
+/* Pin pulse */
+@keyframes pinPulse {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+.pin-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(68,226,205,0.6);
+  animation: pinPulse 2s ease-out infinite;
+}
