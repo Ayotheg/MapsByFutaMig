@@ -92,7 +92,7 @@ function Footer() {
         </div>
 
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 24, display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'rgba(183,109,255,0.5)', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'var(--muted)', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             Made with <Heart size={13} strokeWidth={2} fill="currentColor" /> for FUTA
           </p>
           <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'var(--muted)', margin: 0, opacity: 0.5 }}>

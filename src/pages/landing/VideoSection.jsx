@@ -159,7 +159,7 @@ function VideoSection() {
 
   return (
     <section id="video" style={{ padding: '120px 24px', background: 'var(--bg-darkest)', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, rgba(73,0,128,0.2) 0%, transparent 70%)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, rgba(73,0,128,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
       <div ref={ref} style={{ maxWidth: 900, margin: '0 auto', textAlign: 'center' }}>
         <div className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Montserrat', fontSize: 12, fontWeight: 700, letterSpacing: 4, color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 12 }}>Demo</div>
         <h2 className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(30px,4vw,52px)', fontWeight: 800, marginBottom: 16, transitionDelay: '0.1s' }}>
@@ -170,9 +170,9 @@ function VideoSection() {
         </p>
 
         <div className={`reveal-scale ${visible ? 'visible' : ''}`} style={{ transitionDelay: '0.25s' }}>
-          <div className="animate-pulse-glow" style={{
+          <div style={{
             background: 'rgba(19,27,46,0.85)', backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(183,109,255,0.3)', borderRadius: 28,
+            border: '1px solid var(--border)', borderRadius: 28,
             padding: 8, overflow: 'hidden',
             boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
           }}>
@@ -206,7 +206,7 @@ function VideoSection() {
                     position: 'absolute', bottom: 14, right: 14, zIndex: 2,
                     width: 40, height: 40, borderRadius: '50%',
                     background: 'rgba(11,19,38,0.75)', backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(183,109,255,0.35)',
+                    border: '1px solid var(--border)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     cursor: 'pointer', color: 'var(--text)', transition: 'transform 0.2s',
                   }}
@@ -218,7 +218,7 @@ function VideoSection() {
               )}
             </div>
           </div>
-          <p style={{ fontFamily: 'Poppins', fontSize: 12, color: 'rgba(183,109,255,0.5)', marginTop: 14 }}>
+          <p style={{ fontFamily: 'Poppins', fontSize: 12, color: 'var(--muted)', marginTop: 14 }}>
             Plays automatically as you scroll into view · muted by default, tap the speaker to unmute
           </p>
         </div>

@@ -18,7 +18,7 @@ function WhySection() {
           <div style={{ flex: 1 }}>
             <div className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Montserrat', fontSize: 12, fontWeight: 700, letterSpacing: 4, color: 'var(--orange)', textTransform: 'uppercase', marginBottom: 12 }}>Our Why</div>
             <h2 className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(30px,4vw,50px)', fontWeight: 800, lineHeight: 1.15, marginBottom: 24, transitionDelay: '0.1s' }}>
-              Campus Shouldn't<br /><span className="text-gradient-purple">Be a Maze.</span>
+              Campus Shouldn't<br /><span className="text-gradient-orange">Be a Maze.</span>
             </h2>
             <p className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Poppins', fontSize: 16, lineHeight: 1.8, color: 'var(--muted)', marginBottom: 28, transitionDelay: '0.2s' }}>
               FUTA is a large, vibrant campus with hundreds of buildings, services, and facilities. But for too long, navigating it has relied on asking strangers, following handmade signs, or simply wandering.

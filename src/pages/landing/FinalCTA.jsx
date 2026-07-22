@@ -51,7 +51,7 @@ function FinalCTA() {
             <Map size={20} strokeWidth={2} /> Open Maps By FUTA
           </Link>
         </div>
-        <p className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Poppins', fontSize: 13, color: 'rgba(183,109,255,0.45)', marginTop: 24, transitionDelay: '0.4s' }}>
+        <p className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Poppins', fontSize: 13, color: 'var(--muted)', marginTop: 24, transitionDelay: '0.4s' }}>
           Free · No download required · Open in any browser
         </p>
       </div>

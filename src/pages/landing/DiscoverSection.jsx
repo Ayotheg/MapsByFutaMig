@@ -8,7 +8,7 @@ function DiscoverSection() {
   const { ref, visible } = useReveal()
   return (
     <section id="features" style={{ padding: '120px 24px', background: 'var(--bg-darkest)', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', right: 0, top: '20%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(73,0,128,0.2) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', right: 0, top: '20%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(73,0,128,0.12) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
 
       <div ref={ref} style={{ maxWidth: 1200, margin: '0 auto' }}>
         {/* Label */}
@@ -62,7 +62,7 @@ function DiscoverSection() {
               ['Navigate confidently with live directions', 'Turn-by-turn GPS routes so you always know where to go'],
             ].map(([title, desc]) => (
               <div key={title} className="flex items-start gap-4" style={{ marginBottom: 20 }}>
-                <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'linear-gradient(135deg,#44e2cd,#03c6b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#44e2cd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
                   <Check size={14} strokeWidth={3} color="#0b1326" />
                 </div>
                 <div>

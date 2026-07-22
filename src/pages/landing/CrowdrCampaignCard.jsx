@@ -27,7 +27,7 @@ function CrowdrCampaignCard({ campaignUrl = CROWDR_CAMPAIGN_URL }) {
     <div style={{ width: '100%', maxWidth: 480, margin: '0 auto 32px' }}>
       <div style={{
         position: 'relative', borderRadius: 20, overflow: 'hidden',
-        border: '1px solid rgba(183,109,255,0.3)',
+        border: '1px solid rgba(68,226,205,0.3)',
         background: '#fff',
         boxShadow: '0 20px 50px rgba(0,0,0,0.35)',
       }}>
@@ -38,7 +38,7 @@ function CrowdrCampaignCard({ campaignUrl = CROWDR_CAMPAIGN_URL }) {
           }}>
             <div className="animate-spin-fast" style={{
               width: 28, height: 28, borderRadius: '50%',
-              border: '3px solid rgba(183,109,255,0.25)', borderTopColor: '#b76dff',
+              border: '3px solid rgba(68,226,205,0.25)', borderTopColor: '#44e2cd',
             }} />
           </div>
         )}
@@ -63,7 +63,7 @@ function CrowdrCampaignCard({ campaignUrl = CROWDR_CAMPAIGN_URL }) {
           marginTop: 10, fontFamily: 'Inter', fontSize: 12.5, color: 'var(--muted)',
           textDecoration: 'none',
         }}
-        onMouseEnter={e => (e.currentTarget.style.color = 'var(--purple-light)')}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--teal)')}
         onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}
       >
         Trouble viewing the campaign? Open it on Crowdr <ArrowUpRight size={13} strokeWidth={2} />

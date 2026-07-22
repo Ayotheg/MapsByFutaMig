@@ -138,44 +138,41 @@ html {
   border: 1px solid rgba(183, 109, 255, 0.3);
 }
 
-/* Glow effects */
+/* Glow effects — kept subtle; single-color ambient light, not decoration */
 .glow-purple {
-  box-shadow: 0 0 32px rgba(183,109,255,0.25), 0 0 80px rgba(183,109,255,0.1);
+  box-shadow: 0 0 24px rgba(183,109,255,0.16), 0 0 56px rgba(183,109,255,0.06);
 }
 .glow-teal {
-  box-shadow: 0 0 32px rgba(68,226,205,0.25);
+  box-shadow: 0 0 24px rgba(68,226,205,0.18);
 }
 .glow-orange {
-  box-shadow: 0 0 24px rgba(255,185,95,0.3);
+  box-shadow: 0 0 20px rgba(255,185,95,0.2);
 }
 
-/* Text gradient */
+/* Text accents — solid color, no gradient-clip. Restraint: one accent
+   word per heading, never the whole line. */
 .text-gradient-purple {
-  background: linear-gradient(135deg, var(--purple-light) 0%, var(--purple-mid) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--purple-light);
 }
 .text-gradient-teal {
-  background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--teal);
 }
 .text-gradient-mix {
-  background: linear-gradient(135deg, var(--purple-light) 0%, var(--teal) 60%, var(--orange) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--teal);
+}
+.text-gradient-orange {
+  color: var(--orange);
 }
 
-/* Buttons */
+/* Buttons — solid fills, no gradients. Primary CTA uses the secondary
+   brand color (teal) so it reads as a distinct, findable action rather
+   than blending into the violet-heavy page chrome. */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, #b76dff 0%, #490080 100%);
-  color: white;
+  background: var(--secondary);
+  color: var(--on-secondary);
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   font-size: 15px;
@@ -183,21 +180,25 @@ html {
   border-radius: 14px;
   border: none;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
-  box-shadow: 0 4px 24px rgba(183,109,255,0.35);
+  transition: transform 0.25s cubic-bezier(0.16,1,0.3,1), box-shadow 0.25s cubic-bezier(0.16,1,0.3,1), background 0.2s ease;
+  box-shadow: 0 4px 18px rgba(68,226,205,0.25);
   text-decoration: none;
   white-space: nowrap;
 }
 .btn-primary:hover {
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 10px 40px rgba(183,109,255,0.55);
+  background: var(--secondary-container);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(68,226,205,0.35);
+}
+.btn-primary:active {
+  transform: translateY(0);
 }
 
 .btn-secondary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(34,42,61,0.6);
+  background: rgba(255,255,255,0.04);
   color: var(--text);
   font-family: 'Inter', sans-serif;
   font-weight: 500;
@@ -206,14 +207,14 @@ html {
   border-radius: 14px;
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
   text-decoration: none;
   backdrop-filter: blur(8px);
   white-space: nowrap;
 }
 .btn-secondary:hover {
-  background: rgba(183,109,255,0.12);
-  border-color: rgba(183,109,255,0.4);
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(218,226,253,0.35);
   transform: translateY(-2px);
 }
 
@@ -267,7 +268,7 @@ html {
   box-shadow: 0 12px 40px rgba(68,226,205,0.15);
 }
 
-/* Gradient border */
+/* Accent border — solid, not a gradient ring */
 .gradient-border {
   position: relative;
   border-radius: 20px;
@@ -277,15 +278,13 @@ html {
   position: absolute;
   inset: -1px;
   border-radius: 21px;
-  background: linear-gradient(135deg, rgba(183,109,255,0.5), rgba(68,226,205,0.3), rgba(183,109,255,0.5));
+  background: rgba(183,109,255,0.35);
   z-index: -1;
 }
 
-/* Animated gradient background */
+/* Ambient surface background — solid, no animated color shift */
 .animated-gradient {
-  background: linear-gradient(135deg, var(--bg-darkest), #1a0d2e, var(--bg-darkest), #0d1a2e);
-  background-size: 400% 400%;
-  animation: gradientShift 12s ease infinite;
+  background: var(--bg-darkest);
 }
 
 /* Pin pulse */

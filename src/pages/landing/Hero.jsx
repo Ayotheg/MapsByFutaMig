@@ -32,7 +32,7 @@ function PhoneMockup() {
       {/* Ambient glow behind phone */}
       <div style={{
         position: 'absolute', inset: '-40px', borderRadius: '50%',
-        background: 'radial-gradient(ellipse, rgba(183,109,255,0.25) 0%, transparent 70%)',
+        background: 'radial-gradient(ellipse, rgba(183,109,255,0.16) 0%, transparent 70%)',
         filter: 'blur(20px)',
       }} />
 
@@ -92,7 +92,7 @@ function PhoneMockup() {
           }}>
             <MapPin size={12} strokeWidth={2} color="#dae2fd" />
             <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#888', flex: 1 }}>Search FUTA campus...</span>
-            <div style={{ background: '#b76dff', borderRadius: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Send size={12} strokeWidth={2} color="#fff" /></div>
+            <div style={{ background: '#44e2cd', borderRadius: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Send size={12} strokeWidth={2} color="#003731" /></div>
           </div>
 
           {/* Category chips */}
@@ -167,21 +167,21 @@ function Hero() {
       minHeight: '100vh', display: 'flex', alignItems: 'center',
       position: 'relative', overflow: 'hidden',
       paddingTop: 80,
-      background: 'linear-gradient(160deg, #0b1326 0%, #1a0d2e 40%, #0b1326 100%)',
+      background: 'var(--surface)',
     }}>
-      {/* Background orbs */}
-      <div style={{ position: 'absolute', top: '10%', left: '5%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(73,0,128,0.25) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: '5%', right: '5%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(68,226,205,0.1) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+      {/* Background orbs — one restrained accent, one quiet teal counterweight */}
+      <div style={{ position: 'absolute', top: '8%', left: '2%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(73,0,128,0.16) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '5%', right: '5%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(68,226,205,0.08) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
 
-      {/* Particle dots */}
-      {Array.from({ length: 20 }).map((_, i) => (
+      {/* Particle dots — quiet, mixed brand colors, low count */}
+      {Array.from({ length: 10 }).map((_, i) => (
         <div key={i} style={{
           position: 'absolute',
           left: `${(i * 47 + 10) % 95}%`,
           top: `${(i * 37 + 5) % 90}%`,
           width: i % 3 === 0 ? 3 : 2, height: i % 3 === 0 ? 3 : 2,
           borderRadius: '50%',
-          background: i % 2 === 0 ? 'rgba(183,109,255,0.5)' : 'rgba(68,226,205,0.4)',
+          background: i % 3 === 0 ? 'rgba(183,109,255,0.35)' : i % 3 === 1 ? 'rgba(68,226,205,0.3)' : 'rgba(255,185,95,0.3)',
           animation: `particle ${3 + (i % 4)}s ease-in-out infinite`,
           animationDelay: `${(i * 0.4) % 4}s`,
           pointerEvents: 'none',
@@ -232,9 +232,9 @@ function Hero() {
 
             {/* Mini stats row */}
             <div className="flex flex-wrap gap-8" style={{ marginTop: 48 }}>
-              {[['475+', 'Campus Locations'], ['20+', 'Categories'], ['Live', 'GPS Navigation']].map(([val, label]) => (
+              {[['475+', 'Campus Locations', 'var(--purple-light)'], ['20+', 'Categories', 'var(--teal)'], ['Live', 'GPS Navigation', 'var(--orange)']].map(([val, label, color]) => (
                 <div key={label}>
-                  <div style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 24, fontWeight: 800, color: 'var(--purple-light)', marginBottom: 4 }}>{val}</div>
+                  <div style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 24, fontWeight: 800, color, marginBottom: 4 }}>{val}</div>
                   <div style={{ fontFamily: 'Poppins', fontSize: 12, color: 'var(--muted)' }}>{label}</div>
                 </div>
               ))}

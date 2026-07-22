@@ -17,7 +17,7 @@ function RoadmapSection() {
         <div style={{ textAlign: 'center', marginBottom: 64 }}>
           <div className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Montserrat', fontSize: 12, fontWeight: 700, letterSpacing: 4, color: 'var(--orange)', textTransform: 'uppercase', marginBottom: 12 }}>Roadmap</div>
           <h2 className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(30px,4vw,52px)', fontWeight: 800, transitionDelay: '0.1s' }}>
-            What's Coming<br /><span className="text-gradient-purple">Next.</span>
+            What's Coming<br /><span className="text-gradient-orange">Next.</span>
           </h2>
           <p className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Poppins', fontSize: 16, color: 'var(--muted)', marginTop: 16, transitionDelay: '0.2s' }}>
             Maps By FUTA is just getting started. Here's where we're headed.
