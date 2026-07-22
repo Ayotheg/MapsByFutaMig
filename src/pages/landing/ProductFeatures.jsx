@@ -1,7 +1,12 @@
+import {
+  Map, Search, Compass, Star, Smartphone, ArrowRight,
+  Building2, CreditCard, Hospital, UtensilsCrossed, House,
+  MapPin, Target, PersonStanding, CarFront, Satellite,
+} from 'lucide-react'
 import { useReveal } from './landingHooks'
 
 /* ─── Feature showcase ─── */
-function FeatureShowcase({ index, title, emoji, tagline, bullets, visual }) {
+function FeatureShowcase({ index, title, Icon, tagline, bullets, visual }) {
   const { ref, visible } = useReveal()
   const isEven = index % 2 === 0
 
@@ -11,14 +16,14 @@ function FeatureShowcase({ index, title, emoji, tagline, bullets, visual }) {
         <div style={{ fontFamily: 'Montserrat', fontSize: 12, fontWeight: 700, letterSpacing: 4, color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 12 }}>
           Feature {String(index + 1).padStart(2, '0')}
         </div>
-        <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(26px,3vw,42px)', fontWeight: 800, lineHeight: 1.15, marginBottom: 16 }}>
-          {emoji} {title}
+        <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(26px,3vw,42px)', fontWeight: 800, lineHeight: 1.15, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Icon size={32} strokeWidth={2} style={{ flexShrink: 0 }} /> {title}
         </h3>
         <p style={{ fontFamily: 'Poppins', fontSize: 16, lineHeight: 1.75, color: 'var(--muted)', marginBottom: 28 }}>{tagline}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {bullets.map(b => (
             <div key={b} className="flex items-center gap-3">
-              <span style={{ color: '#44e2cd', fontSize: 14 }}>→</span>
+              <ArrowRight size={14} strokeWidth={2} color="#44e2cd" />
               <span style={{ fontFamily: 'Poppins', fontSize: 15, color: 'var(--text)' }}>{b}</span>
             </div>
           ))}
@@ -57,8 +62,10 @@ const MapFeatureVisual = () => (
       </svg>
     </div>
     <div className="flex flex-wrap gap-2" style={{ marginTop: 16 }}>
-      {['🏫 Academic', '🏧 ATM', '🏥 Clinic', '🍽️ Food', '🏠 Hostels'].map(cat => (
-        <span key={cat} style={{ fontFamily: 'Inter', fontSize: 12, background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.2)', borderRadius: 8, padding: '4px 10px', color: 'var(--purple-light)' }}>{cat}</span>
+      {[[Building2, 'Academic'], [CreditCard, 'ATM'], [Hospital, 'Clinic'], [UtensilsCrossed, 'Food'], [House, 'Hostels']].map(([CatIcon, label]) => (
+        <span key={label} style={{ fontFamily: 'Inter', fontSize: 12, background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.2)', borderRadius: 8, padding: '4px 10px', color: 'var(--purple-light)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <CatIcon size={13} strokeWidth={2} /> {label}
+        </span>
       ))}
     </div>
   </div>
@@ -67,7 +74,7 @@ const MapFeatureVisual = () => (
 const SearchFeatureVisual = () => (
   <div className="glass-card feature-card-hover" style={{ width: '100%', maxWidth: 400, padding: 28, borderRadius: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
     <div style={{ background: 'rgba(183,109,255,0.08)', border: '1px solid rgba(183,109,255,0.2)', borderRadius: 14, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-      <span style={{ fontSize: 16 }}>🔍</span>
+      <Search size={16} strokeWidth={2} color="var(--muted)" />
       <span style={{ fontFamily: 'Inter', fontSize: 14, color: 'var(--muted)' }}>CBT Centre...</span>
       <div style={{ marginLeft: 'auto', background: '#b76dff', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontFamily: 'Inter', color: 'white' }}>Search</div>
     </div>
@@ -108,17 +115,19 @@ const NavFeatureVisual = () => (
           <circle key={i} cx={x} cy={90 - (i % 2) * 40 + (i % 3) * 20} r={4} fill="rgba(183,109,255,0.6)" />
         ))}
       </svg>
-      <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(11,19,38,0.9)', borderRadius: 8, padding: '4px 10px' }}>
-        <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#44e2cd' }}>📍 Current Location</span>
+      <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(11,19,38,0.9)', borderRadius: 8, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
+        <MapPin size={12} strokeWidth={2} color="#44e2cd" />
+        <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#44e2cd' }}>Current Location</span>
       </div>
-      <div style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(11,19,38,0.9)', borderRadius: 8, padding: '4px 10px' }}>
-        <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#b76dff' }}>🎯 Destination</span>
+      <div style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(11,19,38,0.9)', borderRadius: 8, padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5 }}>
+        <Target size={12} strokeWidth={2} color="#b76dff" />
+        <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#b76dff' }}>Destination</span>
       </div>
     </div>
     <div className="flex gap-3">
-      {[['🚶', '8 min', 'Walk'], ['🚗', '3 min', 'Drive'], ['📡', 'Live', 'GPS']].map(([icon, val, label]) => (
+      {[[PersonStanding, '8 min', 'Walk'], [CarFront, '3 min', 'Drive'], [Satellite, 'Live', 'GPS']].map(([StatIcon, val, label]) => (
         <div key={label} style={{ flex: 1, background: 'rgba(34,42,61,0.5)', borderRadius: 12, padding: '10px', textAlign: 'center', border: '1px solid rgba(77,67,84,0.4)' }}>
-          <div style={{ fontSize: 16 }}>{icon}</div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}><StatIcon size={16} strokeWidth={2} color="var(--purple-light)" /></div>
           <div style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 15, color: 'var(--purple-light)' }}>{val}</div>
           <div style={{ fontFamily: 'Poppins', fontSize: 10, color: 'var(--muted)' }}>{label}</div>
         </div>
@@ -141,7 +150,7 @@ const ReviewsFeatureVisual = () => (
             <div style={{ fontFamily: 'Poppins', fontSize: 11, color: 'var(--muted)' }}>{r.tag} · {r.reviews} reviews</div>
           </div>
           <div className="flex items-center gap-1">
-            <span style={{ color: '#ffb95f', fontSize: 14 }}>★</span>
+            <Star size={14} strokeWidth={2} color="#ffb95f" fill="#ffb95f" />
             <span style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 14, color: '#ffb95f' }}>{r.rating}</span>
           </div>
         </div>
@@ -163,7 +172,7 @@ const MobileFeatureVisual = () => (
       <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 60, height: 18, background: '#1a1a2e', borderRadius: '0 0 10px 10px' }} />
       <div style={{ padding: '30px 14px 14px' }}>
         <div style={{ background: 'rgba(183,109,255,0.12)', borderRadius: 12, padding: '8px 12px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10 }}>🔍</span>
+          <Search size={11} strokeWidth={2} color="var(--muted)" />
           <span style={{ fontFamily: 'Inter', fontSize: 10, color: 'var(--muted)' }}>Search FUTA campus...</span>
         </div>
         <div style={{ background: '#e8f0e8', borderRadius: 12, height: 160, overflow: 'hidden', marginBottom: 12, position: 'relative' }}>
@@ -177,8 +186,10 @@ const MobileFeatureVisual = () => (
           </svg>
         </div>
         <div className="flex gap-2">
-          {['📍 Near You', '🏧 ATM', '🍽️ Food'].map(cat => (
-            <div key={cat} style={{ flex: 1, background: 'rgba(34,42,61,0.6)', borderRadius: 8, padding: '6px 4px', textAlign: 'center', fontSize: 9, fontFamily: 'Inter', color: 'var(--muted)' }}>{cat}</div>
+          {[[MapPin, 'Near You'], [CreditCard, 'ATM'], [UtensilsCrossed, 'Food']].map(([CatIcon, label]) => (
+            <div key={label} style={{ flex: 1, background: 'rgba(34,42,61,0.6)', borderRadius: 8, padding: '6px 4px', textAlign: 'center', fontSize: 9, fontFamily: 'Inter', color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <CatIcon size={11} strokeWidth={2} /> {label}
+            </div>
           ))}
         </div>
       </div>
@@ -191,35 +202,35 @@ function ProductFeatures() {
   const features = [
     {
       title: 'Interactive Campus Map',
-      emoji: '🗺️',
+      Icon: Map,
       tagline: 'Explore every corner of FUTA — lecture halls, hostels, restaurants, ATMs, banks, clinics, bus stops, places of worship, sports centres, shopping areas, and many more campus locations.',
       bullets: ['475+ mapped locations', 'Categorized by type', 'Regular map updates', 'Detailed location info'],
       visual: <MapFeatureVisual />,
     },
     {
       title: 'Smart Search',
-      emoji: '🔍',
+      Icon: Search,
       tagline: 'Find any campus location instantly with our intelligent search engine. Type a few characters and get instant results with distance, category, and directions.',
       bullets: ['Instant autocomplete', 'Nearby suggestions', 'Distance-aware results', 'Category shortcuts'],
       visual: <SearchFeatureVisual />,
     },
     {
       title: 'Turn-by-Turn Navigation',
-      emoji: '🧭',
+      Icon: Compass,
       tagline: 'From your current location to anywhere on campus — get precise walking or driving routes with live GPS, real-time tracking, ETA, and voice guidance.',
       bullets: ['Walking & driving routes', 'Estimated arrival time', 'Live GPS tracking', 'Voice navigation'],
       visual: <NavFeatureVisual />,
     },
     {
       title: 'Community Reviews',
-      emoji: '⭐',
+      Icon: Star,
       tagline: 'Students rate restaurants, banks, printing shops, pharmacies, and other campus services — helping fellow students make informed decisions every day.',
       bullets: ['Star ratings & reviews', 'Verified student feedback', 'Most popular places', 'Real-time updates'],
       visual: <ReviewsFeatureVisual />,
     },
     {
       title: 'Mobile First Experience',
-      emoji: '📱',
+      Icon: Smartphone,
       tagline: 'Designed to be beautiful and fast on every screen. Open it in any browser — no app download required. FUTA navigation, always in your pocket.',
       bullets: ['Progressive Web App', 'No download needed', 'Works offline (soon)', 'Fast & lightweight'],
       visual: <MobileFeatureVisual />,

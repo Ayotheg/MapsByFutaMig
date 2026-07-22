@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { X, Menu } from 'lucide-react'
 import { Logo } from './shared'
 
 /* ─── Navigation ─── */
@@ -13,7 +14,7 @@ function Nav() {
     return () => window.removeEventListener('scroll', handler)
   }, [])
 
-  const links = ['About', 'Features', 'Explore', 'Video', 'Support', 'FAQ']
+  const links = ['About', 'Features', 'Explore', 'Video', 'FAQ']
   const scrollTo = (id) => {
     document.getElementById(id.toLowerCase())?.scrollIntoView({ behavior: 'smooth' })
     setMobileOpen(false)
@@ -30,11 +31,17 @@ function Nav() {
       }}
     >
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
-        <div className="flex items-center justify-between" style={{ height: 72 }}>
-          <Logo size={36} />
+        <div
+          className="grid items-center"
+          style={{ height: 72, gridTemplateColumns: '1fr auto 1fr' }}
+        >
+          {/* Logo shown only on mobile — disabled/hidden in desktop mode */}
+          <div className="md:hidden" style={{ justifySelf: 'start' }}>
+            <Logo size={52} />
+          </div>
 
-          {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-8">
+          {/* Desktop links — centered column, independent of logo/actions width */}
+          <div className="hidden md:flex items-center gap-8" style={{ justifySelf: 'center', gridColumn: 2 }}>
             {links.map(l => (
               <button key={l} onClick={() => scrollTo(l)} className="nav-link" style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                 {l}
@@ -42,12 +49,12 @@ function Nav() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3" style={{ justifySelf: 'end', gridColumn: 3 }}>
             <Link to="/map" className="btn-primary hidden md:inline-flex" style={{ padding: '10px 22px', fontSize: 14 }}>
               Open Maps
             </Link>
-            <button className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: 22 }}>
-              {mobileOpen ? '✕' : '☰'}
+            <button className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', display: 'flex', alignItems: 'center' }}>
+              {mobileOpen ? <X size={22} strokeWidth={2} /> : <Menu size={22} strokeWidth={2} />}
             </button>
           </div>
         </div>

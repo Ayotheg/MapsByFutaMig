@@ -94,6 +94,7 @@ html {
 .animate-pulse-glow { animation: pulseGlow 3s ease-in-out infinite; }
 .animate-ticker { animation: ticker 35s linear infinite; }
 .animate-spin-slow { animation: spinSlow 25s linear infinite; }
+.animate-spin-fast { animation: spinSlow 0.8s linear infinite; }
 
 .reveal {
   opacity: 0;

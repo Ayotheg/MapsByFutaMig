@@ -1,9 +1,14 @@
+import {
+  Landmark, Satellite, Smartphone, Search, RadioTower, Globe,
+  BadgeCheck, Zap, Map, Star, Compass, Lock,
+} from 'lucide-react'
+
 /* ─── Trust bar ─── */
 function TrustBar() {
   const badges = [
-    '🏛️ Built for FUTA', '📡 Live Navigation', '📱 Mobile First', '🔍 Smart Search',
-    '🛰️ GPS Enabled', '🌐 Responsive', '✅ Campus Verified', '⚡ Fast & Free',
-    '🗺️ Interactive Map', '⭐ Community Reviews', '🧭 Turn-by-Turn', '🔒 Trusted Platform',
+    [Landmark, 'Built for FUTA'], [Satellite, 'Live Navigation'], [Smartphone, 'Mobile First'], [Search, 'Smart Search'],
+    [RadioTower, 'GPS Enabled'], [Globe, 'Responsive'], [BadgeCheck, 'Campus Verified'], [Zap, 'Fast & Free'],
+    [Map, 'Interactive Map'], [Star, 'Community Reviews'], [Compass, 'Turn-by-Turn'], [Lock, 'Trusted Platform'],
   ]
   const doubled = [...badges, ...badges]
 
@@ -13,9 +18,10 @@ function TrustBar() {
       padding: '18px 0', overflow: 'hidden',
     }}>
       <div className="animate-ticker" style={{ display: 'flex', gap: 48, width: 'max-content' }}>
-        {doubled.map((badge, i) => (
+        {doubled.map(([BadgeIcon, label], i) => (
           <div key={i} className="flex items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
-            <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 500, color: 'var(--muted)' }}>{badge}</span>
+            <BadgeIcon size={15} strokeWidth={2} color="var(--muted)" />
+            <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 500, color: 'var(--muted)' }}>{label}</span>
             <span style={{ color: 'rgba(183,109,255,0.4)', fontSize: 10 }}>◆</span>
           </div>
         ))}

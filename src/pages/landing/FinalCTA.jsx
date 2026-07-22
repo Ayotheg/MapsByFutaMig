@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { Map } from 'lucide-react'
 import { useReveal } from './landingHooks'
 
 /* ─── Final CTA ─── */
@@ -46,8 +47,8 @@ function FinalCTA() {
           Search. Navigate. Discover.<br />Experience campus differently.
         </p>
         <div className={`reveal ${visible ? 'visible' : ''}`} style={{ transitionDelay: '0.3s' }}>
-          <Link to="/map" className="btn-primary" style={{ fontSize: 18, padding: '18px 48px', borderRadius: 18 }}>
-            🗺️ Open Maps By FUTA
+          <Link to="/map" className="btn-primary" style={{ fontSize: 18, padding: '18px 48px', borderRadius: 18, display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+            <Map size={20} strokeWidth={2} /> Open Maps By FUTA
           </Link>
         </div>
         <p className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Poppins', fontSize: 13, color: 'rgba(183,109,255,0.45)', marginTop: 24, transitionDelay: '0.4s' }}>

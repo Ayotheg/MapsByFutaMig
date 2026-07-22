@@ -1,4 +1,4 @@
-import logoImg from '../../assets/MapssByFuta.jpg'
+import mapsLogo from "../../assets/mapsLogo.png"
 
 /* ─── Map pin SVG ─── */
 export const Pin = ({ color = '#44e2cd', size = 10 }) => (
@@ -8,13 +8,16 @@ export const Pin = ({ color = '#44e2cd', size = 10 }) => (
   </svg>
 )
 
-/* ─── Logo component ─── */
-export const Logo = ({ size = 32, inverted = true }) => (
+/**
+ * Logo mark. Was previously `MapssByFuta.jpg` — a flattened JPG, so it
+ * carried a baked-in background square (JPGs have no alpha channel) and
+ * needed an `invert()` filter hack to read on a dark navbar. Swapped for
+ * `logo-mark.svg` (the same mark, sourced from `public/favicon.svg`,
+ * which is already a proper transparent vector in the real brand colors
+ * per About.md) — no background, no filter hack needed.
+ */
+export const Logo = ({ size = 44 }) => (
   <div className="flex items-center gap-2">
-    <img
-      src={logoImg}
-      alt="MapsByFuta logo"
-      style={{ height: size, width: 'auto', filter: inverted ? 'invert(1) brightness(1.5)' : 'none' }}
-    />
+    <img src={mapsLogo} alt="MapsByFuta logo" style={{ height: size, width: 'auto', display: 'block' }} />
   </div>
 )

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { Smartphone, Check, Map } from 'lucide-react'
 import mapsFlyerImg from '../../assets/MAPSBYFUTA.jpg'
 import { useReveal } from './landingHooks'
 
@@ -39,7 +40,9 @@ function DiscoverSection() {
                 border: '1px solid rgba(183,109,255,0.3)', borderRadius: 12,
                 padding: '8px 20px', whiteSpace: 'nowrap',
               }}>
-                <span style={{ fontFamily: 'Inter', fontSize: 13, color: 'var(--muted)' }}>📱 Prefer your phone? Scan to explore instantly.</span>
+                <span style={{ fontFamily: 'Inter', fontSize: 13, color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Smartphone size={14} strokeWidth={2} style={{ flexShrink: 0 }} /> Prefer your phone? Scan to explore instantly.
+                </span>
               </div>
             </div>
           </div>
@@ -60,7 +63,7 @@ function DiscoverSection() {
             ].map(([title, desc]) => (
               <div key={title} className="flex items-start gap-4" style={{ marginBottom: 20 }}>
                 <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'linear-gradient(135deg,#44e2cd,#03c6b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                  <span style={{ color: '#0b1326', fontSize: 12, fontWeight: 700 }}>✓</span>
+                  <Check size={14} strokeWidth={3} color="#0b1326" />
                 </div>
                 <div>
                   <div style={{ fontFamily: 'Inter', fontWeight: 600, fontSize: 15, color: 'var(--text)', marginBottom: 4 }}>{title}</div>
@@ -70,8 +73,8 @@ function DiscoverSection() {
             ))}
 
             <div style={{ marginTop: 36 }}>
-              <Link to="/map" className="btn-primary">
-                🗺️ Open the Map
+              <Link to="/map" className="btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Map size={18} strokeWidth={2} /> Open the Map
               </Link>
             </div>
           </div>

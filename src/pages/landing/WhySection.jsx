@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom'
+import { Frown, Clock, Users, ArrowRight } from 'lucide-react'
 import { useReveal } from './landingHooks'
 
 /* ─── Why section ─── */
 function WhySection() {
   const { ref, visible } = useReveal()
   const cards = [
-    { emoji: '😕', title: 'Freshers Get Lost', body: 'Every new student wastes hours asking for directions to lecture halls, hostels, and cafeterias. The first week on campus shouldn\'t be a navigation test.' },
-    { emoji: '🕐', title: 'Time Lost to Confusion', body: 'Students miss classes, appointments, and events simply because campus is vast and confusing. Time is too valuable to waste getting lost.' },
-    { emoji: '👥', title: 'Visitors Struggle', body: 'Parents, guests, and new staff are left to wander a large campus with no reliable guidance, creating frustration and a poor first impression.' },
+    { Icon: Frown, title: 'Freshers Get Lost', body: 'Every new student wastes hours asking for directions to lecture halls, hostels, and cafeterias. The first week on campus shouldn\'t be a navigation test.' },
+    { Icon: Clock, title: 'Time Lost to Confusion', body: 'Students miss classes, appointments, and events simply because campus is vast and confusing. Time is too valuable to waste getting lost.' },
+    { Icon: Users, title: 'Visitors Struggle', body: 'Parents, guests, and new staff are left to wander a large campus with no reliable guidance, creating frustration and a poor first impression.' },
   ]
 
   return (
@@ -27,7 +28,7 @@ function WhySection() {
             </p>
             <div className={`reveal ${visible ? 'visible' : ''}`} style={{ marginTop: 36, transitionDelay: '0.4s' }}>
               <Link to="/map" className="btn-primary">
-                Start Navigating →
+                Start Navigating <ArrowRight size={16} strokeWidth={2} />
               </Link>
             </div>
           </div>
@@ -35,7 +36,7 @@ function WhySection() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {cards.map((c, i) => (
               <div key={c.title} className={`reveal ${visible ? 'visible' : ''} glass-card`} style={{ padding: '24px 28px', transitionDelay: `${0.2 + i * 0.1}s` }}>
-                <div style={{ fontSize: 28, marginBottom: 12 }}>{c.emoji}</div>
+                <div style={{ marginBottom: 12 }}><c.Icon size={28} strokeWidth={1.75} color="var(--orange)" /></div>
                 <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 16, marginBottom: 8, color: 'var(--text)' }}>{c.title}</div>
                 <p style={{ fontFamily: 'Poppins', fontSize: 14, lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>{c.body}</p>
               </div>

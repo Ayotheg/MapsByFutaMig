@@ -1,4 +1,6 @@
+import { Heart, Map, Zap, Satellite, Gift } from 'lucide-react'
 import { useReveal } from './landingHooks'
+import CrowdrCampaignCard from './CrowdrCampaignCard'
 
 /* ─── Support section ─── */
 function SupportSection() {
@@ -16,7 +18,7 @@ function SupportSection() {
           padding: '60px 48px', backdropFilter: 'blur(20px)',
           transitionDelay: '0.1s',
         }}>
-          <div style={{ fontSize: 48, marginBottom: 20 }}>💜</div>
+          <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'center' }}><Heart size={44} strokeWidth={2} color="#b76dff" fill="#b76dff" /></div>
           <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, marginBottom: 20, lineHeight: 1.15 }}>
             Help Build the Future of<br /><span className="text-gradient-purple">Campus Navigation.</span>
           </h2>
@@ -24,21 +26,13 @@ function SupportSection() {
             Maps By FUTA is independently developed and maintained to improve campus life at FUTA. Community support helps expand features, improve map accuracy, add new locations, and keep the platform free for every student, forever.
           </p>
           <div className="flex flex-wrap gap-4 justify-center" style={{ marginBottom: 40 }}>
-            {['🗺️ Expand the map', '⚡ Faster features', '📡 Better GPS', '🆓 Always free'].map(item => (
-              <div key={item} style={{ background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.25)', borderRadius: 10, padding: '8px 16px', fontFamily: 'Inter', fontSize: 13, color: 'var(--purple-light)' }}>
-                {item}
+            {[[Map, 'Expand the map'], [Zap, 'Faster features'], [Satellite, 'Better GPS'], [Gift, 'Always free']].map(([ItemIcon, label]) => (
+              <div key={label} style={{ background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.25)', borderRadius: 10, padding: '8px 16px', fontFamily: 'Inter', fontSize: 13, color: 'var(--purple-light)', display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                <ItemIcon size={14} strokeWidth={2} /> {label}
               </div>
             ))}
           </div>
-          <a
-            href="https://www.oncrowdr.com/explore/c/fund-mapsbyfuta"
-            target="_blank"
-            rel="noreferrer"
-            className="btn-primary"
-            style={{ fontSize: 16, padding: '16px 40px' }}
-          >
-            💜 Support Maps By FUTA
-          </a>
+          <CrowdrCampaignCard />
           <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'rgba(183,109,255,0.5)', marginTop: 20 }}>
             Every contribution, no matter how small, makes a difference.
           </p>

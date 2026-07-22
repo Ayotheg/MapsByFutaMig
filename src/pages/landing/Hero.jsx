@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  MapPin, Send, Building2, CreditCard, Printer, BusFront,
+  Map, Search, Star, User, Satellite, Play,
+} from 'lucide-react'
 import { Pin } from './shared'
 
 /* ─── Hero phone mockup ─── */
@@ -86,16 +90,16 @@ function PhoneMockup() {
             display: 'flex', alignItems: 'center', gap: 8,
             boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
           }}>
-            <span style={{ fontSize: 12 }}>📍</span>
+            <MapPin size={12} strokeWidth={2} color="#dae2fd" />
             <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#888', flex: 1 }}>Search FUTA campus...</span>
-            <div style={{ background: '#b76dff', borderRadius: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>➤</div>
+            <div style={{ background: '#b76dff', borderRadius: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Send size={12} strokeWidth={2} color="#fff" /></div>
           </div>
 
           {/* Category chips */}
           <div style={{ position: 'absolute', top: 82, left: 8, right: 8, display: 'flex', gap: 5, overflowX: 'hidden' }}>
-            {['🏫 Halls', '🏧 ATM', '🖨️ Print', '🚌 Bus'].map(chip => (
-              <div key={chip} style={{ background: 'rgba(30,30,46,0.9)', borderRadius: 8, padding: '4px 8px', fontSize: 9, fontFamily: 'Inter', color: '#dae2fd', whiteSpace: 'nowrap' }}>
-                {chip}
+            {[[Building2, 'Halls'], [CreditCard, 'ATM'], [Printer, 'Print'], [BusFront, 'Bus']].map(([ChipIcon, label]) => (
+              <div key={label} style={{ background: 'rgba(30,30,46,0.9)', borderRadius: 8, padding: '4px 8px', fontSize: 9, fontFamily: 'Inter', color: '#dae2fd', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
+                <ChipIcon size={9} strokeWidth={2} /> {label}
               </div>
             ))}
           </div>
@@ -114,8 +118,8 @@ function PhoneMockup() {
             display: 'flex', justifyContent: 'space-around',
             backdropFilter: 'blur(8px)',
           }}>
-            {['🗺️', '🔍', '⭐', '👤'].map(icon => (
-              <span key={icon} style={{ fontSize: 18, opacity: icon === '🗺️' ? 1 : 0.5 }}>{icon}</span>
+            {[Map, Search, Star, User].map((NavIcon, i) => (
+              <NavIcon key={i} size={18} strokeWidth={2} color="#dae2fd" style={{ opacity: i === 0 ? 1 : 0.5 }} />
             ))}
           </div>
         </div>
@@ -139,7 +143,7 @@ function PhoneMockup() {
         padding: '10px 14px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
         animationDelay: '1.5s',
       }}>
-        <div style={{ fontSize: 14, marginBottom: 2 }}>📡</div>
+        <div style={{ marginBottom: 2 }}><Satellite size={16} strokeWidth={2} color="#ddb7ff" /></div>
         <div style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 600, color: '#ddb7ff' }}>Live GPS</div>
       </div>
       <div className="animate-float-card" style={{
@@ -219,18 +223,18 @@ function Hero() {
 
             <div className="flex flex-wrap gap-4">
               <Link to="/map" className="btn-primary">
-                <span>🗺️</span> Explore the Map
+                <Map size={18} strokeWidth={2} /> Explore the Map
               </Link>
               <button onClick={() => document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' })} className="btn-secondary">
-                <span>▶</span> Watch Demo
+                <Play size={16} strokeWidth={2} fill="currentColor" /> Watch Demo
               </button>
             </div>
 
             {/* Mini stats row */}
-            <div className="flex flex-wrap gap-6 mt-10">
+            <div className="flex flex-wrap gap-8" style={{ marginTop: 48 }}>
               {[['475+', 'Campus Locations'], ['20+', 'Categories'], ['Live', 'GPS Navigation']].map(([val, label]) => (
                 <div key={label}>
-                  <div style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 24, fontWeight: 800, color: 'var(--purple-light)' }}>{val}</div>
+                  <div style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 24, fontWeight: 800, color: 'var(--purple-light)', marginBottom: 4 }}>{val}</div>
                   <div style={{ fontFamily: 'Poppins', fontSize: 12, color: 'var(--muted)' }}>{label}</div>
                 </div>
               ))}

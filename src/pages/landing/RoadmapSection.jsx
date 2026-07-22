@@ -4,11 +4,11 @@ import { useReveal } from './landingHooks'
 function RoadmapSection() {
   const { ref, visible } = useReveal()
   const items = [
-    { icon: '🧠', title: 'Smarter Navigation', body: 'AI-powered route optimization that learns campus traffic patterns and suggests the fastest paths.' },
-    { icon: '⭐', title: 'Community Reviews v2', body: 'Expanded review system with photos, detailed ratings, and verified student-only feedback.' },
-    { icon: '🏗️', title: 'More Campus Services', body: 'Mapping every hostel room block, new buildings, shuttle routes, and real-time facility availability.' },
-    { icon: '👥', title: 'Student Contributions', body: 'Let students submit new locations, flag outdated data, and help keep Maps By FUTA accurate.' },
-    { icon: '📶', title: 'Offline Mode', body: 'Download campus maps for offline use — navigate even without mobile data.' },
+    { num: '01', title: 'Smarter Navigation', body: 'AI-powered route optimization that learns campus traffic patterns and suggests the fastest paths.' },
+    { num: '02', title: 'Community Reviews v2', body: 'Expanded review system with photos, detailed ratings, and verified student-only feedback.' },
+    { num: '03', title: 'More Campus Services', body: 'Mapping every hostel room block, new buildings, shuttle routes, and real-time facility availability.' },
+    { num: '04', title: 'Student Contributions', body: 'Let students submit new locations, flag outdated data, and help keep Maps By FUTA accurate.' },
+    { num: '05', title: 'Offline Mode', body: 'Download campus maps for offline use — navigate even without mobile data.' },
   ]
 
   return (
@@ -27,7 +27,12 @@ function RoadmapSection() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           {items.map((item, i) => (
             <div key={item.title} className={`reveal ${visible ? 'visible' : ''} roadmap-card glass-card`} style={{ padding: '28px 24px', transitionDelay: `${i * 0.1}s` }}>
-              <div style={{ fontSize: 32, marginBottom: 14 }}>{item.icon}</div>
+              <div style={{
+                fontFamily: "'Bricolage Grotesque'", fontSize: 34, fontWeight: 800,
+                color: 'var(--orange)', opacity: 0.45, lineHeight: 1, marginBottom: 16,
+              }}>
+                {item.num}
+              </div>
               <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 16, color: 'var(--text)', marginBottom: 10 }}>{item.title}</div>
               <p style={{ fontFamily: 'Poppins', fontSize: 14, lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>{item.body}</p>
               <div style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(68,226,205,0.1)', border: '1px solid rgba(68,226,205,0.2)', borderRadius: 8, padding: '4px 10px' }}>

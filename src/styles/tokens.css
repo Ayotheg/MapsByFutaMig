@@ -112,10 +112,23 @@
   --bg-mid:       var(--surface-container);
   --bg-light:     var(--surface-high);
   --bg-lighter:   var(--surface-highest);
-  /* --teal, --text, and --border are omitted here: the landing
-     export's values for those are byte-identical to --secondary,
-     --text, and --border above, so the existing token already
-     serves both names — no separate alias needed. */
+  /* --text and --border are omitted here: the landing export's
+     values for those are byte-identical to --text and --border
+     above, so the existing token already serves both names — no
+     separate alias needed.
+
+     --teal and --orange, however, DO need real aliases below:
+     unlike --text/--border, no token of those exact names existed
+     anywhere in this file (only --secondary/--tertiary, which are
+     different custom-property names with the same values). A
+     custom property that's never declared resolves to nothing —
+     it does not fall back to another property that merely shares
+     its value — so every var(--teal)/var(--orange) across the
+     landing page (icons, gradients, glows) was silently invalid
+     and rendering blank. Declaring them here fixes all of those
+     call sites at once. */
+  --teal:   var(--secondary);
+  --orange: var(--tertiary);
 
   /* FLAGGED, not silently aliased: the landing export also
      declares --muted: #cfc2d6, but that's a *different* color
