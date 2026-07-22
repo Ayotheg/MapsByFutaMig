@@ -23,6 +23,7 @@ import { useGpsTracking } from '../features/navigation/useGpsTracking';
 import MobFabCluster from '../features/navigation/MobFabCluster';
 import { useAuth, friendlyError } from '../features/auth/useAuth';
 import { useAdminPin } from '../features/auth/useAdminPin';
+import { useSeo } from '../lib/useSeo';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -87,6 +88,16 @@ const AdminPanel = lazy(() => import('../features/admin/AdminPanel'));
  * that split, not "the whole slice," is the real lazy-load boundary.
  */
 export default function MapPage({ onReadinessChange }) {
+  // The live map is a real-time interactive tool, not static content —
+  // keep it out of the search index (crawling/indexing a constantly
+  // moving GPS/route view adds no search value and can look like thin
+  // or duplicate content). The indexable summary of what this page
+  // does lives in the static, prerendered "/" landing page instead.
+  useSeo({
+    title: 'Live Map — Maps By FUTA | FUTA Campus Navigation',
+    robots: 'noindex, follow',
+  });
+
   const [map, setMap] = useState(null);
   const [selected, setSelected] = useState(null);
   const [isMobile] = useState(() => window.innerWidth <= 768);

@@ -1,0 +1,17 @@
+{
+  "name": "Maps By FUTA",
+  "short_name": "MapsByFUTA",
+  "description": "Your go-to guide on FUTA Campus — interactive map and turn-by-turn navigation for the Federal University of Technology, Akure.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1326",
+  "theme_color": "#0b1326",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
