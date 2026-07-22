@@ -83,4 +83,4 @@
    every place actually is. Zoom-tier label rules above already hide the
    label at far/mid/near zoom anyway; this just extends that same
    "dot-only" look to close zoom too, driven by mode instead of zoom. */
-:global(body.raw-mode) .gm-pin-label { display: none !important; }
+body.raw-mode .gm-pin-label { display: none !important; }
