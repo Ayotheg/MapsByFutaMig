@@ -33,6 +33,10 @@
     {
       "source": "/assets/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/(favicon.ico|favicon(-16x16|-32x32|-48x48|-96x96)?.(png|svg)|apple-touch-icon.png|android-chrome-(192x192|512x512).png)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
     }
   ]
 }
