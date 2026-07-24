@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Analytics } from '@vercel/analytics/react';
 import './index.css'
 import MapPage from './pages/MapPage'
 import LoadingScreen from './pages/LoadingScreen'
@@ -95,6 +96,7 @@ function App() {
         <Route path="/loadingscreen" element={<LoadingScreen />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <Analytics />
     </BrowserRouter>
   );
 }
