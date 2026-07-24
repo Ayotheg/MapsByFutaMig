@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
+import { useSeo } from "../lib/useSeo";
 import styles from "./LoadingScreen.module.css";
 
 // Default sequence of things the app is actually assembling on first
@@ -26,6 +27,17 @@ function LoadingScreen({
   label = "Loading data",
   onComplete,
 }) {
+  // This component is also mounted directly at the standalone
+  // "/loadingscreen" route (App.jsx) for preview/dev purposes — that
+  // route isn't real content, so keep it out of the index the same
+  // way /map and the 404 page are excluded. Harmless when this
+  // component is instead embedded inside MapPage, which already sets
+  // its own noindex.
+  useSeo({
+    title: "Loading… – Maps By FUTA",
+    robots: "noindex, nofollow",
+  });
+
   const total = steps.length;
   const isControlled = typeof current === "number";
   const [autoStep, setAutoStep] = useState(1);
