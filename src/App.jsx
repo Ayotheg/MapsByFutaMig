@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Analytics } from '@vercel/analytics/react';
 import './index.css'
 import MapPage from './pages/MapPage'
 import LoadingScreen from './pages/LoadingScreen'
 import NotFoundPage from './pages/NotFoundPage'
 
 import LandingPage from './pages/LandingPage'
+import TermsOfService from './pages/legal/TermsOfService'
+import PrivacyPolicy from './pages/legal/PrivacyPolicy'
+import CookiePolicy from './pages/legal/CookiePolicy'
 
 // One entry per real boot milestone tracked below — order matches roughly
 // how they resolve in practice (map init is near-instant; Supabase reads
@@ -93,8 +97,12 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/map" element={<HomeRoute />} />
         <Route path="/loadingscreen" element={<LoadingScreen />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/cookie-policy" element={<CookiePolicy />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <Analytics />
     </BrowserRouter>
   );
 }

@@ -1,16 +1,50 @@
 import { Link } from 'react-router-dom'
-import { Heart, ArrowRight, HeartHandshake, Mail } from 'lucide-react'
+import { Heart, ArrowRight, HeartHandshake, Mail, MessageCircle } from 'lucide-react'
 import { Logo } from './shared'
 
 const CROWDR_DONATE_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
 const CONTACT_EMAIL = 'gearlifycorporation@gmail.com'
+// wa.me links — international format, no "+", no leading zero.
+const WHATSAPP_NUMBERS = [
+  { label: 'WhatsApp (Line 1)', number: '2348101734037' },
+  { label: 'WhatsApp (Line 2)', number: '2349167746480' },
+]
+const PRIMARY_WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBERS[0].number}`
 
 /* ─── Footer ─── */
 function Footer() {
-  const links = {
-    Product: ['About', 'Features', 'Explore the Map', 'How It Works'],
-    Support: ['Support Us', 'FAQ', 'Contact Us', 'Report an Issue'],
-    Legal: ['Privacy Policy', 'Terms of Service', 'Cookie Policy'],
+  // Each Support/Legal item now carries its own destination instead of
+  // being a plain label rendered against a shared "#" href.
+  const linkGroups = {
+    Product: [
+      { label: 'About', href: '#about' },
+      { label: 'Features', href: '#features' },
+      { label: 'Explore the Map', href: '#explore' },
+      { label: 'How It Works', href: '#video' },
+    ],
+    Support: [
+      { label: 'Support Us', href: CROWDR_DONATE_URL, external: true },
+      { label: 'FAQ', href: '#faq' },
+      // Explicit ask: Contact Us should go straight to WhatsApp instead
+      // of the old bare "#" (which just scrolled to the top of the page).
+      { label: 'Contact Us', href: PRIMARY_WHATSAPP_URL, external: true },
+      { label: 'Report an Issue', href: `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Issue report — Maps By FUTA')}` },
+    ],
+    Legal: [
+      { label: 'Privacy Policy', to: '/privacy-policy' },
+      { label: 'Terms of Service', to: '/terms-of-service' },
+      { label: 'Cookie Policy', to: '/cookie-policy' },
+    ],
+  }
+
+  const handleAnchorClick = (e, href) => {
+    if (href.startsWith('#')) {
+      const el = document.getElementById(href.slice(1))
+      if (el) {
+        e.preventDefault()
+        el.scrollIntoView({ behavior: 'smooth' })
+      }
+    }
   }
 
   return (
@@ -34,20 +68,55 @@ function Footer() {
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)' }}>
                 <Mail size={17} strokeWidth={2} />
               </a>
+              {WHATSAPP_NUMBERS.map(wa => (
+                <a key={wa.number} href={`https://wa.me/${wa.number}`} target="_blank" rel="noreferrer" aria-label={wa.label} title={wa.label} style={{
+                  width: 40, height: 40, borderRadius: 10, background: 'rgba(34,42,61,0.6)',
+                  border: '1px solid var(--border)', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: 14, color: 'var(--muted)',
+                  textDecoration: 'none', transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(68,226,205,0.5)'; e.currentTarget.style.color = 'var(--text)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)' }}>
+                  <MessageCircle size={17} strokeWidth={2} />
+                </a>
+              ))}
             </div>
           </div>
 
           {/* Links */}
-          {Object.entries(links).map(([section, items]) => (
+          {Object.entries(linkGroups).map(([section, items]) => (
             <div key={section} style={{ flex: 1 }}>
               <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 13, letterSpacing: 2, color: 'var(--text)', textTransform: 'uppercase', marginBottom: 20 }}>{section}</div>
-              {items.map(item => (
-                <a key={item} href="#" style={{ display: 'block', fontFamily: 'Poppins', fontSize: 14, color: 'var(--muted)', textDecoration: 'none', marginBottom: 12, transition: 'color 0.2s' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}>
-                  {item}
-                </a>
-              ))}
+              {items.map(item => {
+                const linkStyle = { display: 'block', fontFamily: 'Poppins', fontSize: 14, color: 'var(--muted)', textDecoration: 'none', marginBottom: 12, transition: 'color 0.2s' }
+                const hoverIn = e => (e.currentTarget.style.color = 'var(--text)')
+                const hoverOut = e => (e.currentTarget.style.color = 'var(--muted)')
+
+                // Internal route (Legal pages) — use react-router Link.
+                if (item.to) {
+                  return (
+                    <Link key={item.label} to={item.to} style={linkStyle} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+                      {item.label}
+                    </Link>
+                  )
+                }
+
+                // External link (WhatsApp, Crowdr) or same-page anchor
+                // (#faq etc.) or mailto — all plain <a> tags.
+                return (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    {...(item.external ? { target: '_blank', rel: 'noreferrer' } : {})}
+                    onClick={e => handleAnchorClick(e, item.href)}
+                    style={linkStyle}
+                    onMouseEnter={hoverIn}
+                    onMouseLeave={hoverOut}
+                  >
+                    {item.label}
+                  </a>
+                )
+              })}
             </div>
           ))}
 
