@@ -33,6 +33,7 @@ export const ADMIN_BADGE_COLORS = {
   hall: { bg: 'rgba(237,147,177,0.12)', color: '#ED93B1', border: 'rgba(237,147,177,0.28)' },
   clinic: { bg: 'rgba(244,192,209,0.12)', color: '#ED93B1', border: 'rgba(244,192,209,0.28)' },
   auditorium: { bg: 'rgba(153,53,86,0.12)', color: '#ED93B1', border: 'rgba(153,53,86,0.28)' },
+  toilet: { bg: 'rgba(56,189,248,0.12)', color: '#38BDF8', border: 'rgba(56,189,248,0.28)' },
 
   garage: { bg: 'rgba(136,135,128,0.12)', color: '#B4B2A9', border: 'rgba(136,135,128,0.28)' },
   bus_stop: { bg: 'rgba(95,94,90,0.12)', color: '#B4B2A9', border: 'rgba(95,94,90,0.28)' },

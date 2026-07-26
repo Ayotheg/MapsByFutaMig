@@ -3,6 +3,7 @@ import Modal from '../../components/ui/Modal';
 import modalStyles from '../../components/ui/Modal.module.css';
 import styles from './AdminEditModal.module.css';
 import { WP_ALL_TYPES } from './adminTypeOptions';
+import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { getPlaceImageUrl } from '../../lib/supabase';
 import {
   fetchImageRows,
@@ -80,7 +81,14 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       const wp = editContext.data;
       setName(wp.name || '');
       setDescription(wp.description || '');
-      setWpType(wp.type || 'landmark');
+      // Was `wp.type || 'landmark'` — if the stored type wasn't one of
+      // this dropdown's real options (a lot of imported data isn't:
+      // "yes", "off_campus_lodge", "arts_centre"…), the <select> silently
+      // showed its first option instead, disagreeing with the badge in
+      // the points list. resolveWaypointType() guesses the right option
+      // from name+type so this always matches the badge. See its comment
+      // in wpTypeMeta.js.
+      setWpType(resolveWaypointType(wp));
       setImagesLoading(true);
       fetchImageRows('waypoint_images', 'waypoint_id', editContext.id)
         .then((rows) => {

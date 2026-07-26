@@ -14,6 +14,7 @@ import { useViewMode } from '../features/osm-annotations/useViewMode';
 import OSMAnnotationLayer from '../features/osm-annotations/OSMAnnotationLayer';
 import ViewModeToggle from '../features/osm-annotations/ViewModeToggle';
 import { useSearchIndex } from '../features/search/useSearchIndex';
+import { useQuickChips } from '../features/search/useQuickChips';
 import DesktopSearchBar from '../features/search/DesktopSearchBar';
 import MobileSearchBar from '../features/search/MobileSearchBar';
 import MobileSearchOverlay from '../features/search/MobileSearchOverlay';
@@ -137,6 +138,7 @@ export default function MapPage({ onReadinessChange }) {
   const { viewMode, toggle: toggleViewMode, setViewMode } = useViewMode();
 
   const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations });
+  const quickChips = useQuickChips();
 
   // ── Slice 9: GPS + Navigation ──────────────────────────────────────
   // `navOpen` gates whether <NavigationController> is mounted at all
@@ -257,7 +259,10 @@ export default function MapPage({ onReadinessChange }) {
   }, [map]);
 
   function handleChipClick(chip) {
-    setActiveChip((prev) => (prev?.label === chip.label ? null : chip));
+    setActiveChip((prev) => {
+      const same = prev && (chip.id ? prev.id === chip.id : prev.label === chip.label);
+      return same ? null : chip;
+    });
   }
 
   return (
@@ -359,7 +364,7 @@ export default function MapPage({ onReadinessChange }) {
           onNavigateClick={handleNavLaunch}
         />
       )}
-      <QuickChips activeChip={activeChip} onChipClick={handleChipClick} collapsed={collapsed} isMobile={isMobile} />
+      <QuickChips chips={quickChips.chips} activeChip={activeChip} onChipClick={handleChipClick} collapsed={collapsed} isMobile={isMobile} />
       <ChipResultsPanel
         activeChip={activeChip}
         waypoints={waypoints}
@@ -436,6 +441,8 @@ export default function MapPage({ onReadinessChange }) {
             map={map}
             waypoints={waypoints}
             segments={segments}
+            chips={quickChips.chips}
+            onChipsChanged={quickChips.refetch}
             onClose={() => setAdminPanelOpen(false)}
             onWaypointsChanged={refetchWaypoints}
             onSegmentsChanged={refetchSegments}

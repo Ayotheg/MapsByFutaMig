@@ -1,10 +1,40 @@
 import L from 'leaflet';
+import {
+  CHIP_DISPLAY_ORDER,
+  CATEGORY_KEYWORDS,
+  CATEGORY_LABELS,
+  CATEGORY_EMOJI,
+  CATEGORY_ICON_KEYS,
+  nameOrTypeMatches,
+} from '../shared/placeCategories';
 
 /**
- * Ported from legacy's `initQuickChips` IIFE (app.js ~6333–6932) — the
- * colour map, emoji fallbacks, keyword→type map, and the `gatherResults`
- * scoring/sort logic. Pure data + pure functions live here; the
- * components (QuickChips.jsx, ChipResultsPanel.jsx) hold the DOM/state.
+ * Quick Chips — data + matching logic. Originally ported from legacy's
+ * `initQuickChips` IIFE (app.js ~6333–6932); rebuilt in this pass around
+ * the person's explicit categorization spec (see
+ * `features/shared/placeCategories.js`) and made admin-editable (see
+ * `features/admin/quickChipsApi.js` + `QuickChipsTab.jsx`).
+ *
+ * What changed from the legacy-port version, and why:
+ *   - Chips used to be a hardcoded 12-entry array here, matched against
+ *     waypoints by tokenizing the chip's `query` string into words and
+ *     comparing against a `KW_MAP` of type-only synonyms. That missed
+ *     anything whose *name* carried the signal but whose stored `type`
+ *     didn't ("Paradise Lodge" typed `off_campus_lodge`, which was never
+ *     in any chip's type-synonym set, so it could never appear under
+ *     "Hostel").
+ *   - Now: a place counts toward a chip if its NAME *or* its raw stored
+ *     TYPE contains any of that chip's keywords, exactly per spec ("if
+ *     the tag has any one of them — name or tag bearing it — bring it
+ *     on"). `nameOrTypeMatches` (shared/placeCategories.js) is the one
+ *     place that rule lives, so admin-panel classification and chip
+ *     matching can never drift apart.
+ *   - Chips are no longer hardcoded: `DEFAULT_CHIPS` below seeds the 16
+ *     categories the person asked for, but the live list an admin has
+ *     edited (renamed, re-keyworded, added, removed, or individually
+ *     pinned/excluded a place from) comes from `useQuickChips()` —
+ *     QuickChips.jsx/ChipResultsPanel.jsx now receive `chips` as a prop
+ *     instead of importing a static `CHIPS` constant.
  */
 
 export const TYPE_COLORS = {
@@ -18,7 +48,7 @@ export const TYPE_COLORS = {
   landmark: '#CBD5E1', entrance: '#CBD5E1', junction: '#CBD5E1', poi: '#CBD5E1',
   lecture_hall: '#378ADD', faculty: '#185FA5', laboratory: '#5DCAA5',
   workshop: '#1D9E75', admin: '#AFA9EC', senate: '#7F77DD',
-  bursary: '#7F77DD', student_affairs: '#7F77DD',
+  bursary: '#7F77DD', student_affairs: '#7F77DD', toilet: '#38BDF8',
 };
 export function dotColor(t) {
   return TYPE_COLORS[t] || '#DDB7FF';
@@ -34,6 +64,7 @@ export const TYPE_EMOJI = {
   security_post: '🛡️',
   lecture_hall: '🎓', faculty: '🏫', laboratory: '🔬',
   workshop: '🛠️', admin: '🏢', senate: '⚖️', bursary: '💰',
+  toilet: '🚻',
 };
 export function typeEmoji(t, fallback) {
   return TYPE_EMOJI[t] || fallback || '📍';
@@ -43,53 +74,6 @@ export function fmtDist(m) {
   if (m < 50) return 'Very close';
   if (m < 1000) return Math.round(m) + 'm away';
   return (m / 1000).toFixed(1) + 'km away';
-}
-
-const KW_MAP = {
-  kiosk: ['kiosk', 'shopping'], canteen: ['kiosk', 'restaurant'],
-  food: ['kiosk', 'restaurant', 'cafe'], shop: ['kiosk', 'shopping'],
-  store: ['kiosk', 'shopping'], market: ['kiosk', 'shopping'],
-  pos: ['bank'], atm: ['bank'], bank: ['bank'],
-  printing: ['printing_shop', 'kiosk'], print: ['printing_shop'],
-  photocopy: ['printing_shop'], business: ['printing_shop'],
-  centre: ['printing_shop', 'shopping'],
-  cafe: ['cafe'], snack: ['cafe'], coffee: ['cafe'], tea: ['cafe'],
-  restaurant: ['restaurant'], eatery: ['restaurant'],
-  pharmacy: ['pharmacy'], chemist: ['pharmacy'], drug: ['pharmacy'], medicine: ['pharmacy'],
-  barber: ['barber'], salon: ['barber'], hair: ['barber'], cut: ['barber'],
-  laundry: ['laundry'], wash: ['laundry'], dry: ['laundry'], cleaning: ['laundry'],
-  fuel: ['fuel'], petrol: ['fuel'], gas: ['fuel'], station: ['fuel'],
-  garage: ['garage', 'utility'], parking: ['garage'], mechanic: ['garage'],
-  security: ['security_post'], guard: ['security_post'], checkpoint: ['security_post'],
-  library: ['library'],
-  hostel: ['hostel', 'staff_quarters'], dorm: ['hostel'],
-  hall: ['hostel', 'hall', 'auditorium', 'lecture_hall'],
-  mosque: ['mosque'], chapel: ['chapel'], church: ['chapel'],
-  worship: ['mosque', 'chapel'],
-  bus: ['bus_stop'], stop: ['bus_stop'], transit: ['bus_stop'],
-  transport: ['bus_stop'],
-  clinic: ['clinic'], health: ['clinic'], medical: ['clinic'],
-  hospital: ['clinic'],
-  gate: ['gate', 'entrance', 'landmark'], entrance: ['gate', 'entrance'],
-  sports: ['sports', 'hall', 'auditorium'], field: ['sports'],
-  court: ['sports'], gym: ['sports'],
-  lecture: ['lecture_hall'], lt: ['lecture_hall'],
-  lab: ['laboratory'], laboratory: ['laboratory'],
-  workshop: ['workshop'], faculty: ['faculty'],
-  admin: ['admin', 'senate', 'bursary', 'student_affairs'],
-  senate: ['senate'], bursary: ['bursary'], registry: ['admin'],
-};
-
-function queryToTypes(q) {
-  const types = new Set();
-  q.toLowerCase().split(/\s+/).forEach((w) => {
-    const m = KW_MAP[w];
-    if (m) m.forEach((t) => types.add(t));
-  });
-  return types;
-}
-function queryWords(q) {
-  return q.toLowerCase().split(/\s+/).filter((w) => w.length >= 2);
 }
 
 // No GPS tracking exists yet (that's Slice 9's territory — the
@@ -104,42 +88,59 @@ function distanceTo(uLat, uLng, lat, lng) {
   return L.latLng(uLat, uLng).distanceTo(L.latLng(lat, lng));
 }
 
-/**
- * Ports `gatherResults` (app.js ~6471–6543). Deviation, flagged: legacy's
- * Pass 1 walks live Leaflet markers (`window._waypointLayers`) to reach
- * each marker's `_placeCardOpts.imageUrls`; this port's `waypoints` prop
- * already carries `imageUrls` per-item (Slice 2 attaches them when
- * building the array), so Pass 1 reads `waypoints` directly — same
- * result, no DOM reach-through needed. Pass 2 (catches KML-only points,
- * and — faithfully, rarely — segments) queries the shared `searchIndex`
- * exactly as legacy queries `FUTA_SEARCH`.
- */
-/** Normalises a stored `type` value for comparison against `KW_MAP`'s
- * lowercase snake_case vocabulary. Chip matching is exact-string
- * (`types.has(t)`), so a single row saved as `"Kiosk"` or `"kiosk "` (easy
- * to end up with after manual entry or a Firebase->Supabase migration)
- * would silently never match any chip — this makes that class of mismatch
- * a non-issue without changing what actually counts as a match. */
 function normType(t) {
   return (t || '').trim().toLowerCase();
 }
 
-export function gatherResults(query, { waypoints, searchIndex }) {
-  const types = queryToTypes(query);
-  const words = queryWords(query);
+/**
+ * The 16 default chips, generated straight from
+ * `features/shared/placeCategories.js` so the labels/keywords used here
+ * can never drift out of sync with the admin-panel classification rules.
+ * `id` is stable (matches the underlying place-type key) — used as the
+ * row key in `quick_chips` once an admin edits/removes/re-adds one, and
+ * as the React key while chips are still just this in-memory default.
+ */
+export const DEFAULT_CHIPS = CHIP_DISPLAY_ORDER.map((key) => ({
+  id: key,
+  label: CATEGORY_LABELS[key],
+  emoji: CATEGORY_EMOJI[key],
+  iconKey: CATEGORY_ICON_KEYS[key],
+  keywords: CATEGORY_KEYWORDS[key],
+  pinnedIds: [],
+  excludedIds: [],
+  isCustom: false,
+}));
+
+/**
+ * Ports `gatherResults` (app.js ~6471–6543), rebuilt around per-chip
+ * keyword substring matching (see file header) instead of a shared
+ * free-text query string. `chip` is one entry from `DEFAULT_CHIPS` or
+ * `useQuickChips()`'s live list: `{ keywords, pinnedIds, excludedIds }`.
+ *
+ * Pass 1 walks `waypoints` (Slice 2 already attaches `imageUrls` per
+ * item, so no DOM reach-through needed, unlike legacy's marker-walk).
+ * Pass 2 catches KML-only points (and, faithfully, rarely, segments) via
+ * the shared `searchIndex`, one keyword at a time, still requiring the
+ * same name/type keyword match rather than legacy's separate name-score
+ * threshold — a chip's results should mean one consistent thing.
+ */
+export function gatherResults(chip, { waypoints, searchIndex }) {
+  if (!chip) return [];
+  const keywords = chip.keywords || [];
+  const pinned = new Set(chip.pinnedIds || []);
+  const excluded = new Set(chip.excludedIds || []);
   const user = getUserLatLng();
   const seen = new Set();
   const out = [];
 
   (waypoints || []).forEach((wp) => {
-    const t = normType(wp.type);
     if (!wp.lat || !wp.lng) return;
+    if (wp.id != null && excluded.has(wp.id)) return;
     const raw = (wp.name || '').trim();
     if (!raw) return;
+    const isPinned = wp.id != null && pinned.has(wp.id);
+    if (!isPinned && !nameOrTypeMatches(wp.name, wp.type, keywords)) return;
     const nameLow = raw.toLowerCase();
-    const typeMatch = types.has(t);
-    const nameMatch = words.some((w) => nameLow.includes(w));
-    if (!typeMatch && !nameMatch) return;
     if (seen.has(nameLow)) return;
     seen.add(nameLow);
 
@@ -147,7 +148,7 @@ export function gatherResults(query, { waypoints, searchIndex }) {
     out.push({
       id: wp.id,
       name: raw,
-      type: t,
+      type: normType(wp.type),
       lat: wp.lat,
       lng: wp.lng,
       desc: wp.description || '',
@@ -156,36 +157,37 @@ export function gatherResults(query, { waypoints, searchIndex }) {
     });
   });
 
-  words.forEach((w) => {
-    if (w.length < 2) return;
-    searchIndex.query(w, 30).forEach((r) => {
-      const t = normType(r.subtype || r.type) || 'poi';
-      const typeMatch = types.has(t);
-      const nameStrong = (r._score || 0) >= 40;
-      if (!typeMatch && !nameStrong) return;
-      const lat = parseFloat(r.lat);
-      const lng = parseFloat(r.lng);
-      if (!lat || !lng) return;
-      const key = (r.name || '').toLowerCase().trim();
-      if (!key || seen.has(key)) return;
-      seen.add(key);
+  if (keywords.length && searchIndex) {
+    keywords.forEach((kw) => {
+      const w = (kw || '').trim();
+      if (w.length < 2) return;
+      searchIndex.query(w, 30).forEach((r) => {
+        if (r.id != null && excluded.has(r.id)) return;
+        const lat = parseFloat(r.lat);
+        const lng = parseFloat(r.lng);
+        if (!lat || !lng) return;
+        const key = (r.name || '').toLowerCase().trim();
+        if (!key || seen.has(key)) return;
+        if (!nameOrTypeMatches(r.name, r.subtype || r.type, keywords)) return;
+        seen.add(key);
 
-      const matchWp = (waypoints || []).find(
-        (wp) => wp.lat != null && Math.abs(wp.lat - lat) < 0.00005 && Math.abs(wp.lng - lng) < 0.00005
-      );
-      const dist = user ? distanceTo(user.lat, user.lng, lat, lng) : null;
-      out.push({
-        id: r.id,
-        name: r.name,
-        type: t,
-        lat,
-        lng,
-        desc: r.desc || '',
-        imageUrls: matchWp?.imageUrls || [],
-        dist,
+        const matchWp = (waypoints || []).find(
+          (wp) => wp.lat != null && Math.abs(wp.lat - lat) < 0.00005 && Math.abs(wp.lng - lng) < 0.00005
+        );
+        const dist = user ? distanceTo(user.lat, user.lng, lat, lng) : null;
+        out.push({
+          id: r.id,
+          name: r.name,
+          type: normType(r.subtype || r.type) || 'poi',
+          lat,
+          lng,
+          desc: r.desc || '',
+          imageUrls: matchWp?.imageUrls || [],
+          dist,
+        });
       });
     });
-  });
+  }
 
   out.sort((a, b) => {
     if (a.dist === null && b.dist === null) return a.name.localeCompare(b.name);
@@ -196,26 +198,3 @@ export function gatherResults(query, { waypoints, searchIndex }) {
 
   return out;
 }
-
-/**
- * The 12 chip definitions (index.html ~1049–1060). `iconKey` maps into
- * lucide-react via `lib/legacyIconMap.js`. Mosque and Sports used to fall
- * back to legacy's own emoji (`data-icon-text`) here since neither had a
- * confirmed Lucide equivalent — resolved in Slice 7 with hand-drawn
- * custom SVGs (`lib/MosqueIcon.jsx`/`FootballIcon.jsx`), so all 12 chips
- * now render a real icon component.
- */
-export const CHIPS = [
-  { query: 'kiosk', label: 'Kiosk', iconKey: 'shop', emoji: '🛒' },
-  { query: 'POS bank atm', label: 'POS / ATM', iconKey: 'bank2', emoji: '💳' },
-  { query: 'printing print photocopy', label: 'Printing', iconKey: 'printer-fill', emoji: '🖨️' },
-  { query: 'garage', label: 'Garage', iconKey: 'bus-front-fill', emoji: '🔧' },
-  { query: 'library', label: 'Library', iconKey: 'building-fill', emoji: '📚' },
-  { query: 'hostel', label: 'Hostel', iconKey: 'house-door-fill', emoji: '🏠' },
-  { query: 'chapel church fellowship', label: 'Church', iconKey: 'church', emoji: '⛪' },
-  { query: 'bus stop', label: 'Bus Stop', iconKey: 'bus-front-fill', emoji: '🚌' },
-  { query: 'clinic', label: 'Clinic', iconKey: 'hospital-fill', emoji: '🏥' },
-  { query: 'canteen food', label: 'Canteen', iconKey: 'restaurant-fill', emoji: '🍽️' },
-  { query: 'mosque', label: 'Mosque', iconKey: 'mosque', emoji: '🕌' },
-  { query: 'sports', label: 'Sports', iconKey: 'football', emoji: '⚽' },
-];

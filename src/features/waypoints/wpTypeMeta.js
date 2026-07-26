@@ -2,6 +2,13 @@
 // Ported verbatim from legacy app.js (feature/login2), lines ~2367–2460.
 // Do not add/rename/recolor entries without checking the legacy source first
 // — see CLAUDE.md's "never guess at legacy behavior" rule.
+//
+// One deliberate, person-requested addition on top of the legacy port:
+// `toilet` (color/label below, dropdown option in adminTypeOptions.js) —
+// there was no "Toilet" type in legacy and the person explicitly asked
+// for one. Also added: `resolveWaypointType()` below, used by the admin
+// panel to fix a real bug — see its own comment.
+import { classifyPlace } from '../shared/placeCategories';
 
 // ── Place-type → pin colour map ─────────────────────────────────────────────
 // NOTE: this is an exact copy of legacy's WP_TYPE_COLORS, including its gaps.
@@ -40,6 +47,7 @@ export const WP_TYPE_COLORS = {
   hazard: '#E24B4A',
   junction: '#888780',
   poi: '#5DCAA5',
+  toilet: '#38BDF8',
 };
 export const WP_DEFAULT_COLOR = '#00c896';
 
@@ -86,6 +94,7 @@ export const WP_TYPE_LABELS = {
   hazard: '⚠️ Hazard',
   junction: '🔀 Junction',
   poi: '⭐ Point of Interest',
+  toilet: '🚻 Toilet',
 };
 
 // ── Rateable "Point of Interest" service types ──────────────────────────────
@@ -98,4 +107,28 @@ export const POI_RATEABLE_TYPES = new Set([
 
 export function isRateablePOI(type) {
   return POI_RATEABLE_TYPES.has(type);
+}
+
+// ── Resolve a waypoint's *displayed* type ────────────────────────────────
+// Bug this fixes: a chunk of the 475 imported waypoints carry a raw
+// `type` that was never a real option in this app's own Type dropdown
+// (WP_ALL_TYPES) — leftovers from an earlier OSM/legacy import: "yes",
+// "off_campus_lodge", "arts_centre", "townhall", "farm", etc. The admin
+// list badge used to print that raw string verbatim while the Edit
+// modal's `<select>` — which only knows the curated option list — quietly
+// fell back to its first option, so the badge and the "Type" shown on
+// Edit disagreed with each other for the same waypoint.
+//
+// This resolves what a waypoint's type *should* display as: keep it as-is
+// if it's already one of this app's real options; otherwise guess from
+// name+type via `classifyPlace` (the same rule Quick Chips use); otherwise
+// fall back to `landmark` (never "yes"). Both `PointsTab.jsx`'s badge and
+// `AdminEditModal.jsx`'s pre-selected dropdown value call this, so they
+// always show the same thing — and saving the form writes the resolved
+// value back, self-healing the bad data the next time each point is
+// touched.
+export function resolveWaypointType(wp) {
+  const raw = (wp?.type || '').trim().toLowerCase();
+  if (raw && WP_TYPE_LABELS[raw]) return raw;
+  return classifyPlace(wp?.name, wp?.type) || 'landmark';
 }

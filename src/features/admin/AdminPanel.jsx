@@ -3,6 +3,7 @@ import styles from './AdminPanel.module.css';
 import PointsTab from './PointsTab';
 import RoutesTab from './RoutesTab';
 import KmlTab from './KmlTab';
+import QuickChipsTab from './QuickChipsTab';
 import AdminEditModal from './AdminEditModal';
 import { useAdminKml } from './useAdminKml';
 
@@ -10,6 +11,7 @@ const TABS = [
   { key: 'points', label: 'Points' },
   { key: 'routes', label: 'Routes' },
   { key: 'kml', label: 'KML Upload' },
+  { key: 'chips', label: 'Chips' },
 ];
 
 /**
@@ -28,6 +30,8 @@ export default function AdminPanel({
   map,
   waypoints,
   segments,
+  chips,
+  onChipsChanged,
   onClose,
   onWaypointsChanged,
   onSegmentsChanged,
@@ -150,6 +154,9 @@ export default function AdminPanel({
           )}
           {activeTab === 'kml' && (
             <KmlTab adminKml={adminKml} onEditKmlFeature={(ctx) => setEditContext({ type: 'kml', ...ctx })} />
+          )}
+          {activeTab === 'chips' && (
+            <QuickChipsTab chips={chips} waypoints={waypoints} onChipsChanged={onChipsChanged} />
           )}
         </div>
       </div>

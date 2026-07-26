@@ -53,7 +53,7 @@ function Nav() {
             <Link to="/map" className="btn-primary hidden md:inline-flex" style={{ padding: '10px 22px', fontSize: 14 }}>
               Open Maps
             </Link>
-            <button className="md:hidden flex items-center" onClick={() => setMobileOpen(!mobileOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)' }}>
+            <button className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', display: 'flex', alignItems: 'center' }}>
               {mobileOpen ? <X size={22} strokeWidth={2} /> : <Menu size={22} strokeWidth={2} />}
             </button>
           </div>

@@ -54,6 +54,7 @@ import {
   Search,
   Send,           // send-fill
   Store,          // shop
+  Toilet,         // toilet — person-requested addition, not from legacy (no bi-* toilet class existed)
   X,              // x-lg
 } from 'lucide-react';
 import MosqueIcon from './MosqueIcon';
@@ -84,6 +85,7 @@ export const LEGACY_ICON_MAP = {
   'search': Search,
   'send-fill': Send,
   'shop': Store,
+  'toilet': Toilet,
   'x-lg': X,
   'football': FootballIcon,
   'mosque': MosqueIcon,

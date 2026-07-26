@@ -32,7 +32,7 @@ import styles from './ChipResultsPanel.module.css';
 export default function ChipResultsPanel({ activeChip, waypoints, waypointsLoaded, searchIndex, map, onSelect, onNavigate, onClose, isMobile, collapsed }) {
   const results = useMemo(() => {
     if (!activeChip) return [];
-    return gatherResults(activeChip.query, { waypoints, searchIndex });
+    return gatherResults(activeChip, { waypoints, searchIndex });
   }, [activeChip, waypoints, searchIndex]);
 
   if (!activeChip) return null;

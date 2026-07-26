@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import styles from './AdminPanel.module.css';
-import { WP_TYPE_LABELS } from '../waypoints/wpTypeMeta';
+import { WP_TYPE_LABELS, resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { WP_ALL_TYPES } from './adminTypeOptions';
 import { badgeStyleFor } from './adminBadgeColors';
 import { insertWaypoint } from './adminSave';
@@ -160,18 +160,28 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
         {filtered.length === 0 && <div className={styles.empty}>No waypoints found.</div>}
         {filtered.map((wp) => {
           const photoCount = wp.imageUrls?.length || 0;
+          // Resolved type — same value AdminEditModal will pre-select on
+          // "Edit", so the badge shown here and the Type shown there
+          // always agree (see wpTypeMeta.js's resolveWaypointType comment).
+          const resolvedType = resolveWaypointType(wp);
+          const wasRemapped = wp.type && wp.type.trim().toLowerCase() !== resolvedType;
           return (
             <div key={wp.id} className={styles.item} onClick={() => onEditWaypoint(wp)}>
-              <div className={styles.itemIcon}>{typeIcons[wp.type] || '📍'}</div>
+              <div className={styles.itemIcon}>{typeIcons[resolvedType] || '📍'}</div>
               <div className={styles.itemBody}>
                 <div className={styles.itemName}>{wp.name || '(unnamed)'}</div>
                 <div className={styles.itemMeta}>
-                  {wp.description || wp.type || 'No description'} · {Number(wp.lat || 0).toFixed(5)}, {Number(wp.lng || 0).toFixed(5)}
+                  {wp.description || 'No description'} · {Number(wp.lat || 0).toFixed(5)}, {Number(wp.lng || 0).toFixed(5)}
                 </div>
               </div>
               {photoCount > 0 && <span className={styles.itemPhotoBadge}>📷 {photoCount}</span>}
-              <span className={styles.itemBadge} style={badgeStyleFor(wp.type)}>
-                {wp.type || 'pin'}
+              <span
+                className={styles.itemBadge}
+                style={badgeStyleFor(resolvedType)}
+                title={wasRemapped ? `Stored as "${wp.type}" — will be saved as "${resolvedType}" once you edit & save this point` : undefined}
+              >
+                {resolvedType.replace(/_/g, ' ')}
+                {wasRemapped ? ' •' : ''}
               </span>
               <span className={styles.itemChevron}>›</span>
             </div>

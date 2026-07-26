@@ -9,6 +9,14 @@
 // `entrance` (which exists in `WP_TYPE_LABELS` but was seemingly dropped
 // from the selectable-types list — `gate` already covers the same
 // "Gate / Entrance" wording). Kept faithfully missing here too.
+//
+// `toilet` is a deliberate, person-requested addition on top of the
+// legacy list (no equivalent in legacy at all) — see wpTypeMeta.js's
+// header comment for why the rest of this list was otherwise left as-is
+// rather than pruned: the badge/dropdown mismatch the person reported
+// wasn't caused by garbage options *in* this list, it was caused by raw
+// DB `type` values that were never in this list to begin with. Fixed via
+// `resolveWaypointType()` instead of deleting real options here.
 export const WP_ALL_TYPES = [
   ['lecture_hall', 'Lecture Hall'],
   ['faculty', 'Faculty Building'],
@@ -34,6 +42,7 @@ export const WP_ALL_TYPES = [
   ['sports', 'Sports Facility'],
   ['hall', 'Multipurpose Hall'],
   ['clinic', 'Clinic / Health Centre'],
+  ['toilet', 'Toilet / Restroom'],
   ['auditorium', 'Auditorium'],
   ['garage', 'Garage / Car Park'],
   ['bus_stop', 'Bus Stop'],
