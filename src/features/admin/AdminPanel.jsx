@@ -30,6 +30,7 @@ export default function AdminPanel({
   map,
   waypoints,
   segments,
+  kmlAnnotations,
   chips,
   onChipsChanged,
   onClose,
@@ -156,7 +157,12 @@ export default function AdminPanel({
             <KmlTab adminKml={adminKml} onEditKmlFeature={(ctx) => setEditContext({ type: 'kml', ...ctx })} />
           )}
           {activeTab === 'chips' && (
-            <QuickChipsTab chips={chips} waypoints={waypoints} onChipsChanged={onChipsChanged} />
+            <QuickChipsTab
+              chips={chips}
+              waypoints={waypoints}
+              kmlAnnotations={kmlAnnotations}
+              onChipsChanged={onChipsChanged}
+            />
           )}
         </div>
       </div>

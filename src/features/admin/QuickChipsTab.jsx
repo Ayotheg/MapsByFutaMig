@@ -45,8 +45,16 @@ import {
  * being paused) and silently doing nothing on failure looked like a
  * bug. See `describeError()` in quickChipsApi.js for what these messages
  * mean.
+ *
+ * Search/pin covers BOTH place sources, not just the Supabase
+ * `waypoints` table: `kmlAnnotations` (the campus's own hand-drawn KML
+ * files, rendered by StaticKmlLayer) are a second, separate dataset —
+ * previously invisible here, so searching for one of "our own" KML
+ * points to pin turned up nothing while imported waypoints (which trace
+ * back to an OSM import) did. Both are merged into `allPlaces` below,
+ * each tagged with `source` so the UI can show which is which.
  */
-export default function QuickChipsTab({ chips, waypoints, onChipsChanged }) {
+export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChipsChanged }) {
   const [expandedId, setExpandedId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -59,14 +67,22 @@ export default function QuickChipsTab({ chips, waypoints, onChipsChanged }) {
 
   const list = chips || [];
 
+  const allPlaces = useMemo(
+    () => [
+      ...(waypoints || []).map((wp) => ({ ...wp, source: wp.source || 'waypoint' })),
+      ...(kmlAnnotations || []).map((a) => ({ ...a, source: 'kml' })),
+    ],
+    [waypoints, kmlAnnotations]
+  );
+
   const pinSearchResults = useMemo(() => {
     const q = pinSearch.trim().toLowerCase();
     if (q.length < 2) return [];
     const already = new Set(newPinned.map((p) => p.id));
-    return (waypoints || [])
+    return allPlaces
       .filter((wp) => !already.has(wp.id) && (wp.name || '').toLowerCase().includes(q))
       .slice(0, 6);
-  }, [pinSearch, waypoints, newPinned]);
+  }, [pinSearch, allPlaces, newPinned]);
 
   async function handleCreate() {
     const keywords = splitKeywords(newKeywords);
@@ -156,7 +172,10 @@ export default function QuickChipsTab({ chips, waypoints, onChipsChanged }) {
             />
             {pinSearchResults.map((wp) => (
               <div key={wp.id} className={chipStyles.placeRow}>
-                <span className={chipStyles.placeName}>{wp.name}</span>
+                <span className={chipStyles.placeName}>
+                  {wp.name}
+                  {wp.source === 'kml' && <span className={chipStyles.pinnedTag}>kml</span>}
+                </span>
                 <button
                   type="button"
                   className={styles.formCancel}
@@ -205,7 +224,7 @@ export default function QuickChipsTab({ chips, waypoints, onChipsChanged }) {
           <ChipRow
             key={chip.id}
             chip={chip}
-            waypoints={waypoints}
+            places={allPlaces}
             expanded={expandedId === chip.id}
             onToggleExpand={() => setExpandedId((id) => (id === chip.id ? null : chip.id))}
             onDelete={() => handleDelete(chip)}
@@ -218,7 +237,7 @@ export default function QuickChipsTab({ chips, waypoints, onChipsChanged }) {
   );
 }
 
-function ChipRow({ chip, waypoints, expanded, onToggleExpand, onDelete, busy, onChanged }) {
+function ChipRow({ chip, places, expanded, onToggleExpand, onDelete, busy, onChanged }) {
   const [editingKeywords, setEditingKeywords] = useState(false);
   const [keywordsText, setKeywordsText] = useState(joinKeywords(chip.keywords));
   const [pinQuery, setPinQuery] = useState('');
@@ -230,20 +249,20 @@ function ChipRow({ chip, waypoints, expanded, onToggleExpand, onDelete, busy, on
   const excludedIds = useMemo(() => new Set(chip.excludedIds || []), [chip.excludedIds]);
 
   const matched = useMemo(() => {
-    return (waypoints || []).filter((wp) => {
+    return (places || []).filter((wp) => {
       if (excludedIds.has(wp.id)) return false;
       return pinnedIds.has(wp.id) || nameOrTypeMatches(wp.name, wp.type, chip.keywords);
     });
-  }, [waypoints, chip.keywords, pinnedIds, excludedIds]);
+  }, [places, chip.keywords, pinnedIds, excludedIds]);
 
   const pinCandidates = useMemo(() => {
     const q = pinQuery.trim().toLowerCase();
     if (q.length < 2) return [];
     const already = new Set(matched.map((wp) => wp.id));
-    return (waypoints || [])
+    return (places || [])
       .filter((wp) => !already.has(wp.id) && (wp.name || '').toLowerCase().includes(q))
       .slice(0, 6);
-  }, [pinQuery, waypoints, matched]);
+  }, [pinQuery, places, matched]);
 
   async function saveKeywords() {
     setSavingKeywords(true);
@@ -367,6 +386,7 @@ function ChipRow({ chip, waypoints, expanded, onToggleExpand, onDelete, busy, on
                 <span className={chipStyles.placeName}>
                   {wp.name}
                   {pinnedIds.has(wp.id) && <span className={chipStyles.pinnedTag}>pinned</span>}
+                  {wp.source === 'kml' && <span className={chipStyles.pinnedTag}>kml</span>}
                 </span>
                 <button
                   type="button"
@@ -392,7 +412,10 @@ function ChipRow({ chip, waypoints, expanded, onToggleExpand, onDelete, busy, on
             />
             {pinCandidates.map((wp) => (
               <div key={wp.id} className={chipStyles.placeRow}>
-                <span className={chipStyles.placeName}>{wp.name}</span>
+                <span className={chipStyles.placeName}>
+                  {wp.name}
+                  {wp.source === 'kml' && <span className={chipStyles.pinnedTag}>kml</span>}
+                </span>
                 <button
                   type="button"
                   className={styles.formCancel}
@@ -409,7 +432,7 @@ function ChipRow({ chip, waypoints, expanded, onToggleExpand, onDelete, busy, on
             <div className={chipStyles.detailSection}>
               <div className={chipStyles.detailLabel}>Excluded ({chip.excludedIds.length})</div>
               {(chip.excludedIds || []).map((id) => {
-                const wp = (waypoints || []).find((w) => w.id === id);
+                const wp = (places || []).find((w) => w.id === id);
                 if (!wp) return null;
                 return (
                   <div key={id} className={chipStyles.placeRow}>

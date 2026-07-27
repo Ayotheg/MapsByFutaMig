@@ -22,6 +22,18 @@ import styles from './ChipResultsPanel.module.css';
  * in), no polling loop needed. The "Fetching map data…" loading state is
  * kept for the brief window before `waypoints` first resolves.
  *
+ * `kmlAnnotations` is in the memo's dependency list even though
+ * `gatherResults` reads KML entries via `searchIndex.indexRef` (a plain
+ * ref) rather than this prop directly. Necessary anyway: `searchIndex`'s
+ * own object identity never changes across the session (its
+ * register/query/resolve callbacks all have stable `useCallback` deps —
+ * see useSearchIndex.js), so `searchIndex` alone in this array can't tell
+ * React "KML data changed, recompute". Without `kmlAnnotations` here, a
+ * chip opened before StaticKmlLayer's staggered batches finish loading
+ * would keep showing whatever was in the index at that first render,
+ * forever — exactly what looked like "KML points aren't in Quick Chips"
+ * even after the underlying matching logic was already correct.
+ *
  * `panelCatResults` (the sidebar-panel version of this, index.html
  * `#panelCatResults`/`#catRp*`) is confirmed dead: its inner refs
  * (`rIcon`/`rTitle`/`rBadge`/`rList`) are captured at app.js ~6344–6350
@@ -29,11 +41,12 @@ import styles from './ChipResultsPanel.module.css';
  * button (`rBack`) is wired, and the panel that button would close is
  * itself never opened by anything. Not ported.
  */
-export default function ChipResultsPanel({ activeChip, waypoints, waypointsLoaded, searchIndex, map, onSelect, onNavigate, onClose, isMobile, collapsed }) {
+export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations, waypointsLoaded, searchIndex, map, onSelect, onNavigate, onClose, isMobile, collapsed }) {
   const results = useMemo(() => {
     if (!activeChip) return [];
     return gatherResults(activeChip, { waypoints, searchIndex });
-  }, [activeChip, waypoints, searchIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChip, waypoints, searchIndex, kmlAnnotations]);
 
   if (!activeChip) return null;
 

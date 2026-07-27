@@ -119,10 +119,11 @@ export const DEFAULT_CHIPS = CHIP_DISPLAY_ORDER.map((key) => ({
  *
  * Pass 1 walks `waypoints` (Slice 2 already attaches `imageUrls` per
  * item, so no DOM reach-through needed, unlike legacy's marker-walk).
- * Pass 2 catches KML-only points (and, faithfully, rarely, segments) via
- * the shared `searchIndex`, one keyword at a time, still requiring the
- * same name/type keyword match rather than legacy's separate name-score
- * threshold — a chip's results should mean one consistent thing.
+ * Pass 2 catches KML-only points by scanning `searchIndex.indexRef`
+ * directly — see its own comment below for why this isn't routed through
+ * `searchIndex.query()` — still requiring the exact same name/type
+ * keyword match as Pass 1 rather than any fuzzy scoring: a chip's
+ * results should mean one consistent thing.
  */
 export function gatherResults(chip, { waypoints, searchIndex }) {
   if (!chip) return [];
@@ -157,34 +158,42 @@ export function gatherResults(chip, { waypoints, searchIndex }) {
     });
   });
 
-  if (keywords.length && searchIndex) {
-    keywords.forEach((kw) => {
-      const w = (kw || '').trim();
-      if (w.length < 2) return;
-      searchIndex.query(w, 30).forEach((r) => {
-        if (r.id != null && excluded.has(r.id)) return;
-        const lat = parseFloat(r.lat);
-        const lng = parseFloat(r.lng);
-        if (!lat || !lng) return;
-        const key = (r.name || '').toLowerCase().trim();
-        if (!key || seen.has(key)) return;
-        if (!nameOrTypeMatches(r.name, r.subtype || r.type, keywords)) return;
-        seen.add(key);
+  // Pass 2: KML-only named points (StaticKmlLayer's annotations aren't in
+  // `waypoints`, only in `searchIndex`).
+  //
+  // Reads `searchIndex.indexRef.current` directly and applies the exact
+  // same substring rule as Pass 1, rather than going through
+  // `searchIndex.query()`. `query()` is a *scored, top-N* fuzzy search
+  // built for a person typing into a search box — it gives Supabase
+  // waypoints a flat scoring bonus over KML entries and caps results
+  // (useSearchIndex.js's `score()`/`query()`), so on a large campus with
+  // a generic chip keyword ("shopping", "spot"...) a real KML match could
+  // rank below 30 competing waypoint names and get silently dropped even
+  // though it's a genuine match. Scanning the raw index has no such cap —
+  // every KML point gets checked, same as every waypoint does in Pass 1.
+  const rawIndex = searchIndex?.indexRef?.current;
+  if (keywords.length && rawIndex) {
+    rawIndex.forEach((r) => {
+      if (r.source !== 'kml') return; // waypoints already covered by Pass 1; skip segments
+      if (r.id != null && excluded.has(r.id)) return;
+      const lat = parseFloat(r.lat);
+      const lng = parseFloat(r.lng);
+      if (!lat || !lng) return;
+      const key = (r.name || '').toLowerCase().trim();
+      if (!key || seen.has(key)) return;
+      if (!nameOrTypeMatches(r.name, r.subtype, keywords)) return;
+      seen.add(key);
 
-        const matchWp = (waypoints || []).find(
-          (wp) => wp.lat != null && Math.abs(wp.lat - lat) < 0.00005 && Math.abs(wp.lng - lng) < 0.00005
-        );
-        const dist = user ? distanceTo(user.lat, user.lng, lat, lng) : null;
-        out.push({
-          id: r.id,
-          name: r.name,
-          type: normType(r.subtype || r.type) || 'poi',
-          lat,
-          lng,
-          desc: r.desc || '',
-          imageUrls: matchWp?.imageUrls || [],
-          dist,
-        });
+      const dist = user ? distanceTo(user.lat, user.lng, lat, lng) : null;
+      out.push({
+        id: r.id,
+        name: r.name,
+        type: 'landmark', // matches StaticKmlLayer's own tagging for these markers
+        lat,
+        lng,
+        desc: r.desc || '',
+        imageUrls: [],
+        dist,
       });
     });
   }

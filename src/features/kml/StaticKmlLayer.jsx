@@ -30,6 +30,26 @@ const KML_FILES = [
 
 const KML_NUDGE = 0.000018; // same magnitude as legacy KML_NUDGE
 
+// `fetch(path)` with no timeout can hang indefinitely on a slow/dropped
+// connection instead of ever rejecting — which is exactly what a
+// "some KML files just don't show up, with nothing in the console"
+// report looks like: `loadOne`'s catch block never fires because the
+// promise never settles, so that file's markers simply never render and
+// nothing gets logged either. Not a legacy behavior worth preserving —
+// legacy had the same latent bug, just less visible since it also had a
+// visible #mapLoader progress bar that would show mid-load forever.
+// `withTimeout` + one retry below fixes both: a stuck request now fails
+// fast instead of hanging, and a single transient blip (the kind seen
+// in this app's testing — see the Supabase/Overpass network hiccups
+// discussed in chat) gets a second chance before we give up on that file.
+const KML_FETCH_TIMEOUT_MS = 8000;
+
+function fetchWithTimeout(path, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(path, { signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 /**
  * StaticKmlLayer — always-on (first-paint, NOT lazy) loading of the 12
  * bundled campus KML annotation files. MIGRATION_PLAN.md's Slice 5 bullet
@@ -85,9 +105,10 @@ export default function StaticKmlLayer({ map, onSelect, onAnnotationsChange, ded
     const localIdxByPath = {}; // Slice 6: per-file running index, mirrors legacy's `_kmlRegistry[path].length - 1`
     const namedMap = namedMarkersById.current; // captured once — same Map instance for this effect's lifetime
 
-    async function loadOne(path, color) {
+    async function loadOne(path, color, attempt = 1) {
       try {
-        const res = await fetch(path);
+        const res = await fetchWithTimeout(path, KML_FETCH_TIMEOUT_MS);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const text = await res.text();
         const xml = new DOMParser().parseFromString(text, 'text/xml');
         const geo = toGeoJSONKml(xml);
@@ -95,9 +116,11 @@ export default function StaticKmlLayer({ map, onSelect, onAnnotationsChange, ded
 
         if (cancelled) return;
 
+        let pointCount = 0;
         L.geoJSON(geo, {
           filter: (f) => f.geometry?.type === 'Point',
           pointToLayer(f, ll) {
+            pointCount += 1;
             const rawName = f.properties?.name || '';
             const rawDesc = f.properties?.description || '';
             const cleanDesc = cleanKmlDescription(rawDesc);
@@ -162,8 +185,20 @@ export default function StaticKmlLayer({ map, onSelect, onAnnotationsChange, ded
             return marker;
           },
         });
+
+        if (!cancelled) {
+          console.info(`KML loaded: ${path} (${pointCount} point${pointCount === 1 ? '' : 's'})`);
+        }
       } catch (e) {
-        console.warn('KML load failed:', path, e.message);
+        if (cancelled) return;
+        const reason = e.name === 'AbortError' ? `timed out after ${KML_FETCH_TIMEOUT_MS}ms` : e.message;
+        if (attempt < 2) {
+          console.warn(`KML load failed, retrying: ${path} (${reason})`);
+          await new Promise((r) => setTimeout(r, 500));
+          if (!cancelled) await loadOne(path, color, attempt + 1);
+          return;
+        }
+        console.warn(`KML load failed after retry, giving up: ${path} (${reason})`);
       }
     }
 

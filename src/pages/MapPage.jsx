@@ -368,6 +368,7 @@ export default function MapPage({ onReadinessChange }) {
       <ChipResultsPanel
         activeChip={activeChip}
         waypoints={waypoints}
+        kmlAnnotations={kmlAnnotations}
         waypointsLoaded={!waypointsLoading}
         searchIndex={searchIndex}
         map={map}
@@ -441,6 +442,7 @@ export default function MapPage({ onReadinessChange }) {
             map={map}
             waypoints={waypoints}
             segments={segments}
+            kmlAnnotations={kmlAnnotations}
             chips={quickChips.chips}
             onChipsChanged={quickChips.refetch}
             onClose={() => setAdminPanelOpen(false)}
