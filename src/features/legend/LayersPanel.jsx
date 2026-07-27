@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import styles from './LayersPanel.module.css';
 import PlaceTypeFilter from './PlaceTypeFilter';
+import { BASEMAP_STYLES, DEFAULT_BASEMAP_ID } from '../map/basemaps';
 
 /**
  * Body content of the Layers panel — composed once, rendered by both the
@@ -16,6 +17,15 @@ import PlaceTypeFilter from './PlaceTypeFilter';
  * `statLayersOn`) — none of those element IDs exist anywhere in the
  * current `index.html`, so that JS is dead/vestigial (always null-
  * guarded no-ops). Not invented here either, per CLAUDE.md.
+ *
+ * Base Map Style: legacy only ever shipped one selectable swatch
+ * (Light/CARTO Voyager) — its JS supported a second "Dark" style with no
+ * matching `.basemap-thumb` in the HTML to pick it. `features/map/basemaps.js`
+ * already carried a full style catalogue (Light/Dark/Satellite/Terrain)
+ * that nothing consumed; this panel now renders all four and calls
+ * `map._setBasemap(id)` (wired in MapShell) to actually switch the tile
+ * layer — a deliberate extension past legacy's single-option state, not
+ * a re-port of it.
  */
 export default function LayersPanel({
   map,
@@ -47,6 +57,21 @@ export default function LayersPanel({
     const layer = map._campusBoundaryLayer;
     if (layer) map.fitBounds(layer.getBounds(), { padding: [40, 40] });
   }, [map]);
+
+  // ── Base map style — mirrors the `boundaryOn` pattern above: local UI
+  // state, kept in sync by calling straight through to the imperative
+  // Leaflet side (`map._setBasemap`, set up in MapShell) rather than
+  // lifting this into MapPage/React Context. Defaults to the same style
+  // MapShell itself boots with, so the "active" swatch is right even
+  // before the user has touched this panel.
+  const [basemapId, setBasemapId] = useState(DEFAULT_BASEMAP_ID);
+  const selectBasemap = useCallback(
+    (id) => {
+      setBasemapId(id);
+      map?._setBasemap?.(id);
+    },
+    [map]
+  );
 
   // ── Map opacity slider — dims Leaflet's tile + overlay panes together,
   // same target elements as legacy (app.js ~5519–5525).
@@ -128,16 +153,18 @@ export default function LayersPanel({
 
       <div className={styles.sectionLabel}>Base Map Style</div>
       <div className={styles.basemapGrid}>
-        {/* Only one basemap ships in the current legacy markup (Light /
-            CARTO Voyager, the same tile source MapShell already loads in
-            Slice 1) — legacy's JS supports a 'dark' CartoDB DarkMatter
-            style too (app.js ~5470–5513), but no second .basemap-thumb
-            exists in the HTML to select it. Single non-functional-looking
-            but accurate "active" tile, matching what's actually shipped. */}
-        <button type="button" className={`${styles.basemapThumb} ${styles.active}`}>
-          <div className={`${styles.basemapPreview} ${styles.previewLight}`} />
-          <span>Light</span>
-        </button>
+        {BASEMAP_STYLES.map((style) => (
+          <button
+            key={style.id}
+            type="button"
+            className={`${styles.basemapThumb} ${basemapId === style.id ? styles.active : ''}`}
+            onClick={() => selectBasemap(style.id)}
+            aria-pressed={basemapId === style.id}
+          >
+            <div className={`${styles.basemapPreview} ${styles[`preview${style.id[0].toUpperCase()}${style.id.slice(1)}`] || ''}`} />
+            <span>{style.label}</span>
+          </button>
+        ))}
       </div>
 
       <div className={styles.opacitySection}>

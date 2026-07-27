@@ -556,9 +556,18 @@ early "just in case."
     strip/ALL-toggle/active-dot — none of these have working JS or matching
     DOM in the current legacy app, so they were correctly left out rather
     than ported as broken features.
-  - **Basemap:** only "Light" renders — legacy's JS supports a "Dark"
-    CartoDB style but no second `.basemap-thumb` exists in the current HTML
-    to select it, so the port matches that same single-option state.
+  - **Basemap:** now four selectable styles (Light/Dark/Satellite/Terrain),
+    intentionally past legacy's single-option state (legacy's JS supported
+    a "Dark" CartoDB style but had no second `.basemap-thumb` in its HTML
+    to select it). `features/map/basemaps.js` already held the full style
+    catalogue from an earlier session but nothing consumed it — `MapShell`
+    now builds its tile layer from that catalogue and exposes
+    `map._setBasemap(id)`; `LayersPanel` renders a thumb per style and
+    calls it, same hang-it-off-the-map-instance pattern as
+    `_campusBoundaryLayer`. Satellite (Esri World Imagery) and Terrain
+    (OpenTopoMap) are both capped below the map's max zoom on their native
+    tile source and over-zoom past that — see `basemaps.js` comments for
+    why. No API key required for any of the four.
   - **Routing:** `pages/LandingPage.jsx` exists but isn't wired into a
     route — reserved for a future "how the map works" explainer page.
     `pages/LoadingScreen.jsx` and `pages/NotFoundPage.jsx` are still
