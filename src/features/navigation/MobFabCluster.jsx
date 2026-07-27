@@ -21,16 +21,25 @@ import styles from './MobFabCluster.module.css';
  * `FUTA_AUTH.openModal()` and lets the modal itself decide login vs
  * profile tab.
  */
-export default function MobFabCluster({ sheetState, tracking, onLocateClick, onViewToggleClick, onAuthClick, user }) {
+export default function MobFabCluster({ sheetState, tracking, onLocateClick, onViewToggleClick, onAuthClick, user, guestNavRemaining }) {
   const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
   return (
     <div className={`${styles.cluster} ${styles[sheetState] || ''}`}>
       <button
         type="button"
         className={`${styles.fab} ${user ? styles.signedIn : ''}`}
-        title={user ? 'Account' : 'Sign In'}
+        title={
+          user
+            ? 'Account'
+            : guestNavRemaining != null
+              ? `Sign In — ${guestNavRemaining} free navigation${guestNavRemaining === 1 ? '' : 's'} left`
+              : 'Sign In'
+        }
         onClick={onAuthClick}
       >
+        {!user && guestNavRemaining != null && (
+          <span className={styles.guestBadge}>{guestNavRemaining}</span>
+        )}
         {user && avatarUrl ? (
           <img className={styles.avatar} src={avatarUrl} alt="" />
         ) : (

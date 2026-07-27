@@ -23,6 +23,7 @@ import ChipResultsPanel from '../features/search/ChipResultsPanel';
 import { useGpsTracking } from '../features/navigation/useGpsTracking';
 import MobFabCluster from '../features/navigation/MobFabCluster';
 import { useAuth, friendlyError } from '../features/auth/useAuth';
+import { useGuestUsage } from '../features/auth/useGuestUsage';
 import { useAdminPin } from '../features/auth/useAdminPin';
 import { useSeo } from '../lib/useSeo';
 
@@ -165,6 +166,23 @@ export default function MapPage({ onReadinessChange }) {
   // for attribution, and later Slice 11's PIN gate).
   const auth = useAuth();
 
+  // ── Guest navigation limit ────────────────────────────────────────
+  // New requirement: signed-out visitors get `guestUsage.limit` (3) free
+  // successful navigations before "Start Navigation" is blocked in favor
+  // of the auth modal. Only gates navigation — browsing/search/place
+  // cards stay open for guests. See useGuestUsage.js for the storage
+  // model and NavigationController.jsx's header comment for why the gate
+  // lives inside `startNavigation()` rather than only at first open.
+  const guestUsage = useGuestUsage();
+  const guestNavBlocked = !auth.user && guestUsage.limitReached;
+
+  // Once someone actually signs in, their guest tally is irrelevant going
+  // forward — clear it rather than leaving stale count around.
+  useEffect(() => {
+    if (auth.user) guestUsage.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.user]);
+
   // Real boot-readiness signal for App's loading screen — no fake timer,
   // just the same loading flags this page already tracks for its own
   // data hooks (map init, waypoints, segments, session restore).
@@ -179,11 +197,26 @@ export default function MapPage({ onReadinessChange }) {
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState('login');
+  // New: set only when the modal is opened because a guest hit the
+  // navigation limit, so AuthModal can show a short explanation instead
+  // of opening silently. Cleared on every other open path.
+  const [authModalMessage, setAuthModalMessage] = useState(null);
   // Legacy's `openModal(tab)` (app.js ~7185–7189): always lands on the
   // profile tab if already signed in, regardless of the tab requested.
-  function openAuthModal(tab) {
+  function openAuthModal(tab, message = null) {
     setAuthModalTab(auth.user ? 'profile' : (tab || 'login'));
+    setAuthModalMessage(message);
     setAuthModalOpen(true);
+  }
+
+  // Shown whenever a guest tries to navigate after using up their free
+  // tries — lands on Create Account since that's the likely next step,
+  // but the modal still offers Sign In for guests who already have one.
+  function handleGuestNavBlocked() {
+    openAuthModal(
+      'signup',
+      `You've used all ${guestUsage.limit} free navigations as a guest. Sign in or create an account to keep navigating.`
+    );
   }
 
   useEffect(() => {
@@ -220,6 +253,10 @@ export default function MapPage({ onReadinessChange }) {
   }
 
   function handleNavLaunch() {
+    if (guestNavBlocked) {
+      handleGuestNavBlocked();
+      return;
+    }
     if (navOpen) {
       navControllerRef.current?.requestLaunchToggle();
     } else {
@@ -228,6 +265,10 @@ export default function MapPage({ onReadinessChange }) {
   }
 
   function handlePlaceCardNavigate(entry) {
+    if (guestNavBlocked) {
+      handleGuestNavBlocked();
+      return;
+    }
     setNavSeedDest(entry);
     setNavOpen(true);
   }
@@ -329,6 +370,7 @@ export default function MapPage({ onReadinessChange }) {
           user={auth.user}
           onAuthClick={() => openAuthModal('login')}
           onAdminClick={handleAdminClick}
+          guestNavRemaining={auth.user ? null : guestUsage.remaining}
         />
       )}
 
@@ -388,6 +430,7 @@ export default function MapPage({ onReadinessChange }) {
           onViewToggleClick={toggleViewMode}
           onAuthClick={() => openAuthModal('login')}
           user={auth.user}
+          guestNavRemaining={auth.user ? null : guestUsage.remaining}
         />
       )}
       {map && navOpen && (
@@ -404,6 +447,11 @@ export default function MapPage({ onReadinessChange }) {
             }}
             onActiveChange={setNavActive}
             onArrival={setReviewTarget}
+            guestNavBlocked={guestNavBlocked}
+            onGuestBlocked={handleGuestNavBlocked}
+            onNavigationSuccess={() => {
+              if (!auth.user) guestUsage.recordUse();
+            }}
           />
         </Suspense>
       )}
@@ -424,6 +472,7 @@ export default function MapPage({ onReadinessChange }) {
             resetPassword={auth.resetPassword}
             signOut={auth.signOut}
             friendlyError={friendlyError}
+            message={authModalMessage}
           />
         </Suspense>
       )}

@@ -65,7 +65,7 @@ const RAIL_ITEMS = [
  * `body.sidebar-collapsed .desk-search-bar` rule), so MapPage now owns
  * this value and passes it down to all three.
  */
-export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick, onAdminClick }) {
+export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick, onAdminClick, guestNavRemaining }) {
   const [activeKey, setActiveKey] = useState('layers');
 
   // Slice 4: reflect collapsed state onto document.body, same
@@ -171,7 +171,21 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
           `AdminPinGate`, Slice 10) and, as of Slice 11, opens the real
           ported admin panel — see MapPage.jsx's `handleAdminClick`. */}
       <div className={styles.sidebarFooter}>
-        <button type="button" className={styles.authBtn} title={user ? 'Account' : 'Sign In'} onClick={onAuthClick}>
+        <button
+          type="button"
+          className={styles.authBtn}
+          title={
+            user
+              ? 'Account'
+              : guestNavRemaining != null
+                ? `Sign In — ${guestNavRemaining} free navigation${guestNavRemaining === 1 ? '' : 's'} left`
+                : 'Sign In'
+          }
+          onClick={onAuthClick}
+        >
+          {!user && guestNavRemaining != null && (
+            <span className={styles.guestBadge}>{guestNavRemaining}</span>
+          )}
           {user ? (
             <>
               {/* Legacy shows the avatar only if photoURL exists; no icon

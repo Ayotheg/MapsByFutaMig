@@ -246,6 +246,7 @@
 
 .authBtn,
 .adminBtn {
+  position: relative;
   width: 40px;
   height: 40px;
   border-radius: var(--r-lg);
@@ -264,6 +265,25 @@
   font-size: 7px;
   font-weight: 500;
   letter-spacing: 0.06em;
+}
+
+/* Guest free-navigation counter — small badge on the Sign In rail button,
+   only shown while signed out (Sidebar.jsx's `guestNavRemaining`). */
+.guestBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--primary, #a05aff);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  border: 1.5px solid var(--surface, #1a1224);
 }
 .authBtn:hover,
 .adminBtn:hover {

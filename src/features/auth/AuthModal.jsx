@@ -25,7 +25,7 @@ import { displayName, initials } from './useAuth';
  * `initialTab` mirrors legacy's `openModal(tab)` — MapPage passes
  * `user ? 'profile' : 'login'` (app.js ~7185–7189's exact same gate).
  */
-export default function AuthModal({ initialTab, user, onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword, signOut, friendlyError }) {
+export default function AuthModal({ initialTab, user, onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword, signOut, friendlyError, message }) {
   const [tab, setTab] = useState(initialTab);
 
   // Login fields
@@ -170,6 +170,8 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
           <div className={styles.brandText}>Maps By Futa</div>
           <div className={styles.brandSub}>Your campus, navigated.</div>
         </div>
+
+        {message && <div className={styles.limitMessage}>{message}</div>}
 
         {showTabs && (
           <div className={styles.tabs}>

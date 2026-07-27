@@ -33,6 +33,17 @@ import './navMapLayers.css';
  *    unmounting is this port's equivalent "dormant" state, and is what
  *    makes this component a real lazy-load boundary instead of a
  *    permanently-resident one.
+ *  - `onNavigationSuccess()` — new (no legacy equivalent): fired once per
+ *    real arrival, for ANY destination — unlike `onArrival` above this is
+ *    NOT gated on `isRateablePOI`. This is what MapPage uses to count a
+ *    guest's free navigations (see `useGuestUsage.js`); a guest "using the
+ *    map successfully" isn't about whether the place happens to support
+ *    reviews.
+ *  - `guestNavBlocked` (bool) / `onGuestBlocked()` — the guest-limit gate
+ *    itself. Checked at the top of `startNavigation()`, not just once at
+ *    mount, so a guest who already has this controller open (e.g. picked a
+ *    new destination in an already-open "Where to?" panel) is still
+ *    stopped the moment their free tries run out, not only on first open.
  *
  * `gps` is `useGpsTracking()`'s return value, lifted to MapPage — used
  * for `gps.lastKnownPosRef` (legacy's shared `lastKnownPos` cache, read
@@ -40,7 +51,7 @@ import './navMapLayers.css';
  * location resolver" (below).
  */
 const NavigationController = forwardRef(function NavigationController(
-  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onArrival },
+  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess },
   ref
 ) {
   const [destPanelOpen, setDestPanelOpen] = useState(true);
@@ -70,6 +81,13 @@ const NavigationController = forwardRef(function NavigationController(
   const destPanelOpenRef = useRef(true);
   const voiceEnabledRef = useRef(true);
   voiceEnabledRef.current = voiceEnabled;
+
+  // Guest-limit gate — read fresh on every `startNavigation()` call rather
+  // than only at mount, since this controller can stay mounted across
+  // several destination picks in one session (see this file's header
+  // comment on `guestNavBlocked`).
+  const guestNavBlockedRef = useRef(false);
+  guestNavBlockedRef.current = guestNavBlocked;
 
   const navDestRef = useRef(null); // {lat,lng,name,id,type}
   const navModeRef = useRef('foot-walking');
@@ -309,7 +327,10 @@ const NavigationController = forwardRef(function NavigationController(
     }));
     speak(`You have arrived at your destination, ${dest.name}!`);
     setArrivedBannerDest(dest.name);
-  }, [speak]);
+    // Counts towards the guest free-navigation limit regardless of
+    // destination type — see this file's header comment.
+    onNavigationSuccess?.();
+  }, [speak, onNavigationSuccess]);
 
   const dismissArrivedBanner = useCallback(() => {
     const dest = navDestRef.current;
@@ -413,6 +434,11 @@ const NavigationController = forwardRef(function NavigationController(
 
   // ── Start / stop navigation ────────────────────────────────────────
   const startNavigation = useCallback(async () => {
+    if (guestNavBlockedRef.current) {
+      onGuestBlocked?.();
+      return;
+    }
+
     const dest = navDestRef.current;
     if (!dest) {
       setHint('⚠️ Please choose a destination first.');
@@ -523,7 +549,7 @@ const NavigationController = forwardRef(function NavigationController(
 
     setGoDisabled(false);
     setGoLabel('Start Navigation');
-  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, updateHUD, onActiveChange]);
+  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, updateHUD, onActiveChange, onGuestBlocked]);
 
   const stopNavigation = useCallback(() => {
     navActiveRef.current = false;

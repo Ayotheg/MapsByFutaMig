@@ -30,6 +30,7 @@
 }
 
 .fab {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,6 +44,26 @@
   height: 40px;
   background: var(--surface-bright);
   color: var(--text-variant);
+}
+
+/* Guest free-navigation counter (MobFabCluster.jsx's `guestNavRemaining`) —
+   same small badge pattern as Sidebar.module.css's `.guestBadge`. */
+.guestBadge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--primary, #a05aff);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  border: 1.5px solid var(--surface, #1a1224);
+  z-index: 1;
 }
 .fab:active {
   transform: scale(0.9);

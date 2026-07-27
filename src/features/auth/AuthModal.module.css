@@ -238,6 +238,22 @@
 .statusError { background: rgba(255, 80, 80, 0.12); color: #ff8080; border: 1px solid rgba(255, 80, 80, 0.20); }
 .statusOk { background: rgba(80, 220, 130, 0.12); color: #6ddc99; border: 1px solid rgba(80, 220, 130, 0.20); }
 
+/* Guest nav-limit banner — shown above the tabs when AuthModal is opened
+   because a guest used up their free navigations (MapPage.jsx's
+   `authModalMessage`), same shape as .status but neutral/brand-toned
+   rather than error/success. */
+.limitMessage {
+  font-size: 12.5px;
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin: 0 0 18px;
+  line-height: 1.4;
+  text-align: center;
+  background: rgba(183, 109, 255, 0.10);
+  color: var(--text);
+  border: 1px solid rgba(183, 109, 255, 0.28);
+}
+
 .submitBtn {
   width: 100%;
   padding: 12px;
