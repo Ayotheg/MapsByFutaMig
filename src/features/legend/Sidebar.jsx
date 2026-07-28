@@ -65,7 +65,7 @@ const RAIL_ITEMS = [
  * `body.sidebar-collapsed .desk-search-bar` rule), so MapPage now owns
  * this value and passes it down to all three.
  */
-export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick, onAdminClick, guestNavRemaining }) {
+export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick, onAdminClick, guestNavRemaining, onSuggestPlaceClick }) {
   const [activeKey, setActiveKey] = useState('layers');
 
   // Slice 4: reflect collapsed state onto document.body, same
@@ -213,6 +213,20 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
           </svg>
           <span>Admin</span>
+        </button>
+        {/* Slice 13 — button always visible; whether it opens the
+            submission form or a "sign in first" prompt is decided by
+            `onSuggestPlaceClick` (wired in MapPage.jsx), same reasoning
+            as this button's `title` above not hiding Admin for signed-
+            out visitors either — the entry point stays discoverable,
+            the gate happens on click. */}
+        <button type="button" className={styles.adminBtn} title="Suggest a Place" onClick={onSuggestPlaceClick}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2C7.03 2 3 6.03 3 11c0 5.25 7.5 11 9 11s9-5.75 9-11c0-4.97-4.03-9-9-9z" />
+            <line x1="12" y1="7" x2="12" y2="15" />
+            <line x1="8" y1="11" x2="16" y2="11" />
+          </svg>
+          <span>Suggest</span>
         </button>
       </div>
     </aside>

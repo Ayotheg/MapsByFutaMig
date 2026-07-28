@@ -26,6 +26,7 @@ import { useAuth, friendlyError } from '../features/auth/useAuth';
 import { useGuestUsage } from '../features/auth/useGuestUsage';
 import { useAdminPin } from '../features/auth/useAdminPin';
 import { useSeo } from '../lib/useSeo';
+import SubmissionToast from '../features/waypoint-submissions/SubmissionToast';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -62,6 +63,11 @@ const AdminPinGate = lazy(() => import('../features/auth/AdminPinGate'));
 // tier as the rest — a large, admin-only surface with no reason to be in
 // the first-paint bundle.
 const AdminPanel = lazy(() => import('../features/admin/AdminPanel'));
+
+// Slice 13: same lazy tier as the other on-demand modals above — only
+// mounts once a signed-in student actually opens "Suggest a place".
+const SuggestWaypointModal = lazy(() => import('../features/waypoint-submissions/SuggestWaypointModal'));
+const MyWaypointSubmissionsPanel = lazy(() => import('../features/waypoint-submissions/MyWaypointSubmissionsPanel'));
 
 /**
  * First page-level composition of the map with feature chrome around it.
@@ -252,6 +258,47 @@ export default function MapPage({ onReadinessChange }) {
     adminPin.requestAdminAccess(() => setAdminPanelOpen(true));
   }
 
+  // ── Slice 13: student waypoint submissions ────────────────────────────
+  // `suggestModalOpen`/`mySubmissionsOpen` are two separate surfaces: the
+  // submission form itself, and a signed-in student's own past-
+  // submissions list. `pickedCoord`/`onCoordConsumed` reuse AdminPanel's
+  // exact "hide the whole overlay, wait for one map click" flow
+  // (`startPicking` there), rather than a second, separate implementation
+  // of the same interaction.
+  const [suggestModalOpen, setSuggestModalOpen] = useState(false);
+  const [mySubmissionsOpen, setMySubmissionsOpen] = useState(false);
+  const [suggestPickedCoord, setSuggestPickedCoord] = useState(null);
+  const [submissionToast, setSubmissionToast] = useState(null);
+  const suggestClickHandlerRef = useRef(null);
+
+  useEffect(
+    () => () => {
+      if (suggestClickHandlerRef.current) map?.off('click', suggestClickHandlerRef.current);
+    },
+    [map]
+  );
+
+  function handleSuggestPlaceClick() {
+    // A sign-in prompt instead of letting the form open and fail at the
+    // RLS layer.
+    if (!auth.user) {
+      openAuthModal('login', 'Sign in to suggest a place on the map.');
+      return;
+    }
+    setSuggestModalOpen(true);
+  }
+
+  function handleRequestMapPick() {
+    if (!map) return;
+    setSuggestModalOpen(false);
+    const handler = (e) => {
+      setSuggestPickedCoord({ lat: e.latlng.lat, lng: e.latlng.lng });
+      setSuggestModalOpen(true);
+    };
+    suggestClickHandlerRef.current = handler;
+    map.once('click', handler);
+  }
+
   function handleNavLaunch() {
     if (guestNavBlocked) {
       handleGuestNavBlocked();
@@ -357,6 +404,7 @@ export default function MapPage({ onReadinessChange }) {
           navActive={navActive}
           onNavLaunch={handleNavLaunch}
           onAdminClick={handleAdminClick}
+          onSuggestPlaceClick={handleSuggestPlaceClick}
         />
       ) : (
         <Sidebar
@@ -370,6 +418,7 @@ export default function MapPage({ onReadinessChange }) {
           user={auth.user}
           onAuthClick={() => openAuthModal('login')}
           onAdminClick={handleAdminClick}
+          onSuggestPlaceClick={handleSuggestPlaceClick}
           guestNavRemaining={auth.user ? null : guestUsage.remaining}
         />
       )}
@@ -502,6 +551,31 @@ export default function MapPage({ onReadinessChange }) {
           />
         </Suspense>
       )}
+
+      {/* ── Slice 13: student waypoint submissions ─────────────────── */}
+      {suggestModalOpen && (
+        <Suspense fallback={null}>
+          <SuggestWaypointModal
+            user={auth.user}
+            waypoints={waypoints}
+            pickedCoord={suggestPickedCoord}
+            onCoordConsumed={() => setSuggestPickedCoord(null)}
+            onRequestMapPick={handleRequestMapPick}
+            onClose={() => setSuggestModalOpen(false)}
+            onSubmitted={(message) => setSubmissionToast(message)}
+            onViewSubmissions={() => {
+              setSuggestModalOpen(false);
+              setMySubmissionsOpen(true);
+            }}
+          />
+        </Suspense>
+      )}
+      {mySubmissionsOpen && (
+        <Suspense fallback={null}>
+          <MyWaypointSubmissionsPanel user={auth.user} onClose={() => setMySubmissionsOpen(false)} />
+        </Suspense>
+      )}
+      <SubmissionToast message={submissionToast} onDismiss={() => setSubmissionToast(null)} />
     </>
   );
 }

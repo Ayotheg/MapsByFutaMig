@@ -16,6 +16,14 @@ const NUDGE = 0.00004;
  *   - viewport-batched DOM insertion — handled in WaypointLayer.jsx instead,
  *     since that's a rendering concern, not a data-fetching one.
  */
+// Slice 13: student-submitted waypoints stay `status: 'pending'` until an
+// admin approves them (RLS enforces this server-side — see
+// `supabase/waypoint_submissions.sql`). The map itself should only ever
+// render `approved` rows; a signed-in student's own pending/rejected
+// submissions are surfaced separately via `MyWaypointSubmissionsPanel.jsx`
+// (`src/features/waypoint-submissions/`), not mixed into this list — the
+// simpler "approved-only here, own-submissions in their own panel" shape,
+// rather than teaching WaypointLayer a new pending-pin visual state.
 export function useWaypoints() {
   const [waypoints, setWaypoints] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +39,13 @@ export function useWaypoints() {
           .from('waypoints')
           .select(
             'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count'
-          ),
+          )
+          // Every pre-Slice-13 row is backfilled to 'approved' by
+          // waypoint_submissions.sql, and admin-created rows (adminSave.js's
+          // insertWaypoint) default to 'approved' too — this filter is a
+          // no-op for all of those, it only actually excludes
+          // pending/rejected student submissions.
+          .eq('status', 'approved'),
         supabase
           .from('waypoint_images')
           .select('waypoint_id, storage_path, position')

@@ -4,14 +4,19 @@ import PointsTab from './PointsTab';
 import RoutesTab from './RoutesTab';
 import KmlTab from './KmlTab';
 import QuickChipsTab from './QuickChipsTab';
+import PendingTab from './PendingTab';
 import AdminEditModal from './AdminEditModal';
 import { useAdminKml } from './useAdminKml';
 
+// Slice 13: new "Pending" tab for reviewing student-submitted waypoints —
+// added as a 5th tab, appended at the end so it doesn't reorder/renumber
+// anything an admin's muscle memory already relies on for the other four.
 const TABS = [
   { key: 'points', label: 'Points' },
   { key: 'routes', label: 'Routes' },
   { key: 'kml', label: 'KML Upload' },
   { key: 'chips', label: 'Chips' },
+  { key: 'pending', label: 'Pending' },
 ];
 
 /**
@@ -164,6 +169,7 @@ export default function AdminPanel({
               onChipsChanged={onChipsChanged}
             />
           )}
+          {activeTab === 'pending' && <PendingTab onRefreshWaypoints={onWaypointsChanged} />}
         </div>
       </div>
 

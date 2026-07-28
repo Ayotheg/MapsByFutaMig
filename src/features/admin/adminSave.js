@@ -121,6 +121,26 @@ export async function insertWaypoint({ name, description, type, lat, lng }) {
   return data.id;
 }
 
+// ── Pending submissions (Slice 13) ──────────────────────────────────────
+// No legacy equivalent — a genuinely new admin action, not a port. Lives
+// here (not `submitWaypoint.js`) for the same reason every other function
+// in this file does: it's an admin write. RLS's `admin_update` policy
+// (`supabase/waypoint_submissions.sql`) is what actually enforces only
+// admins can call these successfully — this client uses the anon key,
+// same as every other call in this file.
+export async function approveWaypoint(id) {
+  const { error } = await supabase.from('waypoints').update({ status: 'approved' }).eq('id', id);
+  if (error) throw error;
+}
+
+export async function rejectWaypoint(id, reason) {
+  const { error } = await supabase
+    .from('waypoints')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', id);
+  if (error) throw error;
+}
+
 // ── Segments ─────────────────────────────────────────────────────────────
 // Legacy: `adminSaveBtn`'s segment branch (app.js ~4156–4197) also
 // batch-writes a denormalized `segmentName` onto every child waypoint doc.

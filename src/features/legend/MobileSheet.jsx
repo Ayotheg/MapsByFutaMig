@@ -54,6 +54,11 @@ const TABS = [
   { key: 'gps', label: 'Signal', hasPanel: true },
   { key: 'navigate', label: 'Nav', hasPanel: true },
   { key: 'admin', label: 'Admin', hasPanel: false, isAction: true },
+  // Slice 13: same isAction shape as 'admin' above — collapses the sheet
+  // and hands off to a callback rather than switching this sheet's body,
+  // reusing the exact pattern Slice 11 established for 'admin' instead of
+  // inventing a second one.
+  { key: 'suggest', label: 'Suggest', hasPanel: false, isAction: true },
 ];
 
 export default function MobileSheet({
@@ -67,6 +72,7 @@ export default function MobileSheet({
   navActive,
   onNavLaunch,
   onAdminClick,
+  onSuggestPlaceClick,
 }) {
   const [internalSheetState, setInternalSheetState] = useState('peek');
   const sheetState = controlledSheetState ?? internalSheetState;
@@ -185,7 +191,11 @@ export default function MobileSheet({
         // touched, only its tab-strip highlight).
         setActiveTab(null);
         setSheetState('peek');
-        onAdminClick?.();
+        if (tab.key === 'suggest') {
+          onSuggestPlaceClick?.();
+        } else {
+          onAdminClick?.();
+        }
         return;
       }
       if (!tab.hasPanel) return; // matches Sidebar's inert-tab fallback
@@ -197,7 +207,7 @@ export default function MobileSheet({
       setActiveTab(tab.key);
       if (sheetState === 'peek') setSheetState('half');
     },
-    [activeTab, sheetState, setSheetState, setActiveTab, onAdminClick]
+    [activeTab, sheetState, setSheetState, setActiveTab, onAdminClick, onSuggestPlaceClick]
   );
 
   const handleTap = useCallback(() => {
