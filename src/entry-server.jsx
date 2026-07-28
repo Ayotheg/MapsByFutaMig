@@ -18,3 +18,4 @@ export function render(url = "/") {
     </StaticRouter>
   );
 }
+
