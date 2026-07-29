@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { X, MapPin, ChevronRight } from 'lucide-react';
+import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import styles from './AdminPanel.module.css';
 import chipStyles from './QuickChipsTab.module.css';
 import { nameOrTypeMatches } from '../shared/placeCategories';
@@ -58,7 +60,6 @@ export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChip
   const [expandedId, setExpandedId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLabel, setNewLabel] = useState('');
-  const [newEmoji, setNewEmoji] = useState('');
   const [newKeywords, setNewKeywords] = useState('');
   const [newPinned, setNewPinned] = useState([]); // [{id, name}]
   const [pinSearch, setPinSearch] = useState('');
@@ -95,13 +96,11 @@ export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChip
     try {
       await createChip({
         label: newLabel,
-        emoji: newEmoji,
         keywordsText: newKeywords,
         pinnedIds: newPinned.map((p) => p.id),
         sortOrder: list.length,
       });
       setNewLabel('');
-      setNewEmoji('');
       setNewKeywords('');
       setNewPinned([]);
       setPinSearch('');
@@ -142,15 +141,9 @@ export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChip
       {showAddForm && (
         <div className={styles.inlineForm}>
           <div className={styles.formTitle}>New chip</div>
-          <div className={styles.fieldRow}>
-            <div className={styles.fieldGroup} style={{ flex: 1 }}>
-              <label>Name</label>
-              <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Barber Shops" />
-            </div>
-            <div className={styles.fieldGroup} style={{ maxWidth: 90 }}>
-              <label>Emoji</label>
-              <input value={newEmoji} onChange={(e) => setNewEmoji(e.target.value)} placeholder="✂️" />
-            </div>
+          <div className={styles.fieldGroup}>
+            <label>Name</label>
+            <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Barber Shops" />
           </div>
 
           <div className={styles.fieldGroup}>
@@ -198,7 +191,7 @@ export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChip
                       className={chipStyles.pillRemove}
                       onClick={() => setNewPinned((prev) => prev.filter((x) => x.id !== p.id))}
                     >
-                      ✕
+                      <X size={11} />
                     </button>
                   </span>
                 ))}
@@ -321,14 +314,19 @@ function ChipRow({ chip, places, expanded, onToggleExpand, onDelete, busy, onCha
   return (
     <div className={chipStyles.row}>
       <div className={styles.item} onClick={onToggleExpand} style={{ cursor: 'pointer' }}>
-        <div className={styles.itemIcon}>{chip.emoji || '📍'}</div>
+        <div className={styles.itemIcon}>
+          {(() => {
+            const Icon = LEGACY_ICON_MAP[chip.iconKey] || MapPin;
+            return <Icon size={16} />;
+          })()}
+        </div>
         <div className={styles.itemBody}>
           <div className={styles.itemName}>{chip.label}</div>
           <div className={styles.itemMeta}>{joinKeywords(chip.keywords) || 'no keywords — hand-picked only'}</div>
         </div>
         <span className={chipStyles.matchCount}>{matched.length} places</span>
         <span className={styles.itemChevron} style={{ transform: expanded ? 'rotate(90deg)' : undefined }}>
-          ›
+          <ChevronRight size={14} />
         </span>
       </div>
 
@@ -395,7 +393,7 @@ function ChipRow({ chip, places, expanded, onToggleExpand, onDelete, busy, onCha
                   disabled={rowBusy === wp.id}
                   onClick={() => excludePlace(wp.id)}
                 >
-                  {rowBusy === wp.id ? '…' : '✕'}
+                  {rowBusy === wp.id ? '…' : <X size={12} />}
                 </button>
               </div>
             ))}

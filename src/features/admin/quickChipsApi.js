@@ -27,7 +27,6 @@ function rowToChip(row) {
   return {
     id: row.id,
     label: row.label,
-    emoji: row.emoji || '📍',
     iconKey: row.icon_key || null,
     keywords: row.keywords || [],
     pinnedIds: row.pinned_ids || [],
@@ -67,12 +66,11 @@ function slugify(label) {
  * chip be created purely from hand-picked places, with no keywords at
  * all — useful when every candidate keyword would clash with another
  * chip's places. */
-export async function createChip({ label, emoji, keywordsText, pinnedIds, sortOrder }) {
+export async function createChip({ label, keywordsText, pinnedIds, sortOrder }) {
   const keywords = splitKeywords(keywordsText);
   const row = {
     id: slugify(label),
     label: label.trim(),
-    emoji: emoji?.trim() || '📍',
     icon_key: null,
     keywords,
     pinned_ids: pinnedIds || [],
@@ -94,7 +92,6 @@ export async function createChip({ label, emoji, keywordsText, pinnedIds, sortOr
 export async function updateChip(id, patch) {
   const update = {};
   if (patch.label !== undefined) update.label = patch.label;
-  if (patch.emoji !== undefined) update.emoji = patch.emoji;
   if (patch.keywordsText !== undefined) update.keywords = splitKeywords(patch.keywordsText);
   if (patch.keywords !== undefined) update.keywords = patch.keywords;
   if (patch.pinnedIds !== undefined) update.pinned_ids = patch.pinnedIds;

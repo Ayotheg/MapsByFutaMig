@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { ArrowLeft, X, MapPin } from 'lucide-react';
 import { gatherResults } from './chipConfig';
+import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import ChipResultRow from './ChipResultRow';
 import styles from './ChipResultsPanel.module.css';
 
@@ -50,6 +51,7 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
 
   if (!activeChip) return null;
 
+  const ChipIcon = LEGACY_ICON_MAP[activeChip.iconKey] || MapPin;
   const loading = !waypointsLoaded;
   const subtitle = loading ? 'Loading…' : results.length ? 'Sorted alphabetically' : 'No places found';
   const badge = loading ? '…' : String(results.length || 0);
@@ -86,7 +88,9 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
     </div>
   ) : !results.length ? (
     <div className={styles.empty}>
-      <div className={styles.emptyIcon}>{activeChip.emoji}</div>
+      <div className={styles.emptyIcon}>
+        <ChipIcon size={22} />
+      </div>
       No <strong>{activeChip.label.toLowerCase()}</strong> places mapped yet.
     </div>
   ) : (
@@ -94,7 +98,7 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
       <ChipResultRow
         key={r.id || r.name + i}
         result={r}
-        iconText={activeChip.emoji}
+        fallbackIconKey={activeChip.iconKey}
         onOpen={handleOpen}
         onNavigate={handleNavigate}
         style={{ animationDelay: Math.min(i * 0.035, 0.4) + 's' }}
@@ -109,7 +113,9 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
         <div className={styles.card}>
           <div className={styles.hd}>
             <div className={styles.hdLeft}>
-              <span className={styles.emoji}>{activeChip.emoji}</span>
+              <span className={styles.emoji}>
+                <ChipIcon size={16} />
+              </span>
               <span className={styles.title}>{activeChip.label}</span>
               <span className={styles.badge}>{badge}</span>
             </div>
@@ -137,7 +143,9 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
         <button className={styles.back} onClick={onClose} aria-label="Back" type="button">
           <ArrowLeft size={15} />
         </button>
-        <span className={styles.icon}>{activeChip.emoji}</span>
+        <span className={styles.icon}>
+          <ChipIcon size={17} />
+        </span>
         <div className={styles.titles}>
           <div className={styles.title}>{activeChip.label}</div>
           <div className={styles.subtitle}>{subtitle}</div>

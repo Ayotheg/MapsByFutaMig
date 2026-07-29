@@ -153,7 +153,7 @@ export default function StaticKmlLayer({ map, onSelect, onAnnotationsChange, ded
 
             marker._placeCardOpts = {
               name: displayName,
-              badge: '📍 Annotation',
+              badge: 'Annotation',
               description: cleanDesc,
               lat,
               lng,

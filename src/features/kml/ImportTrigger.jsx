@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
+import { Upload } from 'lucide-react';
 import styles from './ImportTrigger.module.css';
 
 const KmlImportPanel = lazy(() => import('./KmlImportPanel'));
@@ -51,7 +52,7 @@ export default function ImportTrigger({ waypoints, segments, onSaved, open: open
         onClick={() => setOpen(true)}
         title="Import KML/GPX (admin)"
       >
-        ⬆ Import
+        <Upload size={13} /> Import
       </button>
 
       {open && (

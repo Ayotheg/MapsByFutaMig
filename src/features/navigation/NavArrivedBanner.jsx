@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { PartyPopper } from 'lucide-react';
 import styles from './NavArrivedBanner.module.css';
 
 /**
@@ -14,7 +15,9 @@ export default function NavArrivedBanner({ destName, onDismiss }) {
 
   return (
     <div className={styles.banner}>
-      <h2>🎉 You&apos;ve Arrived!</h2>
+      <h2>
+        <PartyPopper size={22} /> You&apos;ve Arrived!
+      </h2>
       <p>{destName}</p>
       <button type="button" onClick={onDismiss}>
         Done

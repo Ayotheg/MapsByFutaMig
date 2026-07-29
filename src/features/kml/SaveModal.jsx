@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MapPin, Camera, X, CheckCircle2, CircleX, Loader2 } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import modalStyles from '../../components/ui/Modal.module.css';
 import styles from './SaveModal.module.css';
@@ -103,7 +104,7 @@ export default function SaveModal({ draft, onClose, onSaved }) {
     if (!trimmedName) return;
 
     setSaving(true);
-    setStatus({ kind: 'info', text: '⏳ Saving segment…' });
+    setStatus({ kind: 'info', text: 'Saving segment…' });
 
     try {
       await saveSegment(
@@ -120,11 +121,11 @@ export default function SaveModal({ draft, onClose, onSaved }) {
       );
 
       doExport(trimmedName);
-      setStatus({ kind: 'success', text: '✅ Saved + file downloaded!' });
+      setStatus({ kind: 'success', text: 'Saved + file downloaded!' });
       await onSaved?.();
       setTimeout(onClose, 2200);
     } catch (err) {
-      setStatus({ kind: 'error', text: `❌ Save failed: ${err.message}` });
+      setStatus({ kind: 'error', text: `Save failed: ${err.message}` });
       setSaving(false);
     }
   }
@@ -157,7 +158,7 @@ export default function SaveModal({ draft, onClose, onSaved }) {
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Gate 1 → SUB"
+          placeholder="e.g. Gate 1 to SUB"
         />
       </div>
 
@@ -187,7 +188,9 @@ export default function SaveModal({ draft, onClose, onSaved }) {
         <div className={styles.waypointSummary}>
           {waypoints.map((wp, i) => (
             <div key={i} className={styles.waypointItem}>
-              <div className={styles.waypointIcon}>📍</div>
+              <div className={styles.waypointIcon}>
+                <MapPin size={14} />
+              </div>
               <div className={styles.waypointFields}>
                 <input
                   type="text"
@@ -215,7 +218,7 @@ export default function SaveModal({ draft, onClose, onSaved }) {
         <div className={styles.imageZone}>
           <label className={styles.uploadPlaceholder} style={{ display: images.length ? 'none' : 'flex' }}>
             <input type="file" accept="image/*" multiple hidden onChange={handleImagePick} />
-            📷 Tap to add photos
+            <Camera size={16} /> Tap to add photos
           </label>
           {images.length > 0 && (
             <div className={styles.imagePreviews}>
@@ -227,7 +230,7 @@ export default function SaveModal({ draft, onClose, onSaved }) {
                     className={styles.previewRemove}
                     onClick={() => removeImage(i)}
                   >
-                    ✕
+                    <X size={12} />
                   </button>
                 </div>
               ))}
@@ -253,7 +256,16 @@ export default function SaveModal({ draft, onClose, onSaved }) {
       </div>
 
       {status && (
-        <div className={`${styles.saveStatus} ${styles[status.kind]}`}>{status.text}</div>
+        <div className={`${styles.saveStatus} ${styles[status.kind]}`}>
+          {status.kind === 'success' ? (
+            <CheckCircle2 size={13} />
+          ) : status.kind === 'error' ? (
+            <CircleX size={13} />
+          ) : (
+            <Loader2 size={13} className={styles.spin} />
+          )}{' '}
+          {status.text}
+        </div>
       )}
     </Modal>
   );

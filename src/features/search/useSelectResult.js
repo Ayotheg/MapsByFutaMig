@@ -1,6 +1,11 @@
 import { useCallback, useRef } from 'react';
 import L from 'leaflet';
 
+// Raw Leaflet marker HTML can't hold a React icon — inline SVG matching
+// Lucide's own Search glyph, same approach as NavigationController's
+// SVG_FLAG for the same reason.
+const SVG_SEARCH = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-1px"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>`;
+
 /**
  * Ports legacy's `selectResult()` (app.js ~729–777) — shared by the
  * (dead, unported) sidebar search, the desktop floating bar's
@@ -28,7 +33,7 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
           html: `<div style="background:#60a5fa;color:#000;font-family:'DM Mono',monospace;font-size:10px;
                              font-weight:bold;padding:5px 10px;border-radius:8px;white-space:nowrap;
                              box-shadow:0 3px 12px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.2)">
-                   🔍 ${entry.name}
+                   ${SVG_SEARCH} ${entry.name}
                  </div>`,
           iconAnchor: [0, 0],
         }),

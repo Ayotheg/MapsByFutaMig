@@ -1,3 +1,4 @@
+import { MapPin } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import styles from './Detailmodal.module.css';
 
@@ -66,7 +67,9 @@ export default function DetailModal({ segment, onClose }) {
           <div className={styles.waypoints}>
             {waypoints.map((w) => (
               <div key={w.id} className={styles.waypoint}>
-                <div className={styles.wpName}>📍 {w.name}</div>
+                <div className={styles.wpName}>
+                  <MapPin size={12} /> {w.name}
+                </div>
                 {w.desc && <div className={styles.wpDesc}>{w.desc}</div>}
                 <div className={styles.wpCoord}>
                   {Number(w.lat).toFixed(6)}, {Number(w.lng).toFixed(6)}

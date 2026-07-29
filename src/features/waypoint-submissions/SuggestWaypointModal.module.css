@@ -52,6 +52,10 @@
   flex-wrap: wrap;
 }
 .locBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   flex: 1;
   min-width: 140px;
   background: rgba(255, 255, 255, 0.04);
@@ -63,6 +67,9 @@
   padding: 9px 10px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
+}
+.locBtn svg {
+  flex-shrink: 0;
 }
 .locBtn:hover {
   border-color: rgba(183, 109, 255, 0.35);
@@ -125,6 +132,9 @@
 }
 
 .viewSubmissionsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   background: none;
   border: none;
   color: var(--primary);

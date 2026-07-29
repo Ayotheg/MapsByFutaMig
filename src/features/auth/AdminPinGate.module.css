@@ -124,6 +124,9 @@
 }
 
 .key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #0e1628;
   border: none;
   color: var(--text);

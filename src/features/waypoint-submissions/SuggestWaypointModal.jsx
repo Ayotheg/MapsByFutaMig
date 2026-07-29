@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LocateFixed, Target, ChevronRight } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import modalStyles from '../../components/ui/Modal.module.css';
 import styles from './SuggestWaypointModal.module.css';
@@ -177,10 +178,12 @@ export default function SuggestWaypointModal({
         <label>Location *</label>
         <div className={styles.locationRow}>
           <button type="button" className={styles.locBtn} onClick={handleUseGps}>
-            📍 Use my current GPS
+            <LocateFixed size={14} />
+            Use my current GPS
           </button>
           <button type="button" className={styles.locBtn} onClick={() => onRequestMapPick?.()}>
-            🎯 Tap a spot on the map
+            <Target size={14} />
+            Tap a spot on the map
           </button>
         </div>
         {lat !== '' && lng !== '' && (
@@ -229,7 +232,7 @@ export default function SuggestWaypointModal({
 
       {onViewSubmissions && (
         <button type="button" className={styles.viewSubmissionsLink} onClick={onViewSubmissions}>
-          View my submissions →
+          View my submissions <ChevronRight size={13} />
         </button>
       )}
     </Modal>

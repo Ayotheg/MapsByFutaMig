@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Route, Camera, ChevronRight } from 'lucide-react';
 import styles from './AdminPanel.module.css';
 import { badgeStyleFor } from './adminBadgeColors';
 
@@ -32,7 +33,9 @@ export default function RoutesTab({ segments, onEditSegment }) {
           const photoCount = seg.imageUrls?.length || 0;
           return (
             <div key={seg.id} className={styles.item} onClick={() => onEditSegment(seg)}>
-              <div className={styles.itemIcon}>🛣</div>
+              <div className={styles.itemIcon}>
+                <Route size={16} />
+              </div>
               <div className={styles.itemBody}>
                 <div className={styles.itemName}>{seg.name || '(unnamed)'}</div>
                 <div className={styles.itemMeta}>
@@ -40,11 +43,17 @@ export default function RoutesTab({ segments, onEditSegment }) {
                   waypoints
                 </div>
               </div>
-              {photoCount > 0 && <span className={styles.itemPhotoBadge}>📷 {photoCount}</span>}
+              {photoCount > 0 && (
+                <span className={styles.itemPhotoBadge}>
+                  <Camera size={11} /> {photoCount}
+                </span>
+              )}
               <span className={styles.itemBadge} style={badgeStyleFor('road')}>
                 {seg.category || 'route'}
               </span>
-              <span className={styles.itemChevron}>›</span>
+              <span className={styles.itemChevron}>
+                <ChevronRight size={14} />
+              </span>
             </div>
           );
         })}

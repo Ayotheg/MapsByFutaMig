@@ -327,6 +327,9 @@
 }
 
 .saveStatus {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--font-mono);
   font-size: 10px;
   padding: 8px 12px;
@@ -432,6 +435,9 @@
   flex-shrink: 0;
 }
 .itemPhotoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-family: var(--font-mono);
   font-size: 8px;
   background: rgba(255, 185, 95, 0.08);

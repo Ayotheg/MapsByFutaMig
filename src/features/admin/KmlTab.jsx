@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { CheckCircle2, CircleX, Folder, Waypoints, MapPin, Camera, ChevronRight } from 'lucide-react';
 import styles from './AdminPanel.module.css';
 
 /** Legacy: the KML-upload markup (index.html ~910–940) + `buildKmlAdminList`
@@ -18,9 +19,9 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
     setUploadStatus(null);
     try {
       await adminKml.loadFromFile(file, color);
-      setUploadStatus({ text: `✓ Loaded ${file.name}`, error: false });
+      setUploadStatus({ text: `Loaded ${file.name}`, error: false, icon: true });
     } catch (err) {
-      setUploadStatus({ text: `❌ ${err.message}`, error: true });
+      setUploadStatus({ text: err.message, error: true, icon: true });
     }
   }
 
@@ -30,10 +31,10 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
     setPathStatus(null);
     try {
       await adminKml.loadFromPath(p, color);
-      setPathStatus({ text: `✓ Loaded ${p}`, error: false });
+      setPathStatus({ text: `Loaded ${p}`, error: false, icon: true });
       setPath('');
     } catch (err) {
-      setPathStatus({ text: `❌ ${err.message}`, error: true });
+      setPathStatus({ text: err.message, error: true, icon: true });
     }
   }
 
@@ -60,7 +61,7 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
         </div>
         {uploadStatus && (
           <div className={`${styles.saveStatus} ${uploadStatus.error ? styles.saveStatusError : styles.saveStatusSuccess}`}>
-            {uploadStatus.text}
+            {uploadStatus.icon && (uploadStatus.error ? <CircleX size={13} /> : <CheckCircle2 size={13} />)} {uploadStatus.text}
           </div>
         )}
       </div>
@@ -86,7 +87,7 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
           className={`${styles.saveStatus} ${pathStatus.error ? styles.saveStatusError : styles.saveStatusSuccess}`}
           style={{ margin: '0 14px' }}
         >
-          {pathStatus.text}
+          {pathStatus.icon && (pathStatus.error ? <CircleX size={13} /> : <CheckCircle2 size={13} />)} {pathStatus.text}
         </div>
       )}
 
@@ -96,7 +97,9 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
         {entries.map(([filePath, file]) => (
           <div key={filePath}>
             <div className={styles.item} style={{ cursor: 'default', borderBottom: `2px solid ${file.color}44`, paddingBottom: 4, marginBottom: 4 }}>
-              <div className={styles.itemIcon}>📁</div>
+              <div className={styles.itemIcon}>
+                <Folder size={16} />
+              </div>
               <div className={styles.itemBody}>
                 <div className={styles.itemName} style={{ color: file.color }}>
                   {file.label}
@@ -108,7 +111,7 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
             </div>
             {file.features.map((f, idx) => {
               const isAuto = f.name && /@ \d+\.\d+/.test(f.name);
-              const typeIcon = f.type === 'LineString' || f.type === 'MultiLineString' ? '〰️' : '📍';
+              const TypeIcon = f.type === 'LineString' || f.type === 'MultiLineString' ? Waypoints : MapPin;
               const photoCount = f.imageFiles?.length || 0;
               return (
                 <div
@@ -117,7 +120,9 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
                   style={{ paddingLeft: 20 }}
                   onClick={() => onEditKmlFeature({ path: filePath, idx, data: f })}
                 >
-                  <div className={styles.itemIcon}>{typeIcon}</div>
+                  <div className={styles.itemIcon}>
+                    <TypeIcon size={16} />
+                  </div>
                   <div className={styles.itemBody}>
                     <div className={styles.itemName} style={isAuto ? { opacity: 0.65, fontStyle: 'italic' } : undefined}>
                       {f.name}
@@ -127,11 +132,17 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
                       {f.description ? ` · ${f.description.replace(/<[^>]+>/g, '').slice(0, 50)}` : ''}
                     </div>
                   </div>
-                  {photoCount > 0 && <span className={styles.itemPhotoBadge}>📷 {photoCount}</span>}
+                  {photoCount > 0 && (
+                    <span className={styles.itemPhotoBadge}>
+                      <Camera size={11} /> {photoCount}
+                    </span>
+                  )}
                   <span className={styles.itemBadge} style={{ background: 'rgba(255,185,95,0.1)', color: 'var(--tertiary)', borderColor: 'rgba(255,185,95,0.22)' }}>
                     {f.type || 'feature'}
                   </span>
-                  <span className={styles.itemChevron}>›</span>
+                  <span className={styles.itemChevron}>
+                    <ChevronRight size={14} />
+                  </span>
                 </div>
               );
             })}

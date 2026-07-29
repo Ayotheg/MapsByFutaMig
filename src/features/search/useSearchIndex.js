@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { WP_TYPE_LABELS } from '../waypoints/wpTypeMeta';
+import { TYPE_ICON_KEYS } from '../../lib/typeIcons';
 
 /**
  * React port of legacy's `window.FUTA_SEARCH` (app.js ~547–648).
@@ -33,7 +33,7 @@ import { WP_TYPE_LABELS } from '../waypoints/wpTypeMeta';
  * FUTA_SEARCH methods 1:1 (same dedup keys, same scoring weights).
  */
 
-const TYPE_ICONS = { waypoint: '📍', segment: '🛣', osm: '🌍', kml: '📂' };
+const TYPE_ICONS = { waypoint: 'geo-alt-fill', segment: 'route', osm: 'globe', kml: 'folder' };
 
 function norm(s) {
   return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
@@ -61,8 +61,7 @@ function score(entry, q) {
 }
 
 function icon(entry) {
-  if (WP_TYPE_LABELS[entry.subtype]) return WP_TYPE_LABELS[entry.subtype].split(' ')[0];
-  return TYPE_ICONS[entry.subtype] || TYPE_ICONS[entry.type] || '📍';
+  return TYPE_ICON_KEYS[entry.subtype] || TYPE_ICONS[entry.subtype] || TYPE_ICONS[entry.type] || 'geo-alt-fill';
 }
 
 function highlight(text, q) {

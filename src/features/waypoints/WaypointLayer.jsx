@@ -51,7 +51,7 @@ export default function WaypointLayer({ map, waypoints, isTypeVisible, onSelect,
       marker._rendered = false;
       marker._placeCardOpts = {
         name: wp.name,
-        badge: WP_TYPE_LABELS[wp.type] || '📍 Waypoint',
+        badge: WP_TYPE_LABELS[wp.type] || 'Waypoint',
         description: wp.description,
         lat: wp.lat,
         lng: wp.lng,

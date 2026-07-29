@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Star } from 'lucide-react';
 import styles from './PlaceCard.module.css';
 import { isRateablePOI } from './wpTypeMeta';
 
@@ -13,13 +14,15 @@ function RatingBadge({ type, avgRating, reviewCount }) {
   const count = reviewCount || 0;
   if (!count) {
     return (
-      <span className={styles.ratingEmpty}>☆ No reviews yet — be the first!</span>
+      <span className={styles.ratingEmpty}>
+        <Star size={12} /> No reviews yet — be the first!
+      </span>
     );
   }
   const avg = (avgRating || 0).toFixed(1);
   return (
     <span className={styles.ratingFilled}>
-      ★ {avg}{' '}
+      <Star size={12} fill="currentColor" /> {avg}{' '}
       <span className={styles.ratingCount}>
         ({count} review{count === 1 ? '' : 's'})
       </span>

@@ -74,6 +74,9 @@
 }
 
 .sectionLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.12em;
@@ -86,7 +89,24 @@
   border-top: none;
 }
 
-.spinner,
+.spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 16px 14px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+.spin {
+  animation: searchSpin 0.9s linear infinite;
+}
+@keyframes searchSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .empty {
   text-align: center;
   padding: 16px 14px;

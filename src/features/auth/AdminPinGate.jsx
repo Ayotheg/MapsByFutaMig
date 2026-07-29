@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { X, Delete } from 'lucide-react';
 import styles from './AdminPinGate.module.css';
 import { ADMIN_PIN_HASH, PIN_LENGTH, hashPin } from './adminPin';
 
@@ -110,9 +111,13 @@ export default function AdminPinGate({ open, onSuccess, onClose }) {
               {d}
             </button>
           ))}
-          <button type="button" className={`${styles.key} ${styles.cancel}`} onClick={onClose}>✕</button>
+          <button type="button" className={`${styles.key} ${styles.cancel}`} onClick={onClose}>
+            <X size={16} />
+          </button>
           <button type="button" className={styles.key} onClick={() => pressDigit('0')}>0</button>
-          <button type="button" className={`${styles.key} ${styles.back}`} onClick={backspace}>⌫</button>
+          <button type="button" className={`${styles.key} ${styles.back}`} onClick={backspace}>
+            <Delete size={16} />
+          </button>
         </div>
       </div>
     </div>

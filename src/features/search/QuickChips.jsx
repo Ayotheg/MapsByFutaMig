@@ -1,3 +1,4 @@
+import { MapPin } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import styles from './QuickChips.module.css';
 
@@ -20,7 +21,7 @@ export default function QuickChips({ chips, activeChip, onChipClick, collapsed, 
     <div className={styles.bar} style={!isMobile && collapsed ? { left: 'calc(var(--sidebar-rail-w) + 16px)' } : undefined}>
       <div className={styles.scroll}>
         {(chips || []).map((chip) => {
-          const Icon = chip.iconKey ? LEGACY_ICON_MAP[chip.iconKey] : null;
+          const Icon = (chip.iconKey ? LEGACY_ICON_MAP[chip.iconKey] : null) || MapPin;
           const isActive = activeChip?.id ? activeChip.id === chip.id : activeChip?.label === chip.label;
           return (
             <button
@@ -29,7 +30,7 @@ export default function QuickChips({ chips, activeChip, onChipClick, collapsed, 
               onClick={() => onChipClick(chip)}
               type="button"
             >
-              {Icon ? <Icon size={13} /> : <span className={styles.emojiIcon}>{chip.emoji}</span>}
+              <Icon size={13} />
               <span className={styles.label}>{chip.label}</span>
             </button>
           );
