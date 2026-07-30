@@ -1,68 +1,145 @@
 import { Link } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { useReveal } from './landingHooks'
+import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap'
 
-/* Two-letter monogram from a category label, e.g. "Bus Stops" -> "BS",
-   "Library" -> "LI". Purely decorative — the label underneath is what
-   actually identifies the category, so occasional collisions between
-   two categories' initials (there are a couple here) are harmless. */
-function initials(label) {
-  const words = label.split(' ')
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase()
-  return label.slice(0, 2).toUpperCase()
-}
+/* ─── Explore categories ───
+ * Light-theme rebuild (Slice 5). Content change, not just a style
+ * change: swapped the old 20-item generic category grid for the 9
+ * most-visited student spots the plan calls out, in the specified
+ * order, plus a "+ more" tile linking into the map's full category
+ * list. Church and mosque are both included, side by side,
+ * deliberately even — see LANDING_PAGE_REDESIGN_PLAN.md Slice 5.
+ *
+ * Icons come from the existing LEGACY_ICON_MAP (src/lib/legacyIconMap.js)
+ * rather than guessed ad hoc — 'mosque' already resolves to a
+ * hand-drawn custom SVG there (no confirmed Lucide equivalent, per that
+ * file's own notes), so it drops in exactly like every other entry.
+ */
+const CATEGORIES = [
+  { label: 'Faculties', icon: 'building-fill' },
+  { label: 'Lecture Halls', icon: 'graduation-cap' },
+  { label: 'Hostels', icon: 'house-door-fill' },
+  { label: 'Library', icon: 'book-open' },
+  { label: 'ATMs & Banks', icon: 'bank2' },
+  { label: 'Printing Shops', icon: 'printer-fill' },
+  { label: 'Student Affairs', icon: 'briefcase' },
+  { label: 'Church', icon: 'church' },
+  { label: 'Mosque', icon: 'mosque' },
+]
 
-/* ─── Explore categories ─── */
 function ExploreSection() {
   const { ref, visible } = useReveal()
-  const categories = [
-    { label: 'Academic Buildings' }, { label: 'Lecture Halls' },
-    { label: 'Hostels' }, { label: 'Restaurants' },
-    { label: 'ATMs' }, { label: 'Banks' },
-    { label: 'Clinics' }, { label: 'Library' },
-    { label: 'Printing Shops' }, { label: 'Laundry' },
-    { label: 'Bus Stops' }, { label: 'Parking' },
-    { label: 'Student Affairs' }, { label: 'Shopping Areas' },
-    { label: 'Laboratories' }, { label: 'Sports Centres' },
-    { label: 'Mosque' }, { label: 'Church' },
-    { label: 'Fuel Stations' }, { label: 'Security Posts' },
-  ]
 
   return (
-    <section id="explore" style={{ padding: '120px 24px', background: 'var(--bg-dark)', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', right: '5%', bottom: '10%', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(68,226,205,0.08) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none' }} />
-
+    <section
+      id="explore"
+      style={{ padding: '120px 24px', background: 'var(--land-bg)' }}
+    >
       <div ref={ref} style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 64 }}>
-          <div className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Montserrat', fontSize: 12, fontWeight: 700, letterSpacing: 4, color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 12 }}>Explore</div>
-          <h2 className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(30px,4vw,52px)', fontWeight: 800, transitionDelay: '0.1s' }}>
-            Every Corner of<br /><span className="text-gradient-teal">FUTA Campus.</span>
+        <div style={{ textAlign: 'center', marginBottom: 56 }}>
+          <div
+            className={`reveal ${visible ? 'visible' : ''}`}
+            style={{
+              fontFamily: 'Montserrat, sans-serif', fontSize: 12, fontWeight: 700,
+              letterSpacing: 3, color: 'var(--land-secondary-accent)',
+              textTransform: 'uppercase', marginBottom: 12,
+            }}
+          >
+            Explore
+          </div>
+          <h2
+            className={`reveal ${visible ? 'visible' : ''}`}
+            style={{
+              fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800,
+              fontSize: 'clamp(28px,3.5vw,44px)', color: 'var(--land-text-primary)',
+              transitionDelay: '0.1s', margin: 0,
+            }}
+          >
+            The places students visit most.
           </h2>
-          <p className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Poppins', fontSize: 16, color: 'var(--muted)', marginTop: 16, transitionDelay: '0.2s' }}>
-            From academic buildings to worship centres — everything mapped, everything searchable.
+          <p
+            className={`reveal ${visible ? 'visible' : ''}`}
+            style={{
+              fontFamily: 'Poppins, sans-serif', fontSize: 15, lineHeight: 1.6,
+              color: 'var(--land-text-secondary)', marginTop: 14, transitionDelay: '0.2s',
+            }}
+          >
+            The spots every student ends up needing directions to, sooner or later.
           </p>
         </div>
 
-        <div className={`reveal ${visible ? 'visible' : ''}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12, transitionDelay: '0.2s' }}>
-          {categories.map((cat, i) => (
-            <Link key={cat.label} to="/map" className="category-card" style={{
-              background: 'rgba(34,42,61,0.5)', backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(77,67,84,0.5)', borderRadius: 16,
-              padding: '20px 16px', textAlign: 'center', textDecoration: 'none',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-              animationDelay: `${i * 0.03}s`,
+        <div
+          className={`reveal ${visible ? 'visible' : ''}`}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            gap: 14,
+            transitionDelay: '0.2s',
+          }}
+        >
+          {CATEGORIES.map((cat) => {
+            const Icon = LEGACY_ICON_MAP[cat.icon]
+            return (
+              <Link
+                key={cat.label}
+                to="/map"
+                className="explore-tile"
+                style={{
+                  background: 'var(--land-surface)',
+                  border: '1px solid var(--land-border)',
+                  borderRadius: 14,
+                  padding: '22px 16px',
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+                }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  background: 'var(--land-secondary-tint-bg)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {Icon && <Icon size={19} strokeWidth={2} color="var(--land-secondary-accent)" />}
+                </div>
+                <span style={{
+                  fontFamily: 'Poppins, sans-serif', fontSize: 13, fontWeight: 500,
+                  color: 'var(--land-text-primary)', lineHeight: 1.3,
+                }}>
+                  {cat.label}
+                </span>
+              </Link>
+            )
+          })}
+
+          {/* "+ more" — violet, not teal: a link out, not a category */}
+          <Link
+            to="/map"
+            className="explore-tile explore-tile-more"
+            style={{
+              background: 'var(--land-surface)',
+              border: '1px solid var(--land-border)',
+              borderRadius: 14,
+              padding: '22px 16px',
+              textAlign: 'center',
+              textDecoration: 'none',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: 'var(--land-accent-tint-bg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: 'rgba(68,226,205,0.12)', border: '1px solid rgba(68,226,205,0.3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'Montserrat', fontWeight: 700, fontSize: 13, letterSpacing: 0.5,
-                color: 'var(--teal)',
-              }}>
-                {initials(cat.label)}
-              </div>
-              <span style={{ fontFamily: 'Inter', fontSize: 12, fontWeight: 500, color: 'var(--muted)', lineHeight: 1.3 }}>{cat.label}</span>
-            </Link>
-          ))}
+              <Plus size={19} strokeWidth={2} color="var(--land-accent)" />
+            </div>
+            <span style={{
+              fontFamily: 'Poppins, sans-serif', fontSize: 13, fontWeight: 500,
+              color: 'var(--land-accent)', lineHeight: 1.3,
+            }}>
+              + more on the map
+            </span>
+          </Link>
         </div>
       </div>
     </section>

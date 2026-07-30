@@ -170,10 +170,10 @@ not just the files that slice touched. Concretely:
 | 3 — Footer | Done |
 | 4 — TrustBar | Done |
 | Routing fix (legal pages) | Done — bonus, found while doing Slice 3 |
-| 5 — Explore | Not started |
-| 6 — FAQ | Not started |
-| 7 — FinalCTA | Not started |
-| 8 — ProductFeatures | Not started |
+| 5 — Explore | Done |
+| 6 — FAQ | Done |
+| 7 — FinalCTA | Done |
+| 8 — ProductFeatures | Done |
 | 9 — VideoSection | Not started |
 | 10 — Hero | Not started |
 | 11 — Integration & QA | Not started |

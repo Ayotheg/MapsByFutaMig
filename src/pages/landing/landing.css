@@ -266,7 +266,10 @@ html {
   color: var(--text);
 }
 
-/* Category card hover */
+/* Category card hover — legacy dark-theme tile, no longer referenced
+   after Slice 5 (Explore now uses .explore-tile below). Left in place
+   for Slice 11 to grep for and remove along with the other orphaned
+   dark-theme classes. */
 .category-card {
   transition: all 0.3s cubic-bezier(0.16,1,0.3,1);
   cursor: pointer;
@@ -277,13 +280,42 @@ html {
   box-shadow: 0 8px 32px rgba(183,109,255,0.2);
 }
 
-/* Feature hover */
+/* Explore tile hover (Slice 5, light theme) — subtle lift + a shift to
+   light teal border, per the redesign plan. The "+more" variant shifts
+   to violet instead, matching its accent color. */
+.explore-tile {
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.explore-tile:hover {
+  transform: translateY(-2px);
+  border-color: #b9e6da !important;
+  box-shadow: 0 6px 20px rgba(15,110,86,0.08);
+}
+.explore-tile-more:hover {
+  border-color: var(--land-accent-tint-border) !important;
+  box-shadow: 0 6px 20px rgba(109,63,199,0.1);
+}
+
+/* Feature hover — legacy dark-theme visual-mockup card, no longer
+   referenced after Slice 8 (all 5 hand-drawn SVG mockups were removed;
+   ProductFeatures now uses .feature-tile below). Left in place for
+   Slice 11 to grep for and remove. */
 .feature-card-hover {
   transition: all 0.3s ease;
 }
 .feature-card-hover:hover {
   transform: translateY(-2px);
   box-shadow: 0 16px 48px rgba(183,109,255,0.2) !important;
+}
+
+/* Feature tile hover (Slice 8, light theme) */
+.feature-tile {
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.feature-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--land-accent-tint-border) !important;
+  box-shadow: 0 10px 28px rgba(109,63,199,0.1);
 }
 
 /* Roadmap card */
