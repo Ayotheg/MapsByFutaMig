@@ -3,13 +3,9 @@ import { useSeo } from '../lib/useSeo'
 import Nav from './landing/Nav'
 import Hero from './landing/Hero'
 import TrustBar from './landing/TrustBar'
-import DiscoverSection from './landing/DiscoverSection'
 import ProductFeatures from './landing/ProductFeatures'
 import VideoSection from './landing/VideoSection'
-import WhySection from './landing/WhySection'
 import ExploreSection from './landing/ExploreSection'
-import StatsSection from './landing/StatsSection'
-import RoadmapSection from './landing/RoadmapSection'
 import FinalCTA from './landing/FinalCTA'
 import FAQ from './landing/FAQ'
 import Footer from './landing/Footer'
@@ -28,13 +24,9 @@ function LandingPage() {
       <Nav />
       <Hero />
       <TrustBar />
-      <DiscoverSection />
       <ProductFeatures />
       <VideoSection />
-      <WhySection />
       <ExploreSection />
-      <StatsSection />
-      <RoadmapSection />
       <FinalCTA />
       <FAQ />
       <Footer />

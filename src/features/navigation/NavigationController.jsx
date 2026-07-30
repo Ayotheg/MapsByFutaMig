@@ -10,6 +10,13 @@ import NavHud from './NavHud';
 import NavArrivedBanner from './NavArrivedBanner';
 import './navMapLayers.css';
 
+// Leaflet marker/popup content is raw HTML (not React), so the "arrived
+// destination" flag glyph below is a hand-built inline SVG matching
+// Lucide's own Flag icon path — same visual language as the rest of the
+// app's icons, just usable outside a React tree.
+const SVG_FLAG = (size, color = 'currentColor') =>
+  `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg>`;
+
 /**
  * Ported from legacy's Navigation module IIFE (`app.js` ~4364–5317).
  * Renders `NavDestPanel` ("Where to?") and/or `NavHud` (turn-by-turn),
@@ -67,7 +74,7 @@ const NavigationController = forwardRef(function NavigationController(
   const [hud, setHud] = useState({
     arriving: false,
     arrived: false,
-    turnIcon: '↑',
+    turnIcon: 'arrow-up',
     turnInstruction: 'Head towards destination',
     turnDist: 'Calculating…',
     nextPreview: '',
@@ -132,7 +139,7 @@ const NavigationController = forwardRef(function NavigationController(
     };
     setDestInputValue(entry.name);
     setDropdownResults([]);
-    setHint(`📍 Destination set: ${entry.name}`);
+    setHint(`Destination set: ${entry.name}`);
     setGoDisabled(false);
   }, []);
 
@@ -244,7 +251,7 @@ const NavigationController = forwardRef(function NavigationController(
       navDestMarkerRef.current = L.marker([lat, lng], {
         icon: L.divIcon({
           className: '',
-          html: `<div class="nav-dest-pin-wrap"><span class="nav-dest-pin-flag">🏁</span></div>`,
+          html: `<div class="nav-dest-pin-wrap"><span class="nav-dest-pin-flag">${SVG_FLAG(18, '#fff')}</span></div>`,
           iconSize: [36, 36],
           iconAnchor: [18, 36],
         }),
@@ -252,7 +259,7 @@ const NavigationController = forwardRef(function NavigationController(
       })
         .addTo(map)
         .bindPopup(
-          `<div class="wp-popup"><div class="wp-popup-title" style="color:#ff4d4d">🏁 ${name}</div><div class="wp-popup-type">Navigation Destination</div></div>`,
+          `<div class="wp-popup"><div class="wp-popup-title" style="color:#ff4d4d;display:flex;align-items:center;gap:5px">${SVG_FLAG(14)} ${name}</div><div class="wp-popup-type">Navigation Destination</div></div>`,
           { className: 'futa-popup' }
         );
     },
@@ -320,7 +327,7 @@ const NavigationController = forwardRef(function NavigationController(
     setHud((h) => ({
       ...h,
       arrived: true,
-      turnIcon: '🎉',
+      turnIcon: 'party-popper',
       turnInstruction: `You have arrived at ${dest.name}`,
       turnDist: 'Destination reached!',
       distRemain: '0 m',
@@ -374,7 +381,7 @@ const NavigationController = forwardRef(function NavigationController(
     }
 
     const currentStep = steps[navStepIndexRef.current];
-    const nextHud = { destName: `→ ${dest.name}`, distRemain: fmtDist(distToDest) };
+    const nextHud = { destName: `To ${dest.name}`, distRemain: fmtDist(distToDest) };
 
     if (currentStep) {
       nextHud.turnIcon = turnIcon(currentStep.type, currentStep.modifier);
@@ -395,7 +402,7 @@ const NavigationController = forwardRef(function NavigationController(
       const nextStep = steps[navStepIndexRef.current + 1];
       nextHud.nextPreview =
         navGpsTicksRef.current >= 2 && nextStep && nextStep.type !== 'arrive' && nextStep.instruction
-          ? `Then: ${turnIcon(nextStep.type, nextStep.modifier)} ${nextStep.instruction}`
+          ? `Then: ${nextStep.instruction}`
           : '';
     }
 
@@ -416,7 +423,7 @@ const NavigationController = forwardRef(function NavigationController(
 
     if (distToDest < 120) {
       nextHud.arriving = true;
-      nextHud.turnIcon = '🏁';
+      nextHud.turnIcon = 'flag';
       nextHud.turnInstruction = 'Destination is very close';
       if (!nearArrivalSpokenRef.current) {
         nearArrivalSpokenRef.current = true;
@@ -441,7 +448,7 @@ const NavigationController = forwardRef(function NavigationController(
 
     const dest = navDestRef.current;
     if (!dest) {
-      setHint('⚠️ Please choose a destination first.');
+      setHint('Please choose a destination first.');
       return;
     }
     if (!('geolocation' in navigator)) {
@@ -450,7 +457,7 @@ const NavigationController = forwardRef(function NavigationController(
     }
 
     setGoDisabled(true);
-    setGoLabel('⌛ Getting your location…');
+    setGoLabel('Getting your location…');
 
     // Smart location resolver — ported from app.js ~4991–5018.
     async function resolveStartPosition() {
@@ -483,7 +490,7 @@ const NavigationController = forwardRef(function NavigationController(
           : err.code === 2
             ? 'GPS unavailable. Move to an open area and try again.'
             : 'Could not get your location (timed out). Try again in a moment.';
-      setHint(`⚠️ ${reason}`);
+      setHint(reason);
       return;
     }
 
@@ -491,7 +498,7 @@ const NavigationController = forwardRef(function NavigationController(
     navUserPosRef.current = { lat, lng };
     gps.lastKnownPosRef.current = pos;
 
-    setGoLabel('⌛ Calculating route…');
+    setGoLabel('Calculating route…');
 
     let routeData;
     try {
@@ -499,7 +506,7 @@ const NavigationController = forwardRef(function NavigationController(
     } catch (e) {
       setGoDisabled(false);
       setGoLabel('Start Navigation');
-      setHint(`⚠️ Routing failed: ${e.message}. Check your connection.`);
+      setHint(`Routing failed: ${e.message}. Check your connection.`);
       return;
     }
     navRouteDataRef.current = routeData;
@@ -537,7 +544,7 @@ const NavigationController = forwardRef(function NavigationController(
 
         clearTimeout(navGpsStaleTimerRef.current);
         navGpsStaleTimerRef.current = setTimeout(() => {
-          if (navActiveRef.current) setHud((h) => ({ ...h, turnInstruction: '⚠️ GPS signal lost — waiting…' }));
+          if (navActiveRef.current) setHud((h) => ({ ...h, turnInstruction: 'GPS signal lost — waiting…' }));
         }, 15000);
 
         updateNavUserDot(latitude, longitude);
@@ -583,7 +590,7 @@ const NavigationController = forwardRef(function NavigationController(
     setHud({
       arriving: false,
       arrived: false,
-      turnIcon: '↑',
+      turnIcon: 'arrow-up',
       turnInstruction: 'Head towards destination',
       turnDist: 'Calculating…',
       nextPreview: '',

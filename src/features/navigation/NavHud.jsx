@@ -1,3 +1,5 @@
+import { Volume2, VolumeX, X } from 'lucide-react';
+import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import styles from './NavHud.module.css';
 
 /**
@@ -9,19 +11,22 @@ import styles from './NavHud.module.css';
  * slice's "this was a DOM workaround, not a real requirement" cases.
  */
 export default function NavHud({ arriving, arrived, turnIcon, turnInstruction, turnDist, nextPreview, distRemain, destName, voiceEnabled, onToggleVoice, onClose }) {
+  const TurnIcon = LEGACY_ICON_MAP[turnIcon] || LEGACY_ICON_MAP['arrow-up'];
   return (
     <div className={`${styles.hud} ${arriving ? styles.arriving : ''} ${arrived ? styles.arrived : ''}`}>
       <div className={styles.top}>
-        <div className={styles.turnIcon}>{turnIcon}</div>
+        <div className={styles.turnIcon}>
+          <TurnIcon size={22} />
+        </div>
         <div className={styles.turnInfo}>
           <div className={styles.turnInstruction}>{turnInstruction}</div>
           <div className={styles.turnDist}>{turnDist}</div>
         </div>
         <button type="button" className={styles.voiceBtn} title="Toggle voice navigation" onClick={onToggleVoice}>
-          {voiceEnabled ? '🔊' : '🔇'}
+          {voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
         </button>
         <button type="button" className={styles.closeBtn} onClick={onClose}>
-          ✕ END
+          <X size={13} /> END
         </button>
       </div>
 

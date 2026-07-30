@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CheckCircle2, TriangleAlert } from 'lucide-react';
 import styles from './AuthModal.module.css';
 import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
@@ -113,7 +114,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
     }
     try {
       await resetPassword(loginEmail.trim());
-      setLoginStatus({ text: '✅ Reset email sent — check your inbox.', error: false });
+      setLoginStatus({ text: 'Reset email sent — check your inbox.', error: false });
     } catch (err) {
       setLoginStatus({ text: friendlyError(err), error: true });
     }
@@ -317,7 +318,7 @@ function PasswordInput({ value, onChange, show, onToggleShow, placeholder = '•
 function StatusMsg({ status }) {
   return (
     <div className={`${styles.status} ${status.error ? styles.statusError : styles.statusOk}`}>
-      {status.text}
+      {status.error ? <TriangleAlert size={12} /> : <CheckCircle2 size={12} />} {status.text}
     </div>
   );
 }

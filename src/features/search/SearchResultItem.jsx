@@ -1,3 +1,5 @@
+import { MapPin } from 'lucide-react';
+import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import styles from './SearchResultItem.module.css';
 
 /**
@@ -11,6 +13,7 @@ import styles from './SearchResultItem.module.css';
 export default function SearchResultItem({ entry, query, icon, highlight, onSelect, active, showBadge = true }) {
   const badgeClass = entry.source === 'segment' ? styles.badgeSeg : entry.subtype === 'osm' ? styles.badgeOsm : '';
   const badgeLabel = entry.source === 'segment' ? 'Route' : entry.subtype === 'osm' ? 'OSM' : entry.subtype || entry.type || 'Pin';
+  const Icon = LEGACY_ICON_MAP[icon(entry)] || MapPin;
 
   return (
     <div
@@ -20,7 +23,9 @@ export default function SearchResultItem({ entry, query, icon, highlight, onSele
         onSelect(entry);
       }}
     >
-      <div className={styles.icon}>{icon(entry)}</div>
+      <div className={styles.icon}>
+        <Icon size={16} />
+      </div>
       <div className={styles.body}>
         <div className={styles.name} dangerouslySetInnerHTML={{ __html: highlight(entry.name, query) }} />
         {(entry.desc || entry.sub) && <div className={styles.sub}>{entry.desc || entry.sub}</div>}

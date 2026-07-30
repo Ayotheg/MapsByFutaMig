@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Camera, Cloud, CheckCircle2, CircleX, X } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import modalStyles from '../../components/ui/Modal.module.css';
 import styles from './AdminEditModal.module.css';
@@ -152,22 +153,22 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       if (type === 'waypoint') {
         await updateWaypoint(editContext.id, { name: name.trim(), description: description.trim(), type: wpType });
         await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
-        setStatus({ text: '✅ Waypoint updated!', error: false });
+        setStatus({ text: 'Waypoint updated!', error: false, icon: true });
         onWaypointChanged?.();
       } else if (type === 'segment') {
         await updateSegment(editContext.id, { name: name.trim(), description: description.trim(), category });
         await reconcileImages('segment_images', 'segment_id', editContext.id, 'segments');
-        setStatus({ text: '✅ Segment updated!', error: false });
+        setStatus({ text: 'Segment updated!', error: false, icon: true });
         onSegmentChanged?.();
       } else if (type === 'kml') {
         // Legacy: kml edits never write to Firebase directly on Save —
         // only the separate "Import to Supabase" button does (app.js
         // ~4270–4271, "Updated in memory. (KML file not modified)").
         adminKml.renameFeature(editContext.path, editContext.idx, name.trim(), description.trim());
-        setStatus({ text: '✅ Updated in memory. (KML file not modified)', error: false });
+        setStatus({ text: 'Updated in memory. (KML file not modified)', error: false, icon: true });
       }
     } catch (e) {
-      setStatus({ text: `❌ ${e.message}`, error: true });
+      setStatus({ text: e.message, error: true, icon: true });
     } finally {
       setBusy(false);
     }
@@ -213,7 +214,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       // .display = 'none'` when opening a kml feature, app.js ~4014) —
       // matched by AdminPanel not rendering a footer delete button for it.
     } catch (e) {
-      setStatus({ text: `❌ ${e.message}`, error: true });
+      setStatus({ text: e.message, error: true, icon: true });
     } finally {
       setBusy(false);
     }
@@ -330,7 +331,9 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       <div className={styles.fieldGroup}>
         <label>{type === 'segment' ? 'Photos (shown in route popup)' : type === 'kml' ? 'Photos for this KML feature' : 'Photos'}</label>
         <div className={styles.imgZone} onClick={() => document.getElementById('adminImgInput')?.click()}>
-          <div className={styles.imgZoneLabel}>📷 Click to add photos (JPEG/PNG)</div>
+          <div className={styles.imgZoneLabel}>
+            <Camera size={13} /> Click to add photos (JPEG/PNG)
+          </div>
           <div className={styles.imgThumbs}>
             {imagesLoading && <span className={styles.loadingNote}>Loading…</span>}
             {type !== 'kml' &&
@@ -369,22 +372,22 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                   onSegmentChanged?.();
                 },
               });
-              setStatus({ text: '✅ Imported to Supabase successfully!', error: false });
+              setStatus({ text: 'Imported to Supabase successfully!', error: false, icon: true });
               onClose();
             } catch (e) {
-              setStatus({ text: `❌ Import failed: ${e.message}`, error: true });
+              setStatus({ text: `Import failed: ${e.message}`, error: true, icon: true });
             } finally {
               setBusy(false);
             }
           }}
         >
-          ☁ IMPORT TO SUPABASE
+          <Cloud size={13} /> IMPORT TO SUPABASE
         </button>
       )}
 
       {status && (
         <div className={`${styles.saveStatus} ${status.error ? styles.saveStatusError : styles.saveStatusSuccess}`}>
-          {status.text}
+          {status.icon && (status.error ? <CircleX size={13} /> : <CheckCircle2 size={13} />)} {status.text}
         </div>
       )}
     </Modal>
@@ -421,7 +424,7 @@ function Thumb({ url, onRemove }) {
         }}
         title="Remove"
       >
-        ✕
+        <X size={11} />
       </button>
     </div>
   );

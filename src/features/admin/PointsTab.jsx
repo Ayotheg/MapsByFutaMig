@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Target, CheckCircle2, Camera, ChevronRight } from 'lucide-react';
 import styles from './AdminPanel.module.css';
-import { WP_TYPE_LABELS, resolveWaypointType } from '../waypoints/wpTypeMeta';
+import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { WP_ALL_TYPES } from './adminTypeOptions';
 import { badgeStyleFor } from './adminBadgeColors';
 import { insertWaypoint } from './adminSave';
-
-const typeIcons = Object.fromEntries(Object.entries(WP_TYPE_LABELS).map(([k, v]) => [k, v.split(' ')[0]]));
+import { getTypeIcon } from '../../lib/typeIcons';
 
 /**
  * Legacy: `renderWaypointList` (app.js ~3743–3771) + the "Add Point" inline
@@ -55,7 +55,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
     setStatus(null);
     try {
       await insertWaypoint({ name: trimmedName, description: desc.trim(), type, lat: latNum, lng: lngNum });
-      setStatus({ text: '✓ Point added successfully!', error: false });
+      setStatus({ text: 'Point added successfully!', error: false, icon: true });
       setName('');
       setDesc('');
       setLat('');
@@ -136,7 +136,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
               className={`${styles.pickBtn} ${pickingCoord ? styles.pickBtnActive : ''}`}
               onClick={onStartPicking}
             >
-              🎯 Pick from Map
+              <Target size={13} /> Pick from Map
             </button>
             {pickingCoord && <div className={styles.pickHint}>Click anywhere on the map…</div>}
           </div>
@@ -150,7 +150,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
           </div>
           {status && (
             <div className={`${styles.saveStatus} ${status.error ? styles.saveStatusError : styles.saveStatusSuccess}`}>
-              {status.text}
+              {status.icon && <CheckCircle2 size={13} />} {status.text}
             </div>
           )}
         </div>
@@ -167,14 +167,20 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
           const wasRemapped = wp.type && wp.type.trim().toLowerCase() !== resolvedType;
           return (
             <div key={wp.id} className={styles.item} onClick={() => onEditWaypoint(wp)}>
-              <div className={styles.itemIcon}>{typeIcons[resolvedType] || '📍'}</div>
+              <div className={styles.itemIcon}>
+                {(() => { const Icon = getTypeIcon(resolvedType); return <Icon size={16} />; })()}
+              </div>
               <div className={styles.itemBody}>
                 <div className={styles.itemName}>{wp.name || '(unnamed)'}</div>
                 <div className={styles.itemMeta}>
                   {wp.description || 'No description'} · {Number(wp.lat || 0).toFixed(5)}, {Number(wp.lng || 0).toFixed(5)}
                 </div>
               </div>
-              {photoCount > 0 && <span className={styles.itemPhotoBadge}>📷 {photoCount}</span>}
+              {photoCount > 0 && (
+                <span className={styles.itemPhotoBadge}>
+                  <Camera size={11} /> {photoCount}
+                </span>
+              )}
               <span
                 className={styles.itemBadge}
                 style={badgeStyleFor(resolvedType)}
@@ -183,7 +189,9 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
                 {resolvedType.replace(/_/g, ' ')}
                 {wasRemapped ? ' •' : ''}
               </span>
-              <span className={styles.itemChevron}>›</span>
+              <span className={styles.itemChevron}>
+                <ChevronRight size={14} />
+              </span>
             </div>
           );
         })}

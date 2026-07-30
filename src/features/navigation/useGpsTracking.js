@@ -164,7 +164,7 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     activeBars: 0,
     warning: { visible: false, poor: false, text: '' },
     gpsBtnDisabled: false,
-    gpsBtnLabel: '◎ FIND MY LOCATION',
+    gpsBtnLabel: 'FIND MY LOCATION',
   });
 
   const lastKnownPosRef = useRef(null);
@@ -222,8 +222,7 @@ export function useGpsTracking(map, { hidden = false } = {}) {
       next.signalBadgeClass = isTracking ? 'tracking' : t;
       next.signalBadgeText = isTracking ? 'LIVE' : t.toUpperCase();
       next.accuracyText = `±${Math.round(accuracy)}m`;
-      next.speedText =
-        speedKmh !== null && speedKmh >= 0 ? `${speedKmh > VEHICLE_SPEED_KMH ? '🚗' : '🚶'} ${speedKmh.toFixed(1)}` : '—';
+      next.speedText = speedKmh !== null && speedKmh >= 0 ? `${speedKmh.toFixed(1)} km/h` : '—';
       if (headingDeg !== null && headingDeg >= 0) {
         const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
         next.headingText = `${Math.round(headingDeg)}° ${dirs[Math.round(headingDeg / 45) % 8]}`;
@@ -235,15 +234,15 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         if (t === 'good') {
           next.warning = { visible: false, poor: false, text: '' };
           next.gpsBtnDisabled = false;
-          next.gpsBtnLabel = '◎ FIND MY LOCATION';
+          next.gpsBtnLabel = 'FIND MY LOCATION';
         } else if (t === 'fair') {
-          next.warning = { visible: true, poor: false, text: '⚠️ Weak signal. May be off ~100m. Go outdoors.' };
+          next.warning = { visible: true, poor: false, text: 'Weak signal. May be off ~100m. Go outdoors.' };
           next.gpsBtnDisabled = false;
-          next.gpsBtnLabel = '◎ LOCATE ANYWAY';
+          next.gpsBtnLabel = 'LOCATE ANYWAY';
         } else {
-          next.warning = { visible: true, poor: true, text: '🚫 Signal too weak. Step outside.' };
+          next.warning = { visible: true, poor: true, text: 'Signal too weak. Step outside.' };
           next.gpsBtnDisabled = true;
-          next.gpsBtnLabel = '◎ SIGNAL TOO WEAK';
+          next.gpsBtnLabel = 'SIGNAL TOO WEAK';
         }
       }
       return next;
@@ -398,7 +397,7 @@ export function useGpsTracking(map, { hidden = false } = {}) {
           { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
         );
       }
-      setState((s) => ({ ...s, isTracking: false, gpsBtnLabel: '◎ FIND MY LOCATION', gpsBtnDisabled: false }));
+      setState((s) => ({ ...s, isTracking: false, gpsBtnLabel: 'FIND MY LOCATION', gpsBtnDisabled: false }));
     } else {
       if (!isWarmedUpRef.current) {
         alert('GPS warming up, wait a moment.');
@@ -413,7 +412,7 @@ export function useGpsTracking(map, { hidden = false } = {}) {
       smoothRef.current = { lat: null, lng: null };
       trailPtsRef.current = [];
       drRef.current.start();
-      setState((s) => ({ ...s, isTracking: true, gpsBtnLabel: '⏹ STOP TRACKING' }));
+      setState((s) => ({ ...s, isTracking: true, gpsBtnLabel: 'STOP TRACKING' }));
       watchIdRef.current = navigator.geolocation.watchPosition(onPositionUpdate, (err) => console.warn('GPS err:', err.message), {
         enableHighAccuracy: true,
         maximumAge: 5000,

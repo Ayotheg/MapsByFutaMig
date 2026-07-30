@@ -22,6 +22,34 @@
    from inside one page's stylesheet. Flagging it now so it isn't
    missed. */
 
+/* ─── Landing-page-only light theme (redesign, July 2026) ───
+   Scoped entirely to this file/this page — the in-app map tool keeps
+   its dark theme from src/styles/tokens.css untouched. Sections not
+   yet converted to the light redesign still reference the old dark
+   --purple-light/--bg-dark/etc. tokens from that file; they'll be
+   migrated slice by slice. */
+:root {
+  --land-bg: #ffffff;
+  --land-surface: #ffffff;
+  --land-surface-alt: #faf6ff;
+  --land-border: #ececec;
+  --land-border-strong: #2b2b2b;
+
+  --land-text-primary: #1a1a1a;
+  --land-text-secondary: #5c5c66;
+  --land-text-muted: #8a8a94;
+
+  --land-accent: #6d3fc7;
+  --land-accent-tint-bg: #f0e5ff;
+  --land-accent-tint-border: #e3cfff;
+
+  --land-secondary-accent: #0f6e56;
+  --land-secondary-tint-bg: #e1f5ee;
+
+  --land-radius-pill: 999px;
+  --land-radius-card: 16px;
+}
+
 html {
   scroll-behavior: smooth;
 }

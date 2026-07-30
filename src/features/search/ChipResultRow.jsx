@@ -1,5 +1,6 @@
 import { Navigation, Images } from 'lucide-react';
-import { dotColor, typeEmoji, fmtDist } from './chipConfig';
+import { dotColor, fmtDist } from './chipConfig';
+import { getTypeIcon } from '../../lib/typeIcons';
 import styles from './ChipResultRow.module.css';
 
 /**
@@ -13,7 +14,7 @@ import styles from './ChipResultRow.module.css';
  * `handlePlaceCardNavigate`, same "Where to?" seeding the place card's
  * own Navigate button already uses.
  */
-export default function ChipResultRow({ result, iconText, onOpen, onNavigate, style }) {
+export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavigate, style }) {
   const handleRowClick = (e) => {
     if (e.target.closest('[data-nav-btn]')) return;
     onOpen(result);
@@ -24,13 +25,17 @@ export default function ChipResultRow({ result, iconText, onOpen, onNavigate, st
     onNavigate?.(result);
   };
 
+  const ThumbIcon = getTypeIcon(result.type, fallbackIconKey);
+
   return (
     <div className={styles.row} style={style} onClick={handleRowClick}>
       <div className={styles.thumb}>
         {result.imageUrls && result.imageUrls.length > 0 ? (
           <img src={result.imageUrls[0]} alt={result.name} loading="lazy" />
         ) : (
-          <div className={styles.thumbPh}>{typeEmoji(result.type, iconText)}</div>
+          <div className={styles.thumbPh}>
+            <ThumbIcon size={18} />
+          </div>
         )}
       </div>
 

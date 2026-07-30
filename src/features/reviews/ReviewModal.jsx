@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Star, CheckCircle2, TriangleAlert } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import modalStyles from '../../components/ui/Modal.module.css';
 import styles from './ReviewModal.module.css';
@@ -72,11 +73,11 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
 
     try {
       await submitReview({ waypointId: dest.id, rating, comment, userId: user?.id });
-      setStatus({ kind: 'success', text: '✅ Thanks for helping fellow students!' });
+      setStatus({ kind: 'success', text: 'Thanks for helping fellow students!' });
       await onSubmitted?.();
       setTimeout(onClose, 1200);
     } catch (err) {
-      setStatus({ kind: 'error', text: '⚠️ Failed to save review. Try again.' });
+      setStatus({ kind: 'error', text: 'Failed to save review. Try again.' });
       setSubmitting(false);
       // Match legacy's console.error('Review submit failed:', err) for
       // whoever's debugging a failed submit live.
@@ -120,7 +121,7 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
             onClick={() => setRating(val)}
             onMouseEnter={() => setHoverRating(val)}
           >
-            ★
+            <Star size={22} fill={val <= displayRating ? 'currentColor' : 'none'} />
           </span>
         ))}
       </div>
@@ -136,7 +137,9 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
       </div>
 
       {status && (
-        <div className={`${styles.status} ${styles[status.kind]}`}>{status.text}</div>
+        <div className={`${styles.status} ${styles[status.kind]}`}>
+          {status.kind === 'success' ? <CheckCircle2 size={13} /> : <TriangleAlert size={13} />} {status.text}
+        </div>
       )}
     </Modal>
   );

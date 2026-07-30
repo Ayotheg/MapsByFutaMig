@@ -48,6 +48,9 @@
   padding: 8px 10px;
 }
 .wpName {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   color: var(--tertiary);
   margin-bottom: 2px;

@@ -1,76 +1,97 @@
 import { Link } from 'react-router-dom'
-import { Heart, ArrowRight, HeartHandshake, Mail } from 'lucide-react'
-import { Logo } from './shared'
+import { Heart, ArrowRight, HeartHandshake, Mail, MapPin } from 'lucide-react'
 
 const CROWDR_DONATE_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
 const CONTACT_EMAIL = 'gearlifycorporation@gmail.com'
 
-/* ─── Footer ─── */
+/* ─── Footer ───
+ * Light-theme rebuild (Slice 3). Trimmed from the previous 3 link
+ * columns (12 links total) + separate CTA column down to 2 short
+ * columns, per the redesign plan. Real links preserved where they
+ * exist (Crowdr donate URL, contact email, /map route); the legal
+ * links below point at "#" because /privacy, /terms, /cookies aren't
+ * wired into App.jsx's <Routes> yet even though the page components
+ * (PrivacyPolicy.jsx etc.) exist — that's a routing fix outside this
+ * slice's scope, flagging it rather than guessing a path silently.
+ */
 function Footer() {
-  const links = {
-    Product: ['About', 'Features', 'Explore the Map', 'How It Works'],
-    Support: ['Support Us', 'FAQ', 'Contact Us', 'Report an Issue'],
-    Legal: ['Privacy Policy', 'Terms of Service', 'Cookie Policy'],
-  }
-
   return (
-    <footer style={{ background: '#080f1e', borderTop: '1px solid var(--border)', padding: '60px 24px 32px' }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <div className="flex flex-col lg:flex-row gap-12" style={{ marginBottom: 48 }}>
+    <footer style={{ background: 'var(--land-surface)', borderTop: '0.5px solid var(--land-border)', padding: '56px 24px 32px' }}>
+      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+        <div className="flex flex-col lg:flex-row gap-10" style={{ paddingBottom: 28, justifyContent: 'space-between' }}>
+
           {/* Brand */}
-          <div style={{ flex: 1.5 }}>
-            <Logo size={56} />
-            <p style={{ fontFamily: 'Poppins', fontSize: 14, lineHeight: 1.75, color: 'var(--muted)', marginTop: 16, maxWidth: 300 }}>
-              Your Go-To Guide on FUTA Campus. The intelligent navigation platform built exclusively for the Federal University of Technology, Akure.
+          <div style={{ maxWidth: 260 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%',
+                background: 'var(--land-accent)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <MapPin size={14} strokeWidth={2.25} color="#fff" />
+              </div>
+              <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--land-text-primary)' }}>
+                Maps By FUTA
+              </span>
+            </div>
+            <p style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, lineHeight: 1.6, color: 'var(--land-text-secondary)', margin: 0 }}>
+              Your go-to guide on FUTA campus.
             </p>
-            <div className="flex gap-3" style={{ marginTop: 20 }}>
-              <a href={`mailto:${CONTACT_EMAIL}`} aria-label="Email us" style={{
-                width: 40, height: 40, borderRadius: 10, background: 'rgba(34,42,61,0.6)',
-                border: '1px solid var(--border)', display: 'flex', alignItems: 'center',
-                justifyContent: 'center', fontSize: 14, color: 'var(--muted)',
-                textDecoration: 'none', transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(183,109,255,0.4)'; e.currentTarget.style.color = 'var(--text)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)' }}>
-                <Mail size={17} strokeWidth={2} />
-              </a>
+          </div>
+
+          {/* Link columns */}
+          <div className="flex gap-14">
+            <div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 12, color: 'var(--land-text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>Product</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <Link to="/map" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Open the map</Link>
+                <a href="#features" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Features</a>
+                <a href="#faq" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>FAQ</a>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 12, color: 'var(--land-text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>Legal</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <Link to="/privacy" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Privacy policy</Link>
+                <Link to="/terms" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Terms of service</Link>
+                <Link to="/cookies" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Cookie policy</Link>
+              </div>
             </div>
           </div>
 
-          {/* Links */}
-          {Object.entries(links).map(([section, items]) => (
-            <div key={section} style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 13, letterSpacing: 2, color: 'var(--text)', textTransform: 'uppercase', marginBottom: 20 }}>{section}</div>
-              {items.map(item => (
-                <a key={item} href="#" style={{ display: 'block', fontFamily: 'Poppins', fontSize: 14, color: 'var(--muted)', textDecoration: 'none', marginBottom: 12, transition: 'color 0.2s' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--muted)')}>
-                  {item}
-                </a>
-              ))}
-            </div>
-          ))}
-
-          {/* CTA */}
-          <div style={{ flex: 1.2 }}>
-            <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 13, letterSpacing: 2, color: 'var(--text)', textTransform: 'uppercase', marginBottom: 20 }}>Get Started</div>
-            <p style={{ fontFamily: 'Poppins', fontSize: 14, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 20 }}>
-              Start navigating FUTA campus today. Free, no download needed.
+          {/* Contact + CTA */}
+          <div style={{ maxWidth: 220 }}>
+            <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 12, color: 'var(--land-text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>Get started</div>
+            <p style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
+              Free, no download needed.
             </p>
-            <Link to="/map" className="btn-primary" style={{ fontSize: 14, padding: '12px 24px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              Open Maps <ArrowRight size={15} strokeWidth={2} />
+            <Link
+              to="/map"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'var(--land-accent)', color: '#fff', textDecoration: 'none',
+                borderRadius: 999, padding: '9px 18px',
+                fontFamily: 'Poppins, sans-serif', fontSize: 13, fontWeight: 500,
+              }}
+            >
+              Open the map <ArrowRight size={14} strokeWidth={2} />
             </Link>
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              aria-label="Email us"
+              style={{
+                marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 6,
+                fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)',
+                textDecoration: 'none',
+              }}
+            >
+              <Mail size={14} strokeWidth={2} /> Contact us
+            </a>
           </div>
         </div>
 
-        {/* Donation-platform badge — the way large sites quietly surface a
-            payment/donation partner mark near the bottom of the footer,
-            signalling "you can support us here" without a hard sell.
-            Links straight to the live Crowdr campaign. No official Crowdr
-            logo file was available in this project, so this is a plain
-            icon + wordmark badge rather than their brand mark — drop in
-            their SVG here instead if you get one from Crowdr. */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+        {/* Crowdr support pill — same content/link as before, re-skinned for light mode */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
           <a
             href={CROWDR_DONATE_URL}
             target="_blank"
@@ -79,24 +100,24 @@ function Footer() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '8px 18px', borderRadius: 999,
-              background: 'rgba(183,109,255,0.08)', border: '1px solid rgba(183,109,255,0.25)',
-              textDecoration: 'none', transition: 'all 0.2s',
+              background: 'var(--land-accent-tint-bg)', border: '1px solid var(--land-accent-tint-border)',
+              textDecoration: 'none', transition: 'background 0.15s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(183,109,255,0.5)'; e.currentTarget.style.background = 'rgba(183,109,255,0.14)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(183,109,255,0.25)'; e.currentTarget.style.background = 'rgba(183,109,255,0.08)' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#e9d9ff' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--land-accent-tint-bg)' }}
           >
-            <HeartHandshake size={16} strokeWidth={2} color="#b76dff" />
-            <span style={{ fontFamily: 'Poppins', fontSize: 12, color: 'var(--muted)' }}>Support us on</span>
-            <span style={{ fontFamily: "'Bricolage Grotesque'", fontWeight: 800, fontSize: 15, letterSpacing: -0.3, color: 'var(--text)' }}>Crowdr</span>
+            <HeartHandshake size={15} strokeWidth={2} color="var(--land-accent)" />
+            <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-secondary)' }}>Support us on</span>
+            <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 14, color: 'var(--land-text-primary)' }}>Crowdr</span>
           </a>
         </div>
 
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 24, display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'var(--muted)', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            Made with <Heart size={13} strokeWidth={2} fill="currentColor" /> for FUTA
+        <div style={{ borderTop: '0.5px solid var(--land-border)', paddingTop: 20, display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-muted)', margin: 0 }}>
+            &copy; {new Date().getFullYear()} Maps By FUTA
           </p>
-          <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'var(--muted)', margin: 0, opacity: 0.5 }}>
-            © {new Date().getFullYear()} Maps By FUTA · All rights reserved
+          <p style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-muted)', margin: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            Made with <Heart size={12} strokeWidth={2} fill="currentColor" /> for FUTA
           </p>
         </div>
       </div>

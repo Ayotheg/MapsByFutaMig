@@ -56,7 +56,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
   function placeCardOptsFor(name, lat, lng, description) {
     return {
       name,
-      badge: '📍 Annotation',
+      badge: 'Annotation',
       description: cleanKmlDescription(description) || description || '',
       lat,
       lng,

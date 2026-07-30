@@ -6,28 +6,28 @@
  * templates.
  */
 
-// Turn arrow map (OSRM maneuver types)
+// Turn icon map (OSRM maneuver types) — values are lib/legacyIconMap.js keys
 export const TURN_ICONS = {
-  'turn-left': '↰',
-  'turn-right': '↱',
-  'turn-slight-left': '↖',
-  'turn-slight-right': '↗',
-  'turn-sharp-left': '⬅',
-  'turn-sharp-right': '➡',
-  uturn: '↩',
-  roundabout: '🔄',
-  rotary: '🔄',
-  'fork-left': '↰',
-  'fork-right': '↱',
-  arrive: '🏁',
-  depart: '🚀',
-  straight: '↑',
-  continue: '↑',
+  'turn-left': 'corner-up-left',
+  'turn-right': 'corner-up-right',
+  'turn-slight-left': 'arrow-up-left',
+  'turn-slight-right': 'arrow-up-right',
+  'turn-sharp-left': 'corner-up-left',
+  'turn-sharp-right': 'corner-up-right',
+  uturn: 'rotate-ccw',
+  roundabout: 'rotate-cw',
+  rotary: 'rotate-cw',
+  'fork-left': 'corner-up-left',
+  'fork-right': 'corner-up-right',
+  arrive: 'flag',
+  depart: 'rocket',
+  straight: 'arrow-up',
+  continue: 'arrow-up',
 };
 
 export function turnIcon(type, modifier) {
   const key = modifier ? `${type}-${modifier}` : type;
-  return TURN_ICONS[key] || TURN_ICONS[type] || '↑';
+  return TURN_ICONS[key] || TURN_ICONS[type] || 'arrow-up';
 }
 
 export function fmtDist(m) {

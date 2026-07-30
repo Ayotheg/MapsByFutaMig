@@ -2,6 +2,11 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import './segmentPopup.css';
 
+// Raw Leaflet popup HTML can't hold a React icon — inline SVG matching
+// Lucide's own ChevronRight glyph, same approach as NavigationController's
+// SVG_FLAG and useSelectResult's SVG_SEARCH, same reason.
+const SVG_CHEVRON = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="m9 18 6-6-6-6"/></svg>`;
+
 // ── Ported from legacy app.js `drawSavedSegment` (~2548–2590) ────────────
 // Raw Leaflet, not react-leaflet, per CLAUDE.md — same imperative pattern
 // as WaypointLayer.jsx. Segments aren't viewport-batched or gated behind
@@ -52,7 +57,7 @@ export default function SegmentsLayer({ map, segments, onViewDetails }) {
             `<div class="seg-popup">
               <div class="seg-popup-name">${seg.name}</div>
               <div class="seg-popup-meta">${seg.category} · ${((seg.distance || 0) / 1000).toFixed(2)} km</div>
-              <button type="button" class="seg-popup-btn">▶ VIEW DETAILS</button>
+              <button type="button" class="seg-popup-btn">${SVG_CHEVRON} VIEW DETAILS</button>
             </div>`
           )
           .openOn(map);

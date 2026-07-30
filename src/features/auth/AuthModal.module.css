@@ -229,6 +229,9 @@
 .forgotLink:hover { opacity: 1; text-decoration: underline; }
 
 .status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12.5px;
   border-radius: 8px;
   padding: 9px 12px;

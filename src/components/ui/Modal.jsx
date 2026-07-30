@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import styles from './Modal.module.css';
 
 /**
@@ -33,7 +34,7 @@ export default function Modal({ title, onClose, children, footer, closeOnBackdro
         <div className={styles.header}>
           <div className={styles.title}>{title}</div>
           <button type="button" className={styles.close} onClick={onClose}>
-            ✕
+            <X size={16} />
           </button>
         </div>
 

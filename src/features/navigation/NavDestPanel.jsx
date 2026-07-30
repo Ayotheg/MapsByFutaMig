@@ -1,4 +1,5 @@
-import { Footprints, Bike, Car, MapPin, Navigation } from 'lucide-react';
+import { Footprints, Bike, Car, MapPin, Navigation, X } from 'lucide-react';
+import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import styles from './NavDestPanel.module.css';
 
 const MODES = [
@@ -33,7 +34,7 @@ export default function NavDestPanel({
       <div className={styles.header}>
         <span className={styles.title}>Where to?</span>
         <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-          ✕
+          <X size={16} />
         </button>
       </div>
 
@@ -89,7 +90,9 @@ export default function NavDestPanel({
                         onPickResult(r);
                       }}
                     >
-                      <div className={styles.ddIcon}>{icon(r)}</div>
+                      <div className={styles.ddIcon}>
+                        {(() => { const Icon = LEGACY_ICON_MAP[icon(r)] || MapPin; return <Icon size={14} />; })()}
+                      </div>
                       <div>
                         <div className={styles.ddName} dangerouslySetInnerHTML={{ __html: highlight(r.name, destInputValue) }} />
                         {r.desc && <div className={styles.ddSub}>{r.desc}</div>}

@@ -1,4 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
+import {
+  X, Menu, MapPin, GraduationCap, Landmark, Printer, BusFront, Map, Search, Star,
+  User, Radio, CheckCircle2, Zap, Satellite, Globe, Compass, Lock, Smartphone,
+  Check, ArrowRight, Hospital, UtensilsCrossed, House, Target, Footprints, Car,
+  Frown, Clock, Users, BookOpen, Shirt, SquareParking, Backpack, ShoppingBag,
+  FlaskConical, Church, Fuel, Brain, Construction, Wifi, Heart, MessageCircle,
+  ExternalLink, Camera, Play, Building2, Gift,
+} from 'lucide-react'
+import FootballIcon from './lib/FootballIcon'
+import MosqueIcon from './lib/MosqueIcon'
 // Moved to src/assets/ during Task 1 (asset migration) — path is relative
 // to src/pages/landing/, where Task 2 plans to place the split-up files.
 import mapsFlyerImg from '../../assets/MAPSBYFUTA.jpg'
@@ -103,7 +113,7 @@ function Nav() {
               Open Maps
             </a>
             <button className="md:hidden" onClick={() => setMobileOpen(!mobileOpen)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: 22 }}>
-              {mobileOpen ? '✕' : '☰'}
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
         </div>
@@ -212,16 +222,23 @@ function PhoneMockup() {
             display: 'flex', alignItems: 'center', gap: 8,
             boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
           }}>
-            <span style={{ fontSize: 12 }}>📍</span>
+            <MapPin size={12} />
             <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#888', flex: 1 }}>Search FUTA campus...</span>
-            <div style={{ background: '#b76dff', borderRadius: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>➤</div>
+            <div style={{ background: '#b76dff', borderRadius: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowRight size={12} color="#fff" />
+            </div>
           </div>
 
           {/* Category chips */}
           <div style={{ position: 'absolute', top: 82, left: 8, right: 8, display: 'flex', gap: 5, overflowX: 'hidden' }}>
-            {['🏫 Halls', '🏧 ATM', '🖨️ Print', '🚌 Bus'].map(chip => (
-              <div key={chip} style={{ background: 'rgba(30,30,46,0.9)', borderRadius: 8, padding: '4px 8px', fontSize: 9, fontFamily: 'Inter', color: '#dae2fd', whiteSpace: 'nowrap' }}>
-                {chip}
+            {[
+              { Icon: GraduationCap, label: 'Halls' },
+              { Icon: Landmark, label: 'ATM' },
+              { Icon: Printer, label: 'Print' },
+              { Icon: BusFront, label: 'Bus' },
+            ].map(({ Icon, label }) => (
+              <div key={label} style={{ background: 'rgba(30,30,46,0.9)', borderRadius: 8, padding: '4px 8px', fontSize: 9, fontFamily: 'Inter', color: '#dae2fd', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Icon size={10} /> {label}
               </div>
             ))}
           </div>
@@ -240,8 +257,8 @@ function PhoneMockup() {
             display: 'flex', justifyContent: 'space-around',
             backdropFilter: 'blur(8px)',
           }}>
-            {['🗺️', '🔍', '⭐', '👤'].map(icon => (
-              <span key={icon} style={{ fontSize: 18, opacity: icon === '🗺️' ? 1 : 0.5 }}>{icon}</span>
+            {[Map, Search, Star, User].map((Icon, i) => (
+              <Icon key={i} size={18} style={{ opacity: i === 0 ? 1 : 0.5 }} />
             ))}
           </div>
         </div>
@@ -265,7 +282,9 @@ function PhoneMockup() {
         padding: '10px 14px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
         animationDelay: '1.5s',
       }}>
-        <div style={{ fontSize: 14, marginBottom: 2 }}>📡</div>
+        <div style={{ marginBottom: 2, color: '#ddb7ff' }}>
+          <Satellite size={14} />
+        </div>
         <div style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 600, color: '#ddb7ff' }}>Live GPS</div>
       </div>
       <div className="animate-float-card" style={{
@@ -345,10 +364,10 @@ function Hero() {
 
             <div className="flex flex-wrap gap-4">
               <a href="https://mapsbyfuta.xyz" target="_blank" rel="noreferrer" className="btn-primary">
-                <span>🗺️</span> Explore the Map
+                <Map size={16} /> Explore the Map
               </a>
               <button onClick={() => document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' })} className="btn-secondary">
-                <span>▶</span> Watch Demo
+                <Play size={16} fill="currentColor" /> Watch Demo
               </button>
             </div>
 
@@ -376,9 +395,12 @@ function Hero() {
 /* ─── Trust bar ─── */
 function TrustBar() {
   const badges = [
-    '🏛️ Built for FUTA', '📡 Live Navigation', '📱 Mobile First', '🔍 Smart Search',
-    '🛰️ GPS Enabled', '🌐 Responsive', '✅ Campus Verified', '⚡ Fast & Free',
-    '🗺️ Interactive Map', '⭐ Community Reviews', '🧭 Turn-by-Turn', '🔒 Trusted Platform',
+    { Icon: Landmark, label: 'Built for FUTA' }, { Icon: Radio, label: 'Live Navigation' },
+    { Icon: Smartphone, label: 'Mobile First' }, { Icon: Search, label: 'Smart Search' },
+    { Icon: Satellite, label: 'GPS Enabled' }, { Icon: Globe, label: 'Responsive' },
+    { Icon: CheckCircle2, label: 'Campus Verified' }, { Icon: Zap, label: 'Fast & Free' },
+    { Icon: Map, label: 'Interactive Map' }, { Icon: Star, label: 'Community Reviews' },
+    { Icon: Compass, label: 'Turn-by-Turn' }, { Icon: Lock, label: 'Trusted Platform' },
   ]
   const doubled = [...badges, ...badges]
 
@@ -388,9 +410,10 @@ function TrustBar() {
       padding: '18px 0', overflow: 'hidden',
     }}>
       <div className="animate-ticker" style={{ display: 'flex', gap: 48, width: 'max-content' }}>
-        {doubled.map((badge, i) => (
+        {doubled.map(({ Icon, label }, i) => (
           <div key={i} className="flex items-center gap-2" style={{ whiteSpace: 'nowrap' }}>
-            <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 500, color: 'var(--muted)' }}>{badge}</span>
+            <Icon size={14} style={{ color: 'var(--muted)' }} />
+            <span style={{ fontFamily: 'Inter', fontSize: 14, fontWeight: 500, color: 'var(--muted)' }}>{label}</span>
             <span style={{ color: 'rgba(183,109,255,0.4)', fontSize: 10 }}>◆</span>
           </div>
         ))}
@@ -436,7 +459,9 @@ function DiscoverSection() {
                 border: '1px solid rgba(183,109,255,0.3)', borderRadius: 12,
                 padding: '8px 20px', whiteSpace: 'nowrap',
               }}>
-                <span style={{ fontFamily: 'Inter', fontSize: 13, color: 'var(--muted)' }}>📱 Prefer your phone? Scan to explore instantly.</span>
+                <span style={{ fontFamily: 'Inter', fontSize: 13, color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Smartphone size={14} /> Prefer your phone? Scan to explore instantly.
+                </span>
               </div>
             </div>
           </div>
@@ -457,7 +482,7 @@ function DiscoverSection() {
             ].map(([title, desc]) => (
               <div key={title} className="flex items-start gap-4" style={{ marginBottom: 20 }}>
                 <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'linear-gradient(135deg,#44e2cd,#03c6b2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                  <span style={{ color: '#0b1326', fontSize: 12, fontWeight: 700 }}>✓</span>
+                  <Check size={13} color="#0b1326" strokeWidth={3} />
                 </div>
                 <div>
                   <div style={{ fontFamily: 'Inter', fontWeight: 600, fontSize: 15, color: 'var(--text)', marginBottom: 4 }}>{title}</div>
@@ -468,7 +493,7 @@ function DiscoverSection() {
 
             <div style={{ marginTop: 36 }}>
               <a href="https://mapsbyfuta.xyz" target="_blank" rel="noreferrer" className="btn-primary">
-                🗺️ Open the Map
+                <Map size={16} /> Open the Map
               </a>
             </div>
           </div>
@@ -479,10 +504,10 @@ function DiscoverSection() {
 }
 
 /* ─── Feature showcase ─── */
-function FeatureShowcase({ index, title, emoji, tagline, bullets, visual }: {
+function FeatureShowcase({ index, title, Icon, tagline, bullets, visual }: {
   index: number
   title: string
-  emoji: string
+  Icon: React.ComponentType<{ size?: number }>
   tagline: string
   bullets: string[]
   visual: React.ReactNode
@@ -496,14 +521,14 @@ function FeatureShowcase({ index, title, emoji, tagline, bullets, visual }: {
         <div style={{ fontFamily: 'Montserrat', fontSize: 12, fontWeight: 700, letterSpacing: 4, color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 12 }}>
           Feature {String(index + 1).padStart(2, '0')}
         </div>
-        <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(26px,3vw,42px)', fontWeight: 800, lineHeight: 1.15, marginBottom: 16 }}>
-          {emoji} {title}
+        <h3 style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(26px,3vw,42px)', fontWeight: 800, lineHeight: 1.15, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Icon size={30} /> {title}
         </h3>
         <p style={{ fontFamily: 'Poppins', fontSize: 16, lineHeight: 1.75, color: 'var(--muted)', marginBottom: 28 }}>{tagline}</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {bullets.map(b => (
             <div key={b} className="flex items-center gap-3">
-              <span style={{ color: '#44e2cd', fontSize: 14 }}>→</span>
+              <ArrowRight size={14} color="#44e2cd" />
               <span style={{ fontFamily: 'Poppins', fontSize: 15, color: 'var(--text)' }}>{b}</span>
             </div>
           ))}
@@ -542,8 +567,14 @@ const MapFeatureVisual = () => (
       </svg>
     </div>
     <div className="flex flex-wrap gap-2" style={{ marginTop: 16 }}>
-      {['🏫 Academic', '🏧 ATM', '🏥 Clinic', '🍽️ Food', '🏠 Hostels'].map(cat => (
-        <span key={cat} style={{ fontFamily: 'Inter', fontSize: 12, background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.2)', borderRadius: 8, padding: '4px 10px', color: 'var(--purple-light)' }}>{cat}</span>
+      {[
+        { Icon: GraduationCap, label: 'Academic' }, { Icon: Landmark, label: 'ATM' },
+        { Icon: Hospital, label: 'Clinic' }, { Icon: UtensilsCrossed, label: 'Food' },
+        { Icon: House, label: 'Hostels' },
+      ].map(({ Icon, label }) => (
+        <span key={label} style={{ fontFamily: 'Inter', fontSize: 12, background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.2)', borderRadius: 8, padding: '4px 10px', color: 'var(--purple-light)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          <Icon size={12} /> {label}
+        </span>
       ))}
     </div>
   </div>
@@ -552,7 +583,7 @@ const MapFeatureVisual = () => (
 const SearchFeatureVisual = () => (
   <div className="glass-card feature-card-hover" style={{ width: '100%', maxWidth: 400, padding: 28, borderRadius: 24, boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
     <div style={{ background: 'rgba(183,109,255,0.08)', border: '1px solid rgba(183,109,255,0.2)', borderRadius: 14, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-      <span style={{ fontSize: 16 }}>🔍</span>
+      <Search size={16} />
       <span style={{ fontFamily: 'Inter', fontSize: 14, color: 'var(--muted)' }}>CBT Centre...</span>
       <div style={{ marginLeft: 'auto', background: '#b76dff', borderRadius: 8, padding: '4px 10px', fontSize: 12, fontFamily: 'Inter', color: 'white' }}>Search</div>
     </div>
@@ -594,16 +625,24 @@ const NavFeatureVisual = () => (
         ))}
       </svg>
       <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(11,19,38,0.9)', borderRadius: 8, padding: '4px 10px' }}>
-        <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#44e2cd' }}>📍 Current Location</span>
+        <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#44e2cd', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <MapPin size={11} /> Current Location
+        </span>
       </div>
       <div style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(11,19,38,0.9)', borderRadius: 8, padding: '4px 10px' }}>
-        <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#b76dff' }}>🎯 Destination</span>
+        <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#b76dff', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <Target size={11} /> Destination
+        </span>
       </div>
     </div>
     <div className="flex gap-3">
-      {[['🚶', '8 min', 'Walk'], ['🚗', '3 min', 'Drive'], ['📡', 'Live', 'GPS']].map(([icon, val, label]) => (
+      {[
+        { Icon: Footprints, val: '8 min', label: 'Walk' },
+        { Icon: Car, val: '3 min', label: 'Drive' },
+        { Icon: Satellite, val: 'Live', label: 'GPS' },
+      ].map(({ Icon, val, label }) => (
         <div key={label} style={{ flex: 1, background: 'rgba(34,42,61,0.5)', borderRadius: 12, padding: '10px', textAlign: 'center', border: '1px solid rgba(77,67,84,0.4)' }}>
-          <div style={{ fontSize: 16 }}>{icon}</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 2 }}><Icon size={16} /></div>
           <div style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 15, color: 'var(--purple-light)' }}>{val}</div>
           <div style={{ fontFamily: 'Poppins', fontSize: 10, color: 'var(--muted)' }}>{label}</div>
         </div>
@@ -626,7 +665,7 @@ const ReviewsFeatureVisual = () => (
             <div style={{ fontFamily: 'Poppins', fontSize: 11, color: 'var(--muted)' }}>{r.tag} · {r.reviews} reviews</div>
           </div>
           <div className="flex items-center gap-1">
-            <span style={{ color: '#ffb95f', fontSize: 14 }}>★</span>
+            <Star size={14} color="#ffb95f" fill="#ffb95f" />
             <span style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 14, color: '#ffb95f' }}>{r.rating}</span>
           </div>
         </div>
@@ -648,7 +687,7 @@ const MobileFeatureVisual = () => (
       <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 60, height: 18, background: '#1a1a2e', borderRadius: '0 0 10px 10px' }} />
       <div style={{ padding: '30px 14px 14px' }}>
         <div style={{ background: 'rgba(183,109,255,0.12)', borderRadius: 12, padding: '8px 12px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10 }}>🔍</span>
+          <Search size={10} />
           <span style={{ fontFamily: 'Inter', fontSize: 10, color: 'var(--muted)' }}>Search FUTA campus...</span>
         </div>
         <div style={{ background: '#e8f0e8', borderRadius: 12, height: 160, overflow: 'hidden', marginBottom: 12, position: 'relative' }}>
@@ -662,8 +701,12 @@ const MobileFeatureVisual = () => (
           </svg>
         </div>
         <div className="flex gap-2">
-          {['📍 Near You', '🏧 ATM', '🍽️ Food'].map(cat => (
-            <div key={cat} style={{ flex: 1, background: 'rgba(34,42,61,0.6)', borderRadius: 8, padding: '6px 4px', textAlign: 'center', fontSize: 9, fontFamily: 'Inter', color: 'var(--muted)' }}>{cat}</div>
+          {[
+            { Icon: MapPin, label: 'Near You' }, { Icon: Landmark, label: 'ATM' }, { Icon: UtensilsCrossed, label: 'Food' },
+          ].map(({ Icon, label }) => (
+            <div key={label} style={{ flex: 1, background: 'rgba(34,42,61,0.6)', borderRadius: 8, padding: '6px 4px', textAlign: 'center', fontSize: 9, fontFamily: 'Inter', color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <Icon size={11} /> {label}
+            </div>
           ))}
         </div>
       </div>
@@ -676,35 +719,35 @@ function ProductFeatures() {
   const features = [
     {
       title: 'Interactive Campus Map',
-      emoji: '🗺️',
+      Icon: Map,
       tagline: 'Explore every corner of FUTA — lecture halls, hostels, restaurants, ATMs, banks, clinics, bus stops, places of worship, sports centres, shopping areas, and many more campus locations.',
       bullets: ['100+ mapped locations', 'Categorized by type', 'Regular map updates', 'Detailed location info'],
       visual: <MapFeatureVisual />,
     },
     {
       title: 'Smart Search',
-      emoji: '🔍',
+      Icon: Search,
       tagline: 'Find any campus location instantly with our intelligent search engine. Type a few characters and get instant results with distance, category, and directions.',
       bullets: ['Instant autocomplete', 'Nearby suggestions', 'Distance-aware results', 'Category shortcuts'],
       visual: <SearchFeatureVisual />,
     },
     {
       title: 'Turn-by-Turn Navigation',
-      emoji: '🧭',
+      Icon: Compass,
       tagline: 'From your current location to anywhere on campus — get precise walking or driving routes with live GPS, real-time tracking, ETA, and voice guidance.',
       bullets: ['Walking & driving routes', 'Estimated arrival time', 'Live GPS tracking', 'Voice navigation'],
       visual: <NavFeatureVisual />,
     },
     {
       title: 'Community Reviews',
-      emoji: '⭐',
+      Icon: Star,
       tagline: 'Students rate restaurants, banks, printing shops, pharmacies, and other campus services — helping fellow students make informed decisions every day.',
       bullets: ['Star ratings & reviews', 'Verified student feedback', 'Most popular places', 'Real-time updates'],
       visual: <ReviewsFeatureVisual />,
     },
     {
       title: 'Mobile First Experience',
-      emoji: '📱',
+      Icon: Smartphone,
       tagline: 'Designed to be beautiful and fast on every screen. Open it in any browser — no app download required. FUTA navigation, always in your pocket.',
       bullets: ['Progressive Web App', 'No download needed', 'Works offline (soon)', 'Fast & lightweight'],
       visual: <MobileFeatureVisual />,
@@ -796,9 +839,9 @@ function VideoSection() {
 function WhySection() {
   const { ref, visible } = useReveal()
   const cards = [
-    { emoji: '😕', title: 'Freshers Get Lost', body: 'Every new student wastes hours asking for directions to lecture halls, hostels, and cafeterias. The first week on campus shouldn\'t be a navigation test.' },
-    { emoji: '🕐', title: 'Time Lost to Confusion', body: 'Students miss classes, appointments, and events simply because campus is vast and confusing. Time is too valuable to waste getting lost.' },
-    { emoji: '👥', title: 'Visitors Struggle', body: 'Parents, guests, and new staff are left to wander a large campus with no reliable guidance, creating frustration and a poor first impression.' },
+    { Icon: Frown, title: 'Freshers Get Lost', body: 'Every new student wastes hours asking for directions to lecture halls, hostels, and cafeterias. The first week on campus shouldn\'t be a navigation test.' },
+    { Icon: Clock, title: 'Time Lost to Confusion', body: 'Students miss classes, appointments, and events simply because campus is vast and confusing. Time is too valuable to waste getting lost.' },
+    { Icon: Users, title: 'Visitors Struggle', body: 'Parents, guests, and new staff are left to wander a large campus with no reliable guidance, creating frustration and a poor first impression.' },
   ]
 
   return (
@@ -818,7 +861,7 @@ function WhySection() {
             </p>
             <div className={`reveal ${visible ? 'visible' : ''}`} style={{ marginTop: 36, transitionDelay: '0.4s' }}>
               <a href="https://mapsbyfuta.xyz" target="_blank" rel="noreferrer" className="btn-primary">
-                Start Navigating →
+                Start Navigating <ArrowRight size={16} />
               </a>
             </div>
           </div>
@@ -826,7 +869,7 @@ function WhySection() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {cards.map((c, i) => (
               <div key={c.title} className={`reveal ${visible ? 'visible' : ''} glass-card`} style={{ padding: '24px 28px', transitionDelay: `${0.2 + i * 0.1}s` }}>
-                <div style={{ fontSize: 28, marginBottom: 12 }}>{c.emoji}</div>
+                <div style={{ marginBottom: 12, color: 'var(--purple-light)' }}><c.Icon size={28} /></div>
                 <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 16, marginBottom: 8, color: 'var(--text)' }}>{c.title}</div>
                 <p style={{ fontFamily: 'Poppins', fontSize: 14, lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>{c.body}</p>
               </div>
@@ -842,16 +885,16 @@ function WhySection() {
 function ExploreSection() {
   const { ref, visible } = useReveal()
   const categories = [
-    { icon: '🏫', label: 'Academic Buildings' }, { icon: '🎓', label: 'Lecture Halls' },
-    { icon: '🏠', label: 'Hostels' }, { icon: '🍽️', label: 'Restaurants' },
-    { icon: '🏧', label: 'ATMs' }, { icon: '🏦', label: 'Banks' },
-    { icon: '🏥', label: 'Clinics' }, { icon: '📚', label: 'Library' },
-    { icon: '🖨️', label: 'Printing Shops' }, { icon: '👕', label: 'Laundry' },
-    { icon: '🚌', label: 'Bus Stops' }, { icon: '🅿️', label: 'Parking' },
-    { icon: '🎒', label: 'Student Affairs' }, { icon: '🛍️', label: 'Shopping Areas' },
-    { icon: '🔬', label: 'Laboratories' }, { icon: '⚽', label: 'Sports Centres' },
-    { icon: '🕌', label: 'Mosque' }, { icon: '⛪', label: 'Church' },
-    { icon: '⛽', label: 'Fuel Stations' }, { icon: '🔒', label: 'Security Posts' },
+    { Icon: Building2, label: 'Academic Buildings' }, { Icon: GraduationCap, label: 'Lecture Halls' },
+    { Icon: House, label: 'Hostels' }, { Icon: UtensilsCrossed, label: 'Restaurants' },
+    { Icon: Landmark, label: 'ATMs' }, { Icon: Landmark, label: 'Banks' },
+    { Icon: Hospital, label: 'Clinics' }, { Icon: BookOpen, label: 'Library' },
+    { Icon: Printer, label: 'Printing Shops' }, { Icon: Shirt, label: 'Laundry' },
+    { Icon: BusFront, label: 'Bus Stops' }, { Icon: SquareParking, label: 'Parking' },
+    { Icon: Backpack, label: 'Student Affairs' }, { Icon: ShoppingBag, label: 'Shopping Areas' },
+    { Icon: FlaskConical, label: 'Laboratories' }, { Icon: FootballIcon, label: 'Sports Centres' },
+    { Icon: MosqueIcon, label: 'Mosque' }, { Icon: Church, label: 'Church' },
+    { Icon: Fuel, label: 'Fuel Stations' }, { Icon: Lock, label: 'Security Posts' },
   ]
 
   return (
@@ -878,7 +921,7 @@ function ExploreSection() {
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
               animationDelay: `${i * 0.03}s`,
             }}>
-              <span style={{ fontSize: 28 }}>{cat.icon}</span>
+              <cat.Icon size={28} />
               <span style={{ fontFamily: 'Inter', fontSize: 12, fontWeight: 500, color: 'var(--muted)', lineHeight: 1.3 }}>{cat.label}</span>
             </a>
           ))}
@@ -935,11 +978,11 @@ function StatsSection() {
 function RoadmapSection() {
   const { ref, visible } = useReveal()
   const items = [
-    { icon: '🧠', title: 'Smarter Navigation', body: 'AI-powered route optimization that learns campus traffic patterns and suggests the fastest paths.' },
-    { icon: '⭐', title: 'Community Reviews v2', body: 'Expanded review system with photos, detailed ratings, and verified student-only feedback.' },
-    { icon: '🏗️', title: 'More Campus Services', body: 'Mapping every hostel room block, new buildings, shuttle routes, and real-time facility availability.' },
-    { icon: '👥', title: 'Student Contributions', body: 'Let students submit new locations, flag outdated data, and help keep Maps By FUTA accurate.' },
-    { icon: '📶', title: 'Offline Mode', body: 'Download campus maps for offline use — navigate even without mobile data.' },
+    { Icon: Brain, title: 'Smarter Navigation', body: 'AI-powered route optimization that learns campus traffic patterns and suggests the fastest paths.' },
+    { Icon: Star, title: 'Community Reviews v2', body: 'Expanded review system with photos, detailed ratings, and verified student-only feedback.' },
+    { Icon: Construction, title: 'More Campus Services', body: 'Mapping every hostel room block, new buildings, shuttle routes, and real-time facility availability.' },
+    { Icon: Users, title: 'Student Contributions', body: 'Let students submit new locations, flag outdated data, and help keep Maps By FUTA accurate.' },
+    { Icon: Wifi, title: 'Offline Mode', body: 'Download campus maps for offline use — navigate even without mobile data.' },
   ]
 
   return (
@@ -958,7 +1001,7 @@ function RoadmapSection() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           {items.map((item, i) => (
             <div key={item.title} className={`reveal ${visible ? 'visible' : ''} roadmap-card glass-card`} style={{ padding: '28px 24px', transitionDelay: `${i * 0.1}s` }}>
-              <div style={{ fontSize: 32, marginBottom: 14 }}>{item.icon}</div>
+              <div style={{ marginBottom: 14, color: 'var(--teal)' }}><item.Icon size={32} /></div>
               <div style={{ fontFamily: 'Montserrat', fontWeight: 700, fontSize: 16, color: 'var(--text)', marginBottom: 10 }}>{item.title}</div>
               <p style={{ fontFamily: 'Poppins', fontSize: 14, lineHeight: 1.7, color: 'var(--muted)', margin: 0 }}>{item.body}</p>
               <div style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(68,226,205,0.1)', border: '1px solid rgba(68,226,205,0.2)', borderRadius: 8, padding: '4px 10px' }}>
@@ -989,7 +1032,9 @@ function SupportSection() {
           padding: '60px 48px', backdropFilter: 'blur(20px)',
           transitionDelay: '0.1s',
         }}>
-          <div style={{ fontSize: 48, marginBottom: 20 }}>💜</div>
+          <div style={{ marginBottom: 20, color: '#b76dff', display: 'flex', justifyContent: 'center' }}>
+            <Heart size={44} fill="#b76dff" />
+          </div>
           <h2 style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, marginBottom: 20, lineHeight: 1.15 }}>
             Help Build the Future of<br /><span className="text-gradient-purple">Campus Navigation.</span>
           </h2>
@@ -997,9 +1042,12 @@ function SupportSection() {
             Maps By FUTA is independently developed and maintained to improve campus life at FUTA. Community support helps expand features, improve map accuracy, add new locations, and keep the platform free for every student, forever.
           </p>
           <div className="flex flex-wrap gap-4 justify-center" style={{ marginBottom: 40 }}>
-            {['🗺️ Expand the map', '⚡ Faster features', '📡 Better GPS', '🆓 Always free'].map(item => (
-              <div key={item} style={{ background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.25)', borderRadius: 10, padding: '8px 16px', fontFamily: 'Inter', fontSize: 13, color: 'var(--purple-light)' }}>
-                {item}
+            {[
+              { Icon: Map, label: 'Expand the map' }, { Icon: Zap, label: 'Faster features' },
+              { Icon: Satellite, label: 'Better GPS' }, { Icon: Gift, label: 'Always free' },
+            ].map(({ Icon, label }) => (
+              <div key={label} style={{ background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.25)', borderRadius: 10, padding: '8px 16px', fontFamily: 'Inter', fontSize: 13, color: 'var(--purple-light)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Icon size={14} /> {label}
               </div>
             ))}
           </div>
@@ -1010,7 +1058,7 @@ function SupportSection() {
             className="btn-primary"
             style={{ fontSize: 16, padding: '16px 40px' }}
           >
-            💜 Support Maps By FUTA
+            <Heart size={16} fill="currentColor" /> Support Maps By FUTA
           </a>
           <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'rgba(183,109,255,0.5)', marginTop: 20 }}>
             Every contribution, no matter how small, makes a difference.
@@ -1114,7 +1162,7 @@ function FinalCTA() {
         </p>
         <div className={`reveal ${visible ? 'visible' : ''}`} style={{ transitionDelay: '0.3s' }}>
           <a href="https://mapsbyfuta.xyz" target="_blank" rel="noreferrer" className="btn-primary" style={{ fontSize: 18, padding: '18px 48px', borderRadius: 18 }}>
-            🗺️ Open Maps By FUTA
+            <Map size={18} /> Open Maps By FUTA
           </a>
         </div>
         <p className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Poppins', fontSize: 13, color: 'rgba(183,109,255,0.45)', marginTop: 24, transitionDelay: '0.4s' }}>
@@ -1144,7 +1192,12 @@ function Footer() {
               Your Go-To Guide on FUTA Campus. The intelligent navigation platform built exclusively for the Federal University of Technology, Akure.
             </p>
             <div className="flex gap-3" style={{ marginTop: 20 }}>
-              {[['𝕏', 'Twitter'], ['in', 'LinkedIn'], ['📸', 'Instagram'], ['💬', 'WhatsApp']].map(([icon, label]) => (
+              {[
+                { node: '𝕏', label: 'Twitter' },
+                { node: 'in', label: 'LinkedIn' },
+                { node: <Camera size={16} />, label: 'Instagram' },
+                { node: <MessageCircle size={16} />, label: 'WhatsApp' },
+              ].map(({ node, label }) => (
                 <a key={label} href="#" aria-label={label} style={{
                   width: 40, height: 40, borderRadius: 10, background: 'rgba(34,42,61,0.6)',
                   border: '1px solid var(--border)', display: 'flex', alignItems: 'center',
@@ -1153,7 +1206,7 @@ function Footer() {
                 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(183,109,255,0.4)'; e.currentTarget.style.color = 'var(--text)' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)' }}>
-                  {icon}
+                  {node}
                 </a>
               ))}
             </div>
@@ -1180,20 +1233,20 @@ function Footer() {
               Start navigating FUTA campus today. Free, no download needed.
             </p>
             <a href="https://mapsbyfuta.xyz" target="_blank" rel="noreferrer" className="btn-primary" style={{ fontSize: 14, padding: '12px 24px' }}>
-              Open Maps →
+              Open Maps <ArrowRight size={14} />
             </a>
           </div>
         </div>
 
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 24, display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'rgba(183,109,255,0.5)', margin: 0 }}>
-            Made with ❤️ for FUTA
+          <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'rgba(183,109,255,0.5)', margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+            Made with <Heart size={13} fill="currentColor" /> for FUTA
           </p>
           <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'var(--muted)', margin: 0, opacity: 0.5 }}>
             © {new Date().getFullYear()} Maps By FUTA · All rights reserved
           </p>
-          <a href="https://mapsbyfuta.xyz" target="_blank" rel="noreferrer" style={{ fontFamily: 'Inter', fontSize: 13, color: 'var(--purple-mid)', textDecoration: 'none' }}>
-            mapsbyfuta.xyz ↗
+          <a href="https://mapsbyfuta.xyz" target="_blank" rel="noreferrer" style={{ fontFamily: 'Inter', fontSize: 13, color: 'var(--purple-mid)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            mapsbyfuta.xyz <ExternalLink size={12} />
           </a>
         </div>
       </div>

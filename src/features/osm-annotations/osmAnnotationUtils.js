@@ -17,20 +17,20 @@ export const DEDUP_RADIUS_M = 90; // metres — see legacy's comment (app.js ~29
 // centroid; documented real-world offsets run up to ~80m, so 90m gives margin.
 
 const OSM_BADGE = {
-  university: '🎓 University', college: '🎓 College', school: '🏫 School',
-  library: '📚 Library', hospital: '🏥 Hospital', clinic: '🏥 Clinic',
-  pharmacy: '💊 Pharmacy', bank: '🏦 Bank', atm: '🏧 ATM',
-  restaurant: '🍽 Restaurant', cafe: '☕ Café', fast_food: '🍔 Fast Food',
-  fuel: '⛽ Fuel Station', parking: '🅿 Parking',
-  place_of_worship: '⛪ Place of Worship', stadium: '🏟 Stadium',
-  sports_centre: '🏋 Sports Centre', dormitory: '🛏 Dormitory',
-  hall_of_residence: '🛏 Hall of Residence', office: '🏢 Office',
-  administrative: '🏛 Administrative', yes: '🏛 Building',
+  university: 'University', college: 'College', school: 'School',
+  library: 'Library', hospital: 'Hospital', clinic: 'Clinic',
+  pharmacy: 'Pharmacy', bank: 'Bank', atm: 'ATM',
+  restaurant: 'Restaurant', cafe: 'Café', fast_food: 'Fast Food',
+  fuel: 'Fuel Station', parking: 'Parking',
+  place_of_worship: 'Place of Worship', stadium: 'Stadium',
+  sports_centre: 'Sports Centre', dormitory: 'Dormitory',
+  hall_of_residence: 'Hall of Residence', office: 'Office',
+  administrative: 'Administrative', yes: 'Building',
 };
 
 export function osmBadge(tags) {
   const v = tags.amenity || tags.building || tags.office || tags.leisure || tags.shop || '';
-  return OSM_BADGE[v] || (v ? '🏛 ' + v.replace(/_/g, ' ') : '📍 Place');
+  return OSM_BADGE[v] || (v ? v.replace(/_/g, ' ') : 'Place');
 }
 
 export function metersApart(lat1, lng1, lat2, lng2) {

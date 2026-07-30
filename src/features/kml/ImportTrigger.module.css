@@ -5,6 +5,9 @@
  * legacy's equivalent button lives inside the not-yet-built admin overlay.
  */
 .trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   position: fixed;
   left: 16px;
   bottom: 16px;

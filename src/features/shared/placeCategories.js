@@ -101,8 +101,9 @@ export const CATEGORY_KEYWORDS = {
   faculty: ['faculty'],
 };
 
-// Display metadata for the 16 default Quick Chips (label/emoji/icon).
-// `iconKey` looks up `lib/legacyIconMap.js`; null falls back to emoji.
+// Display metadata for the 16 default Quick Chips (label/icon).
+// `iconKey` looks up `lib/legacyIconMap.js`; every category has one, so
+// there's no emoji fallback to fall back to anymore.
 export const CATEGORY_LABELS = {
   toilet: 'Toilet',
   hostel: 'Hostel / Lodges',
@@ -122,25 +123,6 @@ export const CATEGORY_LABELS = {
   faculty: 'Faculty',
 };
 
-export const CATEGORY_EMOJI = {
-  toilet: '🚻',
-  hostel: '🏠',
-  printing_shop: '🖨️',
-  garage: '🔧',
-  library: '📚',
-  kiosk: '🛒',
-  bank: '💳',
-  chapel: '⛪',
-  bus_stop: '🚌',
-  gate: '🚧',
-  clinic: '🏥',
-  restaurant: '🍽️',
-  mosque: '🕌',
-  sports: '⚽',
-  lecture_hall: '🎓',
-  faculty: '🏫',
-};
-
 export const CATEGORY_ICON_KEYS = {
   toilet: 'toilet',
   hostel: 'house-door-fill',
@@ -151,7 +133,9 @@ export const CATEGORY_ICON_KEYS = {
   bank: 'bank2',
   chapel: 'church',
   bus_stop: 'bus-front-fill',
-  gate: null,
+  gate: 'gate-barrier', // no direct Lucide icon reads as a campus vehicle
+                         // gate (Fence/DoorOpen don't fit) — custom SVG,
+                         // see lib/GateIcon.jsx
   clinic: 'hospital-fill',
   restaurant: 'restaurant-fill',
   mosque: 'mosque',

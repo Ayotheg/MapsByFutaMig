@@ -1,3 +1,4 @@
+import { MapPin, Globe, Loader2 } from 'lucide-react';
 import SearchResultItem from './SearchResultItem';
 import styles from './SearchResultItem.module.css';
 
@@ -26,7 +27,9 @@ export default function SearchDropdownList({
     <>
       {hasLocal && (
         <>
-          <div className={styles.sectionLabel}>📍 On This Map</div>
+          <div className={styles.sectionLabel}>
+            <MapPin size={11} /> On This Map
+          </div>
           {localResults.map((r) => {
             idx += 1;
             return (
@@ -45,11 +48,17 @@ export default function SearchDropdownList({
         </>
       )}
 
-      {loading && <div className={styles.spinner}>⌛ Searching OSM…</div>}
+      {loading && (
+        <div className={styles.spinner}>
+          <Loader2 size={12} className={styles.spin} /> Searching OSM…
+        </div>
+      )}
 
       {hasOsm && (
         <>
-          <div className={styles.sectionLabel}>🌍 OpenStreetMap</div>
+          <div className={styles.sectionLabel}>
+            <Globe size={11} /> OpenStreetMap
+          </div>
           {osmResults.map((r) => {
             idx += 1;
             return (

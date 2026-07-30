@@ -208,6 +208,9 @@
   margin-top: 5px;
 }
 .ratingEmpty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 600;

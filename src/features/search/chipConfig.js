@@ -3,7 +3,6 @@ import {
   CHIP_DISPLAY_ORDER,
   CATEGORY_KEYWORDS,
   CATEGORY_LABELS,
-  CATEGORY_EMOJI,
   CATEGORY_ICON_KEYS,
   nameOrTypeMatches,
 } from '../shared/placeCategories';
@@ -54,22 +53,6 @@ export function dotColor(t) {
   return TYPE_COLORS[t] || '#DDB7FF';
 }
 
-export const TYPE_EMOJI = {
-  kiosk: '🏪', shopping: '🛍️', bank: '🏧', library: '📚',
-  printing_shop: '🖨️', cafe: '☕', restaurant: '🍽️',
-  pharmacy: '💊', barber: '💈', laundry: '🧺', fuel: '⛽',
-  hostel: '🏠', staff_quarters: '🏘️', mosque: '🕌', chapel: '⛪',
-  bus_stop: '🚌', clinic: '🏥', sports: '⚽', hall: '🏛️',
-  auditorium: '🎭', garage: '🔧', gate: '🚧', landmark: '📍',
-  security_post: '🛡️',
-  lecture_hall: '🎓', faculty: '🏫', laboratory: '🔬',
-  workshop: '🛠️', admin: '🏢', senate: '⚖️', bursary: '💰',
-  toilet: '🚻',
-};
-export function typeEmoji(t, fallback) {
-  return TYPE_EMOJI[t] || fallback || '📍';
-}
-
 export function fmtDist(m) {
   if (m < 50) return 'Very close';
   if (m < 1000) return Math.round(m) + 'm away';
@@ -103,7 +86,6 @@ function normType(t) {
 export const DEFAULT_CHIPS = CHIP_DISPLAY_ORDER.map((key) => ({
   id: key,
   label: CATEGORY_LABELS[key],
-  emoji: CATEGORY_EMOJI[key],
   iconKey: CATEGORY_ICON_KEYS[key],
   keywords: CATEGORY_KEYWORDS[key],
   pinnedIds: [],

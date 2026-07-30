@@ -6,6 +6,9 @@ import LoadingScreen from './pages/LoadingScreen'
 import NotFoundPage from './pages/NotFoundPage'
 
 import LandingPage from './pages/LandingPage'
+import PrivacyPolicy from './pages/legal/PrivacyPolicy'
+import TermsOfService from './pages/legal/TermsOfService'
+import CookiePolicy from './pages/legal/CookiePolicy'
 
 // One entry per real boot milestone tracked below — order matches roughly
 // how they resolve in practice (map init is near-instant; Supabase reads
@@ -93,6 +96,9 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/map" element={<HomeRoute />} />
         <Route path="/loadingscreen" element={<LoadingScreen />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/cookies" element={<CookiePolicy />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
