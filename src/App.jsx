@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import './index.css'
 import MapPage from './pages/MapPage'
 import LoadingScreen from './pages/LoadingScreen'
@@ -89,9 +89,24 @@ function HomeRoute() {
   );
 }
 
+// React Router doesn't reset scroll position on navigation by default —
+// without this, clicking e.g. the footer's "Privacy Policy" link (or any
+// link lower on a page) lands on the new route still scrolled down,
+// forcing the user to manually scroll back up. Runs on every path change,
+// instant (not smooth) so it doesn't fight the in-page smooth-scroll used
+// for anchor links on the landing page itself.
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/map" element={<HomeRoute />} />

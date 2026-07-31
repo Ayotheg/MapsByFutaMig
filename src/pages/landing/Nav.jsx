@@ -113,9 +113,9 @@ function Nav() {
             Open the map
           </Link>
           <button
-            className="md:hidden"
+            className="md:hidden flex items-center"
             onClick={() => setMobileOpen(!mobileOpen)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--land-text-primary)', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--land-text-primary)' }}
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           >
             {mobileOpen ? <X size={20} strokeWidth={2} /> : <Menu size={20} strokeWidth={2} />}

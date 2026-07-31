@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { Volume2, VolumeX, TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
+import { Play, TriangleAlert } from 'lucide-react'
 import { useReveal } from './landingHooks'
+import { RouteMotif } from './shared'
 
 /**
  * Real footage is too large to push through GitHub, so the commercial is
@@ -39,188 +40,150 @@ function extractYouTubeId(input) {
 
 const DEMO_VIDEO_ID = extractYouTubeId(DEMO_VIDEO_INPUT)
 
-// Loads the YouTube IFrame API script once and resolves with `window.YT`,
-// sharing a single promise across every VideoSection instance/remount so
-// the script tag never gets injected twice.
-let youtubeApiPromise = null
-function loadYouTubeIframeApi() {
-  if (typeof window === 'undefined') return Promise.resolve(null)
-  if (window.YT && window.YT.Player) return Promise.resolve(window.YT)
-  if (youtubeApiPromise) return youtubeApiPromise
+const CHAPTERS = [
+  '0:05 Search a building',
+  '0:20 Get directions',
+  '0:45 Explore campus',
+]
 
-  youtubeApiPromise = new Promise((resolve) => {
-    const previousReady = window.onYouTubeIframeAPIReady
-    window.onYouTubeIframeAPIReady = () => {
-      if (typeof previousReady === 'function') previousReady()
-      resolve(window.YT)
-    }
-    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-      const tag = document.createElement('script')
-      tag.src = 'https://www.youtube.com/iframe_api'
-      document.head.appendChild(tag)
-    }
-  })
-  return youtubeApiPromise
-}
-
-/* ─── Video section ─── */
+/* ─── Video section ───
+ * Light-theme rebuild (Slice 9) — replaces the old always-loaded YouTube
+ * IFrame API + IntersectionObserver play/pause/rewind/mute-toggle setup
+ * with a plain facade: a static poster (YouTube's own thumbnail CDN, no
+ * extra fetch/SDK needed for it) with a play button on top. Nothing
+ * YouTube-related loads until the button is clicked, at which point a
+ * plain <iframe> (not the JS API) is mounted with autoplay=1 — safe
+ * because the click itself is the user gesture browsers require for
+ * unmuted autoplay. This removes the entire observer/mute-toggle logic;
+ * there's nothing left to observe or mute.
+ */
 function VideoSection() {
   const { ref, visible } = useReveal()
-  const mountRef = useRef(null)
-  const playerRef = useRef(null)
-  const inViewRef = useRef(false)
-  const [playerReady, setPlayerReady] = useState(false)
-  const [muted, setMuted] = useState(true)
-  const [loadError, setLoadError] = useState(null)
+  const [playing, setPlaying] = useState(false)
+  const [posterFallback, setPosterFallback] = useState(false)
 
-  // Create the YT player once, muted by default — browsers block unmuted
-  // autoplay without a prior user gesture, so this is what makes the
-  // "plays automatically on scroll" behavior actually work everywhere.
-  useEffect(() => {
-    if (!DEMO_VIDEO_ID) {
-      setLoadError(`Couldn't read a video ID from DEMO_VIDEO_INPUT ("${DEMO_VIDEO_INPUT}") — paste a full YouTube URL or the bare 11-character ID.`)
-      return
-    }
-    let cancelled = false
-    loadYouTubeIframeApi().then((YT) => {
-      if (cancelled || !YT || !mountRef.current) return
-      playerRef.current = new YT.Player(mountRef.current, {
-        videoId: DEMO_VIDEO_ID,
-        playerVars: {
-          autoplay: 0,
-          mute: 1,
-          controls: 1,
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-        },
-        events: {
-          onReady: () => {
-            setPlayerReady(true)
-            if (inViewRef.current) playerRef.current.playVideo()
-          },
-          // Fires for invalid IDs, private/removed videos, or videos with
-          // embedding disabled — the exact "pasted the wrong thing" cases
-          // that otherwise fail silently.
-          onError: (e) => {
-            const messages = {
-              2: 'Invalid video ID.',
-              5: 'This video can\u2019t be played in the HTML5 player.',
-              100: 'Video not found (removed or private).',
-              101: 'The video owner has disabled embedding.',
-              150: 'The video owner has disabled embedding.',
-            }
-            setLoadError(messages[e.data] || `YouTube playback error (code ${e.data}).`)
-          },
-        },
-      })
-    })
-    return () => {
-      cancelled = true
-      playerRef.current?.destroy?.()
-    }
-  }, [])
-
-  // Play once the section is meaningfully in view; pause AND rewind to 0
-  // once it scrolls out, so scrolling back in always replays from the start
-  // rather than resuming mid-clip.
-  useEffect(() => {
-    const section = document.getElementById('video')
-    if (!section) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        inViewRef.current = entry.isIntersecting
-        const player = playerRef.current
-        if (!player || !playerReady) return
-        if (entry.isIntersecting) {
-          player.playVideo()
-        } else {
-          player.pauseVideo()
-          player.seekTo(0)
-        }
-      },
-      { threshold: 0.5 }
-    )
-    observer.observe(section)
-    return () => observer.disconnect()
-  }, [playerReady])
-
-  const toggleMute = () => {
-    const player = playerRef.current
-    if (!player) return
-    if (muted) {
-      player.unMute()
-      setMuted(false)
-    } else {
-      player.mute()
-      setMuted(true)
-    }
-  }
+  const posterSrc = DEMO_VIDEO_ID
+    ? `https://img.youtube.com/vi/${DEMO_VIDEO_ID}/${posterFallback ? 'hqdefault' : 'maxresdefault'}.jpg`
+    : null
 
   return (
-    <section id="video" style={{ padding: '120px 24px', background: 'var(--bg-darkest)', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, rgba(73,0,128,0.1) 0%, transparent 70%)', pointerEvents: 'none' }} />
+    <section id="video" style={{ padding: '120px 24px', background: 'var(--land-bg)' }}>
       <div ref={ref} style={{ maxWidth: 900, margin: '0 auto', textAlign: 'center' }}>
-        <div className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Montserrat', fontSize: 12, fontWeight: 700, letterSpacing: 4, color: 'var(--teal)', textTransform: 'uppercase', marginBottom: 12 }}>Demo</div>
-        <h2 className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 'clamp(30px,4vw,52px)', fontWeight: 800, marginBottom: 16, transitionDelay: '0.1s' }}>
-          Watch Maps By FUTA<br /><span className="text-gradient-purple">in Action.</span>
+        <div
+          className={`reveal ${visible ? 'visible' : ''}`}
+          style={{
+            fontFamily: 'Montserrat, sans-serif', fontSize: 12, fontWeight: 700,
+            letterSpacing: 3, color: 'var(--land-accent)', textTransform: 'uppercase',
+            marginBottom: 12,
+          }}
+        >
+          The story
+        </div>
+        <h2
+          className={`reveal ${visible ? 'visible' : ''}`}
+          style={{
+            fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800,
+            fontSize: 'clamp(28px,3.5vw,44px)', color: 'var(--land-text-primary)',
+            margin: 0, marginBottom: 16, transitionDelay: '0.1s',
+          }}
+        >
+          See it in action.
         </h2>
-        <p className={`reveal ${visible ? 'visible' : ''}`} style={{ fontFamily: 'Poppins', fontSize: 17, color: 'var(--muted)', marginBottom: 48, transitionDelay: '0.2s' }}>
-          See how Maps By FUTA transforms the way students navigate campus.
+        <p
+          className={`reveal ${visible ? 'visible' : ''}`}
+          style={{
+            fontFamily: 'Poppins, sans-serif', fontSize: 15, lineHeight: 1.6,
+            color: 'var(--land-text-secondary)', marginBottom: 48, transitionDelay: '0.2s',
+          }}
+        >
+          A 60-second look at searching, directions, and campus exploration.
         </p>
 
         <div className={`reveal-scale ${visible ? 'visible' : ''}`} style={{ transitionDelay: '0.25s' }}>
-          <div style={{
-            background: 'rgba(19,27,46,0.85)', backdropFilter: 'blur(20px)',
-            border: '1px solid var(--border)', borderRadius: 28,
-            padding: 8, overflow: 'hidden',
-            boxShadow: '0 30px 80px rgba(0,0,0,0.5)',
-          }}>
-            <div style={{
-              background: '#000', borderRadius: 22, position: 'relative', overflow: 'hidden',
-              // 16:9 responsive box — swap the aspect ratio here if the final
-              // commercial ships in a different frame.
+          <div
+            style={{
+              position: 'relative', overflow: 'hidden',
+              background: 'var(--land-surface)', border: '1px solid var(--land-border)',
+              borderRadius: 'var(--land-radius-card)',
               aspectRatio: '16 / 9',
-            }}>
-              {/* The YT.Player call above replaces this div with the actual iframe */}
-              <div ref={mountRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+              boxShadow: '0 20px 50px rgba(20,10,40,0.08)',
+            }}
+          >
+            {/* Same route motif as Hero, low-opacity, for visual continuity between sections */}
+            <RouteMotif
+              opacity={0.08}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0 }}
+            />
 
-              {loadError && (
-                <div style={{
-                  position: 'absolute', inset: 0, zIndex: 3, display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 10, padding: '0 32px', textAlign: 'center',
-                  background: 'rgba(11,19,38,0.95)',
-                }}>
-                  <TriangleAlert size={28} strokeWidth={2} color="#ffb95f" />
-                  <div style={{ fontFamily: 'Inter', fontSize: 13, color: 'var(--muted)', maxWidth: 420, lineHeight: 1.6 }}>
-                    {loadError}
-                  </div>
+            {!DEMO_VIDEO_ID && (
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 2, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 10, padding: '0 32px', textAlign: 'center',
+              }}>
+                <TriangleAlert size={28} strokeWidth={2} color="#c77b1f" />
+                <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', maxWidth: 420, lineHeight: 1.6 }}>
+                  Couldn't read a video ID from DEMO_VIDEO_INPUT ("{DEMO_VIDEO_INPUT}") — paste a full YouTube URL or the bare 11-character ID.
                 </div>
-              )}
+              </div>
+            )}
 
-              {!loadError && (
-                <button
-                  onClick={toggleMute}
-                  aria-label={muted ? 'Unmute video' : 'Mute video'}
+            {DEMO_VIDEO_ID && !playing && (
+              <button
+                onClick={() => setPlaying(true)}
+                aria-label="Play video"
+                style={{
+                  position: 'absolute', inset: 0, zIndex: 1, width: '100%', height: '100%',
+                  border: 'none', padding: 0, cursor: 'pointer', background: 'none',
+                }}
+              >
+                <img
+                  src={posterSrc}
+                  onError={() => setPosterFallback(true)}
+                  alt="Maps By FUTA demo video preview"
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(10,6,20,0.18)' }} />
+                <span
+                  className="play-pulse pill-btn"
                   style={{
-                    position: 'absolute', bottom: 14, right: 14, zIndex: 2,
-                    width: 40, height: 40, borderRadius: '50%',
-                    background: 'rgba(11,19,38,0.75)', backdropFilter: 'blur(8px)',
-                    border: '1px solid var(--border)',
+                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+                    width: 68, height: 68, borderRadius: '50%',
+                    background: 'var(--land-accent)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', color: 'var(--text)', transition: 'transform 0.2s',
+                    boxShadow: '0 8px 24px rgba(20,10,40,0.28)',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.08)')}
-                  onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
                 >
-                  {muted ? <VolumeX size={18} strokeWidth={2} /> : <Volume2 size={18} strokeWidth={2} />}
-                </button>
-              )}
-            </div>
+                  <Play size={26} strokeWidth={2} fill="#fff" color="#fff" style={{ marginLeft: 3 }} />
+                </span>
+              </button>
+            )}
+
+            {DEMO_VIDEO_ID && playing && (
+              <iframe
+                src={`https://www.youtube.com/embed/${DEMO_VIDEO_ID}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
+                title="Maps By FUTA demo video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none', zIndex: 1 }}
+              />
+            )}
           </div>
-          <p style={{ fontFamily: 'Poppins', fontSize: 12, color: 'var(--muted)', marginTop: 14 }}>
-            Plays automatically as you scroll into view · muted by default, tap the speaker to unmute
-          </p>
+
+          {/* Static chapter labels — not real scrubbing controls, just a preview of what's covered */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 18 }}>
+            {CHAPTERS.map((label) => (
+              <span
+                key={label}
+                style={{
+                  fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-secondary)',
+                  background: 'var(--land-surface-alt)', border: '1px solid var(--land-border)',
+                  borderRadius: 'var(--land-radius-pill)', padding: '6px 14px',
+                }}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </section>

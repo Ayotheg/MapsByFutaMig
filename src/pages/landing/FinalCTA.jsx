@@ -4,9 +4,26 @@ import { useReveal } from './landingHooks'
 
 /* ─── Final CTA ───
  * Light-theme rebuild (Slice 7). This is the one deliberate exception
- * to "light background throughout" — a solid violet, full-bleed
- * rounded card, per the redesign plan (both reference sites close on
- * one saturated color slab). Everything else on the page stays light.
+ * to "light background throughout" — a solid violet card, per the
+ * redesign plan (both reference sites close on one saturated color
+ * slab). Everything else on the page stays light.
+ *
+ * Slice 12: top shape reworked from a uniform pill radius to an
+ * inward-dipping valley — the purple card is a flat, full-bleed
+ * rectangle (100vw, no maxWidth/side padding, no border-radius); a
+ * `--land-bg`-colored ellipse overlaid on top (spanning the card's
+ * own width exactly, no overshoot) carves a smooth U-shaped dip into
+ * the top-center, flush with the viewport edges at both ends and
+ * deepest in the middle — the mirror of a normal outward dome. Card
+ * padding increased (esp. top) so the "Ready?" label sits with clear
+ * breathing room below the dip rather than crowding it. Dot-grid
+ * texture kept as-is.
+ *
+ * The outer `<section>` used to carry a 120px bottom padding with no
+ * background of its own — that strip exposed the raw `body` color
+ * (`--surface: #0b1326`, the app's dark map theme) as a dark band
+ * between the card and FAQ. Removed entirely: the card is the whole
+ * section now, flush against FAQ below with zero gap.
  *
  * Copy tightened rather than kept verbatim: the old "Ready to Explore
  * FUTA Like Never Before? / Search. Navigate. Discover." was a second
@@ -18,23 +35,23 @@ function FinalCTA() {
   const { ref, visible } = useReveal(0.2)
 
   return (
-    <section style={{ padding: '0 24px 120px' }}>
-      <div
-        ref={ref}
-        style={{
-          maxWidth: 1120, margin: '0 auto', position: 'relative', overflow: 'hidden',
-          background: 'var(--land-accent)', borderRadius: 32,
-          padding: '96px 32px', textAlign: 'center',
-        }}
-      >
-        {/* Flat dot-grid texture — repeated dots, no gradient/glow */}
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none',
-          backgroundImage: 'radial-gradient(rgba(255,255,255,0.16) 1.5px, transparent 1.5px)',
-          backgroundSize: '20px 20px',
-        }} />
+    <section style={{ padding: 0 }}>
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={ref}
+          style={{
+            position: 'relative', overflow: 'hidden',
+            background: 'var(--land-accent)', borderRadius: 0,
+            padding: '180px 32px 120px', textAlign: 'center',
+          }}
+        >
+          {/* Flat dot-grid texture — repeated dots, no gradient/glow */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            backgroundImage: 'radial-gradient(rgba(255,255,255,0.16) 1.5px, transparent 1.5px)',
+            backgroundSize: '20px 20px',
+          }} />
 
-        <div style={{ position: 'relative', zIndex: 1 }}>
           <div
             className={`reveal ${visible ? 'visible' : ''}`}
             style={{
@@ -93,6 +110,19 @@ function FinalCTA() {
             475+ locations mapped · free · no download
           </p>
         </div>
+
+        {/* Inward valley notch — page-bg ellipse spans exactly the card's
+            own (now full-bleed, 100vw) width, no overshoot, so the curve
+            tapers to zero depth precisely at the viewport's left/right
+            edges and dips deepest in the middle. Sits above the card
+            (later in DOM = higher paint order), unaffected by the card's
+            own overflow:hidden. Depth increased from the container-width
+            version so it stays visually proportionate now that it spans
+            the full viewport instead of a 1120px column. */}
+        <div style={{
+          position: 'absolute', top: -140, left: 0, right: 0, height: 280,
+          background: 'var(--land-bg)', borderRadius: '50%', pointerEvents: 'none',
+        }} />
       </div>
     </section>
   )

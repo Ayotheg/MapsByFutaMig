@@ -174,9 +174,11 @@ not just the files that slice touched. Concretely:
 | 6 — FAQ | Done |
 | 7 — FinalCTA | Done |
 | 8 — ProductFeatures | Done |
-| 9 — VideoSection | Not started |
-| 10 — Hero | Not started |
-| 11 — Integration & QA | Not started |
+| 9 — VideoSection | Done |
+| 10 — Hero | Done |
+| 11 — Integration & QA | Done |
+| 12 — Legal pages relight + FinalCTA corner shape | Done |
+| 13 — Nav mobile-toggle desktop leak + Footer WhatsApp link | Done |
 
 ### Repo structure you're working in
 ```
@@ -563,3 +565,210 @@ the locked-in copy exactly, character for character.
 **Acceptance check:** build has zero unused-import/unused-CSS warnings
 introduced by this redesign; manual click-through of every nav link,
 both CTAs, and the video play button works end-to-end.
+
+### Slice 11 findings (this pass)
+
+Everything below was checked against the actual final component set,
+not just the plan's claims:
+
+1. **Section order** — `LandingPage.jsx` already matched the Slice 1
+   spec exactly (Nav → Hero → TrustBar → ProductFeatures → VideoSection
+   → ExploreSection → FinalCTA → FAQ → Footer). No change needed.
+2. **Slice 1 wasn't fully done despite being marked "Done."** The six
+   files it called for deleting (`DiscoverSection.jsx`,
+   `RoadmapSection.jsx`, `StatsSection.jsx`, `WhySection.jsx`,
+   `SupportSection.jsx`, `CrowdrCampaignCard.jsx`) were unimported (so
+   harmless to the build) but still physically present in
+   `src/pages/landing/`. Deleted now.
+3. **`landing.css` orphaned-class cleanup** — grepped every class and
+   `@keyframes` in the file against the nine surviving components.
+   Removed: `.glass`/`.glass-card`/`.glass-purple`, `.glow-purple`/
+   `-teal`/`-orange`, `.text-gradient-*`, `.btn-primary`,
+   `.btn-secondary`, `.shimmer-bg`, `.nav-link`, `.category-card`,
+   `.feature-card-hover`, `.roadmap-card`, `.gradient-border`,
+   `.animated-gradient`, `.pin-pulse`, and the now-unused `@keyframes
+   float/floatCard/pulseGlow/drawRoute/blink/particle/shimmer/spinSlow/
+   fadeUp/scaleIn/gradientShift/pinPulse`. Kept everything still
+   referenced: `.reveal`, `.reveal-scale`, `.hero-fade`, `.pill-btn`,
+   `.play-pulse` (+ its keyframe), `.animate-ticker` (+ its keyframe),
+   `.explore-tile`/`.explore-tile-more`, `.feature-tile`.
+4. **Reduced-motion gap found and fixed** — `.animate-ticker`
+   (TrustBar's infinite marquee) was the one looping animation with no
+   `prefers-reduced-motion` fallback; every other animation had one.
+   Added it to the existing media query.
+5. **Progressive-enhancement gap found and fixed** — `.hero-fade`,
+   `.reveal`, and `.reveal-scale` all default to `opacity: 0` and only
+   reach their visible state via a JS-driven `IntersectionObserver`.
+   With scripting fully disabled (not just reduced-motion — genuine
+   no-JS), nothing ever adds `.visible` and the whole page stays blank,
+   which directly contradicts Slice 10's own acceptance check
+   ("legible with JS animations disabled"). Added a `<noscript>` style
+   override in `LandingPage.jsx` forcing the end state when JS is off.
+6. **Route-motif bug found and fixed** — `useDrawRoute` (used by
+   `RouteMotif` in Hero and VideoSection) was overwriting the path's
+   `strokeDasharray` to a single value equal to the path's total
+   length before animating `strokeDashoffset`. That's correct for
+   animating a *solid* line drawing itself in, but `RouteMotif`'s path
+   is meant to stay a dotted line (`strokeDasharray="2 10"` set in
+   `shared.jsx`) — the override replaced that pattern with one giant
+   dash, so once the draw-in animation finished the "dotted route" cue
+   the plan calls out as the page's one explicit map motif was
+   rendering as a near-solid line instead. Fixed by leaving
+   `strokeDasharray` alone and only animating `strokeDashoffset`, which
+   slides the existing dot pattern into place without changing it.
+7. **Nav anchors verified** — `#features`, `#video`, `#explore`,
+   `#faq` (Nav's scroll targets) and `#about` (Hero, though nothing
+   currently scrolls to it) all exist on real sections. Hero's "See how
+   it works" button correctly targets `#video`.
+8. **PWA / dark-tool boundary verified untouched** —
+   `public/site.webmanifest`'s `start_url` is still `/map?source=pwa`;
+   no `--land-*` token or landing-page class leaked into
+   `BRAND_GUIDELINES.md`, `src/styles/tokens.css`, or
+   `src/pages/MapPage.jsx`.
+9. **Stale doc comment fixed** — `Footer.jsx`'s file-header comment
+   still claimed the legal links pointed at `"#"` pending a routing
+   fix, but that fix (adding `/privacy`, `/terms`, `/cookies` to
+   `App.jsx`) was already done as the "bonus" item in the status table
+   above — the code was correct, only the comment was stale. Updated
+   it to match. Same treatment for `landing.css`'s file-header comment,
+   which flagged the map tool's `overflow:hidden; position:fixed` body
+   rule as an unresolved blocker for landing-page scrolling; that was
+   also already resolved (via a `.map-viewport` class App.jsx toggles
+   only while `/map` is mounted) but the comment hadn't been updated to
+   say so.
+10. **Out of scope, flagged but not touched:** `src/App.tsx` and
+    `src/main.tsx` are leftover pre-migration files (the app actually
+    boots from `main.jsx` → `App.jsx`, confirmed via `index.html`'s
+    `<script>` tag). They're dead code sitting in the repo root of
+    `src/`, not under `src/pages/landing/`, so deleting them falls
+    outside this plan's explicit scope (marketing landing page only) —
+    worth a follow-up cleanup task, but not done here to avoid
+    overreaching this slice's remit.
+
+**Not independently verified in this pass:** an actual `npm run build`
+— no network access in this environment to install dependencies, and
+`node_modules/` wasn't part of the delivered zip. Recommend running
+`npm install && npm run build` locally before shipping to confirm zero
+unused-import/CSS warnings, per the acceptance check above.
+
+---
+
+## Slice 12 — Legal pages relight + FinalCTA corner shape
+
+**Depends on:** Slice 11.
+
+Three fixes, found during a post-Slice-11 review:
+
+1. **Legal pages never got the light redesign.** `LegalPageLayout.jsx`
+   and `legal.css` (shared by `/privacy-policy`, `/terms-of-service`,
+   `/cookie-policy`) still referenced the pre-redesign dark-navy tokens
+   (`--bg-darkest`, `--muted`, `--text`, `--text-variant`,
+   `--purple-light`) instead of the `--land-*` tokens the rest of the
+   site moved onto. Fixed by swapping every reference 1:1 onto the
+   matching `--land-*` token (background, link/muted text, headings,
+   body copy, `<h2>`/`<strong>`/`<a>` in `legal.css`). Content in the
+   three page files themselves was untouched — this was a shell/token
+   fix only, no copy changes.
+2. **FinalCTA top shape and width.** Was a uniform 32px pill radius on
+   all four corners, capped at `maxWidth: 1120` like every other
+   section. Iterated through an outward-dome, then a container-width
+   inward-valley version, before landing on the final shape: the
+   purple card is a flat, **full-bleed** rectangle — no `maxWidth`, no
+   side padding on the wrapping `<section>`, so it spans the true
+   viewport edge to edge (confirmed against a reference comp the user
+   supplied) rather than sitting inset with page background visible on
+   either side. A `var(--land-bg)`-colored ellipse is overlaid on top,
+   spanning the card's own width exactly (`left: 0, right: 0`, no
+   overshoot past its edges) with `height: 280px` / `top: -140px` —
+   depth increased from the earlier container-width version (100px) to
+   140px so the curve stays visually proportionate now that it spans
+   the full viewport instead of a 1120px column. Card's own padding
+   increased to `180px 32px 120px` (was `96px 32px`) so the "Ready?"
+   label sits with clear breathing room below the dip instead of
+   crowding it. Dot-grid texture overlay was kept throughout every
+   pass. Bottom sits flush against the FAQ section below (see item 4 —
+   the true zero-gap fix landed one pass later than this one).
+3. **Legal page links didn't reset scroll position.** Clicking a legal
+   link (e.g. the footer's "Privacy Policy") from partway down the
+   landing page landed on the new route still scrolled to that same
+   position, forcing a manual scroll back up — React Router doesn't
+   reset scroll on navigation by default. Fixed with a `ScrollToTop`
+   component (`src/App.jsx`) mounted once inside `BrowserRouter`,
+   above `<Routes>`, that calls `window.scrollTo(0, 0)` on every
+   `pathname` change via `useLocation`. Applies to all routes, not
+   just the legal pages.
+4. **Root cause of the recurring "dark strip"/"stubborn blue" reports.**
+   The outer `<section>` wrapping FinalCTA carried a 120px bottom
+   padding with no `background` of its own — every other landing
+   section (Hero, TrustBar, ProductFeatures, VideoSection, ExploreSection,
+   FAQ, Footer) sets its background on the `<section>`/`<footer>` tag
+   itself, covering its full padding box, but this one didn't, so that
+   120px strip exposed the raw `body` background (`--surface:
+   #0b1326`, tokens.css — the app's dark in-app-map theme) as a dark
+   band between the purple card and FAQ. This was the actual source of
+   what had been reported a few different ways across earlier passes.
+   Fixed by removing the outer section's padding entirely (`padding:
+   0`) — the purple card now *is* the whole section, flush against FAQ
+   with zero gap and nothing left for the dark body color to show
+   through. Audited every other landing section for the same
+   unbacked-padding pattern while in there; none had it (Nav's own
+   transparent background is intentional — it's a floating pill nav
+   meant to show the Hero through it, not a bug).
+
+**Acceptance check:** `npm run build` (or `build:client-only`) succeeds
+with zero errors; all three legal pages visually match the Nav/FAQ
+light theme (white surface, hairline border, violet accent, Bricolage
+Grotesque headline); FinalCTA renders full-bleed edge to edge (no page
+background visible on either side, no dark strip below it either) with
+one continuous inward valley across the whole top, sitting flush
+against FAQ with zero gap, dot-grid texture intact, and clear spacing
+between the dip and the "Ready?" label; navigating to any route (legal
+pages in particular) always lands scrolled to the top regardless of
+scroll position on the previous page.
+
+Verified in this pass: `npm install && npx vite build` runs clean.
+
+---
+
+## Slice 13 — Nav mobile-toggle desktop leak + Footer WhatsApp link
+
+**Depends on:** Slice 12.
+
+Two small fixes:
+
+1. **Hamburger menu icon was showing on desktop.** `Nav.jsx`'s mobile
+   toggle `<button>` had `className="md:hidden"` (correct — Tailwind
+   hides it at the `md` breakpoint and above) but also carried an
+   inline `style={{ ..., display: 'flex' }}`. Inline styles always
+   beat stylesheet classes regardless of specificity, so that
+   `display: flex` silently defeated `md:hidden` on every screen size,
+   including desktop. Fixed by moving `flex items-center` into the
+   `className` (alongside `md:hidden`, same pattern already used
+   elsewhere in this file for the desktop-only links/CTA) and dropping
+   `display`/`alignItems` from the inline `style` object entirely.
+   Behavior now: hidden at `md` (768px) and up, visible as a flex icon
+   button below it — no visual change on mobile, and it now actually
+   disappears on desktop as intended.
+2. **Footer WhatsApp link — final layout.** First pass stacked "Contact
+   us" (email) and "WhatsApp us" as two separate text+icon rows, which
+   looked cramped/misaligned. Reworked into a single row: a "Contact
+   us" label followed by two same-size circular icon buttons (mail,
+   then `MessageCircle` for WhatsApp) in tinted violet circles
+   (`--land-accent-tint-bg`, same hover-darken treatment as the Crowdr
+   pill), `gap: 12` between all three. Email icon links to
+   `mailto:gearlifycorporation@gmail.com`; WhatsApp icon links to the
+   standard `wa.me` click-to-chat API (`https://wa.me/2348101734037` —
+   full international number, no `+` or leading zero) and opens in a
+   new tab like the other external footer links. No brand-logo asset
+   used (lucide-react has no WhatsApp glyph); a generic chat-bubble
+   icon stands in instead.
+
+**Acceptance check:** `npm run build` succeeds with zero errors; the
+hamburger icon in `Nav` is visually absent at desktop widths (≥768px)
+and still opens/closes the mobile menu below that width; the footer's
+"Get started" column shows one row — "Contact us" label, then a mail
+icon button, then a WhatsApp icon button, evenly spaced — with the
+WhatsApp button opening `https://wa.me/2348101734037` in a new tab and
+the mail button opening the mailto link.
+
+Verified in this pass: `npm install && npx vite build` runs clean.

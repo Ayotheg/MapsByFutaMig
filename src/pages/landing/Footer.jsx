@@ -1,18 +1,22 @@
 import { Link } from 'react-router-dom'
-import { Heart, ArrowRight, HeartHandshake, Mail, MapPin } from 'lucide-react'
+import { Heart, ArrowRight, HeartHandshake, Mail, MapPin, MessageCircle } from 'lucide-react'
 
 const CROWDR_DONATE_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
 const CONTACT_EMAIL = 'gearlifycorporation@gmail.com'
+// wa.me click-to-chat API — full international number, no "+" or leading zero.
+const WHATSAPP_NUMBER = '2348101734037'
 
 /* ─── Footer ───
  * Light-theme rebuild (Slice 3). Trimmed from the previous 3 link
  * columns (12 links total) + separate CTA column down to 2 short
- * columns, per the redesign plan. Real links preserved where they
- * exist (Crowdr donate URL, contact email, /map route); the legal
- * links below point at "#" because /privacy, /terms, /cookies aren't
- * wired into App.jsx's <Routes> yet even though the page components
- * (PrivacyPolicy.jsx etc.) exist — that's a routing fix outside this
- * slice's scope, flagging it rather than guessing a path silently.
+ * columns, per the redesign plan. Real links preserved throughout
+ * (Crowdr donate URL, contact email, /map route). The legal links
+ * below originally pointed at "#" because /privacy, /terms, /cookies
+ * weren't wired into App.jsx's <Routes> yet even though the page
+ * components (PrivacyPolicy.jsx etc.) existed — that routing gap was
+ * found and fixed as a bonus while doing this slice (see the plan's
+ * "Routing fix (legal pages)" entry), so they now point at the real
+ * routes below.
  */
 function Footer() {
   return (
@@ -76,17 +80,41 @@ function Footer() {
             >
               Open the map <ArrowRight size={14} strokeWidth={2} />
             </Link>
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              aria-label="Email us"
-              style={{
-                marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 6,
-                fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)',
-                textDecoration: 'none',
-              }}
-            >
-              <Mail size={14} strokeWidth={2} /> Contact us
-            </a>
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)' }}>
+                Contact us
+              </span>
+              <a
+                href={`mailto:${CONTACT_EMAIL}`}
+                aria-label="Email us"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 30, height: 30, borderRadius: '50%',
+                  background: 'var(--land-accent-tint-bg)', color: 'var(--land-accent)',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#e9d9ff' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--land-accent-tint-bg)' }}
+              >
+                <Mail size={14} strokeWidth={2} />
+              </a>
+              <a
+                href={`https://wa.me/${WHATSAPP_NUMBER}`}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Chat with us on WhatsApp"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 30, height: 30, borderRadius: '50%',
+                  background: 'var(--land-accent-tint-bg)', color: 'var(--land-accent)',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#e9d9ff' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--land-accent-tint-bg)' }}
+              >
+                <MessageCircle size={14} strokeWidth={2} />
+              </a>
+            </div>
           </div>
         </div>
 

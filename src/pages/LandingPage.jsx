@@ -21,6 +21,19 @@ function LandingPage() {
 
   return (
     <>
+      {/* Slice 11 QA fix: .hero-fade/.reveal/.reveal-scale (landing.css)
+          default to opacity:0 and only reach their visible end state via
+          a JS-driven IntersectionObserver (useReveal in landingHooks.js)
+          adding a .visible class. That's fine when JS runs, but with
+          scripting off entirely (not just prefers-reduced-motion — real
+          no-JS browsing) nothing ever adds .visible and every section
+          stays invisible forever, which is exactly what Slice 10's own
+          acceptance check called out as unacceptable. This forces the
+          end state when scripting is disabled, without touching the
+          normal JS-enabled animation path at all. */}
+      <noscript>
+        <style>{`.hero-fade, .reveal, .reveal-scale { opacity: 1 !important; transform: none !important; }`}</style>
+      </noscript>
       <Nav />
       <Hero />
       <TrustBar />

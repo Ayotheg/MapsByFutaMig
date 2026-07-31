@@ -1,250 +1,201 @@
-import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  MapPin, Send, Building2, CreditCard, Printer, BusFront,
-  Map, Search, Star, User, Satellite, Play,
-} from 'lucide-react'
-import { Pin } from './shared'
+import { MapPin, Map, Play } from 'lucide-react'
+import { useReveal } from './landingHooks'
+import { RouteMotif } from './shared'
 
-/* ─── Hero phone mockup ─── */
-function PhoneMockup() {
-  const routeRef = useRef(null)
-  useEffect(() => {
-    const el = routeRef.current
-    if (!el) return
-    const len = el.getTotalLength()
-    el.style.strokeDasharray = String(len)
-    el.style.strokeDashoffset = String(len)
-    el.style.transition = 'stroke-dashoffset 3s ease 0.5s'
-    setTimeout(() => { el.style.strokeDashoffset = '0' }, 100)
-  }, [])
-
+/**
+ * Floating preview card content. No real product screenshot is in the
+ * repo yet (src/assets/*.jpg are old promo/logo graphics, not app
+ * screenshots — see shared.jsx's note on why they were replaced). Per
+ * the redesign plan, ship a clearly-labeled placeholder instead of
+ * porting/faking one: swap the body of this component for a real
+ * `<img>` screenshot of /map once one is available — nothing else
+ * about the surrounding card needs to change.
+ */
+function MapPreviewPlaceholder() {
+  const dot = (color) => ({ width: 10, height: 10, borderRadius: '50%', background: color })
   const pins = [
-    { x: 90, y: 120, color: '#44e2cd', label: 'Library' },
-    { x: 170, y: 160, color: '#b76dff', label: 'ATM' },
-    { x: 130, y: 220, color: '#ffb95f', label: 'Hostel' },
-    { x: 200, y: 280, color: '#44e2cd', label: 'Cafeteria' },
-    { x: 80, y: 280, color: '#b76dff', label: 'Clinic' },
+    { top: '28%', left: '22%', color: 'var(--land-secondary-accent)' },
+    { top: '48%', left: '58%', color: 'var(--land-accent)' },
+    { top: '68%', left: '34%', color: 'var(--land-secondary-accent)' },
+    { top: '38%', left: '76%', color: 'var(--land-secondary-accent)' },
   ]
 
   return (
-    <div className="relative" style={{ width: 280, margin: '0 auto' }}>
-      {/* Ambient glow behind phone */}
-      <div style={{
-        position: 'absolute', inset: '-40px', borderRadius: '50%',
-        background: 'radial-gradient(ellipse, rgba(183,109,255,0.16) 0%, transparent 70%)',
-        filter: 'blur(20px)',
-      }} />
-
-      {/* Phone frame */}
-      <div className="animate-float" style={{
-        position: 'relative',
-        width: 260, height: 520, margin: '0 auto',
-        background: 'linear-gradient(160deg, #2d2d45 0%, #1a1a2e 100%)',
-        borderRadius: 44,
-        border: '3px solid rgba(183,109,255,0.3)',
-        boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 40px rgba(183,109,255,0.15), inset 0 1px 0 rgba(255,255,255,0.1)',
-        overflow: 'hidden',
-      }}>
-        {/* Notch */}
-        <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 80, height: 26, background: '#1a1a2e', borderRadius: '0 0 16px 16px', zIndex: 10 }} />
-
-        {/* Screen content */}
-        <div style={{ position: 'absolute', inset: 3, borderRadius: 42, overflow: 'hidden', background: '#e8f0e8' }}>
-          {/* Map background */}
-          <svg width="100%" height="100%" viewBox="0 0 254 514" style={{ position: 'absolute', inset: 0 }}>
-            <rect width="254" height="514" fill="#e8f0e8" />
-            {/* Roads */}
-            <line x1="0" y1="180" x2="254" y2="180" stroke="#d0dcd0" strokeWidth="8" />
-            <line x1="0" y1="320" x2="254" y2="320" stroke="#d0dcd0" strokeWidth="6" />
-            <line x1="80" y1="0" x2="80" y2="514" stroke="#d0dcd0" strokeWidth="6" />
-            <line x1="180" y1="0" x2="180" y2="514" stroke="#d0dcd0" strokeWidth="8" />
-            <line x1="130" y1="0" x2="130" y2="514" stroke="#d8e4d8" strokeWidth="4" />
-            {/* Campus blocks */}
-            <rect x="90" y="50" width="70" height="60" fill="#d4e8d4" rx="4" stroke="#c0d0c0" strokeWidth="1" />
-            <rect x="90" y="200" width="50" height="50" fill="#d4e8d4" rx="4" stroke="#c0d0c0" strokeWidth="1" />
-            <rect x="160" y="200" width="60" height="80" fill="#d4e8d4" rx="4" stroke="#c0d0c0" strokeWidth="1" />
-            <rect x="20" y="200" width="50" height="60" fill="#cce0cc" rx="4" stroke="#b8ccb8" strokeWidth="1" />
-            <rect x="20" y="340" width="80" height="60" fill="#d4e8d4" rx="4" stroke="#c0d0c0" strokeWidth="1" />
-            <rect x="140" y="340" width="90" height="80" fill="#d4e8d4" rx="4" stroke="#c0d0c0" strokeWidth="1" />
-            {/* Animated navigation route */}
-            <path
-              ref={routeRef}
-              d="M 90 120 C 110 120 130 140 130 180 S 160 240 200 280"
-              stroke="#b76dff"
-              strokeWidth="3"
-              fill="none"
-              strokeLinecap="round"
-              strokeDasharray="1000"
-              strokeDashoffset="1000"
-            />
-            {/* Direction arrows along route */}
-            <circle cx="130" cy="180" r="4" fill="#b76dff" opacity="0.8" />
-            <circle cx="160" cy="230" r="4" fill="#b76dff" opacity="0.6" />
-          </svg>
-
-          {/* Search bar */}
-          <div style={{
-            position: 'absolute', top: 36, left: 10, right: 10,
-            background: '#1e1e2e', borderRadius: 12, padding: '8px 14px',
-            display: 'flex', alignItems: 'center', gap: 8,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-          }}>
-            <MapPin size={12} strokeWidth={2} color="#dae2fd" />
-            <span style={{ fontFamily: 'Inter', fontSize: 11, color: '#888', flex: 1 }}>Search FUTA campus...</span>
-            <div style={{ background: '#44e2cd', borderRadius: 8, width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Send size={12} strokeWidth={2} color="#003731" /></div>
-          </div>
-
-          {/* Category chips */}
-          <div style={{ position: 'absolute', top: 82, left: 8, right: 8, display: 'flex', gap: 5, overflowX: 'hidden' }}>
-            {[[Building2, 'Halls'], [CreditCard, 'ATM'], [Printer, 'Print'], [BusFront, 'Bus']].map(([ChipIcon, label]) => (
-              <div key={label} style={{ background: 'rgba(30,30,46,0.9)', borderRadius: 8, padding: '4px 8px', fontSize: 9, fontFamily: 'Inter', color: '#dae2fd', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
-                <ChipIcon size={9} strokeWidth={2} /> {label}
-              </div>
-            ))}
-          </div>
-
-          {/* Location pins */}
-          {pins.map((p, i) => (
-            <div key={i} style={{ position: 'absolute', left: p.x - 5, top: p.y - 13 }}>
-              <Pin color={p.color} size={10} />
-            </div>
-          ))}
-
-          {/* Bottom nav */}
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            background: 'rgba(20,20,35,0.95)', padding: '10px 20px',
-            display: 'flex', justifyContent: 'space-around',
-            backdropFilter: 'blur(8px)',
-          }}>
-            {[Map, Search, Star, User].map((NavIcon, i) => (
-              <NavIcon key={i} size={18} strokeWidth={2} color="#dae2fd" style={{ opacity: i === 0 ? 1 : 0.5 }} />
-            ))}
-          </div>
+    <div
+      style={{
+        position: 'relative', maxWidth: 860, margin: '0 auto',
+        background: 'var(--land-surface)', border: '1px solid var(--land-border)',
+        borderRadius: '16px 16px 0 0', overflow: 'hidden',
+        boxShadow: '0 30px 70px rgba(20,10,40,0.10)',
+      }}
+    >
+      {/* Faux browser chrome */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', borderBottom: '1px solid var(--land-border)' }}>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <span style={dot('#ffb95f')} />
+          <span style={dot('#44c98a')} />
+          <span style={dot('#e2645a')} />
+        </div>
+        <div style={{
+          flex: 1, background: 'var(--land-surface-alt)', border: '1px solid var(--land-border)',
+          borderRadius: 999, padding: '6px 14px', textAlign: 'left',
+          fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-muted)',
+        }}>
+          mapsbyfuta.xyz/map
         </div>
       </div>
 
-      {/* Floating stat cards */}
-      <div className="animate-float-card" style={{
-        position: 'absolute', top: 60, right: -50,
-        background: 'rgba(34,42,61,0.9)', backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(68,226,205,0.3)', borderRadius: 14,
-        padding: '10px 14px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        animationDelay: '0.5s',
-      }}>
-        <div style={{ fontFamily: 'Inter', fontSize: 18, fontWeight: 700, color: '#44e2cd' }}>475+</div>
-        <div style={{ fontFamily: 'Poppins', fontSize: 10, color: 'var(--muted)' }}>Locations</div>
-      </div>
-      <div className="animate-float-card" style={{
-        position: 'absolute', top: 180, left: -55,
-        background: 'rgba(34,42,61,0.9)', backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(183,109,255,0.3)', borderRadius: 14,
-        padding: '10px 14px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        animationDelay: '1.5s',
-      }}>
-        <div style={{ marginBottom: 2 }}><Satellite size={16} strokeWidth={2} color="#ddb7ff" /></div>
-        <div style={{ fontFamily: 'Inter', fontSize: 11, fontWeight: 600, color: '#ddb7ff' }}>Live GPS</div>
-      </div>
-      <div className="animate-float-card" style={{
-        position: 'absolute', bottom: 120, right: -60,
-        background: 'rgba(34,42,61,0.9)', backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255,185,95,0.3)', borderRadius: 14,
-        padding: '10px 14px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-        animationDelay: '1s',
-      }}>
-        <div style={{ fontFamily: 'Inter', fontSize: 18, fontWeight: 700, color: '#ffb95f' }}>20+</div>
-        <div style={{ fontFamily: 'Poppins', fontSize: 10, color: 'var(--muted)' }}>Categories</div>
+      {/* Faux map body */}
+      <div style={{ position: 'relative', aspectRatio: '16 / 8', background: 'var(--land-surface-alt)' }}>
+        {/* Search bar */}
+        <div style={{
+          position: 'absolute', top: 16, left: 16, right: 16, maxWidth: 260,
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: 'var(--land-surface)', border: '1px solid var(--land-border)',
+          borderRadius: 10, padding: '8px 12px', boxShadow: '0 6px 16px rgba(20,10,40,0.06)',
+        }}>
+          <MapPin size={13} strokeWidth={2} color="var(--land-text-muted)" />
+          <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-muted)' }}>Search FUTA campus…</span>
+        </div>
+
+        {pins.map((p, i) => (
+          <span key={i} style={{ position: 'absolute', top: p.top, left: p.left, ...dot(p.color), boxShadow: '0 0 0 4px rgba(255,255,255,0.7)' }} />
+        ))}
+
+        <span style={{
+          position: 'absolute', bottom: 14, right: 16,
+          fontFamily: 'Poppins, sans-serif', fontSize: 11, color: 'var(--land-text-muted)',
+        }}>
+          Map preview
+        </span>
       </div>
     </div>
   )
 }
 
-/* ─── Hero section ─── */
+/* ─── Hero section ───
+ * Near-total rebuild (Slice 10). The old PhoneMockup component (fake
+ * phone frame, hand-drawn SVG map, glow orbs, particle dots — all dark
+ * theme) is gone entirely; replaced with the light-minimal spec: a
+ * single dotted-route decorative motif, centered copy, and a floating
+ * screenshot-style preview card bleeding out of the section's bottom
+ * edge. Headline copy is the locked-in copy from the plan's Global
+ * Context, verbatim — do not edit without checking there first.
+ */
 function Hero() {
+  const { ref, visible } = useReveal(0.1)
+  const fade = (ms) => ({ transitionDelay: `${ms}ms` })
+
   return (
-    <section id="about" style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center',
-      position: 'relative', overflow: 'hidden',
-      paddingTop: 80,
-      background: 'var(--surface)',
-    }}>
-      {/* Background orbs — one restrained accent, one quiet teal counterweight */}
-      <div style={{ position: 'absolute', top: '8%', left: '2%', width: 520, height: 520, borderRadius: '50%', background: 'radial-gradient(circle, rgba(73,0,128,0.16) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: '5%', right: '5%', width: 400, height: 400, borderRadius: '50%', background: 'radial-gradient(circle, rgba(68,226,205,0.08) 0%, transparent 70%)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+    <section
+      id="about"
+      style={{ position: 'relative', overflow: 'visible', background: 'var(--land-bg)', paddingTop: 150 }}
+    >
+      {/* Decorative route motif — the one explicit "yes, it's a map" cue.
+          Confined to its own overflow:hidden layer so it can't visually
+          collide with the preview card bleeding past the section below. */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
+        <RouteMotif
+          opacity={0.55}
+          style={{ position: 'absolute', top: '4%', left: '50%', width: 'min(1000px, 130%)', transform: 'translateX(-50%)' }}
+        />
+      </div>
 
-      {/* Particle dots — quiet, mixed brand colors, low count */}
-      {Array.from({ length: 10 }).map((_, i) => (
-        <div key={i} style={{
-          position: 'absolute',
-          left: `${(i * 47 + 10) % 95}%`,
-          top: `${(i * 37 + 5) % 90}%`,
-          width: i % 3 === 0 ? 3 : 2, height: i % 3 === 0 ? 3 : 2,
-          borderRadius: '50%',
-          background: i % 3 === 0 ? 'rgba(183,109,255,0.35)' : i % 3 === 1 ? 'rgba(68,226,205,0.3)' : 'rgba(255,185,95,0.3)',
-          animation: `particle ${3 + (i % 4)}s ease-in-out infinite`,
-          animationDelay: `${(i * 0.4) % 4}s`,
-          pointerEvents: 'none',
-        }} />
-      ))}
+      <div ref={ref} style={{ position: 'relative', zIndex: 1, maxWidth: 620, margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
+        {/* Badge */}
+        <div
+          className={`hero-fade ${visible ? 'visible' : ''}`}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7,
+            background: 'var(--land-accent-tint-bg)', border: '1px solid var(--land-accent-tint-border)',
+            borderRadius: 'var(--land-radius-pill)', padding: '7px 16px', marginBottom: 24,
+            ...fade(0),
+          }}
+        >
+          <MapPin size={13} strokeWidth={2.25} color="var(--land-accent)" />
+          <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, fontWeight: 500, color: 'var(--land-accent)' }}>
+            Built for FUTA
+          </span>
+        </div>
 
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 24px', width: '100%' }}>
-        <div className="flex flex-col lg:flex-row items-center gap-16">
-          {/* Left copy */}
-          <div style={{ flex: 1, maxWidth: 580 }}>
-            <div style={{
+        {/* Headline — locked copy, verbatim */}
+        <h1
+          className={`hero-fade ${visible ? 'visible' : ''}`}
+          style={{
+            fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800,
+            fontSize: 'clamp(30px, 5vw, 40px)', lineHeight: 1.16,
+            margin: '0 0 20px', color: 'var(--land-text-primary)',
+            ...fade(80),
+          }}
+        >
+          Know exactly where you're going{' '}
+          <span style={{ color: 'var(--land-accent)' }}>before you get there.</span>
+        </h1>
+
+        {/* Subhead — locked copy, verbatim */}
+        <p
+          className={`hero-fade ${visible ? 'visible' : ''}`}
+          style={{
+            fontFamily: 'Poppins, sans-serif', fontSize: 15, lineHeight: 1.7,
+            color: 'var(--land-text-secondary)', margin: '0 0 32px',
+            ...fade(160),
+          }}
+        >
+          Search any building, hostel, or campus service, see a recent photo before you arrive, and follow up-to-date campus directions designed specifically for FUTA — not outdated Google Maps data.
+        </p>
+
+        {/* CTA row */}
+        <div
+          className={`hero-fade ${visible ? 'visible' : ''}`}
+          style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginBottom: 20, ...fade(240) }}
+        >
+          <Link
+            to="/map"
+            className="pill-btn"
+            style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
-              background: 'rgba(183,109,255,0.12)', border: '1px solid rgba(183,109,255,0.3)',
-              borderRadius: 100, padding: '6px 16px', marginBottom: 24,
-            }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#44e2cd', boxShadow: '0 0 8px #44e2cd', display: 'inline-block', animation: 'blink 2s ease-in-out infinite' }} />
-              <span style={{ fontFamily: 'Inter', fontSize: 13, color: 'var(--muted)' }}>Now live at mapsbyfuta.xyz</span>
-            </div>
+              background: 'var(--land-accent)', color: '#fff', textDecoration: 'none',
+              fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: 15,
+              padding: '14px 30px', borderRadius: 'var(--land-radius-pill)',
+            }}
+          >
+            <Map size={17} strokeWidth={2} /> Open the Map
+          </Link>
+          <button
+            onClick={() => document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' })}
+            className="pill-btn"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: 'var(--land-surface)', color: 'var(--land-text-primary)',
+              fontFamily: 'Poppins, sans-serif', fontWeight: 500, fontSize: 15,
+              padding: '13px 28px', borderRadius: 'var(--land-radius-pill)',
+              border: '1px solid var(--land-border-strong)', cursor: 'pointer',
+            }}
+          >
+            <Play size={14} strokeWidth={2} fill="currentColor" /> See how it works
+          </button>
+        </div>
 
-            <h1 style={{
-              fontFamily: "'Bricolage Grotesque', sans-serif",
-              fontSize: 'clamp(40px, 6vw, 74px)',
-              fontWeight: 800,
-              lineHeight: 1.05,
-              marginBottom: 24,
-              letterSpacing: '-1px',
-            }}>
-              <span style={{ color: 'var(--text)' }}>Never Get Lost</span>
-              <br />
-              <span className="text-gradient-purple">on Campus Again.</span>
-            </h1>
+        {/* Trust line — locked copy, verbatim */}
+        <p
+          className={`hero-fade ${visible ? 'visible' : ''}`}
+          style={{
+            fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-muted)',
+            margin: 0, ...fade(320),
+          }}
+        >
+          475+ locations mapped · free · no download
+        </p>
+      </div>
 
-            <p style={{
-              fontFamily: 'Poppins', fontSize: 17, lineHeight: 1.75,
-              color: 'var(--muted)', marginBottom: 36, maxWidth: 500,
-            }}>
-              Navigate lecture halls, hostels, ATMs, restaurants, banks, classrooms, printing shops, clinics, bus stops, and hundreds of campus locations with live turn-by-turn navigation built exclusively for FUTA.
-            </p>
-
-            <div className="flex flex-wrap gap-4">
-              <Link to="/map" className="btn-primary">
-                <Map size={18} strokeWidth={2} /> Explore the Map
-              </Link>
-              <button onClick={() => document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' })} className="btn-secondary">
-                <Play size={16} strokeWidth={2} fill="currentColor" /> Watch Demo
-              </button>
-            </div>
-
-            {/* Mini stats row */}
-            <div className="flex flex-wrap gap-8" style={{ marginTop: 48 }}>
-              {[['475+', 'Campus Locations', 'var(--purple-light)'], ['20+', 'Categories', 'var(--teal)'], ['Live', 'GPS Navigation', 'var(--orange)']].map(([val, label, color]) => (
-                <div key={label}>
-                  <div style={{ fontFamily: "'Bricolage Grotesque'", fontSize: 24, fontWeight: 800, color, marginBottom: 4 }}>{val}</div>
-                  <div style={{ fontFamily: 'Poppins', fontSize: 12, color: 'var(--muted)' }}>{label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right phone mockup */}
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            <PhoneMockup />
-          </div>
+      {/* Floating preview card, bleeding out of the bottom of the section */}
+      <div
+        className={`hero-fade ${visible ? 'visible' : ''}`}
+        style={{ position: 'relative', zIndex: 1, marginTop: 64, padding: '0 24px', ...fade(400) }}
+      >
+        <div className="-mb-20 md:-mb-28">
+          <MapPreviewPlaceholder />
         </div>
       </div>
     </section>
