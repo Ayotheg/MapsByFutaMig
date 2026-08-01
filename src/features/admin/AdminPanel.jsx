@@ -7,6 +7,7 @@ import QuickChipsTab from './QuickChipsTab';
 import PendingTab from './PendingTab';
 import AdminEditModal from './AdminEditModal';
 import { useAdminKml } from './useAdminKml';
+import InsightsErrorBoundary from '../analytics/InsightsErrorBoundary';
 
 // Slice 14: the Insights tab is lazy-loaded per CLAUDE.md's bundle-size
 // policy — this is explicitly the heaviest tab (recharts + presence +
@@ -181,9 +182,11 @@ export default function AdminPanel({
           )}
           {activeTab === 'pending' && <PendingTab onRefreshWaypoints={onWaypointsChanged} />}
           {activeTab === 'insights' && (
-            <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: 'var(--muted)', fontSize: 11 }}>Loading insights…</div>}>
-              <InsightsTab />
-            </Suspense>
+            <InsightsErrorBoundary>
+              <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: 'var(--muted)', fontSize: 11 }}>Loading insights…</div>}>
+                <InsightsTab />
+              </Suspense>
+            </InsightsErrorBoundary>
           )}
         </div>
       </div>

@@ -3,31 +3,42 @@ import styles from './InsightsTab.module.css';
 import { supabase } from '../../lib/supabase';
 
 // ── Slice 14 — Live "who's online right now" ────────────────────────────
-// Subscribes to the same 'site-presence' channel usePresenceTracking.js
-// tracks every visitor onto — the admin's own browser is just another
-// client here. Renders channel.presenceState() as a live list: no
-// polling, no manual refresh button, presence pushes updates
-// automatically on 'sync'.
 //
-// First sub-tab (matches the stated build-plan priority) — active count
-// front and center as a big number, list below it.
+// BUGFIX (post-ship): this originally called
+// `supabase.channel('site-presence').on('presence', ...).subscribe()`
+// itself. That's broken — usePresenceTracking.js (mounted in MapPage.jsx,
+// running for every visitor including the admin) already owns a
+// subscribed channel with that exact name, and supabase-js caches
+// channels by name: `supabase.channel('site-presence')` here returned
+// THAT SAME already-subscribed channel object, not a fresh one. Calling
+// `.on('presence', ...)` on an already-subscribed channel throws
+// synchronously ("cannot add 'presence' callbacks... after
+// 'subscribe()'"), and with no error boundary anywhere in this app, that
+// uncaught error unmounted the entire page, not just this tab.
+//
+// Fixed by not subscribing here at all — `presenceState()` is a
+// synchronous read of the channel's already-current state and doesn't
+// need its own subscription, so this just looks up the existing channel
+// (via `supabase.getChannels()`, not `supabase.channel()` — the latter
+// would create/return the shared instance again and invite the same
+// mistake) and polls its state every 2s. Simpler than trying to hook a
+// second 'sync' listener onto a channel someone else already subscribed.
+const POLL_MS = 2000;
+
 export default function LiveTab() {
   const [presenceState, setPresenceState] = useState({});
 
   useEffect(() => {
-    const channel = supabase.channel('site-presence', {
-      config: { presence: { key: 'insights-viewer-' + Math.random().toString(36).slice(2) } },
-    });
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        setPresenceState(channel.presenceState());
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    function poll() {
+      const channel = supabase.getChannels().find((c) => c.topic === 'realtime:site-presence');
+      // Not found yet (e.g. usePresenceTracking's own subscribe hasn't
+      // resolved on first paint) — leave state as-is, next tick will
+      // pick it up once it exists.
+      if (channel) setPresenceState(channel.presenceState());
+    }
+    poll();
+    const id = setInterval(poll, POLL_MS);
+    return () => clearInterval(id);
   }, []);
 
   // Each presence key can have multiple entries (e.g. rapid re-tracks
