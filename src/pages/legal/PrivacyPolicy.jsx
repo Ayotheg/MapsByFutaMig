@@ -28,10 +28,19 @@ function PrivacyPolicy() {
       <p><strong>Reviews and ratings:</strong> any review, rating, or comment
         you submit on a place is stored and may be shown publicly on that
         place's listing.</p>
-      <p><strong>Usage analytics:</strong> we use privacy-respecting web
-        analytics to understand overall traffic and
-        which features are used, in aggregate — this doesn't identify you
-        individually.</p>
+      <p><strong>Usage analytics:</strong> we track how the Service is used so
+        we can see what's working and fix what isn't. For anonymous
+        visitors, this stays aggregate and non-identifying — a rotating
+        identifier stored in your browser lets us count you as one visitor
+        instead of many, without attaching a name or email to it. If you're
+        signed in, it's different: your activity in the app (which features
+        you use, what you search for, where you navigate) is associated
+        with your account rather than kept anonymous, the same way your
+        reviews already are. We also run a live "who's currently active"
+        view for admins — while you're signed in and using the Service,
+        an admin can see what you're doing right now (for example, that
+        you're searching or navigating to a place), in real time. This
+        stops the moment you close the tab or sign out.</p>
 
       <h2>2. How we use this information</h2>
       <ul>

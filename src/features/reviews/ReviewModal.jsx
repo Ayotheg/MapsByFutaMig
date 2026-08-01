@@ -4,6 +4,7 @@ import Modal from '../../components/ui/Modal';
 import modalStyles from '../../components/ui/Modal.module.css';
 import styles from './ReviewModal.module.css';
 import { submitReview } from './submitReview';
+import { track } from '../../lib/analytics';
 
 /**
  * Ported from legacy `initPoiReview()` (app.js ~6944–7066) + its markup
@@ -82,6 +83,8 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
       // Match legacy's console.error('Review submit failed:', err) for
       // whoever's debugging a failed submit live.
       console.error('Review submit failed:', err);
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+      track('error_occurred', { context: 'review_submit', message: err?.message || String(err) });
     }
   }
 

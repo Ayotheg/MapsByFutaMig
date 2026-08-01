@@ -37,6 +37,11 @@ export default defineConfig({
           if (!id.includes('node_modules')) return undefined;
           if (id.includes('leaflet')) return 'leaflet';
           if (id.includes('@supabase')) return 'supabase';
+          // Slice 14: recharts gets its own key, per CLAUDE.md's bundle-size
+          // policy — kept out of `vendor` so it doesn't bleed into the
+          // react/react-dom/react-router-dom group; only the lazy-loaded
+          // Insights tab pulls it in.
+          if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor')) return 'charts';
           if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('react-router-dom') || id.includes('scheduler')) return 'vendor';
           return undefined;
         },

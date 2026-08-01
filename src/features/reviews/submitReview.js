@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { track } from '../../lib/analytics';
 
 // ── Submit a review ──────────────────────────────────────────────────────
 // Ported from legacy's `reviewSubmitBtn` click handler (app.js ~7000–7062).
@@ -46,4 +47,8 @@ export async function submitReview({ waypointId, rating, comment, userId }) {
   });
 
   if (error) throw error;
+
+  // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — only fires
+  // after a confirmed successful insert, not on failed attempts.
+  track('review_submitted', { waypoint_id: waypointId, rating });
 }

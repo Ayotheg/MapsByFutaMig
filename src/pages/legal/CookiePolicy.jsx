@@ -19,10 +19,14 @@ function CookiePolicy() {
         you signed in, remember your session, and store lightweight
         preferences (like your last map view or view-mode toggle) so the
         Service works smoothly between visits.</p>
-      <p><strong>Analytics:</strong> We use analytics to understand
-        aggregate traffic to the Service. It's designed to avoid tracking
-        individuals across sites and doesn't set the kind of long-lived
-        cross-site advertising cookies you'd see from ad networks.</p>
+      <p><strong>Analytics:</strong> We store two small identifiers in your
+        browser to power this: one in local storage that persists across
+        visits (so repeat visits from the same browser count as one
+        visitor, not several), and one in session storage that's cleared
+        when you close the tab (used to group activity within a single
+        visit). Neither is a long-lived cross-site advertising cookie, and
+        neither is shared with ad networks or other sites — it's used
+        only within Maps By FUTA.</p>
 
       <h2>2. What we don't use</h2>
       <p>

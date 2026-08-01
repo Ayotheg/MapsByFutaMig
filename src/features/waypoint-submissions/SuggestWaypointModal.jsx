@@ -5,6 +5,7 @@ import modalStyles from '../../components/ui/Modal.module.css';
 import styles from './SuggestWaypointModal.module.css';
 import { WP_ALL_TYPES } from '../admin/adminTypeOptions';
 import { submitWaypoint, findNearbyApprovedWaypoint, isWithinCampusBounds } from '../waypoints/submitWaypoint';
+import { track } from '../../lib/analytics';
 
 const MAX_IMAGES = 5;
 
@@ -148,6 +149,8 @@ export default function SuggestWaypointModal({
       onClose();
     } catch (e) {
       setStatus({ text: e.message || 'Something went wrong. Try again.', error: true });
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+      track('error_occurred', { context: 'waypoint_suggest', message: e?.message || String(e) });
     } finally {
       setBusy(false);
     }

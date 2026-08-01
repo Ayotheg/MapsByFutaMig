@@ -6,6 +6,7 @@ import { WP_ALL_TYPES } from './adminTypeOptions';
 import { badgeStyleFor } from './adminBadgeColors';
 import { insertWaypoint } from './adminSave';
 import { getTypeIcon } from '../../lib/typeIcons';
+import { track } from '../../lib/analytics';
 
 /**
  * Legacy: `renderWaypointList` (app.js ~3743–3771) + the "Add Point" inline
@@ -64,6 +65,8 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
       setTimeout(() => setFormOpen(false), 1500);
     } catch (e) {
       setStatus({ text: `Error: ${e.message}`, error: true });
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+      track('error_occurred', { context: 'admin_insert_waypoint', message: e?.message || String(e) });
     } finally {
       setSaving(false);
     }

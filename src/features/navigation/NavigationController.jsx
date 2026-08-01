@@ -9,6 +9,7 @@ import NavDestPanel from './NavDestPanel';
 import NavHud from './NavHud';
 import NavArrivedBanner from './NavArrivedBanner';
 import './navMapLayers.css';
+import { track } from '../../lib/analytics';
 
 // Leaflet marker/popup content is raw HTML (not React), so the "arrived
 // destination" flag glyph below is a hand-built inline SVG matching
@@ -108,6 +109,9 @@ const NavigationController = forwardRef(function NavigationController(
   const navArrivalCountRef = useRef(0);
   const navGpsTicksRef = useRef(0);
   const navArrivedRef = useRef(false);
+  // Slice 14 instrumentation only — wall-clock start time for
+  // nav_completed's duration_ms, not used by any navigation logic.
+  const navStartTimeRef = useRef(null);
   const navGpsStaleTimerRef = useRef(null);
   const lastSpokenStepRef = useRef(-1);
   const spokenTurnNowRef = useRef(false);
@@ -334,6 +338,12 @@ const NavigationController = forwardRef(function NavigationController(
     }));
     speak(`You have arrived at your destination, ${dest.name}!`);
     setArrivedBannerDest(dest.name);
+    // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+    track('nav_completed', {
+      from: 'My Location',
+      to: dest.name,
+      duration_ms: navStartTimeRef.current ? Date.now() - navStartTimeRef.current : null,
+    });
     // Counts towards the guest free-navigation limit regardless of
     // destination type — see this file's header comment.
     onNavigationSuccess?.();
@@ -507,6 +517,8 @@ const NavigationController = forwardRef(function NavigationController(
       setGoDisabled(false);
       setGoLabel('Start Navigation');
       setHint(`Routing failed: ${e.message}. Check your connection.`);
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+      track('error_occurred', { context: 'nav_routing', message: e?.message || String(e) });
       return;
     }
     navRouteDataRef.current = routeData;
@@ -515,6 +527,11 @@ const NavigationController = forwardRef(function NavigationController(
     navActiveRef.current = true;
     setNavActive(true);
     onActiveChange?.(true);
+    navStartTimeRef.current = Date.now();
+    // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9). No named
+    // origin exists for a live GPS fix, so "from" is a fixed label
+    // rather than a guessed place name.
+    track('nav_started', { from: 'My Location', to: dest.name });
     navStepIndexRef.current = 0;
     navArrivalCountRef.current = 0;
     navGpsTicksRef.current = 0;
@@ -611,7 +628,16 @@ const NavigationController = forwardRef(function NavigationController(
 
   const handleHudClose = useCallback(() => {
     // eslint-disable-next-line no-alert
-    if (confirm('End navigation?')) stopNavigation();
+    if (confirm('End navigation?')) {
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — the HUD's
+      // close button only reaches here while navActive and not yet
+      // arrived (dismissArrivedBanner is the separate post-arrival close
+      // path), so this is genuinely "abandoned," not a mislabeled
+      // completion.
+      const dest = navDestRef.current;
+      track('nav_abandoned', { from: 'My Location', to: dest?.name });
+      stopNavigation();
+    }
   }, [stopNavigation]);
 
   // ── body.nav-panel-open — only reflects the *destination* panel being

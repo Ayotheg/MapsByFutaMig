@@ -17,6 +17,7 @@ import {
   updateSegment,
   deleteSegment,
 } from './adminSave';
+import { track } from '../../lib/analytics';
 
 const SEGMENT_CATEGORIES = ['footpath', 'road', 'shortcut', 'indoor', 'other'];
 
@@ -169,6 +170,8 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       }
     } catch (e) {
       setStatus({ text: e.message, error: true, icon: true });
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+      track('error_occurred', { context: `admin_update_${type}`, message: e?.message || String(e) });
     } finally {
       setBusy(false);
     }
@@ -215,6 +218,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       // matched by AdminPanel not rendering a footer delete button for it.
     } catch (e) {
       setStatus({ text: e.message, error: true, icon: true });
+      track('error_occurred', { context: `admin_delete_${type}`, message: e?.message || String(e) });
     } finally {
       setBusy(false);
     }

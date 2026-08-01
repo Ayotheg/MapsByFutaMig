@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import styles from './MobileSheet.module.css';
 import LayersPanel from './LayersPanel';
 import NavPanel from '../navigation/NavPanel';
+import { track } from '../../lib/analytics';
 
 const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
 
@@ -194,6 +195,9 @@ export default function MobileSheet({
         if (tab.key === 'suggest') {
           onSuggestPlaceClick?.();
         } else {
+          // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) —
+          // mirrors Sidebar.jsx's desktop admin-rail-click tracking.
+          track('feature_panel_open', { panel: 'admin' });
           onAdminClick?.();
         }
         return;
@@ -206,6 +210,7 @@ export default function MobileSheet({
       }
       setActiveTab(tab.key);
       if (sheetState === 'peek') setSheetState('half');
+      track('feature_panel_open', { panel: tab.key });
     },
     [activeTab, sheetState, setSheetState, setActiveTab, onAdminClick, onSuggestPlaceClick]
   );

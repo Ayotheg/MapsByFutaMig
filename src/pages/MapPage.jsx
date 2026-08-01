@@ -27,6 +27,8 @@ import { useGuestUsage } from '../features/auth/useGuestUsage';
 import { useAdminPin } from '../features/auth/useAdminPin';
 import { useSeo } from '../lib/useSeo';
 import SubmissionToast from '../features/waypoint-submissions/SubmissionToast';
+import { usePresenceTracking } from '../features/analytics/usePresenceTracking';
+import { setAnalyticsUser } from '../lib/analytics';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -172,6 +174,20 @@ export default function MapPage({ onReadinessChange }) {
   // for attribution, and later Slice 11's PIN gate).
   const auth = useAuth();
 
+  // ── Slice 14: analytics identity + live presence ────────────────────
+  // `setAnalyticsUser` keeps src/lib/analytics.js's track() calls carrying
+  // the right user_id without every call site threading it through.
+  // `usePresenceTracking` mounts the 'site-presence' Realtime channel
+  // once here (same "call once, thread down as needed" convention as
+  // useAuth/useGpsTracking above) — `updatePresence` is exposed to a
+  // handful of call sites below (search-open, nav-start, admin-panel-
+  // open, review-modal-open) so LiveTab.jsx's admin view shows something
+  // more useful than a bare path.
+  useEffect(() => {
+    setAnalyticsUser(auth.user?.id ?? null);
+  }, [auth.user]);
+  const presence = usePresenceTracking(auth.user);
+
   // ── Guest navigation limit ────────────────────────────────────────
   // New requirement: signed-out visitors get `guestUsage.limit` (3) free
   // successful navigations before "Start Navigation" is blocked in favor
@@ -255,7 +271,10 @@ export default function MapPage({ onReadinessChange }) {
   const adminPin = useAdminPin(auth.user, openAuthModal);
 
   function handleAdminClick() {
-    adminPin.requestAdminAccess(() => setAdminPanelOpen(true));
+    adminPin.requestAdminAccess(() => {
+      setAdminPanelOpen(true);
+      presence.updatePresence('in admin panel');
+    });
   }
 
   // ── Slice 13: student waypoint submissions ────────────────────────────
@@ -308,6 +327,7 @@ export default function MapPage({ onReadinessChange }) {
       navControllerRef.current?.requestLaunchToggle();
     } else {
       setNavOpen(true);
+      presence.updatePresence('navigating');
     }
   }
 
@@ -318,6 +338,7 @@ export default function MapPage({ onReadinessChange }) {
     }
     setNavSeedDest(entry);
     setNavOpen(true);
+    presence.updatePresence(`navigating to ${entry?.name || 'a destination'}`);
   }
 
   function handleMobNavTrigger() {
@@ -430,6 +451,7 @@ export default function MapPage({ onReadinessChange }) {
             onOpenSearch={() => {
               setMobileSearchOpen(true);
               setSheetState('peek');
+              presence.updatePresence('searching');
             }}
             onToggleSheet={() => setSheetState((s) => (s === 'peek' ? 'half' : 'peek'))}
             onNavigate={handleMobNavTrigger}
@@ -495,7 +517,10 @@ export default function MapPage({ onReadinessChange }) {
               setNavSeedDest(null);
             }}
             onActiveChange={setNavActive}
-            onArrival={setReviewTarget}
+            onArrival={(dest) => {
+              setReviewTarget(dest);
+              presence.updatePresence(`reviewing ${dest?.name || 'a place'}`);
+            }}
             guestNavBlocked={guestNavBlocked}
             onGuestBlocked={handleGuestNavBlocked}
             onNavigationSuccess={() => {

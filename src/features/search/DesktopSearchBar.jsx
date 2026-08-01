@@ -5,6 +5,7 @@ import { useSelectResult } from './useSelectResult';
 import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
 import SearchDropdownList from './SearchDropdownList';
 import styles from './DesktopSearchBar.module.css';
+import { track } from '../../lib/analytics';
 
 /**
  * Ported from legacy's `initDeskSearch` IIFE (app.js ~895–1131) — the
@@ -106,15 +107,23 @@ export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed
     if (!q) return;
     const local = searchIndex.resolve(q);
     if (local) {
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+      track('search_query', { query: q, result_count: 1 });
       handleSelect(local);
       return;
     }
     try {
       const raw = await fetchNominatim(q, { limit: 1 });
+      track('search_query', { query: q, result_count: raw.length });
       if (raw.length) handleSelect(raw[0]);
       else setOsmResults([]); // triggers the "Nothing found" empty state below
-    } catch {
+    } catch (e) {
       alert('Search failed — check your connection.');
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — only the
+      // full-search failure, not the live-suggestion catch above (that
+      // one's deliberately silent, matching legacy, and would fire on
+      // every debounce network hiccup rather than a meaningful error).
+      track('error_occurred', { context: 'search_query', message: e?.message || String(e) });
     }
   }
 

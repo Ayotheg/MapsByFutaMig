@@ -3,6 +3,7 @@ import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
 import NavPanel from '../navigation/NavPanel';
 import { displayName } from '../auth/useAuth';
+import { track } from '../../lib/analytics';
 
 // Slice 9: GPS Signal isn't open by default (only Layers is), so per
 // CLAUDE.md's bundle-size policy it's lazy-loaded like DetailModal/
@@ -93,6 +94,9 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
     }
     setActiveKey(item.key);
     onCollapsedChange(false);
+    // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — only fires
+    // when a panel actually opens, not on the collapse branches above.
+    track('feature_panel_open', { panel: item.key });
   }
 
   return (
@@ -207,7 +211,15 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
             </>
           )}
         </button>
-        <button type="button" className={styles.adminBtn} title="Admin Panel" onClick={onAdminClick}>
+        <button
+          type="button"
+          className={styles.adminBtn}
+          title="Admin Panel"
+          onClick={() => {
+            track('feature_panel_open', { panel: 'admin' });
+            onAdminClick();
+          }}
+        >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="8" r="4" />
             <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />

@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
 import L from 'leaflet';
+import { track } from '../../lib/analytics';
 
 // Raw Leaflet marker HTML can't hold a React icon — inline SVG matching
 // Lucide's own Search glyph, same approach as NavigationController's
@@ -25,6 +26,11 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
     (entry) => {
       if (!map || !entry.lat || !entry.lng) return;
       const ll = [parseFloat(entry.lat), parseFloat(entry.lng)];
+
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — this one
+      // hook is the shared call site for every result-click surface
+      // (desktop bar, mobile overlay), so this covers all of them.
+      track('search_result_selected', { query: entry.query || null, place_name: entry.name });
 
       if (markerRef.current) map.removeLayer(markerRef.current);
       markerRef.current = L.marker(ll, {

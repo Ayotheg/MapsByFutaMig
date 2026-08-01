@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import styles from './AdminPanel.module.css';
 import PointsTab from './PointsTab';
 import RoutesTab from './RoutesTab';
@@ -8,15 +8,25 @@ import PendingTab from './PendingTab';
 import AdminEditModal from './AdminEditModal';
 import { useAdminKml } from './useAdminKml';
 
+// Slice 14: the Insights tab is lazy-loaded per CLAUDE.md's bundle-size
+// policy — this is explicitly the heaviest tab (recharts + presence +
+// several queries), a textbook lazy-load candidate, unlike the other five
+// tabs here which are small enough to stay in AdminPanel's own chunk
+// (AdminPanel itself is already the lazy boundary MapPage.jsx uses for
+// all of admin).
+const InsightsTab = lazy(() => import('../analytics/InsightsTab'));
+
 // Slice 13: new "Pending" tab for reviewing student-submitted waypoints —
 // added as a 5th tab, appended at the end so it doesn't reorder/renumber
 // anything an admin's muscle memory already relies on for the other four.
+// Slice 14: "Insights" appended as a 6th tab, same precedent.
 const TABS = [
   { key: 'points', label: 'Points' },
   { key: 'routes', label: 'Routes' },
   { key: 'kml', label: 'KML Upload' },
   { key: 'chips', label: 'Chips' },
   { key: 'pending', label: 'Pending' },
+  { key: 'insights', label: 'Insights' },
 ];
 
 /**
@@ -170,6 +180,11 @@ export default function AdminPanel({
             />
           )}
           {activeTab === 'pending' && <PendingTab onRefreshWaypoints={onWaypointsChanged} />}
+          {activeTab === 'insights' && (
+            <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: 'var(--muted)', fontSize: 11 }}>Loading insights…</div>}>
+              <InsightsTab />
+            </Suspense>
+          )}
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import ownStyles from './PendingTab.module.css';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
 import { WP_TYPE_LABELS } from '../waypoints/wpTypeMeta';
 import { approveWaypoint, rejectWaypoint } from './adminSave';
+import { track } from '../../lib/analytics';
 
 /**
  * Slice 13 — new "Pending" tab in AdminPanel, alongside the existing
@@ -107,6 +108,8 @@ export default function PendingTab({ onRefreshWaypoints }) {
       afterMutation();
     } catch (e) {
       setError(e.message || 'Could not approve that submission.');
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+      track('error_occurred', { context: 'admin_approve', message: e?.message || String(e) });
     } finally {
       setBusyId(null);
     }
@@ -125,6 +128,7 @@ export default function PendingTab({ onRefreshWaypoints }) {
       afterMutation();
     } catch (e) {
       setError(e.message || 'Could not reject that submission.');
+      track('error_occurred', { context: 'admin_reject', message: e?.message || String(e) });
     } finally {
       setBusyId(null);
     }

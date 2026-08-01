@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { track } from '../../lib/analytics';
 
 // ── Admin panel — Supabase mutation helpers ─────────────────────────────
 //
@@ -85,6 +86,8 @@ export async function deleteImageRows(table, ids) {
 export async function updateWaypoint(id, { name, description, type }) {
   const { error } = await supabase.from('waypoints').update({ name, description, type }).eq('id', id);
   if (error) throw error;
+  // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+  track('admin_action', { action: 'update', entity: 'waypoint' });
 }
 
 // Legacy: `adminDeleteBtn`'s waypoint branch (app.js ~4283–4300). Only
@@ -98,6 +101,7 @@ export async function updateWaypoint(id, { name, description, type }) {
 export async function deleteWaypoint(id) {
   const { error } = await supabase.from('waypoints').delete().eq('id', id);
   if (error) throw error;
+  track('admin_action', { action: 'delete', entity: 'waypoint' });
 }
 
 // Legacy: `adminAddPointSave` (app.js ~3418–3459). `source_type:
@@ -118,6 +122,7 @@ export async function insertWaypoint({ name, description, type, lat, lng }) {
     .select('id')
     .single();
   if (error) throw error;
+  track('admin_action', { action: 'insert', entity: 'waypoint' });
   return data.id;
 }
 
@@ -131,6 +136,7 @@ export async function insertWaypoint({ name, description, type, lat, lng }) {
 export async function approveWaypoint(id) {
   const { error } = await supabase.from('waypoints').update({ status: 'approved' }).eq('id', id);
   if (error) throw error;
+  track('admin_action', { action: 'approve', entity: 'waypoint_submission' });
 }
 
 export async function rejectWaypoint(id, reason) {
@@ -139,6 +145,7 @@ export async function rejectWaypoint(id, reason) {
     .update({ status: 'rejected', rejection_reason: reason })
     .eq('id', id);
   if (error) throw error;
+  track('admin_action', { action: 'reject', entity: 'waypoint_submission' });
 }
 
 // ── Segments ─────────────────────────────────────────────────────────────
@@ -150,6 +157,7 @@ export async function rejectWaypoint(id, reason) {
 export async function updateSegment(id, { name, description, category }) {
   const { error } = await supabase.from('segments').update({ name, description, category }).eq('id', id);
   if (error) throw error;
+  track('admin_action', { action: 'update', entity: 'segment' });
 }
 
 // Legacy: `adminDeleteBtn`'s segment branch (app.js ~4302–4318). Per
@@ -161,6 +169,7 @@ export async function updateSegment(id, { name, description, category }) {
 export async function deleteSegment(id) {
   const { error } = await supabase.from('segments').delete().eq('id', id);
   if (error) throw error;
+  track('admin_action', { action: 'delete', entity: 'segment' });
 }
 
 // ── KML tab → "Import to Supabase" ──────────────────────────────────────
@@ -188,6 +197,7 @@ export async function insertKmlLineAsSegment({ name, description, points, distan
     .single();
   if (error) throw error;
   const segmentId = data.id;
+  track('admin_action', { action: 'insert', entity: 'segment' });
 
   if (points.length > 0) {
     const rows = points.map((p, seq) => ({ segment_id: segmentId, seq, lat: p.lat, lng: p.lng }));

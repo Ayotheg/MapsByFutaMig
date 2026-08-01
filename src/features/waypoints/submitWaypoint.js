@@ -2,6 +2,7 @@ import { supabase } from '../../lib/supabase';
 import { uploadImage, insertImageRows } from '../admin/adminSave';
 import { haversine } from '../../lib/geoUtils';
 import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
+import { track } from '../../lib/analytics';
 
 // ── Student waypoint submissions (Slice 13) ──────────────────────────────
 //
@@ -112,6 +113,11 @@ export async function submitWaypoint({ userId, name, description, type, lat, lng
   }
 
   await supabase.from('waypoint_submission_log').insert({ user_id: userId });
+
+  // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — no free text
+  // in props, avoids storing raw user-submitted content in the events
+  // table twice (the waypoint row itself already has it).
+  track('waypoint_suggested', {});
 
   return waypointId;
 }
