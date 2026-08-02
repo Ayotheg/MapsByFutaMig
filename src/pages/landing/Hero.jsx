@@ -1,7 +1,6 @@
-import { Link } from 'react-router-dom'
 import { MapPin, Map, Play } from 'lucide-react'
 import { useReveal } from './landingHooks'
-import { RouteMotif } from './shared'
+import { RouteMotif, MapLink } from './shared'
 
 /**
  * Floating preview card content. No real product screenshot is in the
@@ -150,8 +149,7 @@ function Hero() {
           className={`hero-fade ${visible ? 'visible' : ''}`}
           style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginBottom: 20, ...fade(240) }}
         >
-          <Link
-            to="/map"
+          <MapLink
             className="pill-btn"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -161,7 +159,7 @@ function Hero() {
             }}
           >
             <Map size={17} strokeWidth={2} /> Open the Map
-          </Link>
+          </MapLink>
           <button
             onClick={() => document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' })}
             className="pill-btn"

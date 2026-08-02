@@ -1,20 +1,18 @@
 import { Clock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useReveal } from './landingHooks'
+import { LAUNCH_DATE } from './launchConfig'
 
 /* ─── Launch countdown ───
- * Sits directly under the Hero, ahead of TrustBar — the first thing a
- * new visitor scrolls into, on purpose, so the "we're launching soon"
- * message lands before anything else competes for attention.
+ * Sits after TrustBar (see LandingPage.jsx) — the first full "moment"
+ * a new visitor hits once Hero's floating map-preview card has fully
+ * cleared, so the big numbers don't visually collide with it.
  *
- * ██ EDIT ME — LAUNCH_DATE ██
- * This is the single source of truth for every number this section
- * renders. To change how many days/hours are shown, just update the
- * date/time below (interpreted in the visitor's own local timezone —
- * no timezone math needed on our end). Everything else recalculates
- * automatically, including once the date has passed (see note below).
+ * To change how many days/hours are shown, edit LAUNCH_DATE in
+ * ./launchConfig.js — that same date also drives whether every "/map"
+ * button on the page (via <MapLink> in shared.jsx) is clickable yet,
+ * so it's kept in one shared file rather than duplicated here.
  */
-const LAUNCH_DATE = new Date('2026-09-15T09:00:00')
 
 function getTimeLeft() {
   const diffMs = LAUNCH_DATE.getTime() - Date.now()

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Heart, ArrowRight, HeartHandshake, Mail, MapPin, MessageCircle } from 'lucide-react'
+import { MapLink } from './shared'
 
 const CROWDR_DONATE_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
 const CONTACT_EMAIL = 'gearlifycorporation@gmail.com'
@@ -48,7 +49,7 @@ function Footer() {
             <div>
               <div style={{ fontFamily: 'Montserrat, sans-serif', fontWeight: 700, fontSize: 12, color: 'var(--land-text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 14 }}>Product</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <Link to="/map" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Open the map</Link>
+                <MapLink style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Open the map</MapLink>
                 <a href="#features" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Features</a>
                 <a href="#faq" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>FAQ</a>
               </div>
@@ -69,8 +70,7 @@ function Footer() {
             <p style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
               Free, no download needed.
             </p>
-            <Link
-              to="/map"
+            <MapLink
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 background: 'var(--land-accent)', color: '#fff', textDecoration: 'none',
@@ -79,7 +79,7 @@ function Footer() {
               }}
             >
               Open the map <ArrowRight size={14} strokeWidth={2} />
-            </Link>
+            </MapLink>
             <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)' }}>
                 Contact us

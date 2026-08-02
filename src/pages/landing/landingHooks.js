@@ -1,4 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
+import { LAUNCH_DATE } from './launchConfig'
+
+/* ─── Launch gate hook ───
+ * Backs every disabled "/map" button on the landing page (see MapLink
+ * in shared.jsx). Starts from the real current-vs-LAUNCH_DATE check
+ * (no flash of "enabled" before JS catches up) and just re-checks on a
+ * light interval — button enable/disable doesn't need per-second
+ * precision the way the visible countdown does. */
+export function useLaunchGate() {
+  const [launched, setLaunched] = useState(() => Date.now() >= LAUNCH_DATE.getTime())
+  useEffect(() => {
+    if (launched) return
+    const timer = setInterval(() => {
+      if (Date.now() >= LAUNCH_DATE.getTime()) {
+        setLaunched(true)
+        clearInterval(timer)
+      }
+    }, 30000)
+    return () => clearInterval(timer)
+  }, [launched])
+  return { launched }
+}
 
 /* ─── Scroll reveal hook ─── */
 export function useReveal(threshold = 0.15) {

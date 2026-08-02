@@ -37,10 +37,17 @@ function LandingPage() {
       </noscript>
       <Nav />
       <Hero />
-      {/* Full-section launch countdown — see LaunchCountdown.jsx for the
-          LAUNCH_DATE constant if the date needs tweaking later. */}
-      <LaunchCountdown />
       <TrustBar />
+      {/* Full-section launch countdown. Placed after TrustBar rather
+          than directly under Hero: Hero's floating map-preview card
+          intentionally bleeds past Hero's own bottom edge (see
+          Hero.jsx's MapPreviewPlaceholder), and putting the countdown
+          immediately after Hero put its big numbers right underneath
+          that overlap. TrustBar's thin strip gives the preview card
+          room to fully clear before this section starts, so nothing
+          collides. See launchConfig.js for the LAUNCH_DATE constant
+          if the date needs tweaking later. */}
+      <LaunchCountdown />
       <ProductFeatures />
       <VideoSection />
       <ExploreSection />

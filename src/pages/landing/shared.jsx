@@ -1,5 +1,38 @@
+import { Link } from 'react-router-dom'
 import mapsLogo from "../../assets/mapsLogo.png"
-import { useDrawRoute } from './landingHooks'
+import { useDrawRoute, useLaunchGate } from './landingHooks'
+
+/**
+ * Drop-in replacement for `<Link to="/map">` used by every "Open the
+ * map" / "Start Navigating" button across the landing page (Nav, Hero,
+ * ExploreSection, FinalCTA, Footer). Before LAUNCH_DATE (launchConfig.js)
+ * it renders the exact same look but as an inert, non-clickable element
+ * — dimmed, `cursor: not-allowed`, no navigation — instead of an actual
+ * link to /map. Once the date passes it renders as a normal Link, no
+ * code changes needed anywhere that uses it.
+ */
+export const MapLink = ({ children, style, onMouseEnter, onMouseLeave, ...rest }) => {
+  const { launched } = useLaunchGate()
+
+  if (launched) {
+    return (
+      <Link to="/map" style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} {...rest}>
+        {children}
+      </Link>
+    )
+  }
+
+  return (
+    <span
+      aria-disabled="true"
+      title="The map isn't open yet — check back at launch"
+      style={{ ...style, opacity: 0.45, cursor: 'not-allowed', pointerEvents: 'none' }}
+      {...rest}
+    >
+      {children}
+    </span>
+  )
+}
 
 /* ─── Map pin SVG ─── */
 export const Pin = ({ color = '#44e2cd', size = 10 }) => (
