@@ -3,9 +3,12 @@ import { useSeo } from '../lib/useSeo'
 import Nav from './landing/Nav'
 import Hero from './landing/Hero'
 import TrustBar from './landing/TrustBar'
+import LaunchCountdown from './landing/LaunchCountdown'
+import CampusTransformSection from './landing/CampusTransformSection'
 import ProductFeatures from './landing/ProductFeatures'
 import VideoSection from './landing/VideoSection'
 import ExploreSection from './landing/ExploreSection'
+import PopularPlacesSection from './landing/PopularPlacesSection'
 import FinalCTA from './landing/FinalCTA'
 import FAQ from './landing/FAQ'
 import Footer from './landing/Footer'
@@ -37,9 +40,20 @@ function LandingPage() {
       <Nav />
       <Hero />
       <TrustBar />
+      {/* Full-section launch countdown. Placed after TrustBar rather
+          than directly under Hero: Hero's floating map-preview card
+          intentionally bleeds past Hero's own bottom edge, and putting
+          the countdown immediately after Hero put its big numbers
+          right underneath that overlap. TrustBar's thin strip gives
+          the preview card room to fully clear before this section
+          starts, so nothing collides. See launchConfig.js for the
+          LAUNCH_DATE constant if the date needs tweaking later. */}
+      <LaunchCountdown />
+      <CampusTransformSection />
       <ProductFeatures />
       <VideoSection />
       <ExploreSection />
+      <PopularPlacesSection />
       <FinalCTA />
       <FAQ />
       <Footer />

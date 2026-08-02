@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
 import { Map } from 'lucide-react'
 import { useReveal } from './landingHooks'
+import { MapLink } from './shared'
 
 /* ─── Final CTA ───
  * Light-theme rebuild (Slice 7). This is the one deliberate exception
@@ -84,8 +84,7 @@ function FinalCTA() {
           </p>
 
           <div className={`reveal ${visible ? 'visible' : ''}`} style={{ marginTop: 40, transitionDelay: '0.3s' }}>
-            <Link
-              to="/map"
+            <MapLink
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 10,
                 background: '#fff', color: 'var(--land-accent)',
@@ -97,7 +96,7 @@ function FinalCTA() {
               onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0) scale(1)' }}
             >
               <Map size={19} strokeWidth={2} /> Open the Map
-            </Link>
+            </MapLink>
           </div>
 
           <p

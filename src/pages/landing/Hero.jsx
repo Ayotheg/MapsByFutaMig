@@ -1,7 +1,6 @@
-import { Link } from 'react-router-dom'
 import { MapPin, Map, Play } from 'lucide-react'
 import { useReveal } from './landingHooks'
-import { RouteMotif } from './shared'
+import { RouteMotif, MapLink } from './shared'
 
 /**
  * Floating preview card content. No real product screenshot is in the
@@ -102,7 +101,7 @@ function Hero() {
         />
       </div>
 
-      <div ref={ref} style={{ position: 'relative', zIndex: 1, maxWidth: 620, margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
+      <div ref={ref} style={{ position: 'relative', zIndex: 1, maxWidth: 680, margin: '0 auto', padding: '0 24px', textAlign: 'center' }}>
         {/* Badge */}
         <div
           className={`hero-fade ${visible ? 'visible' : ''}`}
@@ -124,7 +123,7 @@ function Hero() {
           className={`hero-fade ${visible ? 'visible' : ''}`}
           style={{
             fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800,
-            fontSize: 'clamp(30px, 5vw, 40px)', lineHeight: 1.16,
+            fontSize: 'clamp(36px, 6vw, 52px)', lineHeight: 1.14,
             margin: '0 0 20px', color: 'var(--land-text-primary)',
             ...fade(80),
           }}
@@ -137,7 +136,7 @@ function Hero() {
         <p
           className={`hero-fade ${visible ? 'visible' : ''}`}
           style={{
-            fontFamily: 'Poppins, sans-serif', fontSize: 15, lineHeight: 1.7,
+            fontFamily: 'Poppins, sans-serif', fontSize: 17, lineHeight: 1.7,
             color: 'var(--land-text-secondary)', margin: '0 0 32px',
             ...fade(160),
           }}
@@ -150,8 +149,7 @@ function Hero() {
           className={`hero-fade ${visible ? 'visible' : ''}`}
           style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginBottom: 20, ...fade(240) }}
         >
-          <Link
-            to="/map"
+          <MapLink
             className="pill-btn"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -161,7 +159,7 @@ function Hero() {
             }}
           >
             <Map size={17} strokeWidth={2} /> Open the Map
-          </Link>
+          </MapLink>
           <button
             onClick={() => document.getElementById('video')?.scrollIntoView({ behavior: 'smooth' })}
             className="pill-btn"

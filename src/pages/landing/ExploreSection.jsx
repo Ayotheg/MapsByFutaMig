@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { useReveal } from './landingHooks'
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap'
+import { MapLink } from './shared'
 
 /* ─── Explore categories ───
  * Light-theme rebuild (Slice 5). Content change, not just a style
@@ -81,9 +81,8 @@ function ExploreSection() {
           {CATEGORIES.map((cat) => {
             const Icon = LEGACY_ICON_MAP[cat.icon]
             return (
-              <Link
+              <MapLink
                 key={cat.label}
-                to="/map"
                 className="explore-tile"
                 style={{
                   background: 'var(--land-surface)',
@@ -108,13 +107,12 @@ function ExploreSection() {
                 }}>
                   {cat.label}
                 </span>
-              </Link>
+              </MapLink>
             )
           })}
 
           {/* "+ more" — violet, not teal: a link out, not a category */}
-          <Link
-            to="/map"
+          <MapLink
             className="explore-tile explore-tile-more"
             style={{
               background: 'var(--land-surface)',
@@ -139,7 +137,7 @@ function ExploreSection() {
             }}>
               + more on the map
             </span>
-          </Link>
+          </MapLink>
         </div>
       </div>
     </section>
