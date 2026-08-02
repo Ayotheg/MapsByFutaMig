@@ -3,9 +3,11 @@ import { useSeo } from '../lib/useSeo'
 import Nav from './landing/Nav'
 import Hero from './landing/Hero'
 import TrustBar from './landing/TrustBar'
+import CampusTransformSection from './landing/CampusTransformSection'
 import ProductFeatures from './landing/ProductFeatures'
 import VideoSection from './landing/VideoSection'
 import ExploreSection from './landing/ExploreSection'
+import PopularPlacesSection from './landing/PopularPlacesSection'
 import FinalCTA from './landing/FinalCTA'
 import FAQ from './landing/FAQ'
 import Footer from './landing/Footer'
@@ -37,9 +39,11 @@ function LandingPage() {
       <Nav />
       <Hero />
       <TrustBar />
+      <CampusTransformSection />
       <ProductFeatures />
       <VideoSection />
       <ExploreSection />
+      <PopularPlacesSection />
       <FinalCTA />
       <FAQ />
       <Footer />
