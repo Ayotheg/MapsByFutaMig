@@ -2,6 +2,7 @@ import './landing/landing.css'
 import { useSeo } from '../lib/useSeo'
 import Nav from './landing/Nav'
 import Hero from './landing/Hero'
+import LaunchCountdown from './landing/LaunchCountdown'
 import TrustBar from './landing/TrustBar'
 import ProductFeatures from './landing/ProductFeatures'
 import VideoSection from './landing/VideoSection'
@@ -36,6 +37,9 @@ function LandingPage() {
       </noscript>
       <Nav />
       <Hero />
+      {/* Full-section launch countdown — see LaunchCountdown.jsx for the
+          LAUNCH_DATE constant if the date needs tweaking later. */}
+      <LaunchCountdown />
       <TrustBar />
       <ProductFeatures />
       <VideoSection />
