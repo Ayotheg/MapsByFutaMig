@@ -5,6 +5,7 @@ import HomeRoute from './pages/HomeRoute'
 import LoadingScreen from './pages/LoadingScreen'
 import NotFoundPage from './pages/NotFoundPage'
 import GearlifyGate from './pages/GearlifyGate'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import { useLaunchGate } from './pages/landing/landingHooks'
 
 import LandingPage from './pages/LandingPage'
@@ -49,6 +50,15 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/map" element={<RequireLaunch><HomeRoute /></RequireLaunch>} />
         <Route path="/gearlify" element={<GearlifyGate />} />
+        {/* Landing spot for the "Forgot password?" email link — not
+            behind RequireLaunch, since setting a password is an account
+            action, not access to the map itself. See useAuth.js's
+            resetPassword() + ResetPasswordPage.jsx's header comment for
+            why this route needs to exist at all (Supabase's recovery
+            link auto-logs the browser in; this page is what turns that
+            into an actual "choose a new password, then sign in again"
+            flow instead of a silent auto-login). */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/loadingscreen" element={<LoadingScreen />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />

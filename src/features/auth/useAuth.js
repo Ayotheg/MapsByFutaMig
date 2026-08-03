@@ -77,9 +77,22 @@ export function useAuth() {
   }, []);
 
   // Legacy: `auth.sendPasswordResetEmail(email)` (app.js ~7264–7275).
+  //
+  // redirectTo points at `/reset-password`, NOT the site root. Supabase's
+  // recovery link logs the browser into a real (if short-lived) session
+  // the instant it's clicked — landing that on `/` with no dedicated
+  // handler means `onAuthStateChange` above just sees "a session showed
+  // up" and treats it like any other sign-in, dropping the person straight
+  // into the app already authenticated and skipping the "choose a new
+  // password" step entirely. `/reset-password` (ResetPasswordPage.jsx)
+  // is the dedicated landing spot: it catches the `PASSWORD_RECOVERY`
+  // event, prompts for a new password via `updateUser`, then signs out
+  // and sends them to sign in again with it — matching the intended
+  // "reset, then log in with the new password" flow instead of an
+  // auto-login side effect of the link.
   const resetPassword = useCallback(async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) throw error;
   }, []);
