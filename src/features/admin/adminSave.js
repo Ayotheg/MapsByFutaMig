@@ -111,6 +111,7 @@ export async function insertWaypoint({ name, description, type, lat, lng }) {
   const { data, error } = await supabase
     .from('waypoints')
     .insert({
+      id: crypto.randomUUID(),
       name,
       description,
       type,

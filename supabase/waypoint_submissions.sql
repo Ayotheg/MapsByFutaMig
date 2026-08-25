@@ -12,6 +12,12 @@
 
 -- ── 1. Review-workflow columns on the existing waypoints table ───────────
 
+-- The migrated table preserves Firestore IDs as text and therefore did not
+-- have a default. Keep that compatibility while allowing new inserts to
+-- omit the ID safely.
+alter table waypoints
+  alter column id set default (gen_random_uuid()::text);
+
 alter table waypoints
   add column if not exists status text not null default 'approved'
     check (status in ('pending', 'approved', 'rejected')),

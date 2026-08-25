@@ -84,6 +84,9 @@ export async function submitWaypoint({ userId, name, description, type, lat, lng
   const { data, error } = await supabase
     .from('waypoints')
     .insert({
+      // The migrated schema preserves Firestore IDs and has no database
+      // default, so new browser-created waypoints must provide a text ID.
+      id: crypto.randomUUID(),
       name,
       description,
       type,
