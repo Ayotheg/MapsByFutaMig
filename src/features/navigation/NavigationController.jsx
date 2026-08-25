@@ -412,7 +412,7 @@ const NavigationController = forwardRef(function NavigationController(
       const nextStep = steps[navStepIndexRef.current + 1];
       nextHud.nextPreview =
         navGpsTicksRef.current >= 2 && nextStep && nextStep.type !== 'arrive' && nextStep.instruction
-          ? `Then: ${nextStep.instruction}`
+          ? nextStep.instruction
           : '';
     }
 
