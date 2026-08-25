@@ -1,5 +1,6 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { ALL_TYPES, GROUP_META, PTF_GROUPS, groupOfType } from './placeTypeGroups';
+import { readPersistentState, writePersistentState } from '../../lib/persistentState';
 
 /**
  * Owns place-type filter state (which waypoint types are currently visible)
@@ -20,8 +21,10 @@ export function useTypeVisibility(waypoints) {
     const initial = {};
     for (const t of ALL_TYPES) initial[t] = true;
     initial.__unknown__ = true;
-    return initial;
+    return { ...initial, ...readPersistentState('type-visibility', {}) };
   });
+
+  useEffect(() => writePersistentState('type-visibility', typeVisible), [typeVisible]);
 
   const setTypeVisible = useCallback((type, visible) => {
     setTypeVisibleState((prev) => (prev[type] === visible ? prev : { ...prev, [type]: visible }));

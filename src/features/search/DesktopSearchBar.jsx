@@ -6,6 +6,7 @@ import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
 import SearchDropdownList from './SearchDropdownList';
 import styles from './DesktopSearchBar.module.css';
 import { track } from '../../lib/analytics';
+import { readPersistentState, writePersistentState } from '../../lib/persistentState';
 
 /**
  * Ported from legacy's `initDeskSearch` IIFE (app.js ~895–1131) — the
@@ -30,7 +31,7 @@ import { track } from '../../lib/analytics';
  * new UI not present in legacy; revisit if Slice 9 turns out to need it.
  */
 export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed, onToggleCollapsed, onManualType, activeChipLabel, onNavigateClick }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => readPersistentState('desktop-search-query', ''));
   const [open, setOpen] = useState(false);
   const [osmResults, setOsmResults] = useState(null);
   const [loadingOsm, setLoadingOsm] = useState(false);
@@ -42,6 +43,8 @@ export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed
 
   const { selectResult, clearMarker } = useSelectResult({ map, searchIndex, onSelect });
   const localResults = query.trim() ? searchIndex.query(query, 6) : [];
+
+  useEffect(() => writePersistentState('desktop-search-query', query), [query]);
 
   // Chip click fills the input text (legacy: `deskInput.value = label`,
   // app.js ~6879) without opening the dropdown or counting as manual typing.

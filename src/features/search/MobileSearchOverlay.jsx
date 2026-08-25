@@ -5,6 +5,7 @@ import { useSelectResult } from './useSelectResult';
 import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
 import SearchDropdownList from './SearchDropdownList';
 import styles from './MobileSearchOverlay.module.css';
+import { readPersistentState, writePersistentState } from '../../lib/persistentState';
 
 /**
  * Ported from legacy's dynamically-built `#mobSearchOverlay` (app.js
@@ -29,7 +30,7 @@ import styles from './MobileSearchOverlay.module.css';
  * fallback. Reproduced exactly as-is.
  */
 export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, onClose }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => readPersistentState('mobile-search-query', ''));
   const [osmResults, setOsmResults] = useState(null);
   const [loadingOsm, setLoadingOsm] = useState(false);
   const inputRef = useRef(null);
@@ -41,12 +42,17 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
 
   useEffect(() => {
     if (open) {
+      setQuery(readPersistentState('mobile-search-query', ''));
       const t = setTimeout(() => inputRef.current?.focus(), 80);
       return () => clearTimeout(t);
     }
     setQuery('');
     setOsmResults(null);
   }, [open]);
+
+  useEffect(() => {
+    if (open) writePersistentState('mobile-search-query', query);
+  }, [open, query]);
 
   function handleSelect(entry) {
     selectResult(entry);
