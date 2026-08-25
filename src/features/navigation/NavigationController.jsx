@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import L from 'leaflet';
-import { haversine } from '../../lib/geoUtils';
+import { haversine, routePosition } from '../../lib/geoUtils';
 import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
@@ -366,7 +366,8 @@ const NavigationController = forwardRef(function NavigationController(
     if (!routeData || !userPos || !dest) return;
     const { lat, lng } = userPos;
 
-    const distToDest = haversine(lat, lng, dest.lat, dest.lng);
+    const routePos = routePosition(routeData.coords, lat, lng);
+    const distToDest = routeData.distance * (routePos.distanceRemaining / routePos.distanceTotal || 0);
     const steps = routeData.steps;
     let nearest = navStepIndexRef.current;
     let minD = Infinity;
@@ -416,8 +417,7 @@ const NavigationController = forwardRef(function NavigationController(
           : '';
     }
 
-    const fracRemaining = Math.min(1, distToDest / routeData.distance);
-    const progress = Math.max(0, 1 - fracRemaining);
+    const progress = Math.max(0, Math.min(1, routePos.progress));
     drawRoute(routeData.coords, progress);
 
     if (distToDest < 15 && navGpsTicksRef.current >= 2) {
