@@ -1,92 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import './index.css'
-import MapPage from './pages/MapPage'
+import HomeRoute from './pages/HomeRoute'
 import LoadingScreen from './pages/LoadingScreen'
 import NotFoundPage from './pages/NotFoundPage'
+import GearlifyGate from './pages/GearlifyGate'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import { useLaunchGate } from './pages/landing/landingHooks'
 
 import LandingPage from './pages/LandingPage'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import TermsOfService from './pages/legal/TermsOfService'
 import CookiePolicy from './pages/legal/CookiePolicy'
 
-// One entry per real boot milestone tracked below — order matches roughly
-// how they resolve in practice (map init is near-instant; Supabase reads
-// and session restore take longer). Text doubles as each step's status
-// label in the loading screen.
-const BOOT_STEPS = [
-  "Initializing map shell",
-  "Loading waypoints",
-  "Loading segments",
-  "Restoring session",
-  "Loading fonts",
-];
-
-// Real browser signal, not a guess — resolves once every requested
-// @fontsource face has actually finished downloading/parsing.
-function useFontsReady() {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    if (document.fonts?.ready) {
-      document.fonts.ready.then(() => {
-        if (!cancelled) setReady(true);
-      });
-    } else {
-      // Font Loading API unsupported — don't block boot on it.
-      setReady(true);
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return ready;
-}
-
-// Mounts MapPage immediately (so its data hooks start fetching right
-// away) and overlays the loading screen on top, driven by MapPage's own
-// mapReady/waypointsReady/segmentsReady/authReady flags plus fontsReady
-// here — no artificial timer standing in for real progress.
-function HomeRoute() {
-  const [readiness, setReadiness] = useState({
-    mapReady: false,
-    waypointsReady: false,
-    segmentsReady: false,
-    authReady: false,
-  });
-  const fontsReady = useFontsReady();
-  const [booted, setBooted] = useState(false);
-
-  // Lock the viewport for the map's fixed-canvas layout, only while
-  // this route is mounted — the landing page at "/" needs normal
-  // document scroll instead. See the .map-viewport rule in index.css.
-  useEffect(() => {
-    document.body.classList.add("map-viewport");
-    return () => {
-      document.body.classList.remove("map-viewport");
-    };
-  }, []);
-
-  const completed =
-    Number(readiness.mapReady) +
-    Number(readiness.waypointsReady) +
-    Number(readiness.segmentsReady) +
-    Number(readiness.authReady) +
-    Number(fontsReady);
-  const allReady = completed >= BOOT_STEPS.length;
-
-  return (
-    <>
-      <MapPage onReadinessChange={setReadiness} />
-      {!booted && (
-        <LoadingScreen
-          steps={BOOT_STEPS}
-          current={completed}
-          onComplete={allReady ? () => setBooted(true) : undefined}
-        />
-      )}
-    </>
-  );
+// Guards the real /map route itself — not just the on-page buttons.
+// Renders NotFoundPage (rather than redirecting to "/") when the map
+// isn't open yet, so hitting /map pre-launch looks exactly like
+// hitting any other dead URL — it doesn't tip anyone off that a real
+// route lives there. Same launch check as every MapLink
+// (useLaunchGate → LAUNCH_DATE / hasDevAccess in launchConfig.js), so
+// the two can never disagree. /gearlify (GearlifyGate.jsx) is the one
+// deliberate way around this, and it renders the map directly rather
+// than going through this route at all.
+function RequireLaunch({ children }) {
+  const { launched } = useLaunchGate();
+  if (!launched) return <NotFoundPage />;
+  return children;
 }
 
 // React Router doesn't reset scroll position on navigation by default —
@@ -109,7 +48,17 @@ function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/map" element={<HomeRoute />} />
+        <Route path="/map" element={<RequireLaunch><HomeRoute /></RequireLaunch>} />
+        <Route path="/gearlify" element={<GearlifyGate />} />
+        {/* Landing spot for the "Forgot password?" email link — not
+            behind RequireLaunch, since setting a password is an account
+            action, not access to the map itself. See useAuth.js's
+            resetPassword() + ResetPasswordPage.jsx's header comment for
+            why this route needs to exist at all (Supabase's recovery
+            link auto-logs the browser in; this page is what turns that
+            into an actual "choose a new password, then sign in again"
+            flow instead of a silent auto-login). */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/loadingscreen" element={<LoadingScreen />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />

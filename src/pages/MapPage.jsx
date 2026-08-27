@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MapShell from '../features/map/MapShell';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
@@ -29,6 +29,7 @@ import { useSeo } from '../lib/useSeo';
 import SubmissionToast from '../features/waypoint-submissions/SubmissionToast';
 import { usePresenceTracking } from '../features/analytics/usePresenceTracking';
 import { setAnalyticsUser } from '../lib/analytics';
+import { readPersistentState, writePersistentState } from '../lib/persistentState';
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -109,9 +110,9 @@ export default function MapPage({ onReadinessChange }) {
   });
 
   const [map, setMap] = useState(null);
-  const [selected, setSelected] = useState(null);
+  const [selected, setSelected] = useState(() => readPersistentState('selected-place', null));
   const [isMobile] = useState(() => window.innerWidth <= 768);
-  const [selectedSegmentId, setSelectedSegmentId] = useState(null);
+  const [selectedSegmentId, setSelectedSegmentId] = useState(() => readPersistentState('selected-segment', null));
 
   const { waypoints, loading: waypointsLoading, refetch: refetchWaypoints } = useWaypoints();
   const typeVisibilityProps = useTypeVisibility(waypoints);
@@ -123,11 +124,12 @@ export default function MapPage({ onReadinessChange }) {
   // (see their own header comments) so the floating search chrome can
   // shift/collapse in step with them, matching legacy's body-class-driven
   // CSS coupling without reaching for globals.
-  const [collapsed, setCollapsed] = useState(false);
-  const [sheetState, setSheetState] = useState('peek');
-  const [sheetActiveTab, setSheetActiveTab] = useState('layers');
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
-  const [activeChip, setActiveChip] = useState(null);
+  const [collapsed, setCollapsed] = useState(() => readPersistentState('sidebar-collapsed', false));
+  const [sheetState, setSheetState] = useState(() => readPersistentState('mobile-sheet-state', 'peek'));
+  const [sheetActiveTab, setSheetActiveTab] = useState(() => readPersistentState('mobile-sheet-tab', 'layers'));
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(() => readPersistentState('mobile-search-open', false));
+  const [activeChip, setActiveChip] = useState(() => readPersistentState('active-chip', null));
+  const [mapView, setMapView] = useState(() => readPersistentState('map-view', null));
 
   // ── Slice 6: OSM annotations + dedup ──────────────────────────────────
   // `kmlAnnotations` is reported up by StaticKmlLayer as it loads (named
@@ -156,12 +158,30 @@ export default function MapPage({ onReadinessChange }) {
   // is found and turn-by-turn has started, not just while "Where to?" is
   // open) and is what forces RAW view mode / hides the GPS dot, matching
   // legacy's `_prevInfoMode` save-restore (app.js ~5058–5063, ~5160–5163).
-  const [navOpen, setNavOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(() => readPersistentState('navigation-open', false));
   const [navActive, setNavActive] = useState(false);
-  const [navSeedDest, setNavSeedDest] = useState(null);
+  const [navSeedDest, setNavSeedDest] = useState(() => readPersistentState('navigation-seeded-destination', null));
   const [reviewTarget, setReviewTarget] = useState(null);
   const navControllerRef = useRef(null);
   const prevViewModeRef = useRef(null);
+
+  const persistMapView = useCallback((view) => {
+    const center = view?.center;
+    if (!center) return;
+    const next = { center: [center.lat, center.lng], zoom: view.zoom };
+    setMapView(next);
+    writePersistentState('map-view', next);
+  }, []);
+
+  useEffect(() => writePersistentState('selected-place', selected), [selected]);
+  useEffect(() => writePersistentState('selected-segment', selectedSegmentId), [selectedSegmentId]);
+  useEffect(() => writePersistentState('sidebar-collapsed', collapsed), [collapsed]);
+  useEffect(() => writePersistentState('mobile-sheet-state', sheetState), [sheetState]);
+  useEffect(() => writePersistentState('mobile-sheet-tab', sheetActiveTab), [sheetActiveTab]);
+  useEffect(() => writePersistentState('active-chip', activeChip), [activeChip]);
+  useEffect(() => writePersistentState('navigation-open', navOpen), [navOpen]);
+  useEffect(() => writePersistentState('navigation-seeded-destination', navSeedDest), [navSeedDest]);
+  useEffect(() => writePersistentState('mobile-search-open', mobileSearchOpen), [mobileSearchOpen]);
 
   const gps = useGpsTracking(map, { hidden: navActive });
 
@@ -376,7 +396,7 @@ export default function MapPage({ onReadinessChange }) {
 
   return (
     <>
-      <MapShell onMapReady={setMap} />
+      <MapShell onMapReady={setMap} initialView={mapView} onViewChange={persistMapView} />
       {map && (
         <WaypointLayer
           map={map}

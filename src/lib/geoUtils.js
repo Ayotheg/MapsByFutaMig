@@ -34,6 +34,55 @@ export function haversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/** Returns progress and remaining distance relative to a lat/lng polyline. */
+export function routePosition(coords, lat, lng) {
+  if (!coords || coords.length < 2) return { progress: 0, distanceRemaining: 0, distanceTotal: 0 };
+
+  const cosLat = Math.cos((lat * Math.PI) / 180);
+  const toMeters = (point) => ({
+    x: (point[1] - lng) * 111320 * cosLat,
+    y: (point[0] - lat) * 110540,
+  });
+  const segmentLengths = [];
+  let distanceTotal = 0;
+
+  for (let i = 1; i < coords.length; i++) {
+    const length = haversine(coords[i - 1][0], coords[i - 1][1], coords[i][0], coords[i][1]);
+    segmentLengths.push(length);
+    distanceTotal += length;
+  }
+
+  let distanceBefore = 0;
+  let closestDistance = Infinity;
+  let distanceAtClosest = 0;
+
+  for (let i = 1; i < coords.length; i++) {
+    const start = toMeters(coords[i - 1]);
+    const end = toMeters(coords[i]);
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const denominator = dx * dx + dy * dy;
+    const projection = denominator === 0
+      ? 0
+      : Math.max(0, Math.min(1, -(start.x * dx + start.y * dy) / denominator));
+    const closestX = start.x + projection * dx;
+    const closestY = start.y + projection * dy;
+    const distance = Math.hypot(closestX, closestY);
+
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      distanceAtClosest = distanceBefore + segmentLengths[i - 1] * projection;
+    }
+    distanceBefore += segmentLengths[i - 1];
+  }
+
+  return {
+    progress: distanceTotal ? distanceAtClosest / distanceTotal : 0,
+    distanceRemaining: Math.max(0, distanceTotal - distanceAtClosest),
+    distanceTotal,
+  };
+}
+
 function projectLatLng(lat, lng) {
   return {
     x: (lng - CAMPUS_CENTER.lng) * 110420,

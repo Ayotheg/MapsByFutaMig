@@ -17,7 +17,7 @@ export async function fetchRoute(fromLat, fromLng, toLat, toLng, mode) {
   const url =
     `https://router.project-osrm.org/route/v1/${profile}/` +
     `${fromLng},${fromLat};${toLng},${toLat}` +
-    `?overview=full&geometries=geojson&steps=true&annotations=false`;
+    `?overview=full&geometries=geojson&steps=true&annotations=false&alternatives=true`;
 
   const res = await fetch(url);
   const data = await res.json();
@@ -26,7 +26,9 @@ export async function fetchRoute(fromLat, fromLng, toLat, toLng, mode) {
     throw new Error('No route found');
   }
 
-  const route = data.routes[0];
+  const route = data.routes.reduce((shortest, candidate) =>
+    candidate.distance < shortest.distance ? candidate : shortest
+  );
   const coords = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
   const steps = route.legs.flatMap((leg) => leg.steps).map((s) => ({
     instruction: stepInstruction(s),

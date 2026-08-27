@@ -4,6 +4,7 @@ import LayersPanel from './LayersPanel';
 import NavPanel from '../navigation/NavPanel';
 import { displayName } from '../auth/useAuth';
 import { track } from '../../lib/analytics';
+import { readPersistentState, writePersistentState } from '../../lib/persistentState';
 
 // Slice 9: GPS Signal isn't open by default (only Layers is), so per
 // CLAUDE.md's bundle-size policy it's lazy-loaded like DetailModal/
@@ -67,7 +68,9 @@ const RAIL_ITEMS = [
  * this value and passes it down to all three.
  */
 export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick, onAdminClick, guestNavRemaining, onSuggestPlaceClick }) {
-  const [activeKey, setActiveKey] = useState('layers');
+  const [activeKey, setActiveKey] = useState(() => readPersistentState('sidebar-active-panel', 'layers'));
+
+  useEffect(() => writePersistentState('sidebar-active-panel', activeKey), [activeKey]);
 
   // Slice 4: reflect collapsed state onto document.body, same
   // classList.toggle('sidebar-collapsed') approach legacy uses

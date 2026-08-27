@@ -1,4 +1,30 @@
 import { useState, useEffect, useRef } from 'react'
+import { LAUNCH_DATE, hasDevAccess } from './launchConfig'
+
+/* ─── Launch gate hook ───
+ * Backs every disabled "/map" button on the landing page (see MapLink
+ * in shared.jsx) and the /map route guard in App.jsx. Starts from the
+ * real current-vs-LAUNCH_DATE check (no flash of "enabled" before JS
+ * catches up) and just re-checks on a light interval — button
+ * enable/disable doesn't need per-second precision the way the
+ * visible countdown does. A browser flagged via /gearlify (see
+ * GearlifyGate.jsx + hasDevAccess in launchConfig.js) reads as
+ * "launched" here regardless of the date, so devs get the normal
+ * enabled experience everywhere this hook is used. */
+export function useLaunchGate() {
+  const [launched, setLaunched] = useState(() => Date.now() >= LAUNCH_DATE.getTime() || hasDevAccess())
+  useEffect(() => {
+    if (launched) return
+    const timer = setInterval(() => {
+      if (Date.now() >= LAUNCH_DATE.getTime() || hasDevAccess()) {
+        setLaunched(true)
+        clearInterval(timer)
+      }
+    }, 30000)
+    return () => clearInterval(timer)
+  }, [launched])
+  return { launched }
+}
 
 /* ─── Scroll reveal hook ─── */
 export function useReveal(threshold = 0.15) {

@@ -262,41 +262,26 @@ early "just in case."
 
 ---
 
-## Session Context *(fill in before starting a new session)*
+## Session Context *(current-state note for the repo as it exists now)*
 
-- **Slice being worked on:** Slice 11 (Admin panel) — **built this
-  session**, see `MIGRATION_PLAN.md`'s progress tracker for full detail.
-  **Build/lint could not be run this session (sandbox had no network
-  access to `npm install`)** — run `npm run build`/`npm run lint` before
-  trusting this the way earlier sessions with network access could
-  confirm live. New folder: `src/features/admin/` (`adminSave.js`,
-  `useAdminKml.js`, `adminTypeOptions.js`, `adminBadgeColors.js`,
-  `AdminEditModal.jsx`+`.module.css`, `PointsTab.jsx`, `RoutesTab.jsx`,
-  `KmlTab.jsx`, `AdminPanel.jsx`+`.module.css`). **Required uploading
-  both the legacy repo (`Ayotheg/MapsByFuta` @ `feature/login2`) and this
-  migration repo as zips** — neither was reachable via `web_fetch`
-  (`github.com` blocks robots, and neither repo surfaced via
-  `web_search`, so they're presumably private) — worth remembering for
-  whichever slice is picked up next, since the same wall will be hit
-  again without an upload.
-  **Scope correction, same discipline as every slice since 4:** the
-  plan's `app.js` ~3692–4333ish range starts a little late — the real
-  block (`openAdminPanel`, tab switching, pick-coordinate flow) begins at
-  ~3326, corrected in the plan's own Slice 11 entry. **Real correction to
-  a Slice 5 assumption:** `ImportTrigger.jsx`'s comment claiming
-  `#adminImportBtn` "lives inside the admin overlay, reserved for Slice
-  11" was wrong — that element doesn't exist anywhere in legacy's actual
-  `index.html`; `processImportPipeline`'s wiring at app.js ~1838–1846 is
-  silently dead code there (both `getElementById` calls return `null`).
-  Comment corrected in `ImportTrigger.jsx` itself rather than inventing a
-  relocation that has no real legacy placement to land in. Two
-  genuinely-different "KML" features clarified: this slice's KML tab
-  (session-only overlay loading, `_kmlRegistry`) vs. Slice 5's
-  import-and-save-a-segment pipeline. Full detail — the confirmed-dead
-  line/segment import branch ported faithfully anyway, the normalized-
-  image-tables deviation, the `useSearchIndex.js`/refetch-instead-of-
-  imperative-patching deviations, the mobile `mobTabAdmin` tab and its
-  active-highlight-stripping quirk — all in the tracker row.
+- **Current project status:** this repo is no longer a clean slice-by-slice
+  migration plan. Many slices are already implemented in code, including the
+  map shell, waypoints, segments, KML/OSM overlays, search, navigation, auth,
+  admin, and analytics surfaces.
+- **What matters more than the old notes:** the actual files in `src/` are the
+  live source of truth. Historical migration notes are useful context but they
+  should not override the code when the two disagree.
+- **Build verification blocker:** a fresh `npm run build` was attempted here,
+  and it failed before Vite could compile because the local PowerShell
+  execution policy blocked the command with a `PSSecurityException` /
+  `UnauthorizedAccess` error. That is the current build-status blocker in
+  this environment, not a clean app-level success signal.
+- **Database verification still required:** several feature slices were
+  implemented before live Supabase schema/RLS checks were fully confirmed.
+  Before calling a feature production-ready, the live Supabase project still
+  needs verification directly.
+- **Practical rule:** if the docs and the code disagree, the code wins. The
+  notes are historical context, not a guarantee of current runtime state.
 - **Slice 11 — two real gaps found and fixed live, after the person
   actually ran this against their Supabase project:**
   1. **`useAdminPin.js` was missing the resume-after-sign-in effect**

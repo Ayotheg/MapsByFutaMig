@@ -52,6 +52,17 @@
   flex: 1;
   min-width: 0;
 }
+.instructionLabel,
+.nextLabel {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.instructionLabel {
+  color: var(--primary);
+  margin-bottom: 2px;
+}
 .turnInstruction {
   font-family: 'Geist', var(--font-ui);
   font-size: 13px;
@@ -104,6 +115,9 @@
 }
 
 .nextPreview {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.55);
   padding: 2px 16px 6px;
@@ -111,6 +125,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.nextLabel {
+  color: var(--tertiary);
+  flex-shrink: 0;
 }
 
 .stats {

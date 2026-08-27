@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import L from 'leaflet';
-import { haversine } from '../../lib/geoUtils';
+import { haversine, routePosition } from '../../lib/geoUtils';
 import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
@@ -10,6 +10,7 @@ import NavHud from './NavHud';
 import NavArrivedBanner from './NavArrivedBanner';
 import './navMapLayers.css';
 import { track } from '../../lib/analytics';
+import { readPersistentState, removePersistentState, writePersistentState } from '../../lib/persistentState';
 
 // Leaflet marker/popup content is raw HTML (not React), so the "arrived
 // destination" flag glyph below is a hand-built inline SVG matching
@@ -62,8 +63,11 @@ const NavigationController = forwardRef(function NavigationController(
   { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess },
   ref
 ) {
-  const [destPanelOpen, setDestPanelOpen] = useState(true);
-  const [navActive, setNavActive] = useState(false);
+  const persistedNavigationRef = useRef(readPersistentState('navigation-session', null));
+  const persistedNavigation = persistedNavigationRef.current;
+  const persistedDestination = readPersistentState('navigation-destination', null);
+  const [destPanelOpen, setDestPanelOpen] = useState(!persistedNavigation?.active);
+  const [navActive, setNavActive] = useState(Boolean(persistedNavigation?.active));
   const [mode, setMode] = useState('foot-walking');
   const [destInputValue, setDestInputValue] = useState('');
   const [dropdownResults, setDropdownResults] = useState([]);
@@ -86,6 +90,7 @@ const NavigationController = forwardRef(function NavigationController(
   // ── Refs mirroring state used inside stable callbacks/timers (avoids
   // stale closures — same rationale as useGpsTracking.js's *Ref pairs) ──
   const navActiveRef = useRef(false);
+  navActiveRef.current = navActive;
   const destPanelOpenRef = useRef(true);
   const voiceEnabledRef = useRef(true);
   voiceEnabledRef.current = voiceEnabled;
@@ -97,11 +102,11 @@ const NavigationController = forwardRef(function NavigationController(
   const guestNavBlockedRef = useRef(false);
   guestNavBlockedRef.current = guestNavBlocked;
 
-  const navDestRef = useRef(null); // {lat,lng,name,id,type}
-  const navModeRef = useRef('foot-walking');
-  const navRouteDataRef = useRef(null);
-  const navStepIndexRef = useRef(0);
-  const navUserPosRef = useRef(null);
+  const navDestRef = useRef(persistedNavigation?.dest || persistedDestination || null); // {lat,lng,name,id,type}
+  const navModeRef = useRef(persistedNavigation?.mode || 'foot-walking');
+  const navRouteDataRef = useRef(persistedNavigation?.routeData || null);
+  const navStepIndexRef = useRef(persistedNavigation?.stepIndex || 0);
+  const navUserPosRef = useRef(persistedNavigation?.userPos || null);
   const navWatchIdRef = useRef(null);
   const navRouteLayersRef = useRef(null); // { done, ahead, pulse }
   const navDestMarkerRef = useRef(null);
@@ -120,6 +125,18 @@ const NavigationController = forwardRef(function NavigationController(
   const navClickAbortRef = useRef(null);
   const lastDrawFracRef = useRef(-1);
 
+  const persistNavigation = useCallback(() => {
+    if (!navActiveRef.current || !navRouteDataRef.current || !navDestRef.current || !navUserPosRef.current) return;
+    writePersistentState('navigation-session', {
+      active: true,
+      dest: navDestRef.current,
+      mode: navModeRef.current,
+      routeData: navRouteDataRef.current,
+      stepIndex: navStepIndexRef.current,
+      userPos: navUserPosRef.current,
+    });
+  }, []);
+
   // ── Voice (Web Speech API) — ported from app.js ~4433–4442 ────────────
   const speak = useCallback((text) => {
     if (!voiceEnabledRef.current) return;
@@ -134,13 +151,15 @@ const NavigationController = forwardRef(function NavigationController(
 
   // ── Set destination (from dropdown pick, map click, or "Navigate Here") ──
   const setNavDest = useCallback((entry) => {
-    navDestRef.current = {
+    const destination = {
       lat: parseFloat(entry.lat),
       lng: parseFloat(entry.lng),
       name: entry.name,
       id: entry.id || null,
       type: entry.type || entry.subtype || null,
     };
+    navDestRef.current = destination;
+    writePersistentState('navigation-destination', destination);
     setDestInputValue(entry.name);
     setDropdownResults([]);
     setHint(`Destination set: ${entry.name}`);
@@ -366,7 +385,8 @@ const NavigationController = forwardRef(function NavigationController(
     if (!routeData || !userPos || !dest) return;
     const { lat, lng } = userPos;
 
-    const distToDest = haversine(lat, lng, dest.lat, dest.lng);
+    const routePos = routePosition(routeData.coords, lat, lng);
+    const distToDest = routeData.distance * (routePos.distanceRemaining / routePos.distanceTotal || 0);
     const steps = routeData.steps;
     let nearest = navStepIndexRef.current;
     let minD = Infinity;
@@ -412,12 +432,11 @@ const NavigationController = forwardRef(function NavigationController(
       const nextStep = steps[navStepIndexRef.current + 1];
       nextHud.nextPreview =
         navGpsTicksRef.current >= 2 && nextStep && nextStep.type !== 'arrive' && nextStep.instruction
-          ? `Then: ${nextStep.instruction}`
+          ? nextStep.instruction
           : '';
     }
 
-    const fracRemaining = Math.min(1, distToDest / routeData.distance);
-    const progress = Math.max(0, 1 - fracRemaining);
+    const progress = Math.max(0, Math.min(1, routePos.progress));
     drawRoute(routeData.coords, progress);
 
     if (distToDest < 15 && navGpsTicksRef.current >= 2) {
@@ -448,6 +467,52 @@ const NavigationController = forwardRef(function NavigationController(
 
     if (!map._userInteracting) map.panTo([lat, lng], { animate: true, duration: 0.6 });
   }, [map, drawRoute, speak, arrivedAtDestination]);
+
+  // Rebuild the live map layers and GPS watch after the browser recreates
+  // this component from a persisted navigation session.
+  useEffect(() => {
+    if (!persistedNavigation?.active || !map || !navRouteDataRef.current || !navDestRef.current || !navUserPosRef.current) return;
+
+    navActiveRef.current = true;
+    navGpsTicksRef.current = 2;
+    lastSpokenStepRef.current = navStepIndexRef.current;
+    setMode(navModeRef.current);
+    onActiveChange?.(true);
+    placeDestMarker(navDestRef.current.lat, navDestRef.current.lng, navDestRef.current.name);
+    drawRoute(navRouteDataRef.current.coords, routePosition(navRouteDataRef.current.coords, navUserPosRef.current.lat, navUserPosRef.current.lng).progress, true);
+    updateNavUserDot(navUserPosRef.current.lat, navUserPosRef.current.lng);
+    updateHUD();
+
+    navWatchIdRef.current = navigator.geolocation?.watchPosition(
+      (p) => {
+        navUserPosRef.current = { lat: p.coords.latitude, lng: p.coords.longitude };
+        gps.lastKnownPosRef.current = p;
+        navGpsTicksRef.current++;
+        updateNavUserDot(p.coords.latitude, p.coords.longitude);
+        updateHUD();
+        persistNavigation();
+      },
+      (err) => console.warn('Nav GPS err:', err.message),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    );
+
+    return () => {
+      if (navWatchIdRef.current !== null) navigator.geolocation?.clearWatch(navWatchIdRef.current);
+      navWatchIdRef.current = null;
+    };
+    // This restoration runs once for the snapshot captured at mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+
+  useEffect(() => {
+    const saveBeforeSuspension = () => persistNavigation();
+    document.addEventListener('visibilitychange', saveBeforeSuspension);
+    window.addEventListener('pagehide', saveBeforeSuspension);
+    return () => {
+      document.removeEventListener('visibilitychange', saveBeforeSuspension);
+      window.removeEventListener('pagehide', saveBeforeSuspension);
+    };
+  }, [persistNavigation]);
 
   // ── Start / stop navigation ────────────────────────────────────────
   const startNavigation = useCallback(async () => {
@@ -548,6 +613,7 @@ const NavigationController = forwardRef(function NavigationController(
     speak(`Starting navigation to ${dest.name}. ${firstInstruction}.`);
 
     updateHUD();
+    persistNavigation();
 
     const bounds = L.latLngBounds(routeData.coords);
     map.fitBounds(bounds, { padding: [80, 80] });
@@ -566,6 +632,7 @@ const NavigationController = forwardRef(function NavigationController(
 
         updateNavUserDot(latitude, longitude);
         updateHUD();
+        persistNavigation();
       },
       (err) => console.warn('Nav GPS err:', err.message),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
@@ -573,7 +640,7 @@ const NavigationController = forwardRef(function NavigationController(
 
     setGoDisabled(false);
     setGoLabel('Start Navigation');
-  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, updateHUD, onActiveChange, onGuestBlocked]);
+  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, updateHUD, persistNavigation, onActiveChange, onGuestBlocked]);
 
   const stopNavigation = useCallback(() => {
     navActiveRef.current = false;
@@ -620,6 +687,8 @@ const NavigationController = forwardRef(function NavigationController(
     navStepIndexRef.current = 0;
     navArrivalCountRef.current = 0;
     navGpsTicksRef.current = 0;
+    removePersistentState('navigation-session');
+    removePersistentState('navigation-destination');
     setDestInputValue('');
     setGoDisabled(true);
   }, [map, clearRouteLayers, onActiveChange]);

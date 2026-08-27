@@ -27,16 +27,18 @@ const IS_RETINA = window.devicePixelRatio > 1;
  * (waypoints, legend, search, etc. — later slices) can attach to the
  * same instance without reaching for window globals.
  */
-export default function MapShell({ onMapReady }) {
+export default function MapShell({ onMapReady, initialView, onViewChange }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
 
   useEffect(() => {
     if (mapRef.current) return; // guard against StrictMode double-invoke
 
     const map = L.map(containerRef.current, {
-      center: CAMPUS_CENTER,
-      zoom: 16,
+      center: initialView?.center || CAMPUS_CENTER,
+      zoom: initialView?.zoom || 16,
       maxBounds: CAMPUS_BOUNDS,
       maxBoundsViscosity: 0.95,
       minZoom: 14,
@@ -132,6 +134,8 @@ export default function MapShell({ onMapReady }) {
       else el.classList.add('zoom-close');
     };
     map.on('zoomend', updateZoomClass);
+    const saveView = () => onViewChangeRef.current?.({ center: map.getCenter(), zoom: map.getZoom() });
+    map.on('moveend', saveView);
     updateZoomClass();
 
     // ── Interaction start/end — pauses animations mid-gesture. Consumed
@@ -170,6 +174,7 @@ export default function MapShell({ onMapReady }) {
     return () => {
       clearTimeout(interactTimeout);
       map.off('zoomend', updateZoomClass);
+      map.off('moveend', saveView);
       map.off('dragstart mousedown touchstart', onInteractStart);
       map.off('dragend mouseup touchend', onInteractEnd);
       map.removeLayer(campusBoundaryRect);

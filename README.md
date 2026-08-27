@@ -14,7 +14,7 @@ for a human getting the project running locally.
 
 ## Prerequisites
 
-- Node.js (whatever version `vite` in `package.json` currently targets)
+- Node.js
 - npm
 
 ## Setup
@@ -25,19 +25,7 @@ cd MapsByFutaMig
 npm install
 ```
 
-`npm install` covers everything already in `package.json`. As of the
-current state of this repo (Slice 1 — base map shell), that's still
-missing a few packages the map shell needs — install those too:
-
-```bash
-npm install leaflet
-npm install @fontsource/inter @fontsource/bricolage-grotesque @fontsource/poppins @fontsource/montserrat @fontsource/dm-mono
-npm install lucide-react
-```
-
-(Each new slice may add its own dependencies going forward — check
-`MIGRATION_PLAN.md`'s progress tracker for what's landed and whether
-its notes mention a new package.)
+This repo already declares the app dependencies in `package.json`, including Leaflet, Supabase, React, React Router, Tailwind, and the branding/font packages.
 
 ## Run locally
 
@@ -45,27 +33,37 @@ its notes mention a new package.)
 npm run dev
 ```
 
-Opens on Vite's default port (check terminal output). The app currently
-mounts the map shell directly at `/`.
+The app is a Vite + React SPA. Current routes include:
+
+- `/` — landing page
+- `/map` — the real campus map view behind launch gating
+- `/gearlify` — direct access route used for special launch flow
+- `/reset-password` — password recovery flow
+- `/privacy`, `/terms`, `/cookies` — legal pages
 
 ## Other scripts
 
 ```bash
-npm run build     # production build
-npm run preview   # preview the production build locally
-npm run lint       # oxlint
+npm run build
+npm run build:client-only
+npm run preview
+npm run lint
 ```
+
+> Important: a fresh build was attempted in this environment and it failed before Vite could compile because the local PowerShell execution policy blocked the command with a `PSSecurityException` / `UnauthorizedAccess` error. That is an environment issue, not a clean app-level success signal.
 
 ## Project docs
 
 | File | What it's for |
 |---|---|
-| `CLAUDE.md` | Rules, conventions, and workflow for whoever (human or LLM) works on a slice next. Read this first. |
-| `MIGRATION_PLAN.md` | The full slice list, dependency order, and progress tracker. Check this before starting new work. |
-| `BRAND_GUIDELINES.md` | Design tokens and the icon library decision — source of truth for anything visual. |
-| This README | Clone-and-run instructions only. |
+| `CLAUDE.md` | The project rules, architecture guardrails, and current-state working notes. Read this first. |
+| `MIGRATION_PLAN.md` | Historical migration roadmap and progress tracker. Use it as context, not as a literal live checklist. |
+| `BRAND_GUIDELINES.md` | Design tokens and brand system source of truth. |
+| `FIREBASE_TO_SUPABASE_MIGRATION.md` | Supabase schema/RLS notes and migration design docs. |
+| This README | Local setup and current app-state context. |
 
 ## Current status
 
-Slice 1 (base map shell) is done. See the progress tracker in
-`MIGRATION_PLAN.md` for what's landed and what's next.
+This repo is no longer just a “base map shell” migration. The actual code in `src/` already includes real implementations for the map shell, waypoints, legend, segments, KML/OSM layers, search, GPS/navigation, auth, admin, and analytics surfaces.
+
+The migration docs are historical context. The code in `src/` is the source of truth for what is currently implemented, while live Supabase schema/RLS verification and a clean build on a non-blocked environment are still required before claiming full production readiness.

@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
 import { MapPin, ArrowRight } from 'lucide-react'
 import { useReveal } from './landingHooks'
+import { MapLink } from './shared'
 import tiFrancisImg from '../../assets/TI_FRANCIS.jpg'
 import slsImg from '../../assets/SLS.jpg'
 import senateImg from '../../assets/SENATE_BUILDING.jpg'
@@ -75,9 +75,8 @@ function PopularPlacesSection() {
           style={{ transitionDelay: '0.25s' }}
         >
           {PLACES.map((place, i) => (
-            <Link
+            <MapLink
               key={place.key}
-              to="/map"
               className={`popular-card popular-card-${i}`}
               style={{ backgroundImage: `url(${place.img})` }}
             >
@@ -86,7 +85,7 @@ function PopularPlacesSection() {
                 <MapPin size={13} strokeWidth={2.25} color="#fff" style={{ flexShrink: 0 }} />
                 {place.name}
               </span>
-            </Link>
+            </MapLink>
           ))}
         </div>
 
@@ -94,8 +93,7 @@ function PopularPlacesSection() {
           className={`reveal ${visible ? 'visible' : ''}`}
           style={{ textAlign: 'center', marginTop: 40, transitionDelay: '0.35s' }}
         >
-          <Link
-            to="/map"
+          <MapLink
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: 14,
@@ -103,7 +101,7 @@ function PopularPlacesSection() {
             }}
           >
             See every location on the map <ArrowRight size={15} strokeWidth={2.25} />
-          </Link>
+          </MapLink>
         </div>
       </div>
     </section>

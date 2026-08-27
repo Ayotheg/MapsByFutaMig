@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
 import { ArrowRight, ArrowDown, Search } from 'lucide-react'
 import { useReveal } from './landingHooks'
+import { MapLink } from './shared'
 import obanlaSignpostImg from '../../assets/OBANLA-CAMPUS_SIGNPOST.jpg'
 import obakekereSignpostImg from '../../assets/OBAKEKERE-CAMPUS_SIGNPOST.jpg'
 import digitalMapImg from '../../assets/MapssByFuta.jpg'
@@ -97,8 +97,7 @@ function CampusTransformSection() {
           className={`reveal ${visible ? 'visible' : ''}`}
           style={{ textAlign: 'center', marginTop: 48, transitionDelay: '0.35s' }}
         >
-          <Link
-            to="/map"
+          <MapLink
             className="pill-btn"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -108,7 +107,7 @@ function CampusTransformSection() {
             }}
           >
             Try the digital map <ArrowRight size={16} strokeWidth={2.25} />
-          </Link>
+          </MapLink>
         </div>
       </div>
     </section>

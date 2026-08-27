@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { X, Menu, MapPin } from 'lucide-react'
+import { MapLink } from './shared'
 
 /* ─── Navigation ───
  * Floating light-theme pill nav for the marketing landing page. This is
@@ -19,12 +20,13 @@ function Nav() {
 
   // Every id here must exist on a real section post-redesign:
   // Hero -> #about, ProductFeatures -> #features, VideoSection -> #video,
-  // ExploreSection -> #explore, FAQ -> #faq.
+  // ExploreSection -> #explore, FAQ -> #faq, BTSSection -> #bts.
   const links = [
     { label: 'Features', id: 'features' },
     { label: 'See how it works', id: 'video' },
     { label: 'Explore', id: 'explore' },
     { label: 'FAQ', id: 'faq' },
+    { label: 'Behind the scenes', id: 'bts' },
   ]
 
   const scrollTo = (id) => {
@@ -97,8 +99,7 @@ function Nav() {
 
         {/* CTA + mobile toggle */}
         <div className="flex items-center gap-3" style={{ justifySelf: 'end', gridColumn: 3 }}>
-          <Link
-            to="/map"
+          <MapLink
             className="hidden md:inline-flex"
             style={{
               alignItems: 'center', gap: 6,
@@ -111,7 +112,7 @@ function Nav() {
             onMouseLeave={e => { e.currentTarget.style.transform = 'none' }}
           >
             Open the map
-          </Link>
+          </MapLink>
           <button
             className="md:hidden flex items-center"
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -148,8 +149,7 @@ function Nav() {
             </button>
           ))}
           <div style={{ padding: '8px 24px 4px' }}>
-            <Link
-              to="/map"
+            <MapLink
               style={{
                 display: 'flex', justifyContent: 'center', alignItems: 'center',
                 background: 'var(--land-accent)', color: '#fff', textDecoration: 'none',
@@ -158,7 +158,7 @@ function Nav() {
               }}
             >
               Open the map
-            </Link>
+            </MapLink>
           </div>
         </div>
       )}

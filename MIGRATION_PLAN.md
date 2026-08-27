@@ -5,7 +5,11 @@
 **Backend:** migrating in parallel from Firebase → Supabase (see separate backend plan; this doc assumes Supabase is live by the time each slice starts touching data)
 
 ## How to use this document
-Each slice below is a self-contained unit of work you can hand to a fresh LLM session. Work top to bottom — later slices assume earlier ones exist in the new repo. Don't skip ahead; several features quietly depend on ones above them (noted under "Depends on").
+This file is now best treated as a historical migration roadmap, not as a literal live status checklist. The repo already contains implementations for many of the later slices in code, so a fresh session should read the actual files first and use this document as background context rather than as the final authority.
+
+**Current reality:** the project has moved beyond the original slice-by-slice plan. Many slices are already implemented in code, and the actual files in `src/` are the live source of truth. Historical migration notes are useful context, but live verification against Supabase schema/RLS and a clean build in a non-blocked environment is still required before claiming the app is production-ready.
+
+**Current verification status:** a fresh `npm run build` in this environment failed before Vite compiled because the local PowerShell execution policy blocked the command with a `PSSecurityException` / `UnauthorizedAccess` error. That is the current build-status blocker in this environment, not a clean app-level success signal.
 
 **Bundle-size & code-splitting policy** (see `CLAUDE.md`) is effective **starting Slice 4**. Slices 1–3 predate it and don't need retrofitting.
 

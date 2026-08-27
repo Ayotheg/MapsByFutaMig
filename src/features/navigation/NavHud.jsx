@@ -19,6 +19,7 @@ export default function NavHud({ arriving, arrived, turnIcon, turnInstruction, t
           <TurnIcon size={22} />
         </div>
         <div className={styles.turnInfo}>
+          <div className={styles.instructionLabel}>NOW</div>
           <div className={styles.turnInstruction}>{turnInstruction}</div>
           <div className={styles.turnDist}>{turnDist}</div>
         </div>
@@ -30,7 +31,12 @@ export default function NavHud({ arriving, arrived, turnIcon, turnInstruction, t
         </button>
       </div>
 
-      {nextPreview && <div className={styles.nextPreview}>{nextPreview}</div>}
+      {nextPreview && (
+        <div className={styles.nextPreview}>
+          <span className={styles.nextLabel}>UP NEXT</span>
+          <span>{nextPreview}</span>
+        </div>
+      )}
 
       <div className={styles.stats}>
         <div className={`${styles.stat} ${styles.statSingle}`}>
