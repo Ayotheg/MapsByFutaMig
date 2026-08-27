@@ -45,11 +45,10 @@ create trigger quick_chips_touch
 -- Same unverified-exposure note as adminSave.js: this client uses the
 -- anon key, and the admin PIN gate is a UI convenience only. Read access
 -- needs to be public (every visitor's Quick Chips bar reads this table);
--- writes should be locked down the same way you lock down
--- waypoints/segments writes once real RLS policies exist (ideally scoped
--- to `auth.uid()`). Adjust the two policies below to match whatever you
--- land on there — they're intentionally permissive placeholders so the
--- admin panel works immediately.
+-- writes are restricted to authenticated users whose profile is marked as
+-- an admin. The client-side PIN is only a UI gate; `is_admin(auth.uid())`
+-- is the database security boundary. Run waypoint_submissions.sql first
+-- if that function has not been created yet.
 alter table quick_chips enable row level security;
 
 drop policy if exists "quick_chips_public_read" on quick_chips;
@@ -57,8 +56,21 @@ create policy "quick_chips_public_read" on quick_chips
   for select using (true);
 
 drop policy if exists "quick_chips_public_write" on quick_chips;
-create policy "quick_chips_public_write" on quick_chips
-  for all using (true) with check (true);
+drop policy if exists "quick_chips_admin_insert" on quick_chips;
+create policy "quick_chips_admin_insert" on quick_chips
+  for insert to authenticated
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "quick_chips_admin_update" on quick_chips;
+create policy "quick_chips_admin_update" on quick_chips
+  for update to authenticated
+  using (is_admin(auth.uid()))
+  with check (is_admin(auth.uid()));
+
+drop policy if exists "quick_chips_admin_delete" on quick_chips;
+create policy "quick_chips_admin_delete" on quick_chips
+  for delete to authenticated
+  using (is_admin(auth.uid()));
 
 -- ── Seed the 16 default chips ───────────────────────────────────────────
 -- Matches features/shared/placeCategories.js's CHIP_DISPLAY_ORDER/
