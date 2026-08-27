@@ -11,6 +11,7 @@ import ExploreSection from './landing/ExploreSection'
 import PopularPlacesSection from './landing/PopularPlacesSection'
 import FinalCTA from './landing/FinalCTA'
 import FAQ from './landing/FAQ'
+import BTSSection from './landing/BTSSection'
 import Footer from './landing/Footer'
 
 function LandingPage() {
@@ -55,7 +56,8 @@ function LandingPage() {
       <ExploreSection />
       <PopularPlacesSection />
       <FinalCTA />
-      <FAQ />
+      <BTSSection />
+        <FAQ />
       <Footer />
     </>
   )

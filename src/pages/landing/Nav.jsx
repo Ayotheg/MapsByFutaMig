@@ -20,12 +20,13 @@ function Nav() {
 
   // Every id here must exist on a real section post-redesign:
   // Hero -> #about, ProductFeatures -> #features, VideoSection -> #video,
-  // ExploreSection -> #explore, FAQ -> #faq.
+  // ExploreSection -> #explore, FAQ -> #faq, BTSSection -> #bts.
   const links = [
     { label: 'Features', id: 'features' },
     { label: 'See how it works', id: 'video' },
     { label: 'Explore', id: 'explore' },
     { label: 'FAQ', id: 'faq' },
+    { label: 'Behind the scenes', id: 'bts' },
   ]
 
   const scrollTo = (id) => {
