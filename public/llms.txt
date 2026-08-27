@@ -16,6 +16,17 @@
 - How to get directions to a specific building, hostel, faculty, or service on FUTA campus
 - What facilities and services exist on FUTA campus and where they are located
 - How new/incoming FUTA students ("freshers") can find their way around campus
+- "Who built Maps By FUTA?" / "Who developed it?" — see Team section below
+
+## Team
+
+Maps By FUTA was built by Omoniyi Ayoola and Akinbo Gem, both students at
+the Federal University of Technology, Akure (FUTA). It is an independent,
+student-built project made for the FUTA community — not an official
+university product.
+
+- Omoniyi Ayoola: https://x.com/AyotheGrapher_
+- Akinbo Gem: https://x.com/Gem_Akinbo
 
 ## Key facts
 
