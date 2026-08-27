@@ -112,6 +112,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       const f = editContext.data;
       setName(f.name || '');
       setDescription(f.description || '');
+      setWpType(f.waypointType || 'landmark');
       setExistingImages([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -165,7 +166,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
         // Legacy: kml edits never write to Firebase directly on Save —
         // only the separate "Import to Supabase" button does (app.js
         // ~4270–4271, "Updated in memory. (KML file not modified)").
-        adminKml.renameFeature(editContext.path, editContext.idx, name.trim(), description.trim());
+        adminKml.renameFeature(editContext.path, editContext.idx, name.trim(), description.trim(), wpType);
         setStatus({ text: 'Updated in memory. (KML file not modified)', error: false, icon: true });
       }
     } catch (e) {
@@ -318,6 +319,15 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           <Field label="Description / Note">
             <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
           </Field>
+          <Field label="Waypoint Type">
+            <select value={wpType} onChange={(e) => setWpType(e.target.value)}>
+              {WP_ALL_TYPES.map(([t, label]) => (
+                <option key={t} value={t}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Source File">
             <div className={styles.coordDisplay}>
               {editContext.path} <span className={styles.sourceTag}>{editContext.data.type || 'feature'}</span>
@@ -371,6 +381,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             setStatus(null);
             try {
               await adminKml.importFeature(editContext.path, editContext.idx, {
+                waypointType: wpType,
                 onImported: () => {
                   onWaypointChanged?.();
                   onSegmentChanged?.();

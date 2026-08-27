@@ -60,7 +60,7 @@ export const BASEMAP_STYLES = [
     // don't exist — a bit soft at max zoom, but never a blank/"not
     // available" tile.
     maxZoom: 19,
-    maxNativeZoom: 17,
+    maxNativeZoom: 15,
   },
   {
     id: 'terrain',

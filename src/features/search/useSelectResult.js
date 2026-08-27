@@ -51,9 +51,11 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
         description: entry.desc || '',
         lat: parseFloat(entry.lat),
         lng: parseFloat(entry.lng),
-        imageUrls: [],
+        imageUrls: entry.imageUrls || [],
         id: entry.id,
         type: entry.subtype || entry.type,
+        avgRating: entry.avgRating,
+        reviewCount: entry.reviewCount,
       };
       const marker = markerRef.current;
       marker.on('click', (ev) => {

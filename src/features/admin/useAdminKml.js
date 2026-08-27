@@ -123,6 +123,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
               lat: ll.lat,
               lng: ll.lng,
               type: 'Point',
+              waypointType: 'landmark',
               description: cleanDesc,
               imageFiles: [],
             };
@@ -183,7 +184,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
   // legacy's three-way isNamed/wasNamed branch verbatim — same visual
   // result (teardrop vs dot), fewer code paths to keep in sync.
   const renameFeature = useCallback(
-    (path, idx, name, description) => {
+    (path, idx, name, description, waypointType = 'landmark') => {
       const key = `${path}-${idx}`;
       const marker = markersRef.current[key];
       const file = registry[path];
@@ -233,7 +234,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
         });
       }
 
-      setFeature(path, idx, { name, description });
+      setFeature(path, idx, { name, description, waypointType });
     },
     [map, onSelect, registry, setFeature, searchRegister]
   );
@@ -288,7 +289,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
   // to beforehand) — legacy has no equivalent step since it just embeds
   // the same base64 array on the new doc directly.
   const importFeature = useCallback(
-    async (path, idx, { onImported } = {}) => {
+    async (path, idx, { onImported, waypointType = 'landmark' } = {}) => {
       const file = registry[path];
       const feature = file?.features?.[idx];
       if (!feature) return;
@@ -300,6 +301,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
         newId = await insertKmlPointAsWaypoint({
           name: feature.name,
           description: feature.description,
+          type: waypointType,
           lat: feature.lat,
           lng: feature.lng,
         });
