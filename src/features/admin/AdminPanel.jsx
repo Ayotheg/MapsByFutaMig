@@ -44,6 +44,7 @@ const TABS = [
  */
 export default function AdminPanel({
   map,
+  user,
   waypoints,
   segments,
   kmlAnnotations,
@@ -174,6 +175,7 @@ export default function AdminPanel({
           )}
           {activeTab === 'chips' && (
             <QuickChipsTab
+              user={user}
               chips={chips}
               waypoints={waypoints}
               kmlAnnotations={kmlAnnotations}

@@ -43,12 +43,17 @@ create trigger quick_chips_touch
 
 -- ── RLS ──────────────────────────────────────────────────────────────────
 -- Same unverified-exposure note as adminSave.js: this client uses the
--- anon key, and the admin PIN gate is a UI convenience only. Read access
--- needs to be public (every visitor's Quick Chips bar reads this table);
--- writes are restricted to authenticated users whose profile is marked as
--- an admin. The client-side PIN is only a UI gate; `is_admin(auth.uid())`
--- is the database security boundary. Run waypoint_submissions.sql first
--- if that function has not been created yet.
+-- anon key for anonymous reads, but admin writes (create/update/delete)
+-- require an authenticated user session with admin privileges. The Supabase
+-- client in src/lib/supabase.js automatically includes the authenticated
+-- user's session token in requests once they sign in via useAuth.js,
+-- enabling these policies to check is_admin(auth.uid()).
+--
+-- Read access needs to be public (every visitor's Quick Chips bar reads
+-- this table); writes are restricted to authenticated users whose profile
+-- is marked as an admin. The client-side PIN is only a UI gate;
+-- `is_admin(auth.uid())` is the database security boundary. Run
+-- waypoint_submissions.sql first if that function has not been created yet.
 alter table quick_chips enable row level security;
 
 drop policy if exists "quick_chips_public_read" on quick_chips;
