@@ -48,8 +48,25 @@ export async function findNearbyApprovedWaypoint(lat, lng, waypoints) {
  * attempt logged in `waypoint_submission_log` regardless of
  * approve/reject outcome — a user who gets 5 submissions rejected in a
  * row shouldn't get 5 fresh attempts, see waypoint_submissions.sql's
- * schema note. */
+ * schema note.
+ *
+ * Admins bypass the student cap entirely: the app uses the same server-side
+ * `is_admin(auth.uid())` database checks for real enforcement, but the client
+ * UX should not block a trusted admin from submitting as many times as they
+ * need while they review or curate the map.
+ */
 export async function checkRateLimit(userId) {
+  const { data: adminProfile, error: adminError } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (adminError) throw adminError;
+  if (adminProfile?.is_admin) {
+    return true;
+  }
+
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count, error } = await supabase
     .from('waypoint_submission_log')
