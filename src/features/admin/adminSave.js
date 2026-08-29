@@ -83,8 +83,37 @@ export async function deleteImageRows(table, ids) {
 // all re-render declaratively from the `waypoints` prop once the caller
 // calls `refetch()`, same "refetch instead of hand-patch" deviation
 // segmentSave.js already established for the save flow.
-export async function updateWaypoint(id, { name, description, type }) {
-  const { error } = await supabase.from('waypoints').update({ name, description, type }).eq('id', id);
+//
+// Explore fields (isExplore/exploreTags/explorePriority/isPromoted/
+// sponsorName/promoLabel — supabase/explore_fields.sql) are optional
+// patch fields, not required ones: AdminEditModal.jsx always passes them
+// now, but this stays backward-compatible with any other caller passing
+// only name/description/type.
+export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel }) {
+  const patch = { name, description, type };
+  const explorePatch = {};
+  if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
+  if (exploreTags !== undefined) explorePatch.explore_tags = exploreTags;
+  if (explorePriority !== undefined) explorePatch.explore_priority = explorePriority;
+  if (isPromoted !== undefined) explorePatch.is_promoted = !!isPromoted;
+  if (sponsorName !== undefined) explorePatch.sponsor_name = sponsorName || null;
+  if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
+
+  const hasExploreFields = Object.keys(explorePatch).length > 0;
+  const { error } = await supabase
+    .from('waypoints')
+    .update(hasExploreFields ? { ...patch, ...explorePatch } : patch)
+    .eq('id', id);
+
+  if (error && hasExploreFields && /column .* does not exist/i.test(error.message || '')) {
+    // supabase/explore_fields.sql hasn't been run yet — don't let that
+    // block saving the ordinary name/description/type edit too.
+    const { error: baseError } = await supabase.from('waypoints').update(patch).eq('id', id);
+    if (baseError) throw baseError;
+    throw new Error(
+      'Saved name/description/type, but Explore fields need supabase/explore_fields.sql run first — the Explore toggle/tags/priority above were not saved.'
+    );
+  }
   if (error) throw error;
   // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
   track('admin_action', { action: 'update', entity: 'waypoint' });

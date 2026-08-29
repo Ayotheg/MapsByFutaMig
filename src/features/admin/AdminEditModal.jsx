@@ -66,6 +66,17 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
   const [wpType, setWpType] = useState('landmark');
   const [category, setCategory] = useState('other');
 
+  // Explore panel fields (supabase/explore_fields.sql) — this IS the
+  // "pick a name on the map and feature it" flow: no separate admin
+  // tab/table, just a few more fields on the same waypoint edit form
+  // already used for name/description/type.
+  const [isExplore, setIsExplore] = useState(false);
+  const [exploreTagsText, setExploreTagsText] = useState('');
+  const [explorePriority, setExplorePriority] = useState(0);
+  const [isPromoted, setIsPromoted] = useState(false);
+  const [sponsorName, setSponsorName] = useState('');
+  const [promoLabel, setPromoLabel] = useState('Promoted');
+
   const [existingImages, setExistingImages] = useState([]); // {id, storagePath, url}
   const [newFiles, setNewFiles] = useState([]); // File[]
   const [removedImages, setRemovedImages] = useState([]); // {id, storagePath}[]
@@ -91,6 +102,12 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       // from name+type so this always matches the badge. See its comment
       // in wpTypeMeta.js.
       setWpType(resolveWaypointType(wp));
+      setIsExplore(!!wp.isExplore);
+      setExploreTagsText((wp.exploreTags || []).join(', '));
+      setExplorePriority(wp.explorePriority ?? 0);
+      setIsPromoted(!!wp.isPromoted);
+      setSponsorName(wp.sponsorName || '');
+      setPromoLabel(wp.promoLabel || 'Promoted');
       setImagesLoading(true);
       fetchImageRows('waypoint_images', 'waypoint_id', editContext.id)
         .then((rows) => {
@@ -153,7 +170,17 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
     setStatus(null);
     try {
       if (type === 'waypoint') {
-        await updateWaypoint(editContext.id, { name: name.trim(), description: description.trim(), type: wpType });
+        await updateWaypoint(editContext.id, {
+          name: name.trim(),
+          description: description.trim(),
+          type: wpType,
+          isExplore,
+          exploreTags: exploreTagsText.split(',').map((s) => s.trim()).filter(Boolean),
+          explorePriority: Number(explorePriority) || 0,
+          isPromoted,
+          sponsorName,
+          promoLabel,
+        });
         await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
         setStatus({ text: 'Waypoint updated!', error: false, icon: true });
         onWaypointChanged?.();
@@ -282,6 +309,55 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
               {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
             </div>
           </Field>
+
+          {/* "Feature in Explore" — the whole ask was "just me picking a
+              name on the map and featuring it", so this lives right in
+              the same edit form as everything else, no separate tab. */}
+          <div className={styles.exploreSection}>
+            <label className={styles.checkboxRow}>
+              <input type="checkbox" checked={isExplore} onChange={(e) => setIsExplore(e.target.checked)} />
+              Feature this place in Explore
+            </label>
+
+            {isExplore && (
+              <>
+                <Field label="Tags shown on the Explore card (comma separated)">
+                  <input
+                    value={exploreTagsText}
+                    onChange={(e) => setExploreTagsText(e.target.value)}
+                    placeholder="e.g. Quick bite, Open late"
+                  />
+                </Field>
+                <Field label="Priority (higher shows first / more often)">
+                  <input type="number" value={explorePriority} onChange={(e) => setExplorePriority(e.target.value)} />
+                </Field>
+
+                <label className={styles.checkboxRow}>
+                  <input type="checkbox" checked={isPromoted} onChange={(e) => setIsPromoted(e.target.checked)} />
+                  Promoted (shows an ad badge, pinned first)
+                </label>
+
+                {isPromoted && (
+                  <>
+                    <Field label="Sponsor name">
+                      <input
+                        value={sponsorName}
+                        onChange={(e) => setSponsorName(e.target.value)}
+                        placeholder="e.g. Chicken Republic"
+                      />
+                    </Field>
+                    <Field label="Badge label">
+                      <input
+                        value={promoLabel}
+                        onChange={(e) => setPromoLabel(e.target.value)}
+                        placeholder="Promoted / Ad / Sponsored"
+                      />
+                    </Field>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </>
       )}
 

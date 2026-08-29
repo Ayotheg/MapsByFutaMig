@@ -279,9 +279,10 @@ JSX/logic change).
 | Search (mobile) | `src/features/search/MobileSearchBar.*`, `MobileSearchOverlay.*` | Mobile | — | Not started |
 | Search (desktop) | `src/features/search/DesktopSearchBar.*`, `SearchDropdownList.jsx`, `SearchResultItem.*` | Desktop | — | Not started |
 | Quick chips | `src/features/search/QuickChips.*`, `ChipResultsPanel.*`, `ChipResultRow.*` | Both — single component, internal `@media` queries, not split files | — | Not started |
-| Filter/legend content | `src/features/legend/LayersPanel.*`, `PlaceTypeFilter.*` | Both — shared content wrapped by both shells below; redesign once | — | Not started |
-| Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; sheet body pending |
-| Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; panel pending |
+| Filter/legend content | `src/features/legend/LayersPanel.*`, `PlaceTypeFilter.*` | Desktop only now — mobile's Layers entry point removed this session, see Explore Panel flag below | — | Not started |
+| Explore panel | `src/features/explore/*`, `src/features/admin/AdminEditModal.jsx` (Explore fields), `supabase/explore_fields.sql` | Both — mobile navbar's "Explore" tab body + new desktop rail button | Bricolage Grotesque + Inter (v2 tokens) | Done |
+| Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; 'layers'-keyed tab body now Explore Panel (see flag) |
+| Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; Explore panel added this session, Layers panel body still pending
 | Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) | — | Not started |
 | Nav/GPS HUD | `src/features/navigation/NavHud.*`, `NavPanel.*`, `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | — | Not started |
 | Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
@@ -296,6 +297,65 @@ table. Deliverable per session: full repo zip (matching the existing
 migration-slice convention), with this table updated.
 
 **Flags from completed screens:**
+- Explore panel (this session): **real functionality added, not a
+  reskin — an explicit, deliberate exception to Rule 1/2 above, made on
+  direct user instruction in-session, not assumed.** Figma node 1:3
+  (screenshot supplied in-session, `figma.com` itself is robots-blocked
+  for automated fetching) is the "Explore Campus" card: a header + "View
+  All" + a couple of rotating place cards (image/colored icon, name,
+  distance, promoted badge), reached by tapping the mobile navbar's
+  existing "Explore" tab (previously mislabeled — it opened
+  `LayersPanel`, flagged as a leftover in the entry below).
+  - **Revised mid-session, per explicit follow-up instruction:** the
+    first pass built a separate `explore_picks` table + a 7th admin tab
+    (`ExploreTab.jsx`) — mirroring `QuickChipsTab.jsx`'s "curation layer
+    over an existing table" shape. That table needing its own migration
+    run before use is exactly what the person hit
+    (`Could not find the table 'public.explore_picks'`), and they then
+    said plainly they didn't want a separate database concept at all —
+    just picking a place on the map and featuring it. **Replaced with:**
+    `supabase/explore_fields.sql` adds a handful of plain columns
+    directly onto the existing `waypoints` table (`is_explore`,
+    `explore_tags`, `explore_priority`, `is_promoted`, `sponsor_name`,
+    `promo_label`) instead of a new table. Featuring a place is now just
+    a checkbox + a couple of fields inside the *same* waypoint edit form
+    (`AdminEditModal.jsx`, opened by clicking a pin on the map) already
+    used to edit its name/description/type — no new admin tab, no new
+    RLS policies (reuses `waypoints`' existing ones, the same ones
+    `updateWaypoint()` already relied on). `ExploreTab.jsx`/
+    `explorePicksApi.js`/`explore_picks.sql` were deleted, not kept
+    alongside. `useWaypoints.js`'s initial select also degrades
+    gracefully (retries without the Explore columns, logs a note) if
+    `explore_fields.sql` hasn't been run yet, so a missing migration
+    can't break waypoint loading for the whole map the way the first
+    version's missing table broke Explore specifically.
+  - New feature folder `src/features/explore/`: `useExplorePicks.js`
+    filters/sorts the `waypoints` array `MapPage` already loads for
+    `isExplore: true` rows — no fetch of its own at all now. Falls back
+    to an auto-generated top-rated list (rating x log(reviews)) when
+    nothing's been featured yet, so the panel is never empty
+    pre-admin-setup — same contract as `useQuickChips()` falling back to
+    `DEFAULT_CHIPS`. `ExplorePanel.jsx` renders a `compact` variant
+    (rotates every 7s; a promoted pick, if any, stays pinned first — an
+    ad slot doesn't roll dice on visibility) and a `full` variant
+    (stable scrollable list, used for "View All" and always on desktop).
+    `useOneShotLocation.js` is a single cheap `getCurrentPosition()` call
+    for "X mins away" labels — deliberately not `useGpsTracking.js`'s
+    live-tracking machinery, see that file's own header comment for why.
+  - **Repurposed, not added:** mobile's "Explore" tab (`MobileSheet.jsx`,
+    key `'layers'`) previously rendered `LayersPanel` — now renders
+    `ExplorePanel`. Mobile has **no Layers/legend entry point at all**
+    after this change; confirmed explicitly in-session rather than
+    assumed, since it's a real capability removal (same flagging
+    standard as the Admin-tab removal below).
+  - **Added, not repurposed:** `Sidebar.jsx` (desktop) keeps its
+    existing Layers rail button untouched and gets a new one alongside
+    it (`Sparkles` icon — `Compass` was already taken by Layers here),
+    per explicit instruction that desktop's two features stay separate
+    while mobile's single tab gets repurposed. This is why mobile and
+    desktop now disagree about whether Explore replaces or supplements
+    Layers — both were direct instructions, not an inconsistency to
+    "fix."
 - Loading Screen: icon swapped from `MapPin` to `Navigation`
   (lucide-react) to match the Figma reference — a component swap, not
   a logic change, no props/behavior affected. Subtitle copy also
@@ -310,6 +370,10 @@ migration-slice convention), with this table updated.
   + footer icons, not the `.body`/`.panel` content those wrap (that's
   `LayersPanel`/`PlaceTypeFilter`, still its own "Not started" row
   above — no Figma reference for it yet, not guessed at here).
+  **Update (see Explore panel flag above):** the 'layers'-keyed tab's
+  body is no longer `LayersPanel` on mobile — it's `ExplorePanel` now.
+  This note is left as-is for history; don't take "no Figma reference"
+  as still true for that specific tab.
   - `.header`/`.tabs` restyled to the v2 light palette (matches
     Figma exactly: white rounded-top bar, elevation shadow, pill
     active state on `var(--v2-primary-glow)`). Deliberately did

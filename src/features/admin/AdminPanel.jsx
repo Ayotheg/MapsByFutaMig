@@ -21,6 +21,11 @@ const InsightsTab = lazy(() => import('../analytics/InsightsTab'));
 // added as a 5th tab, appended at the end so it doesn't reorder/renumber
 // anything an admin's muscle memory already relies on for the other four.
 // Slice 14: "Insights" appended as a 6th tab, same precedent.
+// Explore (in-app redesign) deliberately has NO tab here — per explicit
+// instruction, featuring a place happens right in the existing waypoint
+// edit form (Points tab → click a waypoint → "Feature this place in
+// Explore" checkbox in AdminEditModal.jsx), not a separate admin
+// surface. See supabase/explore_fields.sql's header comment.
 const TABS = [
   { key: 'points', label: 'Points' },
   { key: 'routes', label: 'Routes' },

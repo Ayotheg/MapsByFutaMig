@@ -33,24 +33,35 @@ export function useWaypoints() {
     setLoading(true);
     setError(null);
 
-    const [{ data: wpRows, error: wpErr }, { data: imgRows, error: imgErr }] =
-      await Promise.all([
-        supabase
-          .from('waypoints')
-          .select(
-            'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count'
-          )
-          // Every pre-Slice-13 row is backfilled to 'approved' by
-          // waypoint_submissions.sql, and admin-created rows (adminSave.js's
-          // insertWaypoint) default to 'approved' too — this filter is a
-          // no-op for all of those, it only actually excludes
-          // pending/rejected student submissions.
-          .eq('status', 'approved'),
-        supabase
-          .from('waypoint_images')
-          .select('waypoint_id, storage_path, position')
-          .order('position', { ascending: true }),
-      ]);
+    const EXPLORE_COLS =
+      'is_explore, explore_tags, explore_priority, is_promoted, sponsor_name, promo_label';
+    const BASE_COLS = 'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count';
+
+    let wpRows, wpErr;
+    {
+      const res = await supabase.from('waypoints').select(`${BASE_COLS}, ${EXPLORE_COLS}`).eq('status', 'approved');
+      if (res.error) {
+        // Explore fields (supabase/explore_fields.sql) not migrated yet —
+        // don't let that break waypoint loading for the whole map. Retry
+        // without them; useExplorePicks.js already treats a waypoint
+        // with none of these fields as simply "not featured".
+        const fallback = await supabase.from('waypoints').select(BASE_COLS).eq('status', 'approved');
+        wpRows = fallback.data;
+        wpErr = fallback.error;
+        if (!fallback.error) {
+          console.info(
+            '[waypoints] Explore fields not found — run supabase/explore_fields.sql to enable featuring places in Explore.'
+          );
+        }
+      } else {
+        wpRows = res.data;
+        wpErr = res.error;
+      }
+    }
+    const { data: imgRows, error: imgErr } = await supabase
+      .from('waypoint_images')
+      .select('waypoint_id, storage_path, position')
+      .order('position', { ascending: true });
 
     if (wpErr || imgErr) {
       setError(wpErr || imgErr);
@@ -105,6 +116,17 @@ export function useWaypoints() {
         // rule as lat/lng above.
         avgRating: wp.avg_rating != null ? Number(wp.avg_rating) : null,
         reviewCount: Number(wp.review_count) || 0,
+        // Explore panel fields (supabase/explore_fields.sql) — plain
+        // columns on this same row, not a separate table/fetch. Falsy/
+        // empty defaults here matter: `useExplorePicks.js` treats
+        // `isExplore: false` waypoints as simply not in the rotation,
+        // same as if these columns didn't exist yet (pre-migration).
+        isExplore: !!wp.is_explore,
+        exploreTags: wp.explore_tags || [],
+        explorePriority: wp.explore_priority ?? 0,
+        isPromoted: !!wp.is_promoted,
+        sponsorName: wp.sponsor_name || '',
+        promoLabel: wp.promo_label || 'Promoted',
       });
     }
 

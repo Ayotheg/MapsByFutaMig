@@ -132,15 +132,22 @@
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  /* Sheet body (LayersPanel/GpsPanel/NavPanel content) isn't redesigned
-     yet — see "Filter/legend content" in UI_REDESIGN_GUIDE.md Section 7
-     — and still assumes light-on-dark text, so this keeps the v1 dark
-     surface rather than the v2 light one used by the navbar above it. */
+  /* Sheet body defaults to the v1 dark surface — still correct for
+     GpsPanel/NavPanel, which assume light-on-dark text and haven't been
+     redesigned (see "Filter/legend content" in UI_REDESIGN_GUIDE.md
+     Section 7). The Explore tab overrides this via .panelLight below,
+     since its content (ExplorePanel.jsx) is real v2 light-theme design
+     now, not a placeholder — without the override its own white card
+     just floated inside this dark one with grey showing around it. */
   background: var(--surface-bright);
   border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
   box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.4), 0 -1px 0 rgba(255, 255, 255, 0.06);
   transition: height 0.38s var(--v2-ease-standard);
   will-change: height;
+}
+.panelLight {
+  background: var(--v2-surface);
+  box-shadow: 0 -4px 32px rgba(74, 68, 85, 0.14), 0 -1px 0 rgba(74, 68, 85, 0.05);
 }
 .panelClosed {
   height: 0;

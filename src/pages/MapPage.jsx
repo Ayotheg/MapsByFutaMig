@@ -15,6 +15,7 @@ import OSMAnnotationLayer from '../features/osm-annotations/OSMAnnotationLayer';
 import ViewModeToggle from '../features/osm-annotations/ViewModeToggle';
 import { useSearchIndex } from '../features/search/useSearchIndex';
 import { useQuickChips } from '../features/search/useQuickChips';
+import { useExplorePicks } from '../features/explore/useExplorePicks';
 import DesktopSearchBar from '../features/search/DesktopSearchBar';
 import MobileSearchBar from '../features/search/MobileSearchBar';
 import MobileSearchOverlay from '../features/search/MobileSearchOverlay';
@@ -150,6 +151,10 @@ export default function MapPage({ onReadinessChange }) {
 
   const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations });
   const quickChips = useQuickChips();
+  // Explore panel (mobile navbar "Explore" tab + desktop rail button):
+  // derived straight from `waypoints` (no separate fetch/table — see
+  // useExplorePicks.js's own header comment).
+  const explorePicksState = useExplorePicks(waypoints);
 
   // ── Slice 9: GPS + Navigation ──────────────────────────────────────
   // `navOpen` gates whether <NavigationController> is mounted at all
@@ -448,6 +453,9 @@ export default function MapPage({ onReadinessChange }) {
           onSuggestPlaceClick={handleSuggestPlaceClick}
           user={auth.user}
           onAuthClick={() => openAuthModal('login')}
+          explorePicks={explorePicksState.picks}
+          explorePicksLoading={waypointsLoading}
+          onExploreSelect={setSelected}
         />
       ) : (
         <Sidebar
@@ -463,6 +471,9 @@ export default function MapPage({ onReadinessChange }) {
           onAdminClick={handleAdminClick}
           onSuggestPlaceClick={handleSuggestPlaceClick}
           guestNavRemaining={auth.user ? null : guestUsage.remaining}
+          explorePicks={explorePicksState.picks}
+          explorePicksLoading={waypointsLoading}
+          onExploreSelect={setSelected}
         />
       )}
 

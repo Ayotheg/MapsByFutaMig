@@ -10,7 +10,7 @@ import { useReveal } from './landingHooks'
  * This is the one line to change each time a new build-log post goes
  * up, same pattern as DEMO_VIDEO_INPUT in VideoSection.jsx.
  */
-const BTS_POST_INPUT = 'https://twitter.com/AyotheGrapher_/status/2092871359734935630'
+const BTS_POST_INPUT = 'https://twitter.com/AyotheGrapher_/status/2093765653027057834'
 
 function extractPostId(input) {
   if (!input) return null

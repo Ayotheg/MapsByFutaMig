@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { Compass, Rss, Navigation, CirclePlus, CircleUser, Shield } from 'lucide-react';
+import { Compass, Rss, Navigation, CirclePlus, CircleUser, Shield, Sparkles } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
 import NavPanel from '../navigation/NavPanel';
+import ExplorePanel from '../explore/ExplorePanel';
 import { displayName } from '../auth/useAuth';
 import { track } from '../../lib/analytics';
 import { readPersistentState, writePersistentState } from '../../lib/persistentState';
@@ -23,6 +24,12 @@ const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
 // itself matches the "Layers Panel" Figma reference glyphs.
 const RAIL_ITEMS = [
   { key: 'layers', label: 'Layers', title: 'Layers', Icon: Compass, hasPanel: true },
+  // Desktop's own new rail button, added alongside (not instead of)
+  // Layers — per explicit instruction, desktop keeps Layers untouched;
+  // only mobile's pre-existing "Explore" tab got repurposed (see
+  // MobileSheet.jsx's header comment on that). Sparkles rather than
+  // Compass since Compass is already Layers' icon here on desktop.
+  { key: 'explore', label: 'Explore', title: 'Explore', Icon: Sparkles, hasPanel: true },
   { key: 'gps', label: 'Signal', title: 'GPS Signal', Icon: Rss, hasPanel: true },
   { key: 'navigate', label: 'Nav', title: 'Navigate', Icon: Navigation, hasPanel: true },
 ];
@@ -45,7 +52,23 @@ const RAIL_ITEMS = [
  * `body.sidebar-collapsed .desk-search-bar` rule), so MapPage now owns
  * this value and passes it down to all three.
  */
-export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollapsedChange, gps, navActive, onNavLaunch, user, onAuthClick, onAdminClick, guestNavRemaining, onSuggestPlaceClick }) {
+export default function Sidebar({
+  map,
+  typeVisibilityProps,
+  collapsed,
+  onCollapsedChange,
+  gps,
+  navActive,
+  onNavLaunch,
+  user,
+  onAuthClick,
+  onAdminClick,
+  guestNavRemaining,
+  onSuggestPlaceClick,
+  explorePicks,
+  explorePicksLoading,
+  onExploreSelect,
+}) {
   const [activeKey, setActiveKey] = useState(() => readPersistentState('sidebar-active-panel', 'layers'));
 
   useEffect(() => writePersistentState('sidebar-active-panel', activeKey), [activeKey]);
@@ -125,6 +148,19 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
           </div>
           <div className={styles.panelBody}>
             <LayersPanel map={map} typeVisibilityProps={typeVisibilityProps} />
+          </div>
+        </div>
+      )}
+
+      {!collapsed && activeKey === 'explore' && (
+        <div className={styles.panel}>
+          <div className={styles.panelBody}>
+            <ExplorePanel
+              picks={explorePicks || []}
+              loading={explorePicksLoading}
+              variant="full"
+              onSelect={onExploreSelect}
+            />
           </div>
         </div>
       )}
