@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { Compass, Rss, Navigation, CirclePlus, CircleUser, Shield } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
 import NavPanel from '../navigation/NavPanel';
@@ -13,40 +14,17 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
 // comment for why.
 const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
 
-// ── Rail button icons, copied verbatim from legacy index.html inline SVGs
-// (~96–119) rather than swapped for a lucide-react equivalent, since these
-// are already simple hand-drawn icons in the legacy markup itself (not
-// Bootstrap Icons references — legacyIconMap.js doesn't apply here).
-function LayersIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 2 7 12 12 22 7 12 2" />
-      <polyline points="2 17 12 22 22 17" />
-      <polyline points="2 12 12 17 22 12" />
-    </svg>
-  );
-}
-function SignalIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
-      <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
-    </svg>
-  );
-}
-function NavigateIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="3 11 22 2 13 21 11 13 3 11" />
-    </svg>
-  );
-}
-
+// ── Rail button icons: previously hand-drawn inline SVGs copied verbatim
+// from legacy index.html (~96–119). UI redesign (UI_REDESIGN_GUIDE.md)
+// swaps these for lucide-react equivalents — a component swap only, same
+// as the Loading Screen's icon swap flag — chosen to match the icon
+// treatment just established on the mobile MobileSheet tab strip
+// (Section 2's pairing rule: reuse the just-made mobile decisions), which
+// itself matches the "Layers Panel" Figma reference glyphs.
 const RAIL_ITEMS = [
-  { key: 'layers', label: 'Layers', title: 'Layers', Icon: LayersIcon, hasPanel: true },
-  { key: 'gps', label: 'Signal', title: 'GPS Signal', Icon: SignalIcon, hasPanel: true },
-  { key: 'navigate', label: 'Nav', title: 'Navigate', Icon: NavigateIcon, hasPanel: true },
+  { key: 'layers', label: 'Layers', title: 'Layers', Icon: Compass, hasPanel: true },
+  { key: 'gps', label: 'Signal', title: 'GPS Signal', Icon: Rss, hasPanel: true },
+  { key: 'navigate', label: 'Nav', title: 'Navigate', Icon: Navigation, hasPanel: true },
 ];
 
 /**
@@ -129,7 +107,7 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
               title={item.title}
               onClick={() => handleRailClick(item)}
             >
-              <item.Icon />
+              <item.Icon size={18} strokeWidth={1.8} />
               <span>{item.label}</span>
             </button>
           );
@@ -206,14 +184,21 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
             </>
           ) : (
             <>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-              </svg>
+              <CircleUser size={15} strokeWidth={1.8} />
               <span>Sign In</span>
             </>
           )}
         </button>
+        {/* Admin stays desktop-only: Sidebar only ever mounts when
+            MapPage's isMobile check is false (see that file's isMobile ≤
+            768px breakpoint), and MobileSheet's tab strip no longer has
+            an Admin entry point (UI redesign, see MobileSheet.jsx's own
+            header comment). `.adminBtn`'s own `@media (max-width: 768px)`
+            rule below is a belt-and-suspenders CSS guard for the same
+            768px cutoff, in case this component is ever kept mounted
+            across a resize rather than swapped. Icon swapped from the
+            Sign In button's person glyph to Shield so the two are
+            visually distinct — was previously the same icon for both. */}
         <button
           type="button"
           className={styles.adminBtn}
@@ -223,10 +208,7 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
             onAdminClick();
           }}
         >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-          </svg>
+          <Shield size={15} strokeWidth={1.8} />
           <span>Admin</span>
         </button>
         {/* Slice 13 — button always visible; whether it opens the
@@ -236,11 +218,7 @@ export default function Sidebar({ map, typeVisibilityProps, collapsed, onCollaps
             out visitors either — the entry point stays discoverable,
             the gate happens on click. */}
         <button type="button" className={styles.adminBtn} title="Suggest a Place" onClick={onSuggestPlaceClick}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2C7.03 2 3 6.03 3 11c0 5.25 7.5 11 9 11s9-5.75 9-11c0-4.97-4.03-9-9-9z" />
-            <line x1="12" y1="7" x2="12" y2="15" />
-            <line x1="8" y1="11" x2="16" y2="11" />
-          </svg>
+          <CirclePlus size={15} strokeWidth={1.8} />
           <span>Suggest</span>
         </button>
       </div>

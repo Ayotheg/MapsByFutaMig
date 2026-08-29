@@ -122,6 +122,9 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
         desc: wp.description || '',
         type: wp.type,
         subtype: wp.type,
+        imageUrls: wp.imageUrls || [],
+        avgRating: wp.avgRating,
+        reviewCount: wp.reviewCount,
         source: 'waypoint',
       });
     });

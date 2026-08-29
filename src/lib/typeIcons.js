@@ -42,6 +42,7 @@ export const TYPE_ICON_KEYS = {
 
   // Commerce / services
   shopping: 'shop',
+  furniture: 'armchair',
   kiosk: 'shop',
   printing_shop: 'printer-fill',
   cafe: 'coffee',

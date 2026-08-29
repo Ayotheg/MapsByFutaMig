@@ -446,6 +446,8 @@ export default function MapPage({ onReadinessChange }) {
           onNavLaunch={handleNavLaunch}
           onAdminClick={handleAdminClick}
           onSuggestPlaceClick={handleSuggestPlaceClick}
+          user={auth.user}
+          onAuthClick={() => openAuthModal('login')}
         />
       ) : (
         <Sidebar
@@ -583,6 +585,7 @@ export default function MapPage({ onReadinessChange }) {
         <Suspense fallback={null}>
           <AdminPanel
             map={map}
+            user={auth.user}
             waypoints={waypoints}
             segments={segments}
             kmlAnnotations={kmlAnnotations}

@@ -30,6 +30,7 @@ export const WP_ALL_TYPES = [
   ['hostel', 'Student Hostel'],
   ['staff_quarters', 'Staff Quarters'],
   ['shopping', 'Shopping Complex'],
+  ['furniture', 'Furniture Shop'],
   ['kiosk', 'Kiosk / Canteen'],
   ['printing_shop', 'Print Shop / Business Centre'],
   ['cafe', 'Café / Snack Bar'],

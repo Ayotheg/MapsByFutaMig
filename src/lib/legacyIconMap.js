@@ -38,6 +38,7 @@
  */
 
 import {
+  Armchair,
   ArrowLeft,
   ArrowUp,       // straight/continue
   ArrowUpLeft,   // slight left
@@ -114,6 +115,7 @@ import FootballIcon from './FootballIcon';
 import GateIcon from './GateIcon';
 
 export const LEGACY_ICON_MAP = {
+  'armchair': Armchair,
   'arrow-left': ArrowLeft,
   'arrow-up': ArrowUp,
   'arrow-up-left': ArrowUpLeft,

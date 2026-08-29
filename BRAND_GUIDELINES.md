@@ -216,3 +216,6 @@ palette:
 
 This makes `bg-primary`, `rounded-lg`, etc. resolve to the exact brand
 values — never Tailwind's built-in `blue-500`/`p-4`-style defaults.
+
+/* New fonts to use 
+InterGeist SansRobotoManropeFigtreePoppinsDM SansInstrument SerifPlayfair DisplayRoboto FlexSource Sans 3 */

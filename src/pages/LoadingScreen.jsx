@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MapPin } from "lucide-react";
+import { Navigation } from "lucide-react";
 import styles from "./LoadingScreen.module.css";
 
 // Default sequence of things the app is actually assembling on first
@@ -72,25 +72,30 @@ function LoadingScreen({
       <div className={styles.content}>
         <div className={styles.iconWrap}>
           <span className={styles.ringOuter} aria-hidden="true" />
-          <span className={styles.ringInner} aria-hidden="true" />
-          <MapPin className={styles.pinIcon} strokeWidth={1.75} />
+          <span className={styles.iconCircle}>
+            <Navigation className={styles.pinIcon} strokeWidth={1.75} />
+          </span>
         </div>
 
         <h1 className={styles.title}>Maps By Futa</h1>
         <p className={styles.subtitle}>
-          Please wait while the map and its components load
+          Your personal guide to campus navigation.
         </p>
 
         <div className={styles.barTrack}>
           <div className={styles.barFill} style={{ width: `${percent}%` }} />
         </div>
 
-        <p className={styles.status}>
-          {currentLabel}
-          <span aria-hidden="true">&hellip; </span>
-          (<strong>{step}</strong>/{total})
-        </p>
+        <div className={styles.status}>
+          <span className={styles.statusLabel}>
+            {currentLabel}
+            <span aria-hidden="true">&hellip;</span>
+          </span>
+          <span className={styles.statusPercent}>{Math.round(percent)}%</span>
+        </div>
       </div>
+
+      <p className={styles.footerMeta}>Navigating made easy..</p>
     </div>
   );
 }

@@ -260,11 +260,27 @@
   border: 1px solid rgba(183, 109, 255, 0.25);
   color: var(--text);
   cursor: pointer;
-  transition: background 0.18s, border-color 0.18s;
+  transition: background 0.18s, border-color 0.18s, transform var(--v2-duration-quick) var(--v2-ease-standard);
   flex-shrink: 0;
   font-size: 7px;
   font-weight: 500;
   letter-spacing: 0.06em;
+}
+.authBtn:active,
+.adminBtn:active {
+  transform: scale(0.97);
+}
+
+/* Admin is a desktop-only surface (UI_REDESIGN_GUIDE.md Section 7): the
+   mobile tab strip (MobileSheet.jsx) no longer has an Admin entry point
+   at all, and Sidebar itself only mounts on desktop per MapPage's
+   isMobile check. This query is a defensive second layer for the same
+   768px cutoff — hides the button outright if this component were ever
+   left mounted across a viewport resize instead of being swapped out. */
+@media (max-width: 768px) {
+  .adminBtn[title='Admin Panel'] {
+    display: none;
+  }
 }
 
 /* Guest free-navigation counter — small badge on the Sign In rail button,

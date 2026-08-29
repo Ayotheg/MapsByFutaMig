@@ -16,14 +16,10 @@ export const BASEMAP_STYLES = [
   {
     id: 'light',
     label: 'Light',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-    urlRetina: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-    // CARTO actually serves a distinct, higher-resolution tile at the
-    // `@2x` URL — safe to tell Leaflet these are 512px tiles.
-    retina: true,
-    subdomains: 'abcd',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    retina: false,
+    subdomains: 'abc',
     maxZoom: 20,
     maxNativeZoom: 19,
   },
@@ -31,11 +27,10 @@ export const BASEMAP_STYLES = [
     id: 'dark',
     label: 'Dark',
     attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png',
-    urlRetina: 'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png',
-    retina: true,
-    subdomains: 'abcd',
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://hot.openstreetmap.org/">HOT</a>',
+    url: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+    retina: false,
+    subdomains: 'abc',
     maxZoom: 20,
     maxNativeZoom: 19,
   },
@@ -60,7 +55,7 @@ export const BASEMAP_STYLES = [
     // don't exist — a bit soft at max zoom, but never a blank/"not
     // available" tile.
     maxZoom: 19,
-    maxNativeZoom: 17,
+    maxNativeZoom: 15,
   },
   {
     id: 'terrain',

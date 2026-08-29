@@ -12,71 +12,28 @@
   pointer-events: auto;
 }
 
-.sheet {
-  display: flex;
-  flex-direction: column;
+/* ── Navbar: fixed, static, always visible ──────────────────────────
+   This is the redesigned white pill (matches the Figma node exactly —
+   a self-contained bar with its own drop shadow). It is its own fixed
+   element, not a slice of a larger draggable sheet, so it never moves:
+   there is no dark sliding shape behind or around it anymore. Tabs here
+   drive `.panel` below via sheetState/activeTab. */
+.navbar {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  height: var(--mob-sheet-full);
-  background: var(--surface-bright);
+  z-index: 1201;
+  padding: 4px 8px calc(8px + var(--mob-safe-bottom));
+  background: var(--v2-surface);
   border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
-  z-index: 1200;
-  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.4), 0 -1px 0 rgba(255, 255, 255, 0.06);
-  transition: transform 0.38s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 }
 
-.statePeek {
-  transform: translateY(calc(100% - var(--mob-sheet-peek) - var(--mob-safe-bottom)));
-}
-.stateHalf {
-  transform: translateY(calc(100% - var(--mob-sheet-half) - var(--mob-safe-bottom)));
-}
-.stateFull {
-  transform: translateY(calc(100% - var(--mob-sheet-full) - var(--mob-safe-bottom)));
-}
-
-.handleWrap {
-  flex-shrink: 0;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  touch-action: none;
-  border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
-}
-.handleWrap:active {
-  cursor: grabbing;
-}
-.handleBar {
-  width: 40px;
-  height: 4px;
-  background: var(--outline);
-  border-radius: 2px;
-  opacity: 0.45;
-  transition: opacity 0.2s, width 0.2s;
-}
-.handleWrap:active .handleBar {
-  opacity: 0.8;
-  width: 52px;
-}
-
-.header {
-  flex-shrink: 0;
-  padding: 0 8px 8px;
-  border-bottom: 1px solid var(--border);
-  touch-action: none;
-  cursor: grab;
-}
 .tabs {
   display: flex;
+  align-items: stretch;
+  justify-content: space-between;
   gap: 2px;
   overflow-x: auto;
   scrollbar-width: none;
@@ -87,33 +44,116 @@
 }
 
 .tab {
+  flex: 1 1 0;
+  min-width: 60px;
   flex-shrink: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 9px 14px;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
   background: none;
   border: none;
-  border-radius: 20px;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
+  border-radius: var(--r-full);
+  color: var(--v2-text-variant);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  position: relative;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    color var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
   white-space: nowrap;
   min-height: 44px;
 }
+.tab:active {
+  transform: scale(0.97);
+}
+.tabIcon {
+  color: inherit;
+}
+.tabLabel {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 14px;
+}
 .tabActive {
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
-  color: var(--primary);
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+.tabActive .tabLabel {
+  font-weight: 600;
 }
 
-.body {
-  flex: 1;
+/* ── Nav: the bar's primary action ──────────────────────────────────
+   Figma (node 5:746) gives the centered Nav tab a permanent round pill
+   (bg rgba(124,58,237,0.2), which is exactly --v2-primary-outline —
+   not a new color) rather than only lighting up once selected, so it
+   reads as the "first point of attraction" at rest. #7C3AED is already
+   --v2-primary in tokens-v2.css, so this reuses that token rather than
+   hardcoding the hex. Stacking .tabActive on top (when its panel is
+   actually open) intensifies pill -> solid fill, giving a second, clearly
+   distinct state for "currently selected" beyond just "the important one". */
+.tabPrimary {
+  background: var(--v2-primary-outline);
+  color: var(--v2-primary);
+}
+.tabPrimary .tabLabel {
+  font-weight: 600;
+}
+.tabPrimary.tabActive {
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+}
+
+.signedInDot {
+  position: absolute;
+  top: 6px;
+  right: 14px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--v2-secondary);
+  border: 1.5px solid var(--v2-surface);
+}
+
+/* ── Panel: separate element, grows open above the navbar ───────────
+   Anchored to sit directly above the navbar (bottom offset = navbar's
+   own height) and animates its height between closed/half/full. It
+   never carries the navbar with it — only this panel slides. */
+.panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom));
+  z-index: 1200;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(16px + var(--mob-safe-bottom));
+  /* Sheet body (LayersPanel/GpsPanel/NavPanel content) isn't redesigned
+     yet — see "Filter/legend content" in UI_REDESIGN_GUIDE.md Section 7
+     — and still assumes light-on-dark text, so this keeps the v1 dark
+     surface rather than the v2 light one used by the navbar above it. */
+  background: var(--surface-bright);
+  border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
+  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.4), 0 -1px 0 rgba(255, 255, 255, 0.06);
+  transition: height 0.38s var(--v2-ease-standard);
+  will-change: height;
+}
+.panelClosed {
+  height: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+.panelHalf {
+  height: calc(var(--mob-sheet-half) - var(--mob-sheet-peek));
+}
+.panelFull {
+  height: calc(var(--mob-sheet-full) - var(--mob-sheet-peek));
+}
+
+.body {
+  padding: 12px 0 calc(16px + var(--mob-safe-bottom));
 }

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
+@import "./styles/tokens-v2.css";
 
 /* ── Self-hosted fonts (npm @fontsource packages — see SETUP_NOTES.md
    for the exact install command). Weights match the legacy Google
