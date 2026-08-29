@@ -179,8 +179,8 @@ export async function deleteSegment(id) {
 // row. Point features become a waypoint; line features become a segment
 // (+ its recorded `segment_points`, one per vertex, distance computed via
 // `haversine` — same as legacy's own inline distance loop there).
-export async function insertKmlPointAsWaypoint({ name, description, lat, lng }) {
-  return insertWaypoint({ name, description, type: 'landmark', lat, lng });
+export async function insertKmlPointAsWaypoint({ name, description, type = 'landmark', lat, lng }) {
+  return insertWaypoint({ name, description, type, lat, lng });
 }
 
 export async function insertKmlLineAsSegment({ name, description, points, distanceM }) {

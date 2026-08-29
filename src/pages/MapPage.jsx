@@ -583,6 +583,7 @@ export default function MapPage({ onReadinessChange }) {
         <Suspense fallback={null}>
           <AdminPanel
             map={map}
+            user={auth.user}
             waypoints={waypoints}
             segments={segments}
             kmlAnnotations={kmlAnnotations}

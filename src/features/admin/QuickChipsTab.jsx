@@ -56,7 +56,7 @@ import {
  * back to an OSM import) did. Both are merged into `allPlaces` below,
  * each tagged with `source` so the UI can show which is which.
  */
-export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChipsChanged }) {
+export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, onChipsChanged }) {
   const [expandedId, setExpandedId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -86,6 +86,10 @@ export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChip
   }, [pinSearch, allPlaces, newPinned]);
 
   async function handleCreate() {
+    if (!user) {
+      setError('You must be signed in to create a chip.');
+      return;
+    }
     const keywords = splitKeywords(newKeywords);
     if (!newLabel.trim() || (!keywords.length && !newPinned.length)) {
       setError('Give the chip a name, and either a keyword or at least one hand-picked place.');
@@ -114,6 +118,10 @@ export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChip
   }
 
   async function handleDelete(chip) {
+    if (!user) {
+      setError('You must be signed in to delete a chip.');
+      return;
+    }
     if (!window.confirm(`Remove the "${chip.label}" chip? This cannot be undone.`)) return;
     setBusyId(chip.id);
     setError('');
@@ -216,6 +224,7 @@ export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChip
         {list.map((chip) => (
           <ChipRow
             key={chip.id}
+            user={user}
             chip={chip}
             places={allPlaces}
             expanded={expandedId === chip.id}
@@ -230,7 +239,7 @@ export default function QuickChipsTab({ chips, waypoints, kmlAnnotations, onChip
   );
 }
 
-function ChipRow({ chip, places, expanded, onToggleExpand, onDelete, busy, onChanged }) {
+function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy, onChanged }) {
   const [editingKeywords, setEditingKeywords] = useState(false);
   const [keywordsText, setKeywordsText] = useState(joinKeywords(chip.keywords));
   const [pinQuery, setPinQuery] = useState('');
@@ -258,6 +267,10 @@ function ChipRow({ chip, places, expanded, onToggleExpand, onDelete, busy, onCha
   }, [pinQuery, places, matched]);
 
   async function saveKeywords() {
+    if (!user) {
+      setRowError('You must be signed in to edit keywords.');
+      return;
+    }
     setSavingKeywords(true);
     setRowError('');
     try {
@@ -272,6 +285,10 @@ function ChipRow({ chip, places, expanded, onToggleExpand, onDelete, busy, onCha
   }
 
   async function excludePlace(wpId) {
+    if (!user) {
+      setRowError('You must be signed in to modify chips.');
+      return;
+    }
     setRowBusy(wpId);
     setRowError('');
     try {
@@ -285,6 +302,10 @@ function ChipRow({ chip, places, expanded, onToggleExpand, onDelete, busy, onCha
   }
 
   async function restorePlace(wpId) {
+    if (!user) {
+      setRowError('You must be signed in to modify chips.');
+      return;
+    }
     setRowBusy(wpId);
     setRowError('');
     try {
@@ -298,6 +319,10 @@ function ChipRow({ chip, places, expanded, onToggleExpand, onDelete, busy, onCha
   }
 
   async function pinPlace(wpId) {
+    if (!user) {
+      setRowError('You must be signed in to modify chips.');
+      return;
+    }
     setRowBusy(wpId);
     setRowError('');
     try {

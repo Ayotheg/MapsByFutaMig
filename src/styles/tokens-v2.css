@@ -1,0 +1,64 @@
+/* ─────────────────────────────────────────────────────────────
+   Maps By FUTA — design tokens v2 (in-app UI/UX redesign)
+   Lives alongside tokens.css (not a replacement) so screens not
+   yet redesigned keep using the v1 values unchanged. Palette is
+   authoritative from the "Lumina Campus Utility" style-guide
+   reference (Primary/Secondary/Tertiary/Neutral + type + button
+   variants) — every screen should pull from these, not invent new
+   hex values; extend this file only when a screen genuinely needs
+   a token that doesn't exist yet.
+   ───────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surface — light theme direction (was dark in v1) */
+  --v2-surface:  #faf8ff;
+
+  /* On-surface (text) */
+  --v2-text:          #4a4455;
+  --v2-text-variant:  #7b7487;
+  --v2-muted:         rgba(123, 116, 135, 0.5);
+
+  /* Primary — violet (style-guide authoritative value) */
+  --v2-primary:              #7c3aed;
+  --v2-on-primary:           #ffffff;
+  --v2-primary-outline:      rgba(124, 58, 237, 0.2);
+  --v2-primary-glow:         rgba(124, 58, 237, 0.1);
+  --v2-primary-glow-strong:  rgba(124, 58, 237, 0.6);
+
+  /* Secondary — teal */
+  --v2-secondary:    #0d9488;
+  --v2-on-secondary: #ffffff;
+
+  /* Tertiary — amber/brown */
+  --v2-tertiary:    #a15100;
+  --v2-on-tertiary: #ffffff;
+
+  /* Neutral — dark navy (inverted surfaces, "Inverted" button variant) */
+  --v2-neutral:    #0f172a;
+  --v2-on-neutral: #ffffff;
+
+  /* Component-specific */
+  --v2-track: #e2e7ff; /* progress bar / meter background */
+
+  /* Motion (Section 6) — first used by the Loading Screen's icon pulse */
+  --v2-ease-standard:     cubic-bezier(0.4, 0, 0.2, 1);
+  --v2-duration-quick:    150ms;
+  --v2-duration-standard: 250ms;
+  --v2-duration-breathe:  2200ms;
+
+  /* Not yet defined — add only when a screen actually needs it:
+     --v2-error (destructive/delete red seen in the style-guide icon
+     cluster, exact hex not given yet — confirm before using),
+     --v2-secondary-container / --v2-tertiary-container (lighter
+     tint variants, e.g. for the "Secondary" button's light fill). */
+
+  /* Radii and spacing intentionally NOT duplicated here — reuse
+     var(--r-sm) / var(--r-full) / var(--gap) / var(--pad) etc. from
+     tokens.css; the scale itself isn't changing, only the palette.
+
+     Fonts intentionally NOT duplicated either — headline is
+     Bricolage Grotesque, body is Inter, both already bundled and
+     already tokenized as var(--font-display) / var(--font-ui) in
+     tokens.css. Reuse those directly; only add a --v2-font-* here
+     if a later screen introduces a font that isn't in v1 already. */
+}

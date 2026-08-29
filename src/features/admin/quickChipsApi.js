@@ -146,11 +146,17 @@ export async function toggleExcluded(chip, waypointId, shouldExclude) {
  * Supabase — table not created yet (supabase/quick_chips.sql not run),
  * a browser extension/tracking-protection blocking the request, or the
  * project being paused — rather than anything wrong with the click
- * itself, so say that instead of just echoing the raw error. */
+ * itself, so say that instead of just echoing the raw error. RLS
+ * violations come back as 403 + "violates row-level security policy",
+ * which usually means either the table wasn't created yet, or the write
+ * was attempted without an authenticated admin session. */
 export function describeError(e) {
   const raw = e?.message || String(e || 'Something went wrong.');
   if (/networkerror|failed to fetch|cors/i.test(raw)) {
     return `Couldn't reach the database (${raw}). Check that supabase/quick_chips.sql has been run, and that no browser extension or privacy setting is blocking requests to Supabase.`;
+  }
+  if (/violates row-level security policy/i.test(raw)) {
+    return `Permission denied. Make sure you're signed in as an admin and supabase/quick_chips.sql has been run.`;
   }
   return raw;
 }
