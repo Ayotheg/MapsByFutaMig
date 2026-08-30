@@ -56,46 +56,43 @@
   flex-shrink: 0;
   height: 30px;
   padding: 0 12px 0 9px;
-  background: rgba(11, 19, 38, 0.93);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(77, 67, 84, 0.55);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
   border-radius: var(--r-full);
-  box-shadow:
-    0 1px 4px rgba(0, 0, 0, 0.28),
-    0 4px 14px rgba(0, 0, 0, 0.28),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
-  color: var(--text);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+  color: var(--v2-text);
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition:
-    background 0.14s ease,
-    border-color 0.14s ease,
-    box-shadow 0.16s ease,
-    transform 0.1s ease;
+    background var(--v2-duration-quick) var(--v2-ease-standard),
+    border-color var(--v2-duration-quick) var(--v2-ease-standard),
+    color var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
   animation: chipIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .chip:hover {
-  background: rgba(183, 109, 255, 0.13);
-  border-color: rgba(183, 109, 255, 0.44);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.28),
-    0 4px 18px rgba(183, 109, 255, 0.2),
-    0 0 0 1px rgba(183, 109, 255, 0.14);
+  border-color: var(--v2-chip-active-border);
   transform: translateY(-1px);
 }
 .chip:active {
   transform: translateY(0) scale(0.96);
 }
 .chip.active {
-  background: rgba(183, 109, 255, 0.18);
-  border-color: rgba(183, 109, 255, 0.55);
-  color: var(--primary);
-  box-shadow:
-    0 2px 12px rgba(183, 109, 255, 0.28),
-    0 0 0 1.5px rgba(183, 109, 255, 0.35);
+  background: var(--v2-chip-active-bg);
+  border-color: var(--v2-chip-active-border);
+  color: var(--v2-chip-active-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+    animation: none;
+  }
+  .chip:hover {
+    transform: none;
+  }
 }
 
 .emojiIcon {

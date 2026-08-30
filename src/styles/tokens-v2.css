@@ -54,6 +54,24 @@
      is likely to recur on other screens (e.g. Explore card badges). */
   --v2-primary-tag-fill: rgba(124, 58, 237, 0.3);
 
+  /* Quick Chips results (this session): the icon-only thumbnail fill on
+     ChipResultRow (Figma node 4:342/4:418, "Background") — a slightly
+     more saturated lavender than --v2-primary-glow's wash, and not a
+     clean alpha step of --v2-primary, so kept as its own literal rather
+     than forced onto an existing token. */
+  --v2-thumb-bg: #d9e0fb;
+
+  /* Quick Chips (this session): active-chip teal-green from Figma node
+     29:23's "Toilets" chip — distinct from --v2-secondary (a bluer
+     teal), so added as its own set rather than forced onto that token.
+     Inactive chip reuses --v2-surface/--v2-text/--v2-border as-is
+     (Figma's #faf8ff/#4a4455/#ccc3d8 match those within a hair —
+     ccc3d8 vs d1d5db is an imperceptible difference, not worth a
+     second near-duplicate border token). */
+  --v2-chip-active-bg:     #86f2e4;
+  --v2-chip-active-border: #006a61;
+  --v2-chip-active-text:   #006f66;
+
   /* Motion (Section 6) — first used by the Loading Screen's icon pulse */
   --v2-ease-standard:     cubic-bezier(0.4, 0, 0.2, 1);
   --v2-duration-quick:    150ms;

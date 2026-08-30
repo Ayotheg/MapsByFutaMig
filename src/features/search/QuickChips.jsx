@@ -15,6 +15,11 @@ import styles from './QuickChips.module.css';
  * mobile placeholder swap are all handled by MapPage, which owns
  * `activeChip` and threads it to DesktopSearchBar/MobileSearchBar too —
  * this component only renders the row and reports clicks upward.
+ *
+ * UI_REDESIGN_GUIDE.md pass (this session, on explicit instruction):
+ * restyled to v2 tokens per Figma node 29:23's Category Chips row —
+ * white/bordered by default, teal-green (`--v2-chip-active-*`, added
+ * this session) when active. Structure/props/handlers unchanged.
  */
 export default function QuickChips({ chips, activeChip, onChipClick, collapsed, isMobile }) {
   return (

@@ -292,7 +292,7 @@ JSX/logic change).
 | Loading screen | `src/pages/LoadingScreen.*` | Both (viewport-agnostic overlay) | Bricolage Grotesque + Inter (already bundled) | Done |
 | Search (mobile) | `src/features/search/MobileSearchBar.*`, `MobileSearchOverlay.*` | Mobile | Inter (already bundled) | Collapsed bar (`MobileSearchBar`) done; `MobileSearchOverlay` still pending, see flag below |
 | Search (desktop) | `src/features/search/DesktopSearchBar.*`, `SearchDropdownList.jsx`, `SearchResultItem.*` | Desktop | Inter (already bundled) | Collapsed pill (`DesktopSearchBar`'s `.bar`/`.pill`) done; `SearchDropdownList`/`SearchResultItem` and `.dropdown` still pending, see flag below |
-| Quick chips | `src/features/search/QuickChips.*`, `ChipResultsPanel.*`, `ChipResultRow.*` | Both — single component, internal `@media` queries, not split files | — | Not started |
+| Quick chips | `src/features/search/QuickChips.*`, `ChipResultsPanel.*`, `ChipResultRow.*` | Both — single component, internal `@media` queries, not split files | Bricolage Grotesque (headings) + Inter (body) for the results dropdown; chip row itself stays Inter-only, see flag | Chip row (`QuickChips`) done; `ChipResultsPanel`/`ChipResultRow` (the dropdown a chip opens into) done this session |
 | Filter/legend content | `src/features/legend/LayersPanel.*`, `PlaceTypeFilter.*` | Desktop only now — mobile's Layers entry point removed this session, see Explore Panel flag below | — | Not started |
 | Explore panel | `src/features/explore/*`, `src/features/admin/AdminEditModal.jsx` (Explore fields), `supabase/explore_fields.sql` | Both — mobile navbar's "Explore" tab body + new desktop rail button | Bricolage Grotesque + Inter (v2 tokens) | Done |
 | Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; 'layers'-keyed tab body now Explore Panel (see flag) |
@@ -413,6 +413,61 @@ migration-slice convention), with this table updated.
     standard` tokens, satisfying Section 6 without adding new idle
     animation (Section 6's own guidance: buttons get press feedback,
     not idle motion).
+- Quick chips — chip row only (this session, on explicit user
+  instruction after they flagged the row still looking v1): restyled
+  `QuickChips.jsx`/`.module.css` to v2 tokens per Figma node 29:23's
+  Category Chips — white/`--v2-border`-bordered by default, teal-green
+  (`--v2-chip-active-bg/-border/-text`, new tokens this session — the
+  design's teal-green didn't match `--v2-secondary` closely enough to
+  reuse) when a chip is active. Removed the old backdrop-blur glass
+  treatment to match the design's flat/opaque chip. Motion: existing
+  hover/press transitions moved onto `--v2-duration-quick`/`--v2-ease-
+  standard`; the per-chip staggered entrance animation was kept as-is
+  (already CSS-only, already subtle).
+  - **Follow-up session — dropdown done:** `ChipResultsPanel.*`/
+    `ChipResultRow.*` (the results list/panel a chip opens into)
+    restyled to v2 light tokens per Figma node 4:323 ("Place List
+    Redesign"). Header consolidated into one shared layout for both
+    platforms: icon badge (`--v2-primary-glow` circle, `--v2-primary`
+    icon), title, a count badge + status line under it, close/back
+    button — matches the Figma reference exactly for the mobile card;
+    desktop's panel reuses the same look per the pairing rule (its
+    existing `ArrowLeft` "back" button, unchanged, just restyled to the
+    same light circular button — no separate desktop Figma frame was
+    given here).
+    - **Copy consolidated, not new:** the old desktop-only "Sorted
+      alphabetically" subtitle and the list-embedded "Showing N places
+      · nearest first" bar (previously shown in two places on desktop,
+      one on mobile) are now one status line under the title: `Loading…`
+      / `No places found` / `Showing N places[ · nearest first]` —
+      exact same three states and exact same existing strings, just
+      picking one of the two pre-existing copies per state instead of
+      showing both. No new copy was written and no logic changed
+      (`subtitle` is still computed inline in `ChipResultsPanel.jsx`
+      from the same `loading`/`results.length`/`isMobile` values).
+    - Row card (`ChipResultRow`): thumbnail is either the place photo
+      or, per Figma's icon-tile fallback, a flat `--v2-thumb-bg` (new
+      token, `#d9e0fb` — a literal, not a clean alpha step of
+      `--v2-primary`) square with a `--v2-primary` icon. Name switched
+      to `var(--font-display)` (Bricolage) to match the Figma headings,
+      body/meta text stays `var(--font-ui)` (Inter) — same split
+      Loading Screen/Place card/Explore panel already use.
+    - **Type tag:** Figma's reference shows one row ("TOWNHALL") with an
+      outlined/translucent tag and four rows ("HOSTEL") with a filled
+      violet tag + white text — not two competing components needing a
+      new rule, just each row rendering its own real `result.type`
+      (already varies per item; only two types happen to appear in this
+      screenshot). One consistent filled treatment
+      (`background: dotColor(type)`, white text) covers it: the tag's
+      color and label already differentiate by type through the
+      existing `dotColor()`/`result.type` data, unchanged from before
+      this session.
+    - Motion: kept the existing row/card/panel entrance animations,
+      retimed onto `--v2-duration-standard`/`--v2-ease-standard`, and
+      added `@media (prefers-reduced-motion: no-preference)` wrapping
+      around every entrance/hover-transform animation in both files —
+      neither file had that guard before this session (Section 6,
+      principle 3).
 - Loading Screen: icon swapped from `MapPin` to `Navigation`
   (lucide-react) to match the Figma reference — a component swap, not
   a logic change, no props/behavior affected. Subtitle copy also

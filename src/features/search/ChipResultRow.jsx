@@ -34,7 +34,7 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
           <img src={result.imageUrls[0]} alt={result.name} loading="lazy" />
         ) : (
           <div className={styles.thumbPh}>
-            <ThumbIcon size={18} />
+            <ThumbIcon size={22} />
           </div>
         )}
       </div>
@@ -45,7 +45,7 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
         </div>
         {result.desc && <div className={styles.desc}>{result.desc}</div>}
         <div className={styles.meta}>
-          <span className={styles.type} style={{ borderColor: dotColor(result.type) + '55', color: dotColor(result.type) }}>
+          <span className={styles.type} style={{ background: dotColor(result.type) }}>
             {(result.type || '').replace(/_/g, ' ')}
           </span>
           {result.dist !== null && <span className={styles.dist}>{fmtDist(result.dist)}</span>}

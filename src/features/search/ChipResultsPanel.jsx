@@ -53,8 +53,18 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
 
   const ChipIcon = LEGACY_ICON_MAP[activeChip.iconKey] || MapPin;
   const loading = !waypointsLoaded;
-  const subtitle = loading ? 'Loading…' : results.length ? 'Sorted alphabetically' : 'No places found';
   const badge = loading ? '…' : String(results.length || 0);
+  // Consolidated status line — Figma node 4:323's header shows one line
+  // under the title ("Showing 63 places") instead of the two separate
+  // pieces of copy the previous layout split across the header
+  // ("Sorted alphabetically") and a list-embedded bar ("Showing N
+  // places · nearest first"). Same three states as before (loading /
+  // empty / count), just rendered in one place now — see handoff notes.
+  const subtitle = loading
+    ? 'Loading…'
+    : !results.length
+      ? 'No places found'
+      : `Showing ${results.length} place${results.length !== 1 ? 's' : ''}${isMobile ? '' : ' · nearest first'}`;
 
   function handleOpen(r) {
     map?.flyTo([r.lat, r.lng], 18, { duration: 1.0 });
@@ -111,27 +121,22 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
       <>
         <div className={styles.scrim} onClick={onClose} />
         <div className={styles.card}>
-          <div className={styles.hd}>
-            <div className={styles.hdLeft}>
-              <span className={styles.emoji}>
-                <ChipIcon size={16} />
-              </span>
-              <span className={styles.title}>{activeChip.label}</span>
-              <span className={styles.badge}>{badge}</span>
+          <div className={styles.header}>
+            <span className={styles.icon}>
+              <ChipIcon size={16} />
+            </span>
+            <div className={styles.titles}>
+              <div className={styles.title}>{activeChip.label}</div>
+              <div className={styles.metaRow}>
+                <span className={styles.badge}>{badge}</span>
+                <span className={styles.subtitle}>{subtitle}</span>
+              </div>
             </div>
             <button className={styles.close} onClick={onClose} aria-label="Close" type="button">
               <X size={14} />
             </button>
           </div>
-          <div className={styles.list}>
-            {!loading && results.length > 0 && (
-              <div className={styles.locBar}>
-                <MapPin size={11} />
-                Showing {results.length} place{results.length !== 1 ? 's' : ''}
-              </div>
-            )}
-            {body}
-          </div>
+          <div className={styles.list}>{body}</div>
         </div>
       </>
     );
@@ -148,19 +153,13 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
         </span>
         <div className={styles.titles}>
           <div className={styles.title}>{activeChip.label}</div>
-          <div className={styles.subtitle}>{subtitle}</div>
-        </div>
-        <span className={styles.badge}>{badge}</span>
-      </div>
-      <div className={styles.list}>
-        {!loading && results.length > 0 && (
-          <div className={styles.locBar}>
-            <MapPin size={11} />
-            Showing {results.length} place{results.length !== 1 ? 's' : ''} · nearest first
+          <div className={styles.metaRow}>
+            <span className={styles.badge}>{badge}</span>
+            <span className={styles.subtitle}>{subtitle}</span>
           </div>
-        )}
-        {body}
+        </div>
       </div>
+      <div className={styles.list}>{body}</div>
     </div>
   );
 }
