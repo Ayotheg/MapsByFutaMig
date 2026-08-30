@@ -40,6 +40,12 @@
   /* Component-specific */
   --v2-track: #e2e7ff; /* progress bar / meter background */
 
+  /* Search bar (this session): node 31:243's white-pill variant uses a
+     plain light-gray border, distinct from the violet-tinted palette
+     above — literal from that reference since it doesn't map to any
+     existing accent token. */
+  --v2-border: #d1d5db;
+
   /* Place card (this session): translucent violet fill for the type
      pill/chip sitting over imagery — matches the Figma node's literal
      rgba(124,58,237,0.3), which is var(--v2-primary) at 30% alpha, not

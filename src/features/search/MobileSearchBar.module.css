@@ -1,3 +1,11 @@
+/* UI_REDESIGN_GUIDE.md pass: restyled to the v2 "Lumina Campus Utility"
+   light theme. Layout/behavior unchanged — the bar is still
+   `display:none` above 768px and a fixed pill below it; only the
+   surface, colors, and the nav button's shape moved to v2 tokens.
+   Background/border updated to node 31:243's opaque white-pill
+   variant (supersedes the initial blurred-glass pass off node 29:23,
+   per in-session confirmation). */
+
 .bar {
   display: none;
 }
@@ -11,15 +19,13 @@
     left: 12px;
     right: 12px;
     height: var(--mob-search-h);
-    background: var(--surface-bright);
-    border-radius: 28px;
-    box-shadow:
-      0 1px 4px rgba(0, 0, 0, 0.12),
-      0 4px 16px rgba(0, 0, 0, 0.2),
-      0 8px 32px rgba(0, 0, 0, 0.18),
-      0 0 0 1px rgba(255, 255, 255, 0.07);
+    background: #ffffff;
+    border: 1px solid var(--v2-border);
+    border-radius: var(--r-full);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
     z-index: 1100;
     overflow: hidden;
+    transition: box-shadow var(--v2-duration-standard) var(--v2-ease-standard);
   }
 }
 
@@ -34,7 +40,11 @@
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  color: var(--text);
+  color: var(--v2-text);
+  transition: opacity var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.logoBtn:active {
+  opacity: 0.7;
 }
 
 .inputBtn {
@@ -51,14 +61,14 @@
 }
 
 .icon {
-  color: var(--muted);
+  color: var(--v2-text-variant);
   flex-shrink: 0;
 }
 
 .placeholder {
   font-family: var(--font-ui);
-  font-size: 14px;
-  color: var(--muted);
+  font-size: 16px;
+  color: var(--v2-text-variant);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -66,23 +76,31 @@
 
 .navBtn {
   flex-shrink: 0;
-  width: 48px;
-  height: 42px;
-  margin: 0 5px;
-  background: var(--primary);
-  border: none;
-  border-radius: 22px;
+  width: 32px;
+  height: 32px;
+  margin: 0 8px;
+  background: var(--v2-primary);
+  border: 1px solid var(--v2-primary);
+  border-radius: var(--r-full);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--v2-on-primary);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(183, 109, 255, 0.4);
+  box-shadow: 0 2px 8px var(--v2-primary-glow-strong);
   transition:
-    opacity 0.15s,
-    transform 0.1s;
+    opacity var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .navBtn:active {
   transform: scale(0.94);
   opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .logoBtn,
+  .navBtn {
+    transition: none;
+  }
 }

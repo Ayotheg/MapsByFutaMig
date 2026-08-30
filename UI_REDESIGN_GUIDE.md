@@ -290,8 +290,8 @@ JSX/logic change).
 | Screen | Files | Platform | Font picked | Status |
 |---|---|---|---|---|
 | Loading screen | `src/pages/LoadingScreen.*` | Both (viewport-agnostic overlay) | Bricolage Grotesque + Inter (already bundled) | Done |
-| Search (mobile) | `src/features/search/MobileSearchBar.*`, `MobileSearchOverlay.*` | Mobile | — | Not started |
-| Search (desktop) | `src/features/search/DesktopSearchBar.*`, `SearchDropdownList.jsx`, `SearchResultItem.*` | Desktop | — | Not started |
+| Search (mobile) | `src/features/search/MobileSearchBar.*`, `MobileSearchOverlay.*` | Mobile | Inter (already bundled) | Collapsed bar (`MobileSearchBar`) done; `MobileSearchOverlay` still pending, see flag below |
+| Search (desktop) | `src/features/search/DesktopSearchBar.*`, `SearchDropdownList.jsx`, `SearchResultItem.*` | Desktop | Inter (already bundled) | Collapsed pill (`DesktopSearchBar`'s `.bar`/`.pill`) done; `SearchDropdownList`/`SearchResultItem` and `.dropdown` still pending, see flag below |
 | Quick chips | `src/features/search/QuickChips.*`, `ChipResultsPanel.*`, `ChipResultRow.*` | Both — single component, internal `@media` queries, not split files | — | Not started |
 | Filter/legend content | `src/features/legend/LayersPanel.*`, `PlaceTypeFilter.*` | Desktop only now — mobile's Layers entry point removed this session, see Explore Panel flag below | — | Not started |
 | Explore panel | `src/features/explore/*`, `src/features/admin/AdminEditModal.jsx` (Explore fields), `supabase/explore_fields.sql` | Both — mobile navbar's "Explore" tab body + new desktop rail button | Bricolage Grotesque + Inter (v2 tokens) | Done |
@@ -370,6 +370,49 @@ migration-slice convention), with this table updated.
     desktop now disagree about whether Explore replaces or supplements
     Layers — both were direct instructions, not an inconsistency to
     "fix."
+- Search bar — mobile collapsed bar + desktop collapsed pill (this
+  session, paired per Section 1a/pairing rule): Figma node 29:23
+  ("Group 2") is a 390px mobile frame showing the floating search
+  pill plus the Category Chips row beneath it. Scoped this session to
+  the search pill only (`MobileSearchBar.jsx`/`.module.css`) —
+  Category Chips is `QuickChips`, its own "Not started" row in this
+  table, not guessed at here even though it appears in the same
+  screenshot.
+  - Initial pass restyled to v2 light tokens: a `rgba(250,248,255,0.9)`
+    glass background with `backdrop-filter: blur(6px)`, `--v2-primary`
+    nav button, `--v2-text-variant` placeholder — matched the Figma
+    frame for the menu button, input, and placeholder text.
+  - **Flag resolved via follow-up node 31:243** (a cleaner pass at the
+    same bar, supplied in-session): confirmed the rightmost button is
+    a plain navigation/send arrow in a solid `--v2-primary` circle, not
+    a profile/avatar element — the existing `Navigation` icon and
+    unchanged `onNavigate`/`onNavigateClick` prop were correct all
+    along, no behavior change needed. Node 31:243 also showed a
+    different pill treatment (opaque white, `1px solid #d1d5db`
+    border, no blur) superseding the initial glass background — both
+    bars switched to it, and a new `--v2-border: #d1d5db` token was
+    added to `tokens-v2.css` since it's a plain neutral gray with no
+    existing accent-token match.
+  - Desktop's collapsed pill (`DesktopSearchBar.jsx`'s `.bar`/`.pill`
+    and its logo/divider/input/clear/nav buttons) restyled to the
+    same v2 tokens per the pairing rule — no separate Figma frame was
+    given for desktop, so this reuses the mobile session's decisions
+    (now the opaque white/bordered pill, `--v2-primary` nav button)
+    rather than reinventing them, consistent with how the pairing rule
+    describes the desktop pass working.
+  - **Deliberately left v1/dark, not part of this session:**
+    `MobileSearchOverlay.*` (no Figma reference yet) and
+    `SearchDropdownList.jsx`/`SearchResultItem.*` and
+    `DesktopSearchBar`'s own `.dropdown`/`.noResults` — that list
+    component is shared verbatim between the desktop dropdown and the
+    still-dark mobile overlay, so restyling it now would put
+    light-on-dark text on the unredesigned overlay. Same shared-
+    component precedent as the Layers panel tab-strip pass (see that
+    flag above). Motion: existing hover/press transitions on both
+    bars' buttons were moved onto `--v2-duration-*`/`--v2-ease-
+    standard` tokens, satisfying Section 6 without adding new idle
+    animation (Section 6's own guidance: buttons get press feedback,
+    not idle motion).
 - Loading Screen: icon swapped from `MapPin` to `Navigation`
   (lucide-react) to match the Figma reference — a component swap, not
   a logic change, no props/behavior affected. Subtitle copy also

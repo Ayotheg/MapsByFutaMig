@@ -19,6 +19,20 @@ import styles from './MobileSearchBar.module.css';
  * bottom sheet to its "navigate" tab and opens it half-height — it does
  * NOT itself start navigation, that's what `#panelNavigate`'s own
  * "START NAVIGATION" button inside that tab is for.
+ *
+ * UI_REDESIGN_GUIDE.md pass (this session): restyled to the v2 "Lumina
+ * Campus Utility" light theme per Figma node 29:23 ("Group 2" — the
+ * floating search pill). Structure/props/handlers unchanged — only
+ * classNames' declarations and icon sizes moved to match the design.
+ *
+ * Update: node 29:23's third button rendered as an ambiguous circular
+ * photo/badge with no source asset, flagged for confirmation rather
+ * than guessed at. Node 31:243 (a cleaner pass at the same bar,
+ * supplied in-session) confirms it as a plain navigation/send arrow
+ * in a solid `--v2-primary` circle — matching what was already here
+ * (`Navigation` icon, unchanged `onNavigate`/title="Navigate"). Flag
+ * resolved; only the icon size and the pill's background/border
+ * moved to match 31:243's opaque white treatment (see .module.css).
  */
 export default function MobileSearchBar({ onOpenSearch, onToggleSheet, onNavigate, activeChipLabel }) {
   return (
@@ -27,11 +41,11 @@ export default function MobileSearchBar({ onOpenSearch, onToggleSheet, onNavigat
         <Menu size={18} />
       </button>
       <button className={styles.inputBtn} onClick={onOpenSearch} type="button">
-        <Search size={14} className={styles.icon} />
+        <Search size={16} className={styles.icon} />
         <span className={styles.placeholder}>{activeChipLabel || 'Search FUTA campus…'}</span>
       </button>
       <button className={styles.navBtn} title="Navigate" type="button" onClick={onNavigate}>
-        <Navigation size={16} />
+        <Navigation size={13} />
       </button>
     </div>
   );
