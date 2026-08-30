@@ -72,6 +72,31 @@
   --v2-chip-active-border: #006a61;
   --v2-chip-active-text:   #006f66;
 
+  /* Nav/GPS HUD (this session, Figma node 4:429 — pulled directly via the
+     Figma MCP connection): --v2-error/-container were previously flagged
+     "confirm before tokenizing" (no hex given yet) — now confirmed from
+     the HUD's "End" button. --v2-icon-btn-bg/-hud-upnext-bg are literal
+     values from the same frame that don't map cleanly onto an existing
+     accent token (icon-btn-bg is blue-tinted, not violet-tinted like
+     --v2-primary-glow; upnext-bg is a paler, cooler lavender than
+     --v2-primary-glow too). */
+  --v2-error:           #93000a;
+  --v2-error-container: #ffdad6;
+  --v2-icon-btn-bg:     #eaedff;
+  --v2-hud-upnext-bg:   #f2f3ff;
+
+  /* Bottom navbar's "in navigation" state (Figma node 4:488, "Nav -
+     Applying relevance logic..."): a distinct solid blue, not
+     --v2-primary — confirmed from the actual frame, not guessed (see
+     this session's flag in UI_REDESIGN_GUIDE.md for how the earlier,
+     wrong violet-fill guess got corrected once Figma access was fixed).
+     The always-accented "Nav" tab keeps its normal --v2-primary-outline
+     pill unchanged on this bar; only its label color swaps to
+     --v2-nav-active-accent, a teal-mint distinct from --v2-secondary. */
+  --v2-nav-active-bg:     #325ece;
+  --v2-nav-active-tab-text: #ccc3d8;
+  --v2-nav-active-accent: #6bd8cb;
+
   /* Motion (Section 6) — first used by the Loading Screen's icon pulse */
   --v2-ease-standard:     cubic-bezier(0.4, 0, 0.2, 1);
   --v2-duration-quick:    150ms;

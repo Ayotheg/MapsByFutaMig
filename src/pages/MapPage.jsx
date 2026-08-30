@@ -277,6 +277,33 @@ export default function MapPage({ onReadinessChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navActive]);
 
+  // Bug fix (reported directly): "only the HUD should be up" once
+  // navigation starts. `MobileSheet.jsx` already collapses its own sheet
+  // on `navActive` (separate fix, same report), but that only covers the
+  // Explore/Signal/Nav/Suggest panel — everything else that can be open
+  // on top of the map is state MapPage owns directly and was never tied
+  // to `navActive` at all: a selected waypoint's `PlaceCard` (this is
+  // exactly how `handlePlaceCardNavigate` launches nav in the first
+  // place — tapping "Navigate" on a card never closed that same card),
+  // an open route-segment `DetailModal`, an expanded `ChipResultsPanel`
+  // (`activeChip`), and the full-screen `MobileSearchOverlay`. All four
+  // get cleared here, once, the moment `navActive` flips true.
+  // Deliberately NOT touched: `authModalOpen`/`adminPanelOpen`/
+  // `suggestModalOpen`/`mySubmissionsOpen`/`reviewTarget`. Those are
+  // blocking modals for a deliberate task the person is mid-way through,
+  // not ambient cards left open around the map — and in the auth case,
+  // `handleNavLaunch`/`handleGuestNavBlocked` already guarantee nav can't
+  // even start while that modal is what's blocking it. Flagged for a
+  // future session rather than guessed at if that turns out wrong.
+  useEffect(() => {
+    if (navActive) {
+      setSelected(null);
+      setSelectedSegmentId(null);
+      setActiveChip(null);
+      setMobileSearchOpen(false);
+    }
+  }, [navActive]);
+
   // ── Admin panel (Slice 11) ────────────────────────────────────────────
   // Sidebar's Admin button previously had no onClick handler; a prior
   // stopgap (superseded here) pointed it at `ImportTrigger`'s KML/GPX

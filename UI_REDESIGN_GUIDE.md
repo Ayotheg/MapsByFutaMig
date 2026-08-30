@@ -298,7 +298,7 @@ JSX/logic change).
 | Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; 'layers'-keyed tab body now Explore Panel (see flag) |
 | Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; Explore panel added this session, Layers panel body still pending
 | Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) + desktop float, single component | Bricolage Grotesque + Inter (v2 tokens) | Done |
-| Nav/GPS HUD | `src/features/navigation/NavHud.*`, `NavPanel.*`, `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | — | Not started |
+| Nav/GPS HUD | `src/features/navigation/NavHud.*`, `NavPanel.*`, `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flag below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavPanel`/`NavDestPanel`/`GpsPanel`/`NavArrivedBanner`/`MobFabCluster` still on v1 dark tokens — 4:429 only covers the HUD itself, no reference yet for those |
 | Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
 | Review modal | `src/features/reviews/ReviewModal.*` | Both | — | Not started |
 | Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | — | Not started |
@@ -525,6 +525,113 @@ migration-slice convention), with this table updated.
     (there's a plan to remove it later), so wiring a Profile tab
     now risks building against auth that's about to change. Revisit
     once the auth direction is settled.
+- Nav/GPS HUD (this session, started on explicit user instruction — not
+  picked up per the "wait for explicit instruction" rule on its own):
+  scope was three specific, user-named things, not a full reskin of every
+  file in this row.
+  - **Note on this session's process:** initially told the user Figma
+    couldn't be reached at all (true for the `figma.com` web fetch, which
+    is robots-blocked — same limitation as the Explore panel's flag
+    above) without checking whether a Figma MCP connection was available
+    in this session. One was. Once that was pointed out and checked, node
+    4:429 was pulled directly and the HUD below reflects the real design,
+    not a guess. Worth remembering for future sessions: check for a
+    connected Figma MCP tool before concluding a node can't be fetched at
+    all — the `figma.com` block only rules out the plain web-fetch path.
+  - **Navbar nav-active color state** (Figma node 4:488, the bar itself,
+    within the 4:429 frame — confirmed via the Figma MCP connection):
+    added `navActive`-driven styling to `MobileSheet.jsx`'s `.navbar` (the
+    tab strip, not this row's own files). The real design is a solid blue
+    fill (`--v2-nav-active-bg`, `#325ece` — not `--v2-primary`, a genuinely
+    distinct color, confirmed from the frame, not a derivation), inactive
+    tab labels go to `--v2-nav-active-tab-text` (`#ccc3d8`), and the
+    always-accented Nav tab keeps its normal `--v2-primary-outline` pill
+    unchanged, just swapping its label to a teal-mint
+    `--v2-nav-active-accent` (`#6bd8cb`) instead of violet. This replaced
+    an earlier guess in this same session (solid `--v2-primary` fill,
+    white tab text) made before the Figma connection was checked — see
+    the note above. No new prop: `navActive` was already threaded into
+    `MobileSheet` from `MapPage` (previously only consumed by the
+    embedded `NavPanel`), just not used on the bar itself yet.
+  - **`NavHud` redesigned to v2** (`NavHud.jsx`/`.module.css`, Figma nodes
+    4:437 top instruction card, 4:459 "up next" strip, 4:475/4:476 bottom
+    distance card): split from one edge-to-edge dark bar into two floating
+    cards — matches the Figma frame's own split, and is this session's
+    real answer to "give the map room to pinch-zoom": a top card (turn
+    icon, instruction, voice/end buttons, up-next strip) and a bottom card
+    (distance remaining + destination) that sits just above the tab bar
+    via `--mob-sheet-peek`, the same var `MobileSheet.module.css` already
+    uses for its own panel. Same props in, same props out — no data or
+    behavior change, purely layout/visual. Color substitutions per
+    Section 3: the frame's icon/button fills use `#630ed4` (the original,
+    superseded Loading-Screen primary) — mapped to `var(--v2-primary)`
+    throughout instead of the literal hex. New tokens added to
+    `tokens-v2.css`, all confirmed from this frame rather than guessed:
+    `--v2-error`/`--v2-error-container` (previously flagged "confirm
+    before tokenizing" with no hex — now confirmed from the HUD's "End"
+    button), `--v2-icon-btn-bg`, `--v2-hud-upnext-bg`. Figma's "Floating
+    Controls" (a recenter button + a second FAB, node 4:466) were **not**
+    built — no existing "recenter" action to wire up (the map already
+    auto-recenters via `panTo` when the person isn't mid-gesture), and the
+    second FAB would duplicate `MobFabCluster`'s existing locate button;
+    revisit as its own decision rather than guessing new interaction here.
+  - **Stale "Start Navigation" card behind the HUD** (reported directly,
+    with a screenshot showing it still visible above the new distance
+    card and below the nav-active navbar) — pre-existing bug, not
+    introduced this session, just now visible/reported: `NavPanel.jsx`
+    (the "Nav" tab's pre-launch body — the launch button + hint text)
+    already received a `navActive` prop but only used it for a cosmetic
+    class on the button; it never stopped rendering once navigation
+    actually started. Separately, `MobileSheet.jsx`'s sheet open/closed
+    state was never tied to `navActive` either — `handleNavLaunch` in
+    `MapPage.jsx` only sets `navOpen`, never touches the sheet — so
+    whichever tab's panel happened to be open when nav launched (Nav's
+    or any other tab's) just stayed open, sitting behind NavHud instead
+    of being replaced by it. Two-part fix: `MobileSheet.jsx` now
+    collapses the sheet to `'peek'` the instant `navActive` flips true
+    (handles the general case, any tab), and `NavPanel.jsx` also returns
+    `null` while `navActive` is true as a second line of defense (covers
+    manually reopening the Nav tab mid-navigation, which the sheet
+    auto-collapse alone wouldn't catch). Removed `NavPanel.module.css`'s
+    now-unreachable `.launchBtn.active` variant along with it.
+  - **All other open cards, not just the sheet, minimized on nav start**
+    (reported directly, as a follow-up to the fix above): the person's
+    ask was broader than just `NavPanel`/the sheet — "only the HUD screen
+    should be up" once navigation starts, full stop. Added a
+    `MapPage.jsx` effect, keyed the same way as the existing
+    `navActive`-driven view-mode effect right above it, that clears a
+    selected waypoint's `PlaceCard` (`selected`), an open route-segment
+    `DetailModal` (`selectedSegmentId`), an expanded `ChipResultsPanel`
+    (`activeChip`), and the full-screen `MobileSearchOverlay`
+    (`mobileSearchOpen`) the instant `navActive` flips true — none of
+    those were ever tied to `navActive` before. Notably this also covers
+    the case where nav is launched *from* a `PlaceCard`'s "Navigate"
+    button (`handlePlaceCardNavigate`) — that never closed the card it
+    was launched from. Deliberately left alone: `authModalOpen`,
+    `adminPanelOpen`, `suggestModalOpen`, `mySubmissionsOpen`,
+    `reviewTarget` — these are blocking modals for a task the person is
+    mid-way through, not ambient cards, and nav can't start while auth
+    is what's blocking it in the first place. Flag this if it turns out
+    wrong rather than have silently guessed either way.
+  - **Mobile zoom-stuck bug** (`NavigationController.jsx`,
+    `gpsConstants.js`) — **real functionality change, flagged per Rule 7,
+    made on direct, explicit user instruction, not guessed:** on
+    `startNavigation()`, `map.fitBounds()` on the *entire route* has been
+    replaced with `map.setView([lat, lng], NAV_START_ZOOM, ...)`, a fixed
+    close zoom (18, new `gpsConstants.js` constant) centered on the user.
+    `fitBounds` over a full route usually landed near `minZoom` (14) and
+    then just sat there — nothing else in this file ever re-zooms, only
+    `panTo`s to recenter (`updateHUD`/`useGpsTracking.js`) — which on
+    mobile read as the map being stuck zoomed out for the whole nav
+    session. `minZoom`/`maxZoom` and Leaflet's default pinch/scroll zoom
+    were never actually disabled anywhere in this codebase; the bug was
+    purely the wide starting framing having nothing to bring it back in
+    from. Same `setView` call added to the persisted-session-restore
+    effect for consistency (a resumed nav session hit the identical
+    ambiguity). This does change nav's default starting zoom versus
+    before — that's the point of the fix — but doesn't touch, lock, or
+    disable any interaction: the person can still pinch in/out at any
+    time, same as before.
 
 ---
 

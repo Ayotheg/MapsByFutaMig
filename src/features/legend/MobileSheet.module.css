@@ -28,6 +28,39 @@
   background: var(--v2-surface);
   border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  transition: background var(--v2-duration-standard) var(--v2-ease-standard),
+    box-shadow var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+/* ── Nav-active state (Figma node 4:488, pulled via the Figma MCP
+   connection — see this session's flag in UI_REDESIGN_GUIDE.md; an
+   earlier pass guessed a solid --v2-primary fill here before that
+   connection was checked, this replaces it with the real design):
+   the bar switches to a solid blue (not primary violet) while
+   turn-by-turn navigation is running, so the chrome itself signals
+   "you're navigating". Inactive tab labels/icons go to a lighter,
+   blue-bg-legible grey; the always-accented Nav tab keeps its normal
+   outline pill exactly as at rest, just with a teal-mint label instead
+   of violet. Shadow is intentionally unchanged from the base .navbar
+   rule above — the Figma frame uses the same neutral shadow here, not
+   a colored one. */
+.navbarNavActive {
+  background: var(--v2-nav-active-bg);
+}
+.navbarNavActive .tab {
+  color: var(--v2-nav-active-tab-text);
+}
+.navbarNavActive .tabActive {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--v2-on-primary);
+}
+.navbarNavActive .tabPrimary,
+.navbarNavActive .tabPrimary.tabActive {
+  background: var(--v2-primary-outline);
+  color: var(--v2-nav-active-accent);
+}
+.navbarNavActive .signedInDot {
+  border-color: var(--v2-nav-active-bg);
 }
 
 .tabs {

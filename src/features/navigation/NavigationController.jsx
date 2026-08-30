@@ -5,6 +5,7 @@ import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
 import { turnIcon, fmtDist } from './turnHelpers';
+import { NAV_START_ZOOM } from './gpsConstants';
 import NavDestPanel from './NavDestPanel';
 import NavHud from './NavHud';
 import NavArrivedBanner from './NavArrivedBanner';
@@ -478,6 +479,10 @@ const NavigationController = forwardRef(function NavigationController(
     lastSpokenStepRef.current = navStepIndexRef.current;
     setMode(navModeRef.current);
     onActiveChange?.(true);
+    // Same nav-start framing as startNavigation() below, for a session
+    // resumed after a reload — otherwise the map would just stay wherever
+    // it happened to be at reload time instead of the usual close nav view.
+    map.setView([navUserPosRef.current.lat, navUserPosRef.current.lng], NAV_START_ZOOM, { animate: false });
     placeDestMarker(navDestRef.current.lat, navDestRef.current.lng, navDestRef.current.name);
     drawRoute(navRouteDataRef.current.coords, routePosition(navRouteDataRef.current.coords, navUserPosRef.current.lat, navUserPosRef.current.lng).progress, true);
     updateNavUserDot(navUserPosRef.current.lat, navUserPosRef.current.lng);
@@ -615,8 +620,15 @@ const NavigationController = forwardRef(function NavigationController(
     updateHUD();
     persistNavigation();
 
-    const bounds = L.latLngBounds(routeData.coords);
-    map.fitBounds(bounds, { padding: [80, 80] });
+    // Flagged bug fix (explicit user instruction, UI_REDESIGN_GUIDE.md Nav/
+    // GPS HUD session): was `map.fitBounds(L.latLngBounds(routeData.coords),
+    // { padding: [80, 80] })`, framing the entire route — usually a wide,
+    // zoomed-out view that then never changes again (see gpsConstants.js's
+    // `NAV_START_ZOOM` comment for the full story). Center on the user at a
+    // fixed close zoom instead, matching normal turn-by-turn nav framing.
+    // `minZoom`/`maxZoom` (MapShell.jsx) and Leaflet's default pinch/scroll
+    // zoom stay untouched, so the user is always free to zoom back out.
+    map.setView([lat, lng], NAV_START_ZOOM, { animate: true });
 
     navWatchIdRef.current = navigator.geolocation.watchPosition(
       (p) => {

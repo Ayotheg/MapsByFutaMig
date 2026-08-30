@@ -29,10 +29,6 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 16px rgba(68, 226, 205, 0.3);
 }
-.launchBtn.active {
-  background: linear-gradient(135deg, var(--error) 0%, #c93030 100%);
-  color: #fff;
-}
 
 .hint {
   font-family: var(--font-mono);

@@ -9,42 +9,63 @@ import styles from './NavHud.module.css';
  * just rendered directly here instead — no reason to replicate the
  * imperative injection-once dance in React, same call as every other
  * slice's "this was a DOM workaround, not a real requirement" cases.
+ *
+ * UI redesign (per UI_REDESIGN_GUIDE.md, Nav/GPS HUD session — Figma node
+ * 4:429 "NAVIGATION pANEL", fetched directly via the Figma MCP connection
+ * once it was confirmed available): the HUD is now two separate floating
+ * cards instead of one edge-to-edge dark bar — a top instruction card
+ * (icon, turn instruction, voice/end buttons, "up next" strip) and a
+ * bottom "distance remaining" card that sits just above the tab bar,
+ * matching the Figma frame's own split (4:437 vs. 4:475). Same props,
+ * same data, same `arriving`/`arrived`/`nextPreview` gating as before —
+ * only the layout changed. The `arriving`/`arrived` color signal, which
+ * used to live on the whole bar's bottom border, now lives on the top
+ * card's border + icon fill instead (same two states, just relocated
+ * onto the element that still makes sense for it once there's no longer
+ * one single bar to put it on).
+ *
+ * Figma's "Floating Controls" (a recenter button + a second FAB, node
+ * 4:466) aren't built here — no wiring exists for a "recenter" action
+ * (the map already auto-recenters via `panTo` whenever the person isn't
+ * mid-gesture, see `useGpsTracking.js`/`NavigationController.jsx`), and
+ * the second FAB would duplicate `MobFabCluster`'s existing locate
+ * button. Flagged in the guide rather than guessed at.
  */
 export default function NavHud({ arriving, arrived, turnIcon, turnInstruction, turnDist, nextPreview, distRemain, destName, voiceEnabled, onToggleVoice, onClose }) {
   const TurnIcon = LEGACY_ICON_MAP[turnIcon] || LEGACY_ICON_MAP['arrow-up'];
   return (
-    <div className={`${styles.hud} ${arriving ? styles.arriving : ''} ${arrived ? styles.arrived : ''}`}>
-      <div className={styles.top}>
-        <div className={styles.turnIcon}>
-          <TurnIcon size={22} />
+    <>
+      <div className={`${styles.topCard} ${arriving ? styles.arriving : ''} ${arrived ? styles.arrived : ''}`}>
+        <div className={styles.top}>
+          <div className={styles.turnIcon}>
+            <TurnIcon size={20} />
+          </div>
+          <div className={styles.turnInfo}>
+            <div className={styles.instructionLabel}>NOW</div>
+            <div className={styles.turnInstruction}>{turnInstruction}</div>
+            <div className={styles.turnDist}>{turnDist}</div>
+          </div>
+          <button type="button" className={styles.voiceBtn} title="Toggle voice navigation" onClick={onToggleVoice}>
+            {voiceEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
+          <button type="button" className={styles.closeBtn} onClick={onClose}>
+            <X size={12} /> End
+          </button>
         </div>
-        <div className={styles.turnInfo}>
-          <div className={styles.instructionLabel}>NOW</div>
-          <div className={styles.turnInstruction}>{turnInstruction}</div>
-          <div className={styles.turnDist}>{turnDist}</div>
-        </div>
-        <button type="button" className={styles.voiceBtn} title="Toggle voice navigation" onClick={onToggleVoice}>
-          {voiceEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
-        </button>
-        <button type="button" className={styles.closeBtn} onClick={onClose}>
-          <X size={13} /> END
-        </button>
+
+        {nextPreview && (
+          <div className={styles.nextPreview}>
+            <span className={styles.nextLabel}>UP NEXT</span>
+            <span className={styles.nextText}>{nextPreview}</span>
+          </div>
+        )}
       </div>
 
-      {nextPreview && (
-        <div className={styles.nextPreview}>
-          <span className={styles.nextLabel}>UP NEXT</span>
-          <span>{nextPreview}</span>
-        </div>
-      )}
-
-      <div className={styles.stats}>
-        <div className={`${styles.stat} ${styles.statSingle}`}>
-          <div className={styles.statLabel}>DISTANCE REMAINING</div>
-          <div className={styles.statVal}>{distRemain}</div>
-        </div>
+      <div className={styles.distCard}>
+        <div className={styles.distLabel}>DISTANCE REMAINING</div>
+        <div className={styles.distVal}>{distRemain}</div>
+        <div className={styles.destName}>{destName}</div>
       </div>
-      <div className={styles.destName}>{destName}</div>
-    </div>
+    </>
   );
 }

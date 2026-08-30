@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Compass, Rss, Navigation, CirclePlus, CircleUser } from 'lucide-react';
 import styles from './MobileSheet.module.css';
 import NavPanel from '../navigation/NavPanel';
@@ -117,6 +117,24 @@ export default function MobileSheet({
   const activeTab = controlledActiveTab ?? internalActiveTab;
   const setActiveTab = onActiveTabChange ?? setInternalActiveTab;
 
+  // Bug fix (reported directly, with a screenshot showing the old
+  // "START NAVIGATION" card still sitting behind the new NavHud cards):
+  // this sheet's open/closed state (`sheetState`) was never tied to
+  // `navActive` at all — `handleNavLaunch` in MapPage.jsx only sets
+  // `navOpen`, it never touches the sheet — so if the sheet happened to
+  // be open (any tab, not just Nav) when navigation started, that tab's
+  // stale panel body just kept sitting there, now underneath NavHud's
+  // floating cards instead of replaced by them. Collapsing to 'peek' the
+  // moment `navActive` flips true means nothing is left open behind the
+  // HUD, regardless of which tab was showing. `navActive` going false
+  // again (nav ends) is intentionally left alone — no reason to force
+  // any particular sheet state on exit, matches every other close path
+  // in this file, which just leaves the sheet wherever it already was.
+  useEffect(() => {
+    if (navActive) setSheetState('peek');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navActive]);
+
   const handleTabClick = useCallback(
     (tab) => {
       if (tab.isAction) {
@@ -195,7 +213,13 @@ export default function MobileSheet({
           {activeTab === 'navigate' && <NavPanel navActive={navActive} onLaunch={onNavLaunch} />}
         </div>
       </div>
-      <div className={styles.navbar}>
+      {/* UI redesign (per UI_REDESIGN_GUIDE.md, Nav/GPS HUD session, Figma
+          node 4:429): navbar switches to its "in navigation" treatment
+          while `navActive` is true — same bar, same tabs, just restyled,
+          driven entirely by the `navActive` prop this component already
+          received (see NavPanel below) and already threaded from MapPage.
+          No new prop, no behavior change. */}
+      <div className={`${styles.navbar} ${navActive ? styles.navbarNavActive : ''}`}>
         <div className={styles.tabs}>
           {TABS.map((tab) => (
             <button
