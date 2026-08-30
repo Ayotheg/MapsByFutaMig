@@ -9,7 +9,7 @@
  * Interpreted in the visitor's own local timezone, no timezone math
  * needed on our end.
  */
-export const LAUNCH_DATE = new Date('2026-09-15T09:00:00')
+export const LAUNCH_DATE = new Date('2026-09-20T09:00:00')
 
 export function isLaunched() {
   return Date.now() >= LAUNCH_DATE.getTime()

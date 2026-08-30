@@ -71,8 +71,38 @@ create policy "read_own_log" on waypoint_submission_log
 -- minimal fix: adds one column + one function, doesn't touch the existing
 -- (working) PIN UI flow at all.
 
+create table if not exists profiles (
+  id            uuid primary key references auth.users(id) on delete cascade,
+  is_admin      boolean not null default false,
+  review_count  integer not null default 0,
+  nav_count     integer not null default 0,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
 alter table profiles
-  add column if not exists is_admin boolean not null default false;
+  add column if not exists is_admin boolean not null default false,
+  add column if not exists review_count integer not null default 0,
+  add column if not exists nav_count integer not null default 0,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+-- Ensure every Supabase Auth user has a profile row even if the client never
+-- calls a separate profile-create API. This is the production-safe backend
+-- equivalent of the app's earlier "assume profiles exists" behavior.
+create or replace function handle_new_user() returns trigger as $$
+begin
+  insert into profiles (id)
+  values (new.id)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function handle_new_user();
 
 -- Manually set true for the known admin account(s) after running this file:
 --   update profiles set is_admin = true where id = '<admin-auth-uid>';
@@ -80,6 +110,17 @@ alter table profiles
 create or replace function is_admin(uid uuid) returns boolean as $$
   select coalesce((select is_admin from profiles where id = uid), false);
 $$ language sql stable security definer;
+
+-- Helper to guarantee a profile row exists before the app uses admin/profile
+-- queries. This prevents "profile missing" edge cases from silently making
+-- auth look broken in production.
+create or replace function ensure_profile_for_user(uid uuid) returns void as $$
+begin
+  insert into profiles (id)
+  values (uid)
+  on conflict (id) do nothing;
+end;
+$$ language plpgsql security definer;
 
 -- A server-side guard for the student rate limit. Admins bypass the daily
 -- cap, but regular students cannot exceed 5 pending submissions in 24h.
