@@ -167,36 +167,44 @@
 }
 
 .dropdown {
-  /* Minor deviation: legacy bleeds this wider than the pill
-     (`left:-53px; right:-57px`) to compensate for the logo/nav button
-     widths eating into the input's horizontal space. Flush edges here
-     read just as well and are simpler to keep in sync with the pill's
-     own border-radius — flag if the wider bleed is wanted back. */
+  /* UI_REDESIGN_GUIDE.md pass (this session, paired with the mobile
+     overlay per the guide's pairing rule): moved off v1 dark glass onto
+     v2 light tokens now that MobileSearchOverlay — which shares this
+     exact list content via SearchDropdownList/SearchResultItem — is
+     redesigned too. Resolves the flag this file's header comment left
+     ("would put light-on-dark text on the still-dark overlay"); no
+     separate Figma frame for the desktop dropdown shell itself, so this
+     reuses the panel treatment ChipResultsPanel's desktop `.panel`
+     already established (surface/border/radius) rather than reinventing
+     one. Minor deviation kept from the original v1 comment: legacy
+     bleeds this wider than the pill; flush edges here read just as well
+     and stay in sync with the pill's own border-radius. */
   position: absolute;
   top: calc(100% + 10px);
   left: -1px;
   right: -1px;
-  background: rgba(11, 19, 38, 0.98);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(77, 67, 84, 0.55);
-  border-radius: 18px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--r-xl);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.6),
-    0 24px 64px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(183, 109, 255, 0.07);
+    0 8px 24px rgba(15, 23, 42, 0.12),
+    0 2px 6px rgba(15, 23, 42, 0.08);
   z-index: 9999;
   max-height: 380px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(77, 67, 84, 0.6) transparent;
+  scrollbar-color: var(--v2-primary-outline) transparent;
   transform-origin: top center;
-  animation: dropIn 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dropdown {
+    animation: dropIn var(--v2-duration-standard) var(--v2-ease-standard) both;
+  }
 }
 @keyframes dropIn {
   from {
     opacity: 0;
-    transform: scaleY(0.91) translateY(-6px);
+    transform: scaleY(0.96) translateY(-6px);
   }
   to {
     opacity: 1;
@@ -206,8 +214,8 @@
 
 .noResults {
   text-align: center;
-  padding: 16px 14px;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  padding: 20px 16px;
+  color: var(--v2-text-variant);
+  font-family: var(--font-ui);
+  font-size: 13px;
 }

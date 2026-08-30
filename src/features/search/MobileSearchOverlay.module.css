@@ -1,66 +1,62 @@
+/* UI_REDESIGN_GUIDE.md pass (this session): restyled to v2 light tokens
+   per Figma node 4:249 ("Search Results Redesign") — see tokens-v2.css
+   for the font/color mapping notes on this specific frame. Structure
+   unchanged: still gated fully off above 768px, still an
+   open/active-class overlay below it — only the show/hide mechanism
+   moved from a hard `display` swap to an opacity/transform transition
+   (Section 6, "Modals: fade + slight scale-in on open") so it doesn't
+   read as an instant cut. `visibility: hidden` + `pointer-events: none`
+   on the closed state keep it exactly as unreachable/non-interactive as
+   `display: none` was — no change to what's focusable or clickable. */
+
 .overlay {
   display: none;
 }
 
 @media (max-width: 768px) {
   .overlay {
-    display: none;
+    display: flex;
+    flex-direction: column;
     position: fixed;
     inset: 0;
     z-index: 1500;
-    background: var(--surface);
-    flex-direction: column;
+    background: var(--v2-surface);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px) scale(0.99);
+    pointer-events: none;
+    transition:
+      opacity var(--v2-duration-standard) var(--v2-ease-standard),
+      transform var(--v2-duration-standard) var(--v2-ease-standard),
+      visibility 0s var(--v2-duration-standard);
   }
   .overlay.active {
-    display: flex;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    transition: none;
   }
 }
 
 .ovBar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 10px;
-  padding-top: calc(10px + var(--mob-safe-top));
-  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  background: #ffffff;
+  padding: 12px 16px 13px;
+  padding-top: calc(12px + var(--mob-safe-top));
+  border-bottom: 1px solid var(--v2-divider);
   flex-shrink: 0;
 }
 
 .back {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  background: none;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text);
-  cursor: pointer;
-  border-radius: 50%;
-  -webkit-tap-highlight-color: transparent;
-}
-.back:active {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-.input {
-  flex: 1;
-  background: var(--surface-bright);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: 15px;
-  outline: none;
-  -webkit-appearance: none;
-}
-.input:focus {
-  border-color: var(--primary);
-}
-
-.clear {
   flex-shrink: 0;
   width: 36px;
   height: 36px;
@@ -69,14 +65,73 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
+  color: var(--v2-text-variant);
+  cursor: pointer;
+  border-radius: var(--r-full);
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.back:hover,
+.back:active {
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  background: var(--v2-input-surface);
+  border: none;
+  border-radius: var(--r-md);
+  padding: 10px 16px;
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  outline: none;
+  -webkit-appearance: none;
+  transition: box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.input::placeholder {
+  color: var(--v2-text-variant);
+}
+.input:focus {
+  box-shadow: 0 0 0 2px var(--v2-primary-outline);
+}
+
+.clear {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v2-text-variant);
+  border-radius: var(--r-full);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--v2-duration-quick) var(--v2-ease-standard),
+    color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.clear:hover,
+.clear:active {
+  background: var(--v2-primary-outline);
+  color: var(--v2-primary);
 }
 
 .results {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 6px 0 var(--mob-safe-bottom);
+  padding: 0 0 var(--mob-safe-bottom);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back,
+  .input,
+  .clear {
+    transition: none;
+  }
 }

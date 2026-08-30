@@ -572,6 +572,7 @@ export default function MapPage({ onReadinessChange }) {
             gps={gps}
             searchIndex={searchIndex}
             initialDest={navSeedDest}
+            explorePicks={explorePicksState.picks}
             onRequestClose={() => {
               setNavOpen(false);
               setNavSeedDest(null);

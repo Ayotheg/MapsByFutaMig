@@ -97,6 +97,27 @@
   --v2-nav-active-tab-text: #ccc3d8;
   --v2-nav-active-accent: #6bd8cb;
 
+  /* Search Results — mobile overlay + shared dropdown list (this session,
+     Figma node 4:249, "Search Results Redesign"): this frame renders in
+     plain Tailwind slate + "Nimbus Sans" rather than the style-guide's
+     lavender-tinted neutrals/Bricolage-Inter pairing every other screen
+     has matched. Treated as a font gap, not a new font pick — Nimbus Sans
+     isn't in Section 4's shortlist and isn't bundled, so headings/body
+     map to the already-bundled var(--font-display)/var(--font-ui) as
+     usual. For color, reused existing tokens wherever the frame's hex was
+     within a hair of one already defined (same call as the Quick Chips
+     chip-border precedent above): heading/input text #0f172a is an exact
+     match for --v2-neutral; subtext/section-label #64748b is close enough
+     to --v2-text-variant (#7b7487) to reuse rather than fork; the result
+     icon badge's #f5f3ff fill is a near-exact tint step of
+     --v2-primary-glow, and its icon color reuses --v2-primary — the same
+     40×40 icon-badge pattern ChipResultsPanel's header already uses, just
+     at this frame's own var(--r-md) (8px) corner instead of a full circle.
+     Only the two divider/surface grays below had no existing token close
+     enough to reuse, so they're new: */
+  --v2-divider:       #e2e8f0; /* header bottom border + between-row divider */
+  --v2-input-surface: #f1f5f9; /* overlay's own search-input fill */
+
   /* Motion (Section 6) — first used by the Loading Screen's icon pulse */
   --v2-ease-standard:     cubic-bezier(0.4, 0, 0.2, 1);
   --v2-duration-quick:    150ms;

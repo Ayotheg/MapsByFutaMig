@@ -23,6 +23,15 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
  * larger) mobile numbers — a minor, flagged simplification, not a
  * behavioral one.
  *
+ * UI_REDESIGN_GUIDE.md pass (this session): restyled to v2 light tokens
+ * per Figma node 4:249 ("Search Results Redesign") — see tokens-v2.css
+ * for how this frame's colors/font map onto existing tokens. Structure,
+ * props, handlers, and search behavior untouched; the show/close
+ * mechanism (`open`/`active` class) is unchanged too, just animated (see
+ * .module.css). Paired in the same session with DesktopSearchBar's
+ * `.dropdown`, since both surfaces render this exact list content via
+ * the shared SearchDropdownList/SearchResultItem components.
+ *
  * Faithfully NOT ported: unlike the desktop bar's Enter-with-no-selection
  * behavior (`deskDoSearch`, which falls back to a full OSM search),
  * legacy's mobile overlay Enter handler (~5939–5948) only tries
@@ -105,7 +114,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
     <div className={`${styles.overlay} ${open ? styles.active : ''}`}>
       <div className={styles.ovBar}>
         <button className={styles.back} onClick={onClose} aria-label="Back" type="button">
-          <ArrowLeft size={18} />
+          <ArrowLeft size={20} />
         </button>
         <input
           ref={inputRef}
@@ -119,7 +128,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
         />
         {query && (
           <button className={styles.clear} onClick={handleClear} aria-label="Clear" type="button">
-            <X size={14} />
+            <X size={16} />
           </button>
         )}
       </div>

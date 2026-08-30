@@ -290,15 +290,15 @@ JSX/logic change).
 | Screen | Files | Platform | Font picked | Status |
 |---|---|---|---|---|
 | Loading screen | `src/pages/LoadingScreen.*` | Both (viewport-agnostic overlay) | Bricolage Grotesque + Inter (already bundled) | Done |
-| Search (mobile) | `src/features/search/MobileSearchBar.*`, `MobileSearchOverlay.*` | Mobile | Inter (already bundled) | Collapsed bar (`MobileSearchBar`) done; `MobileSearchOverlay` still pending, see flag below |
-| Search (desktop) | `src/features/search/DesktopSearchBar.*`, `SearchDropdownList.jsx`, `SearchResultItem.*` | Desktop | Inter (already bundled) | Collapsed pill (`DesktopSearchBar`'s `.bar`/`.pill`) done; `SearchDropdownList`/`SearchResultItem` and `.dropdown` still pending, see flag below |
+| Search (mobile) | `src/features/search/MobileSearchBar.*`, `MobileSearchOverlay.*` | Mobile | Inter (already bundled) | Done — `MobileSearchOverlay` redesigned this session, see flag below |
+| Search (desktop) | `src/features/search/DesktopSearchBar.*`, `SearchDropdownList.jsx`, `SearchResultItem.*` | Desktop | Inter (already bundled) | Done — `.dropdown`/`SearchDropdownList`/`SearchResultItem` redesigned this session (paired with the mobile overlay), see flag below |
 | Quick chips | `src/features/search/QuickChips.*`, `ChipResultsPanel.*`, `ChipResultRow.*` | Both — single component, internal `@media` queries, not split files | Bricolage Grotesque (headings) + Inter (body) for the results dropdown; chip row itself stays Inter-only, see flag | Chip row (`QuickChips`) done; `ChipResultsPanel`/`ChipResultRow` (the dropdown a chip opens into) done this session |
 | Filter/legend content | `src/features/legend/LayersPanel.*`, `PlaceTypeFilter.*` | Desktop only now — mobile's Layers entry point removed this session, see Explore Panel flag below | — | Not started |
 | Explore panel | `src/features/explore/*`, `src/features/admin/AdminEditModal.jsx` (Explore fields), `supabase/explore_fields.sql` | Both — mobile navbar's "Explore" tab body + new desktop rail button | Bricolage Grotesque + Inter (v2 tokens) | Done |
 | Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; 'layers'-keyed tab body now Explore Panel (see flag) |
 | Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; Explore panel added this session, Layers panel body still pending
 | Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) + desktop float, single component | Bricolage Grotesque + Inter (v2 tokens) | Done |
-| Nav/GPS HUD | `src/features/navigation/NavHud.*`, `NavPanel.*`, `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flag below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavPanel`/`NavDestPanel`/`GpsPanel`/`NavArrivedBanner`/`MobFabCluster` still on v1 dark tokens — 4:429 only covers the HUD itself, no reference yet for those |
+| Nav/GPS HUD | `src/features/navigation/NavHud.*`, `NavPanel.*`, `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 this session against Figma node 1:311, see flag below; `NavPanel`/`GpsPanel`/`NavArrivedBanner`/`MobFabCluster` still on v1 dark tokens — no reference yet for those |
 | Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
 | Review modal | `src/features/reviews/ReviewModal.*` | Both | — | Not started |
 | Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | — | Not started |
@@ -632,8 +632,119 @@ migration-slice convention), with this table updated.
     before — that's the point of the fix — but doesn't touch, lock, or
     disable any interaction: the person can still pinch in/out at any
     time, same as before.
+- **`NavDestPanel` — the "Where to?" panel (this session, Figma node
+  1:311, "Navigation Mode"; started on explicit user instruction, not
+  picked up on its own):** redesigned to v2 light tokens, plus two real
+  functionality changes, both made on direct, explicit user instruction
+  and flagged per Rule 7, not guessed.
+  - **Mode picker removed — walk mode hardcoded.** The Figma frame
+    shows no Walk/Moto/Drive control at all. `NavDestPanel.jsx`'s
+    `MODES` array and `.modeRow` were deleted; `mode`/`onModeChange`
+    are no longer passed down from `NavigationController.jsx`. Rather
+    than touch `fetchRoute`/`navModeRef` (functionality files, out of
+    scope for this pass), `mode` state was left exactly as-is — it
+    already defaulted to `'foot-walking'` and nothing calls `setMode`
+    anymore, so it now simply never changes. Net effect: walking is
+    the only mode, with zero changes to the routing logic itself.
+  - **"Popular places on campus" added — shares data with Explore, not
+    a separate list.** `MapPage.jsx` now passes `explorePicks={
+    explorePicksState.picks}` into `<NavigationController>` — the
+    *same* `useExplorePicks(waypoints)` result the Explore panel
+    already renders from (no second call to the hook, no new fetch).
+    `NavigationController.jsx` takes the first two entries of that
+    array as `popularPlaces`, adding a one-shot-location-based "X away"
+    label (`useOneShotLocation` + `fmtDist`, both reused from the
+    Explore feature — same non-blocking, no-permission-prompt-gate
+    approach Explore's own cards use, not reimplemented). Tapping a
+    popular-place card calls the panel's existing `setNavDest` (the
+    same function the destination-search dropdown already uses), so
+    picking one just sets it as the nav destination — no new selection
+    logic. Because "popular" here always reads off Explore's own
+    `picks` array, an admin featuring/un-featuring a place in
+    `AdminEditModal.jsx` updates both sections at once.
+  - **Static "from/to" route rows dropped.** The old header ("Where
+    to?" title + close button) and the "Your current location" /
+    destination two-row layout (with connecting line) had no props
+    tied to them — pure markup — and don't appear in the Figma frame,
+    which shows a single "Where to?" search bar instead. Folded into
+    one `.searchRow` reusing the exact same `destInputValue`/
+    `onDestInputChange`/`dropdownResults`/`onPickResult` props as
+    before (same data in, same data out) — only the container markup
+    changed. The hint text (`hint` prop — several dynamic states, e.g.
+    "Destination set: X", routing-failure messages) is still rendered
+    verbatim, just inside a restyled icon+card container instead of
+    plain centered text; no hardcoded copy was added to replace it.
+  - Desktop keeps the v1 fixed-left-panel mechanics (position, slide-in
+    animation) — no separate desktop Figma frame was given, so per the
+    pairing rule this reuses the same v2 token decisions as the mobile
+    bottom sheet rather than reinventing them, same precedent as the
+    Search bar and Nav HUD passes.
+  - Colors: reused existing v2 tokens wherever a hex was within a hair
+    of one already defined — `--v2-hud-upnext-bg` (#f2f3ff) for the
+    search row and hint card fills, `--v2-primary` in place of the
+    frame's literal `#630ed4`/`#7c3aed` (same "map the literal to the
+    token" call as the Nav HUD pass), `--v2-neutral` for card-name text
+    (frame's `#131b2e` is a hair off `--v2-neutral`'s `#0f172a`, same
+    tolerance already used for the Search Results pass). `#dae2fd`
+    used as a literal border color (not a new token) since it's already
+    used the same way, untokenized, in `NavHud.module.css`. Popular-card
+    icon badges use `dotColor(type)` from `chipConfig.js` — the same
+    per-type color function `ExploreCard` uses — rather than the
+    frame's two one-off swatches, so a card's color means the same
+    thing here as it does in Explore.
+  - Motion: hover/press transforms added to the popular-place cards and
+    the Start Navigation button (existing button already had them,
+    kept), wrapped in `@media (prefers-reduced-motion: no-preference)`
+    per Section 6.
 
 ---
+
+- Search results — mobile overlay + shared dropdown list (this session,
+  Figma node 4:249, "Search Results Redesign"): completes both
+  previously-pending Search rows in one pass, since `MobileSearchOverlay`
+  and `DesktopSearchBar`'s `.dropdown` both render the same shared
+  `SearchDropdownList`/`SearchResultItem` content — redesigning that
+  shared file necessarily finishes both, and the pairing rule calls for
+  doing them together anyway.
+  - **Font/color gap, flagged rather than silently reconciled:** this
+    frame comes back in plain Tailwind slate colors and a "Nimbus Sans"
+    font, not the "Lumina Campus Utility" style guide's lavender-tinted
+    neutrals or Bricolage/Inter pairing every other screen has matched.
+    Nimbus Sans isn't in Section 4's shortlist and isn't bundled, so
+    text still maps to `var(--font-display)`/`var(--font-ui)` as usual.
+    For color, reused an existing v2 token wherever this frame's hex was
+    within a hair of one already defined (same call as the Quick Chips
+    chip-border precedent): `#0f172a` heading/input text is an exact
+    match for `--v2-neutral`; `#64748b` subtext/section-label is close
+    enough to `--v2-text-variant` to reuse; the `#f5f3ff` icon-badge fill
+    is a near-exact tint step of `--v2-primary-glow`, badge icon color
+    reuses `--v2-primary` — the same 40×40 icon-badge pattern
+    `ChipResultsPanel`'s header already uses, just at this frame's own
+    `var(--r-md)` corner instead of a full circle. Two genuinely new
+    grays got their own tokens (`--v2-divider`, `--v2-input-surface` —
+    see `tokens-v2.css`) since nothing close already existed. If this
+    frame turns out to be an intentional break from the style guide
+    (not just an export/font-substitution artifact), the reused
+    text/label tokens above should be revisited.
+  - Icons: unchanged — the app's per-waypoint-type icon already resolves
+    through `LEGACY_ICON_MAP`/`icon(entry)` data-driven, not a literal
+    asset per result; only the icon badge's size/shape/fill moved
+    (16px→20px icon in a new 40×40 `var(--r-md)` tile, was a bare
+    16px glyph with no badge before).
+  - Desktop's `.dropdown` shell (surface/border/radius/shadow) reuses
+    `ChipResultsPanel`'s desktop panel treatment — no separate desktop
+    Figma frame exists for the dropdown container itself, so this
+    follows the same pairing-rule reuse the collapsed pill already used.
+  - Badges (`.badge`/`.badgeOsm`/`.badgeSeg`, desktop-only —
+    `showBadge={false}` on mobile, matching Figma's badge-less rows)
+    recolored to the existing primary/secondary/tertiary three-tier
+    accent split rather than guessed at individually; no Figma reference
+    showed OSM/segment badge colors specifically.
+  - Motion added: the overlay's open/close now fades + slides instead of
+    an instant `display` cut (Section 6's modal guidance), and hover
+    tints on rows/back/clear buttons — `visibility`/`pointer-events` on
+    the closed state keep it exactly as unreachable as `display: none`
+    was, no behavior change.
 
 ## 8. Open decisions (fill in as they're made)
 

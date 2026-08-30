@@ -1,22 +1,38 @@
+/* UI_REDESIGN_GUIDE.md pass (this session): restyled to v2 light tokens
+   per Figma node 4:249 — this file is shared verbatim by
+   MobileSearchOverlay's list and DesktopSearchBar's `.dropdown`, so
+   redesigning it completes both flagged rows in Section 7 at once
+   (DesktopSearchBar's `.dropdown` container itself is repainted to
+   match in DesktopSearchBar.module.css, paired in this same session).
+   JSX/props/markup unchanged — only class declarations moved. */
+
 .item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 18px;
+  gap: 16px;
+  padding: 16px;
   cursor: pointer;
-  transition: background 0.1s;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.item + .item {
+  border-top: 1px solid var(--v2-divider);
+  padding-top: 17px;
 }
 .item:hover,
 .item.active {
-  background: rgba(183, 109, 255, 0.1);
+  background: var(--v2-primary-glow);
 }
 
 .icon {
-  font-size: 16px;
   flex-shrink: 0;
-  width: 24px;
-  text-align: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-md);
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .body {
@@ -25,24 +41,26 @@
 }
 
 .name {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+  line-height: 1.5;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .name :global(mark) {
   background: transparent;
-  color: var(--primary);
+  color: var(--v2-primary);
   font-weight: 800;
 }
 
 .sub {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--v2-text-variant);
+  line-height: 1.5;
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
@@ -50,43 +68,41 @@
 }
 
 .badge {
-  font-family: var(--font-mono);
-  font-size: 8px;
+  font-family: var(--font-ui);
+  font-size: 10px;
   font-weight: 700;
   padding: 3px 8px;
   border-radius: var(--r-full);
-  background: rgba(183, 109, 255, 0.15);
-  color: var(--primary);
-  border: 1px solid rgba(183, 109, 255, 0.25);
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+  border: 1px solid var(--v2-primary-outline);
   flex-shrink: 0;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 .badgeOsm {
-  background: rgba(68, 226, 205, 0.12);
-  color: var(--secondary);
-  border-color: rgba(68, 226, 205, 0.25);
+  background: rgba(13, 148, 136, 0.12);
+  color: var(--v2-secondary);
+  border-color: rgba(13, 148, 136, 0.25);
 }
 .badgeSeg {
-  background: rgba(221, 183, 255, 0.12);
-  color: var(--primary);
-  border-color: rgba(221, 183, 255, 0.25);
+  background: rgba(161, 81, 0, 0.12);
+  color: var(--v2-tertiary);
+  border-color: rgba(161, 81, 0, 0.25);
 }
 
 .sectionLabel {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  padding: 10px 18px 5px;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  color: var(--v2-text-variant);
+  padding: 16px 16px 0;
   text-transform: uppercase;
-  border-top: 1px solid rgba(77, 67, 84, 0.4);
-}
-.sectionLabel:first-child {
-  border-top: none;
+  padding-bottom: 4px;
 }
 
 .spinner {
@@ -96,9 +112,9 @@
   gap: 6px;
   text-align: center;
   padding: 16px 14px;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  color: var(--v2-text-variant);
+  font-family: var(--font-ui);
+  font-size: 12px;
 }
 .spin {
   animation: searchSpin 0.9s linear infinite;
@@ -109,8 +125,16 @@
 }
 .empty {
   text-align: center;
-  padding: 16px 14px;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  padding: 20px 16px;
+  color: var(--v2-text-variant);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .spin {
+    transition: none;
+    animation: none;
+  }
 }

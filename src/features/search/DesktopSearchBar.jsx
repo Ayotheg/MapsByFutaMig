@@ -30,19 +30,21 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
  * → `panelNavigate`). Flagging rather than guessing a trigger or inventing
  * new UI not present in legacy; revisit if Slice 9 turns out to need it.
  *
- * UI_REDESIGN_GUIDE.md pass (this session, paired with MobileSearchBar
+ * UI_REDESIGN_GUIDE.md pass (earlier session, paired with MobileSearchBar
  * per the guide's pairing rule): the collapsed pill (`.bar`/`.pill` and
- * its buttons/input) is restyled to v2 light tokens, reusing the same
+ * its buttons/input) restyled to v2 light tokens, reusing the same
  * decisions just made for the mobile bar (glass pill, v2-primary nav
  * button, etc.) — no separate Figma frame was given for desktop, per
- * the pairing rule this reuses the mobile session's fresh choices
- * rather than reinventing them. The results `.dropdown` and
- * `SearchDropdownList`/`SearchResultItem` are deliberately left on v1
- * dark styling: that list is shared verbatim with MobileSearchOverlay
- * (still unredesigned, no Figma reference yet), so restyling it here
- * would put light-on-dark text on the still-dark overlay — same
- * shared-component precedent as the Layers panel tab-strip pass.
- * Flagged in UI_REDESIGN_GUIDE.md Section 7 rather than guessed at.
+ * the pairing rule this reused the mobile session's fresh choices
+ * rather than reinventing them.
+ *
+ * Follow-up (this session, Figma node 4:249): the results `.dropdown`
+ * and shared `SearchDropdownList`/`SearchResultItem` are now also v2 —
+ * MobileSearchOverlay (which shares this list verbatim) got its own
+ * pass this session, closing the reason `.dropdown` was left dark
+ * before. `.dropdown`'s own shell (surface/border/radius/shadow) reuses
+ * ChipResultsPanel's desktop panel treatment, since no separate desktop
+ * Figma frame exists for it — same pairing-rule reuse as the pill above.
  */
 export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed, onToggleCollapsed, onManualType, activeChipLabel, onNavigateClick }) {
   const [query, setQuery] = useState(() => readPersistentState('desktop-search-query', ''));

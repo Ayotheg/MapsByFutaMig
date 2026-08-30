@@ -24,7 +24,7 @@ export default function SearchResultItem({ entry, query, icon, highlight, onSele
       }}
     >
       <div className={styles.icon}>
-        <Icon size={16} />
+        <Icon size={20} />
       </div>
       <div className={styles.body}>
         <div className={styles.name} dangerouslySetInnerHTML={{ __html: highlight(entry.name, query) }} />

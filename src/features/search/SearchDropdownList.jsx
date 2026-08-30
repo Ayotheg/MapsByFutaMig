@@ -28,7 +28,7 @@ export default function SearchDropdownList({
       {hasLocal && (
         <>
           <div className={styles.sectionLabel}>
-            <MapPin size={11} /> On This Map
+            <MapPin size={14} /> On This Map
           </div>
           {localResults.map((r) => {
             idx += 1;
@@ -57,7 +57,7 @@ export default function SearchDropdownList({
       {hasOsm && (
         <>
           <div className={styles.sectionLabel}>
-            <Globe size={11} /> OpenStreetMap
+            <Globe size={14} /> OpenStreetMap
           </div>
           {osmResults.map((r) => {
             idx += 1;

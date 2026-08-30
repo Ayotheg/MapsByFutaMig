@@ -1,11 +1,13 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import { haversine, routePosition } from '../../lib/geoUtils';
 import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
 import { turnIcon, fmtDist } from './turnHelpers';
+import { fmtDist as fmtDistAway } from '../search/chipConfig';
 import { NAV_START_ZOOM } from './gpsConstants';
+import { useOneShotLocation } from '../explore/useOneShotLocation';
 import NavDestPanel from './NavDestPanel';
 import NavHud from './NavHud';
 import NavArrivedBanner from './NavArrivedBanner';
@@ -59,9 +61,19 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  * for `gps.lastKnownPosRef` (legacy's shared `lastKnownPos` cache, read
  * by both the GPS panel and the nav module) as part of the "smart
  * location resolver" (below).
+ *
+ * `explorePicks` (new, this session — real functionality, flagged per
+ * Rule 7, on direct user instruction): MapPage's own `useExplorePicks
+ * (waypoints)` result, the exact same array the Explore panel renders
+ * from — not a separate fetch or a second call to the hook. The
+ * "Where to?" panel's "Popular places on campus" section is just the
+ * first two of that same array, so it always agrees with Explore about
+ * what's featured. Distance label uses a one-shot location fix (see
+ * `useOneShotLocation` below), same non-blocking approach Explore
+ * itself already uses — never gates the panel on a permission prompt.
  */
 const NavigationController = forwardRef(function NavigationController(
-  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess },
+  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks },
   ref
 ) {
   const persistedNavigationRef = useRef(readPersistentState('navigation-session', null));
@@ -69,6 +81,12 @@ const NavigationController = forwardRef(function NavigationController(
   const persistedDestination = readPersistentState('navigation-destination', null);
   const [destPanelOpen, setDestPanelOpen] = useState(!persistedNavigation?.active);
   const [navActive, setNavActive] = useState(Boolean(persistedNavigation?.active));
+  // Mode switching UI removed this session (real functionality change,
+  // flagged per Rule 7, on direct user instruction) — `mode` now just
+  // stays at its 'foot-walking' default forever since nothing calls
+  // `setMode` anymore. Left as real state (not inlined to a constant)
+  // rather than touching `fetchRoute`/`navModeRef`'s plumbing below,
+  // which are functionality files out of scope for this pass.
   const [mode, setMode] = useState('foot-walking');
   const [destInputValue, setDestInputValue] = useState('');
   const [dropdownResults, setDropdownResults] = useState([]);
@@ -743,6 +761,20 @@ const NavigationController = forwardRef(function NavigationController(
     navModeRef.current = mode;
   }, [mode]);
 
+  // ── Popular places on campus (new, this session — see header comment) ──
+  const userCoords = useOneShotLocation(destPanelOpen);
+  const popularPlaces = useMemo(
+    () =>
+      (explorePicks || []).slice(0, 2).map((pick) => ({
+        ...pick,
+        distanceLabel:
+          userCoords && pick.lat != null && pick.lng != null
+            ? fmtDistAway(haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng))
+            : null,
+      })),
+    [explorePicks, userCoords]
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -782,8 +814,6 @@ const NavigationController = forwardRef(function NavigationController(
     <>
       {destPanelOpen && (
         <NavDestPanel
-          mode={mode}
-          onModeChange={setMode}
           destInputValue={destInputValue}
           onDestInputChange={onDestInputChange}
           dropdownResults={dropdownResults}
@@ -795,6 +825,8 @@ const NavigationController = forwardRef(function NavigationController(
           goLabel={goLabel}
           hint={hint}
           onClose={() => setDestPanelOpen(false)}
+          popularPlaces={popularPlaces}
+          onPopularPlaceSelect={(place) => setNavDest(place.waypoint)}
         />
       )}
       {navActive && (
