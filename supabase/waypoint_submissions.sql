@@ -81,6 +81,21 @@ create or replace function is_admin(uid uuid) returns boolean as $$
   select coalesce((select is_admin from profiles where id = uid), false);
 $$ language sql stable security definer;
 
+-- A server-side guard for the student rate limit. Admins bypass the daily
+-- cap, but regular students cannot exceed 5 pending submissions in 24h.
+create or replace function can_submit_pending_waypoint(uid uuid) returns boolean as $$
+  select
+    is_admin(uid)
+    or (
+      (
+        select count(*)
+        from waypoint_submission_log
+        where user_id = uid
+          and created_at >= now() - interval '24 hours'
+      ) < 5
+    );
+$$ language sql stable security definer;
+
 -- security definer is required here for the same reason quick_chips'
 -- trigger functions and Step 7's handle_new_user needed it: is_admin()
 -- is called from inside OTHER tables' RLS policies (waypoints'
@@ -106,6 +121,7 @@ create policy "student_insert_pending" on waypoints
   with check (
     status = 'pending'
     and submitted_by = auth.uid()
+    and can_submit_pending_waypoint(auth.uid())
   );
 
 drop policy if exists "public_read_approved" on waypoints;
