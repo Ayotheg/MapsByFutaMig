@@ -63,6 +63,20 @@ colors and fonts.
 
 ---
 
+## 1a. Scope per session — wait for explicit instruction
+
+**Do not pick the next "Not started" screen on your own.** Finish only
+the screen you were asked to do, update this file's status table for
+that screen, and stop there — even if another row is sitting at "Not
+started" and would logically come next per Section 7 or the pairing
+rule. The person runs one screen per session on purpose (review time,
+context budget, different models per session); starting an unrequested
+screen wastes their review cycle and can produce work they didn't ask
+for. Only move on to another screen when the person's message names it
+or clearly says "continue"/"next screen" for that purpose.
+
+---
+
 ## 2. How to start a screen session
 
 Paste this at the top of a new model session, filled in:
@@ -283,7 +297,7 @@ JSX/logic change).
 | Explore panel | `src/features/explore/*`, `src/features/admin/AdminEditModal.jsx` (Explore fields), `supabase/explore_fields.sql` | Both — mobile navbar's "Explore" tab body + new desktop rail button | Bricolage Grotesque + Inter (v2 tokens) | Done |
 | Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; 'layers'-keyed tab body now Explore Panel (see flag) |
 | Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; Explore panel added this session, Layers panel body still pending
-| Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) | — | Not started |
+| Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) + desktop float, single component | Bricolage Grotesque + Inter (v2 tokens) | Done |
 | Nav/GPS HUD | `src/features/navigation/NavHud.*`, `NavPanel.*`, `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | — | Not started |
 | Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
 | Review modal | `src/features/reviews/ReviewModal.*` | Both | — | Not started |

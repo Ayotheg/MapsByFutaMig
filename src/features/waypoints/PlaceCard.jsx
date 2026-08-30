@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Star } from 'lucide-react';
+import { Star, X, Navigation } from 'lucide-react';
 import styles from './PlaceCard.module.css';
 import { isRateablePOI } from './wpTypeMeta';
 
@@ -42,6 +42,20 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  * segment-scoped, so clicking a thumbnail/hero image here just opens the
  * full-res image in a new tab directly — same end result, no dependency on
  * Slice 4's segment registry. Revisit if a proper in-app lightbox is wanted.
+ *
+ * UI_REDESIGN_GUIDE.md pass (this session): restyled to v2 light theme
+ * per Figma node 7:943 ("Bottom Sheet Card") — see PlaceCard.module.css's
+ * header comment. Two structural (not functional) notes:
+ *  - Close button: Figma shows it floating on the hero photo, not in the
+ *    header. Rendered there when a photo exists; falls back to the old
+ *    header-close placement (`!hasPhotos`) when a waypoint has no photos,
+ *    so closing is never unreachable. Same `onClose` handler either way —
+ *    no behavior change.
+ *  - Badge/rating row: Figma pairs the type badge with a secondary text
+ *    label (a location string this app's data shape doesn't have — see
+ *    UI_REDESIGN_GUIDE.md's flags). Paired the existing `data.badge` chip
+ *    with the existing rating indicator instead, side by side, to match
+ *    the visual pattern without inventing a new data field.
  */
 export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobile }) {
   const [photoIdx, setPhotoIdx] = useState(0);
@@ -120,6 +134,9 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
               onClick={() => window.open(photos[photoIdx], '_blank')}
             />
             <div className={styles.heroOverlay} />
+            <button className={styles.closeOnHero} aria-label="Close" onClick={onClose}>
+              <X size={14} strokeWidth={2.5} />
+            </button>
             {photos.length > 1 && (
               <div className={styles.photoCount}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
@@ -152,17 +169,18 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
         <div className={styles.header}>
           <div className={styles.titleWrap}>
             <h2 className={styles.name}>{data?.name || 'Location'}</h2>
-            {data?.badge && <div className={styles.badge}>{data.badge}</div>}
-            <div className={styles.rating}>
-              <RatingBadge type={data?.type} avgRating={data?.avgRating} reviewCount={data?.reviewCount} />
+            <div className={styles.metaRow}>
+              {data?.badge && <span className={styles.badge}>{data.badge}</span>}
+              <span className={styles.rating}>
+                <RatingBadge type={data?.type} avgRating={data?.avgRating} reviewCount={data?.reviewCount} />
+              </span>
             </div>
           </div>
-          <button className={styles.close} aria-label="Close" onClick={onClose}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          {!hasPhotos && (
+            <button className={styles.close} aria-label="Close" onClick={onClose}>
+              <X size={16} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
 
         <div className={styles.coords}>
@@ -205,9 +223,7 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
               onClose();
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="3 11 22 2 13 21 11 13 3 11" />
-            </svg>
+            <Navigation size={16} />
             Navigate Here
           </button>
         </div>

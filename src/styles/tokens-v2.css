@@ -40,6 +40,14 @@
   /* Component-specific */
   --v2-track: #e2e7ff; /* progress bar / meter background */
 
+  /* Place card (this session): translucent violet fill for the type
+     pill/chip sitting over imagery — matches the Figma node's literal
+     rgba(124,58,237,0.3), which is var(--v2-primary) at 30% alpha, not
+     a new hex. Kept as a discrete token (rather than an inline
+     color-mix() per usage) since a translucent tag-over-photo pattern
+     is likely to recur on other screens (e.g. Explore card badges). */
+  --v2-primary-tag-fill: rgba(124, 58, 237, 0.3);
+
   /* Motion (Section 6) — first used by the Loading Screen's icon pulse */
   --v2-ease-standard:     cubic-bezier(0.4, 0, 0.2, 1);
   --v2-duration-quick:    150ms;
