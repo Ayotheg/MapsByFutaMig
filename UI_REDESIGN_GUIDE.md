@@ -299,9 +299,9 @@ JSX/logic change).
 | Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; 'layers'-keyed tab body now Explore Panel (see flag) |
 | Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; Explore panel added this session, Layers panel body still pending
 | Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) + desktop float, single component | Bricolage Grotesque + Inter (v2 tokens) | Done |
-| Nav/GPS HUD | `src/features/navigation/NavHud.*`, ~~`NavPanel.*`~~ (dead, see flag below), `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 against Figma node 1:311; `GpsPanel` redesigned to v2 against Figma node 31:52 this session, see flag below; every nav entry point (mobile search bar, mobile navbar, desktop rail, desktop search bar) now routes straight to `NavigationController`/`NavDestPanel` instead of `NavPanel`, which is now unreachable/dead — see flag below; `NavArrivedBanner`/`MobFabCluster` still on v1 dark tokens — no reference yet for those |
+| Nav/GPS HUD | `src/features/navigation/NavHud.*`, ~~`NavPanel.*`~~ (dead, see flag below), `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 against Figma node 1:311; `GpsPanel` redesigned to v2 against Figma node 31:52 this session, see flag below; `NavArrivedBanner` redesigned to v2 against Figma node 67:130 this session, see flag below; every nav entry point (mobile search bar, mobile navbar, desktop rail, desktop search bar) now routes straight to `NavigationController`/`NavDestPanel` instead of `NavPanel`, which is now unreachable/dead — see flag below; `MobFabCluster` still on v1 dark tokens — no reference yet |
 | Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
-| Review modal | `src/features/reviews/ReviewModal.*` | Both | — | Not started |
+| Review modal | `src/features/reviews/ReviewModal.*` | Both | Bricolage Grotesque (question) + Inter (v2 tokens) | Done — see flag below for why it no longer uses the shared `Modal` shell |
 | Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | Bricolage Grotesque (title) + Inter (v2 tokens) | Done — this session also redesigned the shared `components/ui/Modal.*` shell (first modal screen, see flag) |
 | Map shell | `src/features/map/MapShell.jsx`, `.module.css` | Both | — | Not started |
 | Admin panel | `src/features/admin/AdminPanel.*`, `AdminEditModal.*`, tabs (`KmlTab`, `PendingTab`, `PointsTab`, `RoutesTab`, `QuickChipsTab`) | Desktop | — | Not started |
@@ -930,6 +930,111 @@ migration-slice convention), with this table updated.
     reason) but removes the page-level zoom as a competing gesture
     handler on the browsers that do respect it — the actual mechanism
     behind the "interface moves/gets stuck" symptom.
+
+- **Review modal / rating screen (this session):** redesigned
+  `ReviewModal.jsx`/`.module.css` against Figma node 59:2 ("Rating
+  Screen"), pulled via the Figma MCP connection. Same props (`dest`,
+  `onClose`, `onSubmitted`, `user`), same state variables, same
+  `handleSubmit`/`submitReview` call, same reset-on-`dest`-change
+  effect — no functionality changes. `MapPage.jsx`'s
+  `<ReviewModal dest={reviewTarget} onClose={...} onSubmitted={...}
+  user={auth.user} />` call site untouched and confirmed compatible.
+  - **Structural decision, flagged:** the frame is a bottom sheet
+    (rounded top corners only, anchored to the viewport bottom,
+    grabber handle, `max-width: 672px` staying bottom-anchored even at
+    that width) — not the shared `Modal` component's centered card
+    that `Modal.module.css` established on the Waypoint suggestion
+    session. Adding a variant prop to `Modal.jsx` to support this
+    would be a shared-component change touching
+    `AuthModal`/`SaveModal`/`DetailModal`/`AdminEditModal` (all still
+    "Not started") — out of scope per Rule 1. Instead, `ReviewModal`
+    now builds its own overlay/sheet markup and no longer imports
+    `Modal`/`Modal.module.css` at all. Externally-visible behavior is
+    unchanged from before: X-button close, backdrop-click-to-close
+    (this modal already had `closeOnBackdrop` on — same behavior, just
+    now implemented locally instead of via that prop), same
+    Skip/Submit Review footer buttons and disabled states. No other
+    modal is affected by this change.
+  - **Grabber handle omitted, not just left decorative:** the frame
+    shows one, but a static handle with no drag-to-dismiss behind it
+    reads as a broken affordance — and wiring up real swipe-to-dismiss
+    would be new interaction behavior, out of scope per Rule 1/7. Left
+    off entirely (confirmed by direct instruction this session, after
+    initially shipping it decorative); top of the sheet is plain.
+    Flag if a future session is asked to add the real gesture as an
+    explicit, separate instruction.
+  - One literal override, same precedent as the Destination Arrived
+    and Waypoint suggestion sessions: the frame's destination-name
+    accent and "Submit Review" button are a flat `#630ed4` — used the
+    authoritative `--v2-primary` (`#7c3aed`) instead.
+  - Star color: kept the app's existing literal `#ffc857` for a
+    *filled* star (same precedent this file already documented
+    pre-redesign, matching `PlaceCard.module.css`'s `.ratingFilled`) —
+    no Figma reference showed a different filled-star color. The
+    frame's *unfilled* stars are a pale lavender-gray with no exact
+    hex confirmable from the exported node (vector fill wasn't
+    inspectable via the MCP connection) — used the closest existing
+    token, `--v2-muted`, rather than inventing a new one. Flag if an
+    exact literal surfaces later.
+  - Motion: overlay fade + sheet slide-up-in on open
+    (`var(--v2-duration-standard)`/`var(--v2-ease-standard)`), guarded
+    by `prefers-reduced-motion: reduce`; Submit button gets the
+    standard hover lift + `:active` scale-down, no idle motion, same
+    as every other v2 primary button in this guide.
+
+- **Destination Arrived banner (this session):** redesigned
+  `NavArrivedBanner.jsx`/`.module.css` against Figma node 67:130
+  ("Destination Arrived"), pulled via the Figma MCP connection. Same
+  props (`destName`, `onDismiss`) and the same 8s auto-dismiss
+  `useEffect`/`setTimeout` — no functionality changes.
+  - Reused the shared v2 Modal contract (`.overlay`'s `var(--v2-scrim)`
+    backdrop + blur, `.banner`'s `var(--v2-surface)`/`var(--v2-track)`
+    card, both animation curves) that `Modal.module.css` set on the
+    Waypoint suggestion session, even though this component doesn't
+    render through `Modal.jsx` — it never has (standalone fixed
+    banner, not a dismiss-on-backdrop-click modal), and adding that
+    wiring now would be a functionality change per Rule 1/7, so kept
+    as its own component with matching v2 visual language instead.
+  - **Content decision, flagged:** the Figma frame's subtitle is the
+    literal static string "Destination Reached" with no destination
+    name shown. Rule 3 ("same data in, same data out") means
+    `destName` still needed to render somewhere real — kept it in the
+    subtitle's position, just restyled to the frame's subtitle
+    typography (`var(--font-ui)`, 16px, `var(--v2-text-variant)`)
+    instead of adopting the frame's literal copy.
+  - **New content, per explicit instruction:** added a "Support FUTA
+    Maps" link (heart icon, `lucide-react`) above the Done button,
+    pointing at the same Crowdr campaign URL the landing page's donate
+    CTA already uses (`CrowdrCampaignCard.jsx`/`Footer.jsx`) — kept as
+    a local `CROWDR_CAMPAIGN_URL` const in this file rather than
+    importing from `src/pages/landing/`, since Rule 5 keeps this
+    in-app surface decoupled from that (separately redesigned)
+    directory. Plain `<a target="_blank" rel="noopener noreferrer">`,
+    doesn't touch `onDismiss` or any existing handler.
+  - **One literal override:** the frame's "DONE" button and the
+    support link are both a flat `#630ed4` — per `tokens-v2.css`'s own
+    note (and the same call the Waypoint suggestion session made on
+    its "Submit for Review" button), that's the superseded
+    pre-style-guide violet, not the authoritative `--v2-primary`
+    (`#7c3aed`). Used the token.
+  - Icon ring background reuses the existing `--v2-primary-outline`
+    token (`rgba(124,58,237,0.2)`) — an exact match for the frame's
+    literal, no new token needed.
+  - Motion: overlay/banner reuse the Modal shell's fade+scale-in
+    (`var(--v2-duration-standard)`/`var(--v2-ease-standard)`, guarded
+    by `prefers-reduced-motion: reduce`); added a slow breathing pulse
+    (`var(--v2-duration-breathe)`) on the icon ring per Section 6's
+    loading-indicator guidance — this card doesn't have a spinner, but
+    the confetti icon is the equivalent "something is actively
+    happening" moment, guarded by
+    `prefers-reduced-motion: no-preference`; Done button gets the
+    standard hover lift + `:active` scale-down (0.97), no idle motion.
+  - Kept the existing `PartyPopper` icon (already used pre-redesign)
+    for the "Confetti / Flair" icon slot rather than sourcing a new
+    icon for the frame's custom cursor-sparkle artwork — same
+    `lucide-react`-stays-as-is precedent as every other icon swap in
+    this guide, and conceptually the closest match already in the
+    library.
 
 - **Waypoint suggestion (this session):** redesigned `SuggestWaypointModal`,
   `MyWaypointSubmissionsPanel`, and `SubmissionToast` against Figma node

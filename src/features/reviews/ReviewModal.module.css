@@ -1,43 +1,144 @@
 /*
  * Ported from legacy style.css ~2610–2637 (`.review-place-name`,
  * `.review-stars`, `.review-star`, `.review-modal-actions`,
- * `.review-status`). Renders inside the shared Modal's `.body`
- * (components/ui/Modal.module.css), so no overlay/header/footer rules
- * here — those already come from Modal.
+ * `.review-status`).
+ *
+ * v2 (this session): redesigned against Figma node 59:2 ("Rating
+ * Screen"), pulled via the Figma MCP connection. Previously rendered
+ * inside the shared `Modal` shell's `.body` (centered card) — this
+ * frame is a bottom sheet instead, so this component now owns its own
+ * overlay/sheet/header/footer chrome (see ReviewModal.jsx's header
+ * comment for why the shared Modal.jsx wasn't touched). Visible
+ * behavior unchanged: X-button close + backdrop-click-to-close, same
+ * as this modal's previous `closeOnBackdrop` setting.
+ *
+ * One literal override: the frame's destination-name accent and
+ * "Submit Review" button are both a flat #630ed4 — per
+ * tokens-v2.css's own note (Waypoint suggestion / Destination Arrived
+ * sessions made the same call), that's the superseded pre-style-guide
+ * violet, not the authoritative --v2-primary (#7c3aed). Used the
+ * token instead.
+ *
+ * Star color: kept the existing app-wide literal #ffc857 for a
+ * *filled* star — same undocumented-literal precedent this file
+ * already flagged pre-redesign (matches PlaceCard.module.css's
+ * `.ratingFilled`), no Figma reference shows a different filled-star
+ * color so not touched. The frame's *unfilled* stars are a pale
+ * washed-out lavender-gray with no exact hex confirmable from the
+ * exported node (vector fill wasn't inspectable) — used the closest
+ * existing token, --v2-muted, rather than inventing a new one; flag
+ * if a literal hex surfaces later.
  */
 
-/* Font-mapping note: legacy literal was `font-family:'Geist',sans-serif;
-   font-weight:800` (style.css ~2612) — same undocumented-literal
-   situation PlaceCard.module.css's `.name` flags. Using --font-ui/700 for
-   the same reason: closest documented token, matching the precedent
-   already set there rather than re-deciding it differently here. */
-.placeName {
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: var(--v2-scrim);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: reviewOverlayFadeIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+.sheet {
+  background: #ffffff;
+  border-top: 1px solid rgba(204, 195, 216, 0.3);
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  width: 100%;
+  max-width: 672px;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 24px 16px 32px;
+  box-shadow: 0px -10px 25px -5px rgba(15, 23, 42, 0.1);
+  animation: reviewSheetSlideIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .sheet {
+    animation: none;
+  }
+}
+
+@keyframes reviewOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes reviewSheetSlideIn {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  margin-bottom: 24px;
+}
+.eyebrow {
   font-family: var(--font-ui);
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 14px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--v2-text-variant);
+}
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-full);
+  color: var(--v2-text-variant);
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.closeBtn:hover {
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+
+.question {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 32px;
+  color: var(--v2-neutral);
   text-align: center;
+  padding: 0 24px;
+  margin-bottom: 24px;
+}
+.destName {
+  font-weight: 700;
+  color: var(--v2-primary);
 }
 
 .stars {
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 8px;
-  font-size: 36px;
-  line-height: 1;
-  margin-bottom: 4px;
+  margin-bottom: 24px;
   user-select: none;
 }
 
-/* Slice 8: same undocumented literal `#FFC857` as PlaceCard.module.css's
-   .ratingFilled — see that file's comment for why it's kept literal
-   instead of substituted with --tertiary. */
 .star {
   display: inline-flex;
-  color: rgba(255, 255, 255, 0.15);
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: var(--r-full);
+  color: var(--v2-muted);
   cursor: pointer;
-  transition: color 0.12s, transform 0.12s;
+  transition: color var(--v2-duration-quick) var(--v2-ease-standard),
+              transform var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .star:hover {
   transform: scale(1.12);
@@ -49,26 +150,28 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  margin-bottom: 32px;
 }
 .field label {
   font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-variant);
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--v2-text);
 }
 .field textarea {
   font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--text);
-  background: var(--input-bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 10px 12px;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--v2-text);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--r-lg);
+  padding: 17px;
   resize: vertical;
 }
 .field textarea::placeholder {
-  color: var(--muted);
+  color: var(--v2-muted);
 }
 
 .status {
@@ -77,14 +180,67 @@
   justify-content: center;
   gap: 5px;
   text-align: center;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.05em;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--v2-text-variant);
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
 }
 .status.success {
-  color: var(--primary);
+  color: var(--v2-primary);
 }
 .status.error {
-  color: var(--error);
+  color: var(--v2-error-text);
+}
+
+.actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+.btnSkip,
+.btnSubmit {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-lg);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 17px 16px;
+  cursor: pointer;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-quick) var(--v2-ease-standard),
+              opacity var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.btnSkip:disabled,
+.btnSubmit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnSkip {
+  background: #ffffff;
+  border: 1px solid var(--v2-border);
+  color: var(--v2-neutral);
+}
+.btnSkip:hover:not(:disabled) {
+  background: var(--v2-surface);
+}
+
+.btnSubmit {
+  background: var(--v2-primary);
+  border: none;
+  color: var(--v2-on-primary);
+  box-shadow: 0 4px 12px var(--v2-primary-glow);
+}
+.btnSubmit:hover:not(:disabled) {
+  box-shadow: 0 6px 18px var(--v2-primary-glow-strong);
+  transform: translateY(-1px);
+}
+.btnSubmit:active:not(:disabled) {
+  transform: scale(0.98);
 }
