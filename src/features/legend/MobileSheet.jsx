@@ -197,7 +197,7 @@ export default function MobileSheet({
       <div
         className={`${styles.panel} ${
           !panelOpen ? styles.panelClosed : sheetState === 'full' ? styles.panelFull : styles.panelHalf
-        } ${activeTab === 'layers' ? styles.panelLight : ''}`}
+        } ${activeTab === 'layers' || activeTab === 'gps' ? styles.panelLight : ''}`}
         aria-hidden={!panelOpen}
       >
         <div className={styles.body}>

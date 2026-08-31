@@ -298,7 +298,7 @@ JSX/logic change).
 | Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; 'layers'-keyed tab body now Explore Panel (see flag) |
 | Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; Explore panel added this session, Layers panel body still pending
 | Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) + desktop float, single component | Bricolage Grotesque + Inter (v2 tokens) | Done |
-| Nav/GPS HUD | `src/features/navigation/NavHud.*`, ~~`NavPanel.*`~~ (dead, see flag below), `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 against Figma node 1:311; every nav entry point (mobile search bar, mobile navbar, desktop rail, desktop search bar) now routes straight to `NavigationController`/`NavDestPanel` instead of `NavPanel`, which is now unreachable/dead — see flag below; `GpsPanel`/`NavArrivedBanner`/`MobFabCluster` still on v1 dark tokens — no reference yet for those |
+| Nav/GPS HUD | `src/features/navigation/NavHud.*`, ~~`NavPanel.*`~~ (dead, see flag below), `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 against Figma node 1:311; `GpsPanel` redesigned to v2 against Figma node 31:52 this session, see flag below; every nav entry point (mobile search bar, mobile navbar, desktop rail, desktop search bar) now routes straight to `NavigationController`/`NavDestPanel` instead of `NavPanel`, which is now unreachable/dead — see flag below; `NavArrivedBanner`/`MobFabCluster` still on v1 dark tokens — no reference yet for those |
 | Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
 | Review modal | `src/features/reviews/ReviewModal.*` | Both | — | Not started |
 | Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | — | Not started |
@@ -696,6 +696,86 @@ migration-slice convention), with this table updated.
     the Start Navigation button (existing button already had them,
     kept), wrapped in `@media (prefers-reduced-motion: no-preference)`
     per Section 6.
+
+---
+
+- **`GpsPanel` — the GPS Signal screen (this session, Figma node 31:52
+  "GPS Screen", pulled via the Figma MCP connection):** redesigned to v2
+  light tokens. UI/CSS only — no functionality changes; `gps` still
+  carries every value from `useGpsTracking.js` unchanged.
+  - **Header shown in both embedded and non-embedded now, superseding
+    the earlier "hide title when embedded" behavior** (set back when
+    `LayersPanel` was the only precedent and no GPS-specific reference
+    existed): the Figma frame *is* the mobile/embedded view and shows
+    the full title ("GPS Status") + subtitle + badge, so that's now
+    rendered in both contexts; `embedded` still exists as a prop and
+    still governs content padding/density (mobile vs. desktop Sidebar),
+    just no longer toggles the header's visibility.
+  - **Subtitle line is new copy, computed inline from data already
+    passed in** (`gpsBtnDisabled`/`isTracking`/`tier`/`warning`) — no
+    new prop or state, same precedent as `ChipResultsPanel`'s status-
+    line consolidation. The frame's exact copy, "Acquiring high-accuracy
+    lock," is used for the tracking-but-not-`good` case.
+  - **Kept, not in the frame:** the 5-bar signal-strength meter. Unlike
+    the from/to rows dropped from `NavDestPanel`, these bars are bound
+    to real live data (`activeBars`/`tier`), not unbound decorative
+    markup, so removing a real data visualization wasn't assumed without
+    an explicit instruction — restyled to v2 tokens (bars use
+    `--v2-secondary`/`--v2-tertiary`/`--v2-error` by tier, track color
+    reuses the already-defined `--v2-track`) and kept as a compact strip
+    under the header instead.
+  - **Not built: the "Altitude" stat cell the frame shows.**
+    `useGpsTracking.js` has no altitude field — inventing a static value
+    would misrepresent live GPS data, so the stat grid keeps the three
+    real fields (Accuracy, Speed, Heading) with Heading spanning the
+    second row, rather than a fabricated fourth cell.
+  - Value strings (`accuracyText`/`speedText`/`headingText`) render as
+    the single already-formatted string the hook returns (handles edge
+    cases like "GPS unavailable"/"Warming up…") rather than split into a
+    big-number + small-unit pair like the frame — splitting would mean
+    parsing that string's format here, reaching into `.js`-owned
+    formatting logic, out of scope for a markup/CSS-only pass.
+  - Colors: the frame's `#630ed4` (LIVE badge) maps to `var(--v2-primary)`
+    per Section 3's established substitution, not the literal hex; the
+    frame's `rgba(204,195,216,*)` card borders reuse the same
+    near-duplicate-of-`--v2-border` plain-rgba treatment `NavHud` already
+    set; stat-value text (`#131b2e`) reuses `--v2-neutral`, same
+    tolerance already used for the Search Results pass. One genuinely new
+    token: `--v2-error-text` (`#ba1a1a`), the "End Session" button's
+    outlined-state text/icon color — distinct from `--v2-error`
+    (`#93000a`), not a tint step of it.
+  - `MobileSheet.jsx`'s `.panelLight` override (previously only applied
+    to the `layers`/Explore tab) now also applies to the `gps` tab, same
+    precedent — `GpsPanel` is real v2 light content now, not a
+    placeholder that needs the sheet's v1 dark background showing
+    through. Desktop's `Sidebar.jsx` needed no wrapper change: `GpsPanel`
+    owns its own light card (`--v2-surface`, rounded), same "self-
+    contained card floating in the still-dark rail panel" pattern
+    `ExplorePanel` already uses there.
+  - Icons: stat-cell icons (`Crosshair`/`Gauge`/`Compass`) and the
+    start/stop button icons (`LocateFixed`/`CircleStop`) are new
+    `lucide-react` additions — markup only, matching Section 5's icon
+    contract and this row's existing icon language (`LocateFixed`
+    already used by `MobFabCluster`'s locate button).
+  - **Follow-up (this session), Figma node 64:2:** the bar section was
+    restyled into a full "Visualization Card" (soft violet card, taller
+    bars, decorative blurred orb, big number + caption underneath) per
+    this second frame. Per explicit instruction, the frame's own readout
+    — "8/12 Satellites in view" — was dropped (no satellite data exists
+    anywhere in this app) and replaced with a real one built from the
+    same `activeBars`/`tier` values already driving the bars:
+    `{activeBars}/5` + a tier-derived caption ("Strong/Fair/Weak
+    signal"). Bar count stayed at 5 (real `activeBars` granularity)
+    rather than the frame's 15 decorative bars, so as not to fake
+    precision the app doesn't have. Card shadow reuses `NavHud`'s
+    `.topCard` spec verbatim for continuity across this row; card
+    background is an exact match for the already-defined
+    `--v2-hud-upnext-bg`, no new token needed.
+  - Motion: the "End Session" (tracking) button gets a slow breathing
+    pulse (`--v2-duration-breathe`/`--v2-ease-standard`, wrapped in
+    `@media (prefers-reduced-motion: reduce)`) rather than the old sharp
+    1.5s `btnPulse` — matches Section 6's "calm, not urgent" guidance;
+    the idle/primary button gets the standard press-scale feedback.
 
 ---
 

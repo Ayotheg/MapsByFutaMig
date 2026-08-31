@@ -85,6 +85,12 @@
   --v2-icon-btn-bg:     #eaedff;
   --v2-hud-upnext-bg:   #f2f3ff;
 
+  /* GPS Screen (this session, Figma node 31:52, pulled via the Figma MCP
+     connection): the "END SESSION" outlined button's text/icon color,
+     #ba1a1a — a distinct, lighter red from --v2-error (#93000a), not a
+     tint step of it, so kept as its own token rather than reused. */
+  --v2-error-text: #ba1a1a;
+
   /* Bottom navbar's "in navigation" state (Figma node 4:488, "Nav -
      Applying relevance logic..."): a distinct solid blue, not
      --v2-primary — confirmed from the actual frame, not guessed (see
