@@ -1,0 +1,90 @@
+/*
+ * Ported from legacy style.css ~2610–2637 (`.review-place-name`,
+ * `.review-stars`, `.review-star`, `.review-modal-actions`,
+ * `.review-status`). Renders inside the shared Modal's `.body`
+ * (components/ui/Modal.module.css), so no overlay/header/footer rules
+ * here — those already come from Modal.
+ */
+
+/* Font-mapping note: legacy literal was `font-family:'Geist',sans-serif;
+   font-weight:800` (style.css ~2612) — same undocumented-literal
+   situation PlaceCard.module.css's `.name` flags. Using --font-ui/700 for
+   the same reason: closest documented token, matching the precedent
+   already set there rather than re-deciding it differently here. */
+.placeName {
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.stars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  font-size: 36px;
+  line-height: 1;
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+/* Slice 8: same undocumented literal `#FFC857` as PlaceCard.module.css's
+   .ratingFilled — see that file's comment for why it's kept literal
+   instead of substituted with --tertiary. */
+.star {
+  display: inline-flex;
+  color: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: color 0.12s, transform 0.12s;
+}
+.star:hover {
+  transform: scale(1.12);
+}
+.star.active {
+  color: #ffc857;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field label {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-variant);
+}
+.field textarea {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  resize: vertical;
+}
+.field textarea::placeholder {
+  color: var(--muted);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.status.success {
+  color: var(--primary);
+}
+.status.error {
+  color: var(--error);
+}

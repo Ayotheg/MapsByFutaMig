@@ -1,0 +1,199 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1199;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.backdropVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Navbar: fixed, static, always visible ──────────────────────────
+   This is the redesigned white pill (matches the Figma node exactly —
+   a self-contained bar with its own drop shadow). It is its own fixed
+   element, not a slice of a larger draggable sheet, so it never moves:
+   there is no dark sliding shape behind or around it anymore. Tabs here
+   drive `.panel` below via sheetState/activeTab. */
+.navbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1201;
+  padding: 4px 8px calc(8px + var(--mob-safe-bottom));
+  background: var(--v2-surface);
+  border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  transition: background var(--v2-duration-standard) var(--v2-ease-standard),
+    box-shadow var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+/* ── Nav-active state (Figma node 4:488, pulled via the Figma MCP
+   connection — see this session's flag in UI_REDESIGN_GUIDE.md; an
+   earlier pass guessed a solid --v2-primary fill here before that
+   connection was checked, this replaces it with the real design):
+   the bar switches to a solid blue (not primary violet) while
+   turn-by-turn navigation is running, so the chrome itself signals
+   "you're navigating". Inactive tab labels/icons go to a lighter,
+   blue-bg-legible grey; the always-accented Nav tab keeps its normal
+   outline pill exactly as at rest, just with a teal-mint label instead
+   of violet. Shadow is intentionally unchanged from the base .navbar
+   rule above — the Figma frame uses the same neutral shadow here, not
+   a colored one. */
+.navbarNavActive {
+  background: var(--v2-nav-active-bg);
+}
+.navbarNavActive .tab {
+  color: var(--v2-nav-active-tab-text);
+}
+.navbarNavActive .tabActive {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--v2-on-primary);
+}
+.navbarNavActive .tabPrimary,
+.navbarNavActive .tabPrimary.tabActive {
+  background: var(--v2-primary-outline);
+  color: var(--v2-nav-active-accent);
+}
+.navbarNavActive .signedInDot {
+  border-color: var(--v2-nav-active-bg);
+}
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex: 1 1 0;
+  min-width: 60px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  border-radius: var(--r-full);
+  color: var(--v2-text-variant);
+  cursor: pointer;
+  position: relative;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    color var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
+  white-space: nowrap;
+  min-height: 44px;
+}
+.tab:active {
+  transform: scale(0.97);
+}
+.tabIcon {
+  color: inherit;
+}
+.tabLabel {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 14px;
+}
+.tabActive {
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+.tabActive .tabLabel {
+  font-weight: 600;
+}
+
+/* ── Nav: the bar's primary action ──────────────────────────────────
+   Figma (node 5:746) gives the centered Nav tab a permanent round pill
+   (bg rgba(124,58,237,0.2), which is exactly --v2-primary-outline —
+   not a new color) rather than only lighting up once selected, so it
+   reads as the "first point of attraction" at rest. #7C3AED is already
+   --v2-primary in tokens-v2.css, so this reuses that token rather than
+   hardcoding the hex. Stacking .tabActive on top (when its panel is
+   actually open) intensifies pill -> solid fill, giving a second, clearly
+   distinct state for "currently selected" beyond just "the important one". */
+.tabPrimary {
+  background: var(--v2-primary-outline);
+  color: var(--v2-primary);
+}
+.tabPrimary .tabLabel {
+  font-weight: 600;
+}
+.tabPrimary.tabActive {
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+}
+
+.signedInDot {
+  position: absolute;
+  top: 6px;
+  right: 14px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--v2-secondary);
+  border: 1.5px solid var(--v2-surface);
+}
+
+/* ── Panel: separate element, grows open above the navbar ───────────
+   Anchored to sit directly above the navbar (bottom offset = navbar's
+   own height) and animates its height between closed/half/full. It
+   never carries the navbar with it — only this panel slides. */
+.panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom));
+  z-index: 1200;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Sheet body defaults to the v1 dark surface — still correct for
+     GpsPanel/NavPanel, which assume light-on-dark text and haven't been
+     redesigned (see "Filter/legend content" in UI_REDESIGN_GUIDE.md
+     Section 7). The Explore tab overrides this via .panelLight below,
+     since its content (ExplorePanel.jsx) is real v2 light-theme design
+     now, not a placeholder — without the override its own white card
+     just floated inside this dark one with grey showing around it. */
+  background: var(--surface-bright);
+  border-radius: var(--mob-sheet-radius) var(--mob-sheet-radius) 0 0;
+  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.4), 0 -1px 0 rgba(255, 255, 255, 0.06);
+  transition: height 0.38s var(--v2-ease-standard);
+  will-change: height;
+}
+.panelLight {
+  background: var(--v2-surface);
+  box-shadow: 0 -4px 32px rgba(74, 68, 85, 0.14), 0 -1px 0 rgba(74, 68, 85, 0.05);
+}
+.panelClosed {
+  height: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+.panelHalf {
+  height: calc(var(--mob-sheet-half) - var(--mob-sheet-peek));
+}
+.panelFull {
+  height: calc(var(--mob-sheet-full) - var(--mob-sheet-peek));
+}
+
+.body {
+  padding: 12px 0 calc(16px + var(--mob-safe-bottom));
+}

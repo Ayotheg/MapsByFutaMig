@@ -1,0 +1,416 @@
+/* Ported from legacy style.css (feature/login2), the PLACE CARD block
+   (~lines 3900-4130). Structure/behavior kept 1:1; colors/spacing/radii/
+   fonts now come from design tokens per BRAND_GUIDELINES.md instead of
+   literals. See the font-mapping note near .name below for one inference
+   this port had to make that isn't explicitly covered by that doc.
+
+   UI_REDESIGN_GUIDE.md pass (this session): restyled to the v2 "Lumina
+   Campus Utility" light theme per Figma node 7:943 ("Bottom Sheet Card").
+   Class names are unchanged from the port above — only their declarations
+   and a couple of purely-visual additions (.closeOnHero, .metaRow), so
+   PlaceCard.jsx's className contract and all props/handlers/state stay
+   exactly as they were. See PlaceCard.jsx's own header comment for the
+   two structural notes (close button placement, badge+rating row) this
+   pass made. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 1299;
+  pointer-events: auto;
+}
+.hidden {
+  display: none;
+}
+
+.card {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1300;
+  background: var(--v2-surface);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  transform: translateY(100%);
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+  overflow: hidden;
+  pointer-events: none;
+}
+.card.visible {
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Desktop: float as a sidebar-style card on the map's left edge,
+   anchored past the permanent sidebar (features/legend/Sidebar.jsx,
+   Slice 3) so it doesn't overlap the rail/panel — matches legacy's
+   `left: var(--sidebar-total-w)` exactly (style.css ~3949–3955).
+
+   Was a `@media (min-width: 769px)` block. Converted to a `.desktop`
+   class driven by MapPage's `isMobile` prop instead: MapPage decides
+   `isMobile` once at mount (window.innerWidth <= 768, a deliberate 1:1
+   port of legacy) and never re-checks it, but this media query
+   re-evaluated live — so a resize/zoom/monitor-dock/DevTools toggle
+   after mount could desync the two (React still rendering the desktop
+   <Sidebar>, this card silently flipping into its mobile bottom-sheet
+   layout). Same source of truth for both now. */
+.card.desktop {
+  left: var(--sidebar-total-w);
+  right: auto;
+  bottom: 32px;
+  width: 380px;
+  max-height: 78vh;
+  border-radius: var(--r-lg);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  /* Was a hardcoded `translateX(-420px)`. At left: var(--sidebar-total-w)
+     (304px), -420px only clears a card anchored at left:0 — it left the
+     closed card's box spanning roughly -116px to 264px, i.e. still
+     sitting inside the viewport on top of the sidebar. Derive the hide
+     distance from the anchor + the card's own width (100% in a
+     translateX context = this element's width) instead, plus a small
+     buffer, so it stays correct even if --sidebar-total-w or the card's
+     width ever change. Mirrors how the mobile state below already uses
+     a relative unit (translateY(100%)) for the same reason. */
+  transform: translateX(calc(-1 * (var(--sidebar-total-w) + 100% + 24px)));
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.card.desktop.visible {
+  transform: translateX(0);
+}
+.scrim.desktop {
+  display: none !important;
+}
+.handle.desktop {
+  display: none;
+}
+
+.handle {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 0 4px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.handleBar {
+  width: 48px;
+  height: 6px;
+  background: var(--v2-muted);
+  border-radius: var(--r-full);
+}
+
+.hero {
+  position: relative;
+  height: 192px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--v2-surface);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  margin: 4px 16px 0;
+  width: calc(100% - 32px);
+}
+.hero img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.25s;
+}
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 55%, rgba(15, 23, 42, 0.45) 100%);
+  pointer-events: none;
+}
+
+/* New: close button lives on top of the hero image per Figma (node
+   7:949, "Close Button") instead of in the header — a placement change
+   only, same onClose handler as .close below. Only rendered when a hero
+   photo exists (see PlaceCard.jsx); .close (header) remains the fallback
+   for photo-less waypoints so closing is always reachable. */
+.closeOnHero {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--v2-surface) 80%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  color: var(--v2-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+    background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.closeOnHero:hover {
+  background: var(--v2-surface);
+}
+.closeOnHero:active {
+  transform: scale(0.94);
+}
+
+.photoCount {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  border-radius: var(--r-full);
+  padding: 3px 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.photoNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15, 23, 42, 0.5);
+  border: none;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.photoNav:active {
+  background: rgba(15, 23, 42, 0.75);
+  transform: translateY(-50%) scale(0.92);
+}
+.photoNav.prev { left: 10px; }
+.photoNav.next { right: 10px; }
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 4px;
+  flex-shrink: 0;
+}
+.titleWrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Font-mapping note: legacy's literal CSS was `font-family:'Geist',sans-serif;
+   font-weight:800`. This redesign pass instead follows Figma node 7:955
+   exactly — Bricolage Grotesque SemiBold (var(--font-display), already
+   bundled/tokenized for the Loading Screen) at 16px/24px, matching the
+   "Lumina Campus Utility" headline treatment other v2 screens use. Flag
+   if the original 20px/700-weight Geist sizing was actually wanted back. */
+.name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--v2-text);
+  line-height: 24px;
+  margin: 0;
+  word-break: break-word;
+}
+
+/* Row for the type badge + rating, side by side per Figma's "Container"
+   (node 7:956) instead of the legacy stacked layout. */
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Figma's badge is a translucent violet pill (node 7:957/7:958), not
+   plain colored text — restyled as a chip while keeping the same class
+   name/consumer (`data?.badge` in PlaceCard.jsx). */
+.badge {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--v2-primary);
+  background: var(--v2-primary-tag-fill);
+  border: 1px solid var(--v2-primary-outline);
+  border-radius: var(--r-full);
+  padding: 4px 12px;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.rating {
+  display: inline-flex;
+}
+.ratingEmpty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--v2-text-variant);
+}
+
+/* Slice 8: legacy's literal `#FFC857` (style.css ~4081, ~2626) — a star
+   gold that isn't one of the documented tokens (closest v1 token was
+   --tertiary at #ffb95f, a visibly different amber; v2's --v2-tertiary
+   is #a15100, further still). Kept as a literal here rather than
+   substituting the nearest token, same call this file's earlier
+   .name font-mapping note made for undocumented legacy values — flag if
+   a --v2-star token should be added instead. */
+.ratingFilled {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffc857;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ratingCount {
+  color: var(--v2-text-variant);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+/* Header-row close button — fallback for waypoints with no hero photo
+   (see .closeOnHero above and PlaceCard.jsx). Same onClose handler,
+   restyled to the v2 light surface. */
+.close {
+  background: var(--v2-primary-tag-fill);
+  border: 1px solid var(--v2-primary-outline);
+  color: var(--v2-primary);
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+    background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.close:hover {
+  background: color-mix(in srgb, var(--v2-primary) 20%, transparent);
+}
+.close:active {
+  transform: scale(0.94);
+}
+
+.coords {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--v2-text-variant);
+  letter-spacing: 0.02em;
+  padding: 4px 16px 10px;
+  flex-shrink: 0;
+}
+
+/* Font-mapping note: same situation as .name — legacy literal was 'Geist',
+   which the brand docs don't cover for body/description text. Using
+   --font-ui here (Inter, the v2 body font per tokens-v2.css's comment)
+   as the closest documented equivalent. Flag if a different token was
+   intended. */
+.desc {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--v2-text-variant);
+  padding: 12px 16px 12px;
+  flex-shrink: 0;
+  border-top: 1px solid color-mix(in srgb, var(--v2-text) 10%, transparent);
+}
+
+.strip {
+  padding: 0 16px 14px;
+  flex-shrink: 0;
+}
+.stripInner {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.stripInner img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.stripInner img.active {
+  border-color: var(--v2-primary);
+}
+.stripInner img:hover {
+  transform: scale(1.05);
+}
+
+.actions {
+  padding: 16px 16px 24px;
+  flex-shrink: 0;
+}
+.navBtn {
+  width: 100%;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  border: none;
+  border-radius: var(--r-md);
+  box-shadow: 0 4px 7px 0 var(--v2-primary-glow-strong);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 500;
+  padding: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+    opacity var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.navBtn:active {
+  transform: scale(0.98);
+  opacity: 0.92;
+}
+.navBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

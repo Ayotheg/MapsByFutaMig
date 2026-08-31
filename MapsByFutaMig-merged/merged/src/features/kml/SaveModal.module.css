@@ -1,0 +1,204 @@
+/*
+ * Legacy source: style.css ~1450–1601 (field-group, waypoint-list/item,
+ * image-upload-zone, export-toggle, save-status). modal-btn/footer moved
+ * to the shared Modal — see components/ui/Modal.module.css.
+ */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.field input,
+.field textarea,
+.field select {
+  background: var(--input-bg);
+  border: 1px solid var(--outline-dim);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  resize: vertical;
+}
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--muted);
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--primary-container);
+  box-shadow: 0 0 0 2px rgba(183, 109, 255, 0.15);
+}
+.field select option {
+  background: #0e1628;
+}
+
+.waypointSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.waypointItem {
+  background: rgba(255, 185, 95, 0.06);
+  border: 1px solid rgba(255, 185, 95, 0.2);
+  border-radius: var(--r-md);
+  padding: 8px 10px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.waypointIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tertiary);
+  font-size: 14px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.waypointFields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.waypointFields input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--outline-dim);
+  border-radius: 0;
+  padding: 3px 0;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: var(--text);
+}
+.waypointCoords {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.imageZone {
+  border: 1px dashed var(--outline-dim);
+  border-radius: var(--r-md);
+  padding: 12px;
+  transition: border-color 0.2s;
+}
+.imageZone:hover {
+  border-color: var(--primary-container);
+}
+.uploadPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+.imagePreviews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.previewWrap {
+  position: relative;
+}
+.previewWrap img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--outline-dim);
+}
+.previewRemove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  background: var(--error-container);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.exportToggle {
+  display: flex;
+  gap: 6px;
+}
+.exportOpt {
+  flex: 1;
+  background: var(--input-bg);
+  border: 1px solid var(--outline-dim);
+  border-radius: var(--r-md);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 7px 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+}
+.exportOpt.active {
+  background: rgba(183, 109, 255, 0.15);
+  border-color: rgba(183, 109, 255, 0.5);
+  color: var(--primary);
+}
+
+.saveStatus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-align: center;
+  letter-spacing: 0.08em;
+}
+.spin {
+  animation: saveModalSpin 0.9s linear infinite;
+}
+@keyframes saveModalSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.saveStatus.success {
+  background: rgba(68, 226, 205, 0.1);
+  border: 1px solid rgba(68, 226, 205, 0.4);
+  color: var(--secondary);
+}
+.saveStatus.error {
+  background: rgba(255, 180, 171, 0.1);
+  border: 1px solid rgba(255, 180, 171, 0.4);
+  color: var(--error);
+}
+.saveStatus.info {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--outline-dim);
+  color: var(--muted);
+}

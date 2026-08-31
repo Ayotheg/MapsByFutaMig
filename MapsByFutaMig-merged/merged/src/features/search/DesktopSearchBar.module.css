@@ -1,0 +1,221 @@
+.bar {
+  display: none;
+}
+
+@media (min-width: 769px) {
+  .bar {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    top: 14px;
+    left: calc(var(--sidebar-total-w) + 16px);
+    right: 16px;
+    max-width: 580px;
+    margin-left: auto;
+    margin-right: auto;
+    z-index: 1100;
+  }
+  /* NOTE: legacy shifts this with `body.sidebar-collapsed .desk-search-bar
+     { left: calc(--sidebar-rail-w + 16px) }`. Sidebar.jsx's `collapsed`
+     state is passed straight into this component as a prop instead of a
+     body-class global selector — same visual result, React-idiomatic. */
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 52px;
+  background: #ffffff;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--r-full);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  transition:
+    box-shadow var(--v2-duration-standard) var(--v2-ease-standard),
+    border-color var(--v2-duration-standard) var(--v2-ease-standard);
+  position: relative;
+}
+.pill:focus-within {
+  border-color: var(--v2-primary-outline);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1),
+    0 0 0 2.5px var(--v2-primary-outline);
+}
+
+.logoBtn {
+  flex-shrink: 0;
+  width: 52px;
+  height: 100%;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  border-radius: var(--r-full) 0 0 var(--r-full);
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+  color: var(--v2-text);
+}
+.logoBtn:hover {
+  background: var(--v2-primary-glow);
+}
+
+.divider {
+  width: 1px;
+  height: 24px;
+  flex-shrink: 0;
+  background: var(--v2-primary-outline);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 66px;
+  color: var(--v2-text-variant);
+  pointer-events: none;
+  transition: color var(--v2-duration-standard) var(--v2-ease-standard);
+  z-index: 1;
+}
+.pill:focus-within .searchIcon {
+  color: var(--v2-primary);
+}
+
+.input {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--v2-text);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 400;
+  padding: 0 8px 0 40px;
+  caret-color: var(--v2-primary);
+}
+.input::placeholder {
+  color: var(--v2-text-variant);
+}
+
+.clearBtn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--v2-primary-glow);
+  border: none;
+  color: var(--v2-text-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin-right: 4px;
+  transition:
+    background var(--v2-duration-quick) var(--v2-ease-standard),
+    color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.clearBtn:hover {
+  background: var(--v2-primary-outline);
+  color: var(--v2-text);
+}
+
+.actionDivider {
+  width: 0;
+}
+
+.navBtn {
+  flex-shrink: 0;
+  width: 42px;
+  height: 38px;
+  margin: 0 7px;
+  background: var(--v2-primary);
+  border: none;
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v2-on-primary);
+  cursor: pointer;
+  box-shadow: 0 2px 10px var(--v2-primary-glow-strong);
+  transition:
+    opacity var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard),
+    box-shadow var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.navBtn:hover {
+  opacity: 0.9;
+  transform: scale(1.07);
+  box-shadow: 0 4px 18px var(--v2-primary-glow-strong);
+}
+.navBtn:active {
+  transform: scale(0.95);
+  opacity: 0.8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill,
+  .logoBtn,
+  .searchIcon,
+  .clearBtn,
+  .navBtn {
+    transition: none;
+  }
+  .navBtn:hover {
+    transform: none;
+  }
+}
+
+.dropdown {
+  /* UI_REDESIGN_GUIDE.md pass (this session, paired with the mobile
+     overlay per the guide's pairing rule): moved off v1 dark glass onto
+     v2 light tokens now that MobileSearchOverlay — which shares this
+     exact list content via SearchDropdownList/SearchResultItem — is
+     redesigned too. Resolves the flag this file's header comment left
+     ("would put light-on-dark text on the still-dark overlay"); no
+     separate Figma frame for the desktop dropdown shell itself, so this
+     reuses the panel treatment ChipResultsPanel's desktop `.panel`
+     already established (surface/border/radius) rather than reinventing
+     one. Minor deviation kept from the original v1 comment: legacy
+     bleeds this wider than the pill; flush edges here read just as well
+     and stay in sync with the pill's own border-radius. */
+  position: absolute;
+  top: calc(100% + 10px);
+  left: -1px;
+  right: -1px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--r-xl);
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.12),
+    0 2px 6px rgba(15, 23, 42, 0.08);
+  z-index: 9999;
+  max-height: 380px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--v2-primary-outline) transparent;
+  transform-origin: top center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dropdown {
+    animation: dropIn var(--v2-duration-standard) var(--v2-ease-standard) both;
+  }
+}
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: scaleY(0.96) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+}
+
+.noResults {
+  text-align: center;
+  padding: 20px 16px;
+  color: var(--v2-text-variant);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}

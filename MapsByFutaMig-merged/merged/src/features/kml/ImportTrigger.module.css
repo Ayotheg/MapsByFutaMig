@@ -1,0 +1,41 @@
+/*
+ * Provisional standalone placement — see ImportTrigger.jsx's comment.
+ * Styled to match the app's existing floating-button language (glass
+ * surface + primary accent), not lifted from a specific legacy rule since
+ * legacy's equivalent button lives inside the not-yet-built admin overlay.
+ */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 900;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-dim);
+  border-radius: var(--r-full);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 9px 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
+}
+.trigger:hover {
+  border-color: rgba(183, 109, 255, 0.5);
+  background: rgba(183, 109, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .trigger {
+    left: 12px;
+    bottom: calc(var(--mob-safe-bottom, 0px) + 12px);
+    padding: 8px 14px;
+    font-size: 10px;
+  }
+}

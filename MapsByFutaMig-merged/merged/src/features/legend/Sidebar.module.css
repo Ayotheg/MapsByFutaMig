@@ -1,0 +1,334 @@
+.sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-total-w);
+  z-index: 1000;
+  display: flex;
+  flex-direction: row;
+  transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transform: translateZ(0);
+  will-change: transform;
+  isolation: isolate;
+}
+.sidebar.collapsed {
+  width: var(--sidebar-rail-w);
+}
+
+.logo {
+  width: var(--sidebar-rail-w);
+  flex-shrink: 0;
+  background: rgba(8, 14, 28, 0.97);
+  border-right: 1px solid rgba(77, 67, 84, 0.4);
+  border-bottom: 1px solid rgba(77, 67, 84, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 6px 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 76px;
+  z-index: 2;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.logoIcon {
+  width: 36px;
+  height: 36px;
+  background: rgba(183, 109, 255, 0.15);
+  border: 1px solid rgba(183, 109, 255, 0.3);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rail {
+  position: absolute;
+  top: 76px;
+  left: 0;
+  bottom: 102px;
+  width: var(--sidebar-rail-w);
+  flex-shrink: 0;
+  background: rgba(8, 14, 28, 0.97);
+  border-right: 1px solid rgba(77, 67, 84, 0.4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 0 12px;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.railBtn {
+  width: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  background: none;
+  border: none;
+  border-radius: var(--r-lg);
+  color: rgba(218, 226, 253, 0.4);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+  position: relative;
+}
+.railBtn span {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.railBtn:hover {
+  color: var(--text);
+  background: rgba(221, 183, 255, 0.06);
+}
+.railBtnActive {
+  color: var(--primary);
+  background: rgba(183, 109, 255, 0.14);
+}
+.railBtnActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 24px;
+  background: var(--primary);
+  border-radius: 0 3px 3px 0;
+}
+
+.brandText {
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--muted);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding-bottom: 24px;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: auto;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: var(--sidebar-rail-w);
+  bottom: 0;
+  width: var(--sidebar-panel-w);
+  background: rgba(10, 17, 32, 0.96);
+  border-right: 1px solid rgba(77, 67, 84, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  overflow: hidden;
+  animation: panelIn 0.18s ease;
+}
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* #panelLayers-scoped header override (style.css ~952–970) — the Layers
+   panel's header doesn't use the generic .panel-header/.panel-title
+   styling, it has its own font/spacing here. */
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface-low);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 16px 16px 13px;
+  margin-top: 76px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.panelHeaderTitles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.panelTitle {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text);
+}
+.panelSubtitle {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(218, 226, 253, 0.42);
+}
+
+.panelBody {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(77, 67, 84, 0.5) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Generic `.panel-header`/`.panel-title` shell (style.css ~296–309) —
+   distinct from `.panelHeader` above, which is the Layers-only override.
+   Used by the GPS Signal + Navigate panels (Slice 9), which use legacy's
+   plain shared header, not Layers' bespoke one. */
+.panelHeaderGeneric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 14px 14px;
+  border-bottom: 1px solid rgba(77, 67, 84, 0.35);
+  flex-shrink: 0;
+  margin-top: 76px;
+}
+.panelTitleGeneric {
+  font-family: 'Geist', var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.panelHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Slice 6: RAW mode dims the Layers panel, ported from legacy's
+   `document.getElementById('panelLayers').style.opacity = '0.3'`
+   (app.js ~3272/3281, applyViewMode). `.panel` is this sidebar's whole
+   #panelLayers equivalent (header + body). */
+:global(body.raw-mode) .panel {
+  opacity: 0.3;
+  transition: opacity 0.2s;
+}
+
+.sidebarFooter {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-rail-w);
+  background: rgba(8, 14, 28, 0.97);
+  border-right: 1px solid rgba(77, 67, 84, 0.4);
+  border-top: 1px solid rgba(77, 67, 84, 0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.authBtn,
+.adminBtn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-lg);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: rgba(183, 109, 255, 0.08);
+  border: 1px solid rgba(183, 109, 255, 0.25);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform var(--v2-duration-quick) var(--v2-ease-standard);
+  flex-shrink: 0;
+  font-size: 7px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+.authBtn:active,
+.adminBtn:active {
+  transform: scale(0.97);
+}
+
+/* Admin is a desktop-only surface (UI_REDESIGN_GUIDE.md Section 7): the
+   mobile tab strip (MobileSheet.jsx) no longer has an Admin entry point
+   at all, and Sidebar itself only mounts on desktop per MapPage's
+   isMobile check. This query is a defensive second layer for the same
+   768px cutoff — hides the button outright if this component were ever
+   left mounted across a viewport resize instead of being swapped out. */
+@media (max-width: 768px) {
+  .adminBtn[title='Admin Panel'] {
+    display: none;
+  }
+}
+
+/* Guest free-navigation counter — small badge on the Sign In rail button,
+   only shown while signed out (Sidebar.jsx's `guestNavRemaining`). */
+.guestBadge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--primary, #a05aff);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  border: 1.5px solid var(--surface, #1a1224);
+}
+.authBtn:hover,
+.adminBtn:hover {
+  background: rgba(183, 109, 255, 0.18);
+  border-color: rgba(183, 109, 255, 0.5);
+}
+.authBtn span,
+.adminBtn span {
+  font-size: 7px;
+  letter-spacing: 0.06em;
+}
+
+/* Slice 10: signed-in state, legacy style.css ~7660–7677 (`.auth-avatar`/
+   `.auth-display-name`) */
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--primary);
+}
+.displayName {
+  font-size: 6.5px;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  font-weight: 600;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+}

@@ -1,0 +1,416 @@
+/* Landing page styles — plain global CSS, not a CSS Module.
+   Deliberate deviation from the project's CSS Modules convention
+   (LANDING_PAGE_BUILD_PLAN.md conflict #5): this page is almost
+   entirely inline `style={{...}}` per the original Figma Make export,
+   and a CSS-Modules rewrite of that would be a lot of churn for a
+   self-contained marketing page. The className-based pieces below
+   (keyframes, .reveal/.hero-fade/.pill-btn/etc.) are kept as plain
+   utility classes for the same reason, scoped to this file and only
+   imported by LandingPage.jsx.
+
+   The old :root color-token block that used to live here has been
+   removed — those tokens are now aliased in src/styles/tokens.css
+   (Task 1), so every var(--purple-light) etc. reference below
+   resolves from there instead of a second, duplicate declaration.
+
+   Resolved (Slice 11 QA pass, was previously flagged as open here):
+   src/index.css's `html, body` no longer force `position: fixed;
+   overflow: hidden` globally — that's now scoped to a `.map-viewport`
+   class App.jsx toggles on `document.body` only while the `/map` route
+   is mounted (see HomeRoute in App.jsx). The landing page at "/" gets
+   normal document scroll by default, no override needed from this
+   file. */
+
+/* ─── Landing-page-only light theme (redesign, July 2026) ───
+   Scoped entirely to this file/this page — the in-app map tool keeps
+   its dark theme from src/styles/tokens.css untouched. Sections not
+   yet converted to the light redesign still reference the old dark
+   --purple-light/--bg-dark/etc. tokens from that file; they'll be
+   migrated slice by slice. */
+:root {
+  --land-bg: #ffffff;
+  --land-surface: #ffffff;
+  --land-surface-alt: #faf6ff;
+  --land-border: #ececec;
+  --land-border-strong: #2b2b2b;
+
+  --land-text-primary: #1a1a1a;
+  --land-text-secondary: #5c5c66;
+  --land-text-muted: #8a8a94;
+
+  --land-accent: #6d3fc7;
+  --land-accent-tint-bg: #f0e5ff;
+  --land-accent-tint-border: #e3cfff;
+
+  --land-secondary-accent: #0f6e56;
+  --land-secondary-tint-bg: #e1f5ee;
+
+  --land-radius-pill: 999px;
+  --land-radius-card: 16px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Animations
+   Slice 11 QA pass: this file used to carry a much larger set of
+   dark-theme keyframes (float, floatCard, pulseGlow, drawRoute, blink,
+   particle, shimmer, spinSlow, fadeUp, scaleIn, gradientShift, pinPulse)
+   left over from the old dark landing page. Every one of them was
+   grepped against the final component set (Nav/Hero/TrustBar/
+   ProductFeatures/VideoSection/ExploreSection/FinalCTA/FAQ/Footer/
+   shared.jsx) and confirmed unreferenced, so they've been removed here.
+   Only .animate-ticker survives (TrustBar's marquee) — the route-draw
+   effect is handled directly in JS via useDrawRoute (landingHooks.js),
+   not this file's old drawRoute keyframe, which was dead code even
+   before this cleanup. */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Utility classes */
+.animate-ticker { animation: ticker 35s linear infinite; }
+
+.reveal {
+  opacity: 0;
+  transform: translateY(36px);
+  transition: opacity 0.75s cubic-bezier(0.16,1,0.3,1), transform 0.75s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.reveal-scale {
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal-scale.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Hero fade-up-on-load stagger (Slice 10). Distinct from .reveal above —
+   smaller translate (10px vs 36px), shorter/linear-feeling ease, no
+   scroll-triggered delay logic needed since the hero is above the fold;
+   per-element stagger is applied inline via transitionDelay. */
+.hero-fade {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.hero-fade.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Shared pill-button motion (Motion/UX rules): hover lift+scale, crisp
+   scale-down on press, no bounce/spring overshoot. Used by Hero's CTAs
+   and VideoSection's play button. */
+.pill-btn {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.pill-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+}
+.pill-btn:active {
+  transform: scale(0.97);
+}
+
+/* Play-button pulse ring (Slice 9) — flat expanding/fading ring inviting
+   the click, ~2.2s loop per the redesign plan. */
+@keyframes playPulse {
+  0% { box-shadow: 0 0 0 0 rgba(109,63,199,0.35); }
+  100% { box-shadow: 0 0 0 22px rgba(109,63,199,0); }
+}
+.play-pulse {
+  animation: playPulse 2.2s ease-out infinite;
+}
+
+/* Global reduced-motion fallback — every animation this file defines
+   (reveal/reveal-scale/hero-fade transitions, float/particle/pulse
+   keyframes, the play button's pulse ring) collapses to its end state
+   immediately with no transition. SVG stroke-dashoffset drawing is
+   handled separately in JS (useDrawRoute), which checks the same media
+   query directly. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-scale, .hero-fade {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .play-pulse {
+    animation: none !important;
+  }
+  /* Slice 11 fix: TrustBar's marquee (.animate-ticker) was the one
+     infinite-loop animation on the page with no reduced-motion fallback
+     — everything else had one, this was just missed. Pausing it here
+     leaves the (duplicated) badge list visibly static instead of an
+     unbounded scroll. */
+  .animate-ticker {
+    animation: none !important;
+  }
+  .pill-btn:hover, .pill-btn:active {
+    transform: none !important;
+  }
+}
+
+/* Explore tile hover (Slice 5, light theme) — subtle lift + a shift to
+   light teal border, per the redesign plan. The "+more" variant shifts
+   to violet instead, matching its accent color. */
+.explore-tile {
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.explore-tile:hover {
+  transform: translateY(-2px);
+  border-color: #b9e6da !important;
+  box-shadow: 0 6px 20px rgba(15,110,86,0.08);
+}
+.explore-tile-more:hover {
+  border-color: var(--land-accent-tint-border) !important;
+  box-shadow: 0 6px 20px rgba(109,63,199,0.1);
+}
+
+/* Feature tile hover (Slice 8, light theme) */
+.feature-tile {
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.feature-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--land-accent-tint-border) !important;
+  box-shadow: 0 10px 28px rgba(109,63,199,0.1);
+}
+
+/* ─── Popular places fan (PopularPlacesSection) ───
+ * Four cards splayed at increasing angles either side of center — a
+ * "sideways V" hand of cards, not a grid. Each card is absolutely
+ * positioned within a fixed-height stage so the rotation/translate
+ * pairs can overlap on purpose. Hovering/focusing straightens and
+ * lifts that one card above its neighbors without disturbing them.
+ * Below the collapse breakpoint the whole stage flattens into a plain
+ * horizontal scroll-snap row — the angled layout needs sideways room
+ * that narrow viewports don't have.
+ */
+.popular-fan {
+  position: relative;
+  height: 340px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.popular-card {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  width: 200px;
+  height: 280px;
+  margin-left: -100px;
+  border-radius: 18px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  border: 4px solid var(--land-bg);
+  box-shadow: 0 18px 40px rgba(20,10,40,0.16);
+  text-decoration: none;
+  display: flex;
+  align-items: flex-end;
+  cursor: pointer;
+  will-change: transform;
+  backface-visibility: hidden;
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+.popular-card-0 { transform: translateX(-186px) rotate(-13deg) translateZ(0); z-index: 1; }
+.popular-card-1 { transform: translateX(-62px) rotate(-4deg) translateZ(0); z-index: 2; }
+.popular-card-2 { transform: translateX(62px) rotate(4deg) translateZ(0); z-index: 3; }
+.popular-card-3 { transform: translateX(186px) rotate(13deg) translateZ(0); z-index: 4; }
+
+.popular-card:hover,
+.popular-card:focus-visible {
+  transform: translateY(-16px) rotate(0deg) scale(1.07) translateZ(0) !important;
+  z-index: 10 !important;
+  box-shadow: 0 26px 54px rgba(20,10,40,0.26);
+}
+.popular-card-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(10,6,20,0.78) 0%, rgba(10,6,20,0.15) 55%, transparent 80%);
+}
+.popular-card-label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 14px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+}
+
+@media (max-width: 720px) {
+  .popular-fan {
+    position: static;
+    height: auto;
+    max-width: none;
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding: 6px 6px 18px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .popular-card {
+    position: static;
+    margin-left: 0;
+    width: 180px;
+    height: 240px;
+    flex: 0 0 auto;
+    scroll-snap-align: center;
+    transform: none !important;
+  }
+  .popular-card:hover,
+  .popular-card:focus-visible {
+    transform: translateY(-6px) scale(1.02) !important;
+  }
+  /* Shorter, lighter scrim — the desktop gradient (tuned for a 280px-tall
+     card) reads as a heavy black smear once the card shrinks to 240px.
+     Pull it down into a smaller strip behind just the label. */
+  .popular-card-scrim {
+    background: linear-gradient(to top, rgba(10,6,20,0.72) 0%, rgba(10,6,20,0.28) 35%, transparent 60%);
+  }
+  .popular-card-label {
+    padding: 12px 12px;
+    font-size: 12.5px;
+  }
+}
+
+/* ─── Campus transform / before-after (CampusTransformSection) ─── */
+.transform-compare {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  flex-wrap: wrap;
+}
+.transform-col {
+  flex: 1 1 280px;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.transform-badge {
+  display: inline-block;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: var(--land-radius-pill);
+  margin-bottom: 18px;
+}
+.transform-badge-before {
+  background: var(--land-border);
+  color: var(--land-text-secondary);
+}
+.transform-badge-after {
+  background: var(--land-accent-tint-bg);
+  color: var(--land-accent);
+}
+.before-stack {
+  position: relative;
+  width: 100%;
+  height: 190px;
+  margin-bottom: 4px;
+}
+.before-photo {
+  position: absolute;
+  top: 10px;
+  width: 68%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 4px solid var(--land-bg);
+  box-shadow: 0 14px 30px rgba(20,10,40,0.14);
+  transition: transform 0.3s ease;
+}
+.before-photo-1 {
+  left: 4%;
+  transform: rotate(-7deg);
+  z-index: 1;
+}
+.before-photo-2 {
+  right: 4%;
+  transform: rotate(6deg);
+  z-index: 2;
+}
+.transform-compare:hover .before-photo-1 { transform: rotate(-10deg) translateY(-2px); }
+.transform-compare:hover .before-photo-2 { transform: rotate(9deg) translateY(-2px); }
+
+.after-frame {
+  position: relative;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--land-border);
+  box-shadow: 0 18px 40px rgba(20,10,40,0.14);
+  margin-bottom: 4px;
+}
+.after-photo {
+  display: block;
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+}
+.after-chip {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.94);
+  border: 1px solid var(--land-border);
+  border-radius: var(--land-radius-pill);
+  padding: 8px 14px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 12px;
+  color: var(--land-text-muted);
+  box-shadow: 0 6px 16px rgba(20,10,40,0.08);
+}
+.transform-caption {
+  font-family: 'Poppins', sans-serif;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--land-text-secondary);
+  margin: 8px 0 0;
+}
+.transform-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--land-accent-tint-bg);
+}
+.transform-arrow-mobile { display: none; }
+
+@media (max-width: 820px) {
+  .transform-compare { gap: 20px; }
+  .transform-arrow-desktop { display: none; }
+  .transform-arrow-mobile { display: block; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popular-card, .before-photo {
+    transition: none !important;
+  }
+}

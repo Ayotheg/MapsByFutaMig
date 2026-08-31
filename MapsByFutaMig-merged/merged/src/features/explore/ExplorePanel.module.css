@@ -1,0 +1,168 @@
+/* Explore panel — v2 light theme (see tokens-v2.css), matching the
+   Figma "Explore Campus" card exactly: white surface, dark text, solid
+   colored circular icons, violet accents. This is the first real content
+   dropped into MobileSheet's `.body`/`.panel` — everything else in that
+   shell (LayersPanel/GpsPanel/NavPanel) is still v1 dark-on-light and
+   explicitly flagged "not redesigned yet" in that file's own header
+   comment, so this component renders its own light card rather than
+   inheriting the dark `.panel` background around it. */
+
+.panel {
+  background: var(--v2-surface);
+  border-radius: var(--r-xl);
+  padding: var(--pad) var(--pad) 4px;
+  font-family: var(--font-ui);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.headerFull {
+  margin-bottom: 14px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--v2-text);
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--v2-text-variant);
+  margin-top: 2px;
+}
+
+.viewAll {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2-primary);
+  padding: 4px 2px;
+}
+.viewAll:active {
+  opacity: 0.7;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: #ffffff;
+  border: 1px solid rgba(74, 68, 85, 0.08);
+  border-radius: var(--r-lg);
+  padding: 10px 12px;
+  cursor: pointer;
+  position: relative;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+    box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.card:hover {
+  box-shadow: 0 4px 14px rgba(74, 68, 85, 0.08);
+}
+.card:active {
+  transform: scale(0.98);
+}
+
+.avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v2-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardMeta {
+  font-size: 11px;
+  color: var(--v2-text-variant);
+  text-transform: capitalize;
+  margin-top: 1px;
+}
+
+.cardTags {
+  font-size: 10px;
+  color: var(--v2-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.promoBadge {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--v2-tertiary);
+  background: rgba(161, 81, 0, 0.1);
+  border: 1px solid rgba(161, 81, 0, 0.22);
+  padding: 3px 7px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 24px 4px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--v2-text-variant);
+}
+
+/* Desktop sidebar's Explore panel reuses the same component at
+   variant="full" but sits inside Sidebar's fixed-width dark panel
+   shell — give it room to breathe without the mobile card's own
+   outer radius clashing with the sidebar's rounded corners. */
+@media (min-width: 769px) {
+  .panel {
+    border-radius: 0;
+    padding: var(--pad);
+  }
+}

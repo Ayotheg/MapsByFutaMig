@@ -1,0 +1,86 @@
+/*
+ * Body-content styles for DetailModal. The overlay/modal/header/title/
+ * close/body shell moved to `src/components/ui/Modal.module.css` in
+ * Slice 5 — see that file's comment and DetailModal.jsx's comment for why.
+ *
+ * Legacy source: style.css ~1603–1632 (detail-section/badge/text/
+ * waypoints/images).
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sectionLabel {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.text {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.badge {
+  display: inline-block;
+  background: rgba(183, 109, 255, 0.12);
+  border: 1px solid rgba(183, 109, 255, 0.3);
+  border-radius: 5px;
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 3px 8px;
+  letter-spacing: 0.08em;
+}
+
+.waypoints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.waypoint {
+  background: rgba(255, 185, 95, 0.06);
+  border: 1px solid rgba(255, 185, 95, 0.2);
+  border-radius: var(--r-md);
+  padding: 8px 10px;
+}
+.wpName {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--tertiary);
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+.wpDesc {
+  font-size: 10px;
+  color: var(--muted);
+}
+.wpCoord {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.images img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  border: 1px solid var(--outline-dim);
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.images img:hover {
+  border-color: var(--primary-container);
+}
