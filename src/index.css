@@ -135,3 +135,29 @@ body.map-viewport {
   width: 100%;
   height: 100%;
 }
+
+/*
+ * Bug fix (reported directly): "anywhere you have to use a keyboard, it
+ * zooms in the current page... that should be a font size issue" —
+ * correct. Mobile Safari/Chrome auto-zoom the whole page on focusing any
+ * `input`/`textarea`/`select` whose *computed* font-size is under 16px
+ * (an accessibility measure, so what you're about to type is legible) —
+ * and several inputs across this app (search bars, the suggest-a-place
+ * form, auth form, admin forms, etc.) are styled smaller than that for
+ * visual density. A single global floor here is far more reliable than
+ * hunting down and patching every input's own component CSS one at a
+ * time — `!important` is needed because a plain element selector like
+ * this one would otherwise lose to any component's more-specific class
+ * selector (e.g. `.input { font-size: 13px }` beats a bare `input`
+ * rule regardless of source order). Scoped to `max-width: 768px` — this
+ * codebase's own mobile breakpoint (matches `MapPage.jsx`'s `isMobile`
+ * check) — since this browser behavior is mobile-only in the first
+ * place; desktop inputs are untouched.
+ */
+@media (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

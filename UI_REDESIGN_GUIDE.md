@@ -791,6 +791,65 @@ migration-slice convention), with this table updated.
   (only consumer was the deleted `Sidebar.jsx` navigate-panel block) —
   left in place for the same reason.
 
+- **Three cross-app mobile bugs, reported directly, not scoped to one
+  screen** — real functionality changes, flagged per Rule 7, made on
+  direct explicit instruction, not guessed.
+  - **Page zooms when a keyboard opens (search bar, suggest-a-place,
+    etc.).** Root cause confirmed as suspected: mobile Safari/Chrome
+    auto-zoom the whole page on focusing any `input`/`textarea`/`select`
+    whose computed font-size is under 16px. Rather than hunt down and
+    patch every input's own component CSS individually (17 files have
+    at least one), added one global rule (`src/index.css`) that floors
+    `input, textarea, select` to `16px !important` under
+    `max-width: 768px` (this codebase's own mobile breakpoint) — desktop
+    untouched, since this browser behavior is mobile-only.
+  - **"Elements clash — I can open three things at once and they won't
+    give room for each other."** `MapPage.jsx` owned roughly ten
+    independent open/closed booleans (`selected`, `selectedSegmentId`,
+    `activeChip`, `mobileSearchOpen`, `sheetState`, `suggestModalOpen`,
+    `mySubmissionsOpen`, `reviewTarget`, `adminPanelOpen`,
+    `authModalOpen`) and none of them closed any of the others — each
+    was only ever opened or closed on its own, so any combination could
+    end up stacked on screen simultaneously. Added one
+    `closeOtherOverlays(keep)` helper that closes every surface except
+    the one about to open, called at every place that actually opens one
+    (`handleSelectPlace`, `handleViewSegment`, `handleChipClick`,
+    `handleSheetStateChange`, the search bar's open/toggle handlers,
+    `openAuthModal`, `handleSuggestPlaceClick`, the admin-panel-open
+    success callback, `onArrival`'s auto-opened review modal, and
+    "view my submissions"). `handleSheetStateChange` wraps
+    `onSheetStateChange` specifically so every way of opening the mobile
+    sheet (tab taps inside `MobileSheet.jsx`, the search bar's toggle
+    button) is covered by wrapping that one prop, rather than editing
+    each call site inside that file individually. This is the same
+    principle as this session's earlier `navActive`-triggered overlay
+    close (still in place, untouched) — generalized from "clear
+    everything when nav starts" to "clear everything whenever anything
+    else opens."
+  - **Pinching to zoom the map sometimes zooms/moves the whole page
+    instead, requiring a refresh.** `index.html`'s `<meta
+    name="viewport">` only ever set `initial-scale=1`, with no
+    `maximum-scale`/`user-scalable` — nothing stopped the browser's own
+    page-level pinch-zoom from competing with Leaflet's own zoom
+    handling on `.map` (which already sets `touch-action: none`,
+    `MapShell.module.css`, specifically so the browser hands raw touch
+    events to Leaflet instead of handling them itself — which only
+    works if the page beneath it isn't *also* zoomable). Rather than
+    change the global, SEO-facing `index.html` meta tag (which would
+    also lock pinch-zoom on the landing page — an accessibility
+    regression, WCAG 1.4.4, for a normal scrollable content page that
+    has no reason to disable it), `HomeRoute.jsx` now swaps the meta
+    tag's `content` to add `maximum-scale=1, user-scalable=no,
+    viewport-fit=cover` only while the `/map` route is mounted, restoring
+    the original on unmount — same scoping pattern as the
+    `map-viewport` body class right below it in that same file, added
+    in an earlier slice for the identical "only this route needs this"
+    reason. Not airtight on every browser (recent Safari/Chrome versions
+    deliberately ignore `user-scalable=no` for that same accessibility
+    reason) but removes the page-level zoom as a competing gesture
+    handler on the browsers that do respect it — the actual mechanism
+    behind the "interface moves/gets stuck" symptom.
+
 ## 8. Open decisions (fill in as they're made)
 
 - **v2 palette**: set (Section 3) — primary/secondary/tertiary/neutral defined
