@@ -143,3 +143,38 @@
      resolution is wanted.
   */
 }
+
+/*
+ * Bug fix (reported directly): double-tapping a mobile nav tab (e.g.
+ * "Explore") steps its sheet from peek → half → full, and on Chrome the
+ * 'full' state's content was getting flushed off the top of the screen —
+ * Safari was fine. Not actually a "different browsers put their tab bar
+ * in different places" issue as it first looked; it's `vh` units. Mobile
+ * Chrome sizes `vh` against the *largest possible* viewport (as if its
+ * address bar were already hidden), not the viewport actually visible
+ * right now — so `--mob-sheet-full: 92vh` above could genuinely be
+ * taller than the visible screen while Chrome's address bar is showing,
+ * pushing that much of the sheet's content out of view. Safari's own `vh`
+ * handling doesn't have this particular gap, which is why it "already
+ * works well" there, per the report.
+ *
+ * `dvh` (dynamic viewport height) is the CSS spec's own answer to this
+ * exact inconsistency — it tracks the viewport that's actually visible
+ * right now, address bar included, in every current browser. Overriding
+ * the two tokens here (rather than patching `vh` → `dvh` separately in
+ * every component that reads them) keeps `MobileSheet.module.css`'s
+ * panel height *and* `MobFabCluster.module.css`'s "sit above the sheet"
+ * offset — both already read these same two tokens — in agreement, so
+ * the FAB cluster doesn't end up positioned against the old, wrong sheet
+ * height while the sheet itself uses the new one. `@supports` keeps the
+ * plain `vh` values above as the fallback for any browser that somehow
+ * doesn't recognize `dvh` — CSS custom properties don't have a built-in
+ * per-unit fallback the way a single property declaration does, so this
+ * is the standard way to get one.
+ */
+@supports (height: 100dvh) {
+  :root {
+    --mob-sheet-half: 50dvh;
+    --mob-sheet-full: 92dvh;
+  }
+}
