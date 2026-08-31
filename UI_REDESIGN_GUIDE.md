@@ -300,7 +300,7 @@ JSX/logic change).
 | Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; Explore panel added this session, Layers panel body still pending
 | Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) + desktop float, single component | Bricolage Grotesque + Inter (v2 tokens) | Done |
 | Nav/GPS HUD | `src/features/navigation/NavHud.*`, ~~`NavPanel.*`~~ (dead, see flag below), `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 against Figma node 1:311; `GpsPanel` redesigned to v2 against Figma node 31:52 this session, see flag below; `NavArrivedBanner` redesigned to v2 against Figma node 67:130 this session, see flag below; every nav entry point (mobile search bar, mobile navbar, desktop rail, desktop search bar) now routes straight to `NavigationController`/`NavDestPanel` instead of `NavPanel`, which is now unreachable/dead — see flag below; `MobFabCluster` still on v1 dark tokens — no reference yet |
-| Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
+| Auth modal | `src/features/auth/AuthModal.*` | Both | Bricolage Grotesque (brand/buttons) + Inter (v2 tokens) | Done — see flag below |
 | Review modal | `src/features/reviews/ReviewModal.*` | Both | Bricolage Grotesque (question) + Inter (v2 tokens) | Done — see flag below for why it no longer uses the shared `Modal` shell |
 | Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | Bricolage Grotesque (title) + Inter (v2 tokens) | Done — this session also redesigned the shared `components/ui/Modal.*` shell (first modal screen, see flag) |
 | Map shell | `src/features/map/MapShell.jsx`, `.module.css` | Both | — | Not started |
@@ -1095,6 +1095,61 @@ migration-slice convention), with this table updated.
     on appearance, and the submission toast now fades+slides up instead
     of an instant appear — all wrapped in
     `prefers-reduced-motion: reduce` guards.
+
+- **Auth modal (this session):** redesigned `AuthModal.jsx`/`.module.css`
+  against Figma nodes 82:2 ("Sign In") and 82:58 ("Create Account"),
+  pulled via the Figma MCP connection. No functionality changes — same
+  props, state, handlers, and data flow (login/signup/profile tabs,
+  Google auth, forgot-password, sign-out, guest-limit message, live
+  profile stats) as before. Does not adopt the shared `Modal.jsx` shell —
+  same "AuthModal has always had its own namespace" precedent the
+  component's own header comment already documented pre-redesign.
+  - **Shell reconciliation, flagged:** the two frames disagree on layout
+    — 82:2 has no tab switcher (just a "Welcome Back" heading + a bottom
+    "Sign up" text link) while 82:58 has the segmented Sign In/Create
+    Account control the app's `tab` state already drives. Since this is
+    one real shared component, 82:58's shell (brand block → segmented
+    tabs → Google button → divider → form) was used as the authoritative
+    structure for **both** tabs; 82:2's field set/copy (the "Forgot?"
+    link, Sign In field placeholders) was dropped into that shell rather
+    than building a second layout. 82:2's redundant bottom "Sign up" link
+    was dropped since the segmented control above already switches tabs.
+  - **Per explicit instruction:** the placeholder inline location-pin SVG
+    in the brand block was swapped for the real app logo
+    (`public/android-chrome-512x512.png`), plain `<img>`, no new asset
+    pipeline.
+  - **Font gap, same call as the Search Results session:** both frames'
+    exported reference code shows "Liberation Serif" (82:2 — a Figma
+    export fallback for missing font data, not a real pick) and "Geist"
+    (82:58 — in Section 4's shortlist, but not bundled anywhere else in
+    the app yet). Neither treated as a deliberate new pick for this
+    screen; mapped to the already-bundled `var(--font-display)`
+    (headings/buttons) and `var(--font-ui)` (labels/body) instead, same
+    as every other v2 screen. Flag if Geist is explicitly requested.
+  - **One literal override, same precedent as every other v2 screen:**
+    both frames' primary button/link color is a flat `#630ed4` — used
+    the authoritative `--v2-primary` (`#7c3aed`) instead.
+  - **New content, per explicit instruction:** added a "By signing up,
+    you agree to our Terms and Privacy Policy." line under the signup
+    form (82:58 shows this copy) as real `react-router-dom` `Link`s to
+    the app's existing `/terms` and `/privacy` routes
+    (`src/pages/legal/*`, already wired in `App.jsx`) — same same-tab
+    in-app navigation pattern the landing page's `Footer.jsx` already
+    uses for those routes. Plain links, no new props/handlers; clicking
+    one also calls the existing `onClose` so the modal doesn't sit open
+    behind the legal page.
+  - Field inputs got leading icons (`Mail`/`Lock`/`User` from
+    `lucide-react`, matching both frames) and the password field's
+    custom show/hide eye SVGs were swapped for `lucide-react`'s
+    `Eye`/`EyeOff` — same "icons stay lucide-react" contract as every
+    other v2 screen. The sign-out button's inline SVG was swapped for
+    `lucide-react`'s `LogOut` for the same reason; profile-tab layout
+    itself (avatar, stats, sign-out) had no Figma reference this
+    session, so it was restyled to v2 tokens only, not restructured.
+  - Motion: overlay fade + modal pop-in reused from the pre-redesign
+    keyframes, retimed to `var(--v2-duration-standard)`/
+    `var(--v2-ease-standard)`, guarded by `prefers-reduced-motion:
+    reduce` — same treatment as every other v2 modal-style surface.
 
 ## 8. Open decisions (fill in as they're made)
 

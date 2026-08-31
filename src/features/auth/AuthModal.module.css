@@ -1,31 +1,32 @@
 /*
  * Legacy source: style.css ~7679–8040 (`.auth-modal-overlay` through
- * `.auth-signout-btn` + mobile adjustments). Legacy references several
- * custom properties that are never defined anywhere in style.css
- * (grep-confirmed) but always with an inline literal fallback —
- * `var(--text-muted, #9b8ab8)`, `var(--primary-rgb, 160, 90, 255)` —
- * meaning the fallback is what actually renders today, not a broken
- * reference (unlike AdminPinGate's `--text-primary`, which has no
- * fallback at all). Ported using those literal fallback values directly
- * rather than inventing a new token mapping, matching BRAND_GUIDELINES.md's
- * "pixel-identical continuity, not a redesign" instruction — these three
- * (`--text-muted`, `--primary-rgb`, and AdminPinGate's `--text-primary`)
- * are flagged together in this Slice's tracker row as a pre-existing
- * legacy quirk, not fixed or silently normalized to the real token set.
+ * `.auth-signout-btn` + mobile adjustments).
+ *
+ * v2 (this session — Auth modal, Figma nodes 82:2 "Sign In" / 82:58
+ * "Create Account", pulled via the Figma MCP connection). See
+ * AuthModal.jsx's header comment for the full redesign rationale
+ * (shell reconciliation between the two frames, font-gap call, the
+ * literal-#630ed4 override, the new Terms/Privacy line). This does
+ * NOT reuse `components/ui/Modal.module.css` — AuthModal has always
+ * had its own CSS namespace (see AuthModal.jsx's own comment on why),
+ * so this file sets its own v2 look rather than inheriting the shared
+ * Modal shell's contract. Reuses the same `--v2-*` tokens everywhere
+ * a value maps cleanly, same "don't invent hex values per-screen"
+ * rule every other v2 file follows.
  */
 
 .overlay {
   position: fixed;
   inset: 0;
   z-index: 9100;
-  background: rgba(0, 0, 0, 0.62);
+  background: var(--v2-scrim);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
-  animation: overlayIn 0.18s ease;
+  animation: overlayIn var(--v2-duration-standard) var(--v2-ease-standard);
 }
 @keyframes overlayIn {
   from { opacity: 0; }
@@ -34,251 +35,327 @@
 
 .modal {
   position: relative;
-  background: var(--surface);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 20px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-xl);
   width: 100%;
   max-width: 400px;
   max-height: 92vh;
   overflow-y: auto;
-  padding: 32px 28px 28px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(160, 90, 255, 0.10);
-  animation: modalIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  padding: 25px;
+  box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.08);
+  animation: modalIn var(--v2-duration-standard) var(--v2-ease-standard);
 }
 @keyframes modalIn {
-  from { opacity: 0; transform: scale(0.94) translateY(12px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .modal {
+    animation: none;
+  }
 }
 
 .close {
   position: absolute;
   top: 14px;
   right: 14px;
-  background: rgba(255, 255, 255, 0.07);
+  background: transparent;
   border: none;
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
+  border-radius: var(--r-sm);
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9b8ab8;
+  color: var(--v2-text);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+              color var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .close:hover {
-  background: rgba(255, 255, 255, 0.13);
-  color: #fff;
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+.close:active {
+  transform: scale(0.94);
 }
 
 .brand {
   text-align: center;
-  margin-bottom: 22px;
+  padding-top: 8px;
+  margin-bottom: 16px;
 }
 .brandIcon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  background: rgba(160, 90, 255, 0.12);
-  border: 1px solid rgba(160, 90, 255, 0.25);
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 10px;
+}
+.brandIcon img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
 }
 .brandText {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.02em;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  line-height: 32px;
+  letter-spacing: 0;
 }
 .brandSub {
-  font-size: 12px;
-  color: #9b8ab8;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--v2-text);
   margin-top: 2px;
 }
 
 .tabs {
   display: flex;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  padding: 3px;
-  margin-bottom: 20px;
-  gap: 2px;
+  background: var(--v2-icon-btn-bg);
+  border-radius: var(--r-md);
+  padding: 4px;
+  margin-bottom: 16px;
+  gap: 0;
 }
 .tab {
   flex: 1;
   padding: 8px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: transparent;
-  color: #9b8ab8;
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--v2-text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  font-family: inherit;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+              color var(--v2-duration-quick) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .tabActive {
-  background: var(--primary);
-  color: #fff;
+  background: #ffffff;
+  color: var(--v2-neutral);
+  box-shadow: 0px 1px 1px 0px rgba(0, 0, 0, 0.05);
 }
 
-.panel { display: block; }
+.panel { display: flex; flex-direction: column; }
 
 .googleBtn {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 11px 16px;
-  background: #fff;
-  border: 1.5px solid #e0e0e0;
-  border-radius: 10px;
-  color: #3c3c3c;
-  font-size: 14px;
-  font-weight: 500;
+  gap: 8px;
+  padding: 13px 1px;
+  background: #ffffff;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--r-md);
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
   cursor: pointer;
-  transition: background 0.15s, box-shadow 0.15s;
-  font-family: inherit;
-  margin-bottom: 4px;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
+  box-shadow: 0px 1px 1px 0px rgba(0, 0, 0, 0.05);
 }
-.googleBtn:hover { background: #f7f7f7; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); }
-.googleBtn:active { background: #efefef; }
+.googleBtn:hover { background: #f7f7f7; }
+.googleBtn:active { transform: scale(0.99); }
 
 .divider {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin: 16px 0;
-  color: #9b8ab8;
-  font-size: 12px;
+  color: var(--v2-text-variant);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
 }
 .divider::before,
 .divider::after {
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--v2-border);
 }
 
 .field {
   margin-bottom: 14px;
 }
+.fieldLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .field label {
   display: block;
-  font-size: 12px;
+  font-family: var(--font-ui);
+  font-size: 11px;
   font-weight: 500;
-  color: #9b8ab8;
-  margin-bottom: 5px;
-  letter-spacing: 0.02em;
+  color: var(--v2-text);
+  margin-bottom: 4px;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
 }
-.field input {
-  width: 100%;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1.5px solid rgba(255, 255, 255, 0.10);
-  border-radius: 10px;
-  color: var(--text);
-  font-size: 14px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color 0.15s, background 0.15s;
-  box-sizing: border-box;
-}
-.field input:focus {
-  border-color: var(--primary);
-  background: rgba(160, 90, 255, 0.07);
-}
-.field input::placeholder { color: rgba(200, 180, 230, 0.35); }
 
-.passwordWrap {
+.inputWrap {
   position: relative;
+  display: flex;
+  align-items: center;
 }
-.passwordWrap input { padding-right: 40px; }
+.inputWrap input {
+  width: 100%;
+  padding: 12px 13px 12px 41px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--r-sm);
+  color: var(--v2-neutral);
+  font-size: 14px;
+  font-family: var(--font-ui);
+  outline: none;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
+              background var(--v2-duration-quick) var(--v2-ease-standard);
+  box-sizing: border-box;
+  box-shadow: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+}
+.inputWrap input:focus {
+  border-color: var(--v2-primary);
+  background: #ffffff;
+}
+.inputWrap input::placeholder { color: var(--v2-text-variant); }
+.hasToggle { padding-right: 40px; }
+
+.inputIcon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v2-text-variant);
+  pointer-events: none;
+}
+
 .pwToggle {
   position: absolute;
-  right: 10px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: #9b8ab8;
+  color: var(--v2-text-variant);
   cursor: pointer;
   padding: 2px;
   display: flex;
   align-items: center;
 }
-.pwToggle:hover { color: var(--primary); }
+.pwToggle:hover { color: var(--v2-primary); }
+
+.fieldHint {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--v2-text-variant);
+  margin-top: 4px;
+}
 
 .forgotLink {
   background: none;
   border: none;
-  color: var(--primary);
-  font-size: 12px;
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 11px;
   cursor: pointer;
   padding: 0;
-  margin-bottom: 14px;
-  display: block;
-  text-align: right;
-  width: 100%;
-  font-family: inherit;
-  opacity: 0.85;
+  font-weight: 500;
 }
-.forgotLink:hover { opacity: 1; text-decoration: underline; }
+.forgotLink:hover { text-decoration: underline; }
 
 .status {
   display: flex;
   align-items: center;
   gap: 6px;
+  font-family: var(--font-ui);
   font-size: 12.5px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 9px 12px;
   margin-bottom: 12px;
   line-height: 1.4;
 }
-.statusError { background: rgba(255, 80, 80, 0.12); color: #ff8080; border: 1px solid rgba(255, 80, 80, 0.20); }
-.statusOk { background: rgba(80, 220, 130, 0.12); color: #6ddc99; border: 1px solid rgba(80, 220, 130, 0.20); }
+.statusError { background: var(--v2-error-container); color: var(--v2-error-text); border: 1px solid rgba(186, 26, 26, 0.2); }
+.statusOk { background: rgba(13, 148, 136, 0.1); color: var(--v2-secondary); border: 1px solid rgba(13, 148, 136, 0.2); }
 
 /* Guest nav-limit banner — shown above the tabs when AuthModal is opened
    because a guest used up their free navigations (MapPage.jsx's
    `authModalMessage`), same shape as .status but neutral/brand-toned
    rather than error/success. */
 .limitMessage {
+  font-family: var(--font-ui);
   font-size: 12.5px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   padding: 9px 12px;
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   line-height: 1.4;
   text-align: center;
-  background: rgba(183, 109, 255, 0.10);
-  color: var(--text);
-  border: 1px solid rgba(183, 109, 255, 0.28);
+  background: var(--v2-primary-glow);
+  color: var(--v2-text);
+  border: 1px solid var(--v2-primary-outline);
 }
 
 .submitBtn {
   width: 100%;
   padding: 12px;
-  background: var(--primary);
+  background: var(--v2-primary);
   border: none;
-  border-radius: 11px;
-  color: #fff;
-  font-size: 14px;
+  border-radius: var(--r-sm);
+  color: var(--v2-on-primary);
+  font-size: 18px;
   font-weight: 600;
+  font-family: var(--font-display);
   cursor: pointer;
-  font-family: inherit;
-  transition: opacity 0.15s, transform 0.1s;
-  letter-spacing: 0.01em;
+  transition: box-shadow var(--v2-duration-quick) var(--v2-ease-standard),
+              transform var(--v2-duration-quick) var(--v2-ease-standard);
+  box-shadow: 0 4px 12px var(--v2-primary-glow);
+  margin-top: 2px;
 }
-.submitBtn:hover { opacity: 0.90; }
-.submitBtn:active { transform: scale(0.98); }
-.submitBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+.submitBtn:hover:not(:disabled) {
+  box-shadow: 0 6px 18px var(--v2-primary-glow-strong);
+  transform: translateY(-1px);
+}
+.submitBtn:active:not(:disabled) { transform: scale(0.98); }
+.submitBtn:disabled { opacity: 0.6; cursor: default; }
+
+.legalLine {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--v2-text-variant);
+  text-align: center;
+  line-height: 1.5;
+  margin: 14px 0 0;
+}
+.legalLine a {
+  color: var(--v2-primary);
+  text-decoration: none;
+}
+.legalLine a:hover { text-decoration: underline; }
 
 .profileAvatarWrap {
   width: 72px;
   height: 72px;
-  margin: 0 auto 14px;
+  margin: 4px auto 14px;
   position: relative;
 }
 .profileAvatar {
@@ -286,66 +363,71 @@
   height: 72px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2.5px solid var(--primary);
+  border: 2.5px solid var(--v2-primary);
 }
 .profileInitials {
   width: 72px;
   height: 72px;
   border-radius: 50%;
-  background: rgba(160, 90, 255, 0.18);
-  border: 2.5px solid var(--primary);
+  background: var(--v2-primary-glow);
+  border: 2.5px solid var(--v2-primary);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-display);
   font-size: 24px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--v2-primary);
 }
 
 .profileName {
   text-align: center;
+  font-family: var(--font-display);
   font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
+  font-weight: 600;
+  color: var(--v2-neutral);
   margin-bottom: 4px;
 }
 .profileEmail {
   text-align: center;
+  font-family: var(--font-ui);
   font-size: 12px;
-  color: #9b8ab8;
+  color: var(--v2-text-variant);
   margin-bottom: 4px;
 }
 .profileJoined {
   text-align: center;
+  font-family: var(--font-ui);
   font-size: 11px;
-  color: #9b8ab8;
-  opacity: 0.65;
+  color: var(--v2-muted);
   margin-bottom: 20px;
 }
 
 .statsRow {
   display: flex;
   gap: 12px;
-  margin-bottom: 22px;
+  margin-bottom: 20px;
 }
 .stat {
   flex: 1;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-md);
   padding: 14px 10px;
   text-align: center;
 }
 .statVal {
+  font-family: var(--font-display);
   font-size: 22px;
-  font-weight: 700;
-  color: var(--primary);
+  font-weight: 600;
+  color: var(--v2-primary);
   line-height: 1;
   margin-bottom: 4px;
 }
 .statLabel {
+  font-family: var(--font-ui);
   font-size: 11px;
-  color: #9b8ab8;
+  color: var(--v2-text-variant);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -357,18 +439,18 @@
   justify-content: center;
   gap: 8px;
   padding: 10px;
-  background: rgba(255, 80, 80, 0.09);
-  border: 1px solid rgba(255, 80, 80, 0.18);
-  border-radius: 10px;
-  color: #ff8080;
+  background: var(--v2-error-container);
+  border: 1px solid rgba(186, 26, 26, 0.2);
+  border-radius: var(--r-sm);
+  color: var(--v2-error-text);
+  font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
 }
-.signoutBtn:hover { background: rgba(255, 80, 80, 0.16); }
+.signoutBtn:hover { background: rgba(186, 26, 26, 0.18); }
 
 @media (max-width: 480px) {
-  .modal { padding: 24px 18px 20px; border-radius: 16px; }
+  .modal { padding: 20px 18px; border-radius: var(--r-lg); }
 }

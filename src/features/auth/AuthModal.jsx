@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, TriangleAlert } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, TriangleAlert, X, Mail, Lock, User, Eye, EyeOff, LogOut } from 'lucide-react';
 import styles from './AuthModal.module.css';
 import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
@@ -25,6 +26,49 @@ import { displayName, initials } from './useAuth';
  *
  * `initialTab` mirrors legacy's `openModal(tab)` — MapPage passes
  * `user ? 'profile' : 'login'` (app.js ~7185–7189's exact same gate).
+ *
+ * v2 redesign (this session — Auth modal, Figma nodes 82:2 "Sign In" and
+ * 82:58 "Create Account", pulled via the Figma MCP connection). UI/markup
+ * and CSS module only — no functionality changes; same props, state,
+ * handlers, data flow as before.
+ *  - The two frames disagree on layout (82:2 has no tab switcher and a
+ *    "Welcome Back" heading + bottom "Sign up" link; 82:58 has the
+ *    segmented Sign In/Create Account control + brand block + Google
+ *    button ahead of the form). Since this is one real shared component
+ *    (both tabs render from the same `tab` state, exactly like the
+ *    existing `showTabs` switcher already does), 82:58's shell — brand
+ *    block, segmented tab control, Google button, divider, then the
+ *    tab's own form fields — was used as the authoritative structure for
+ *    BOTH tabs, with 82:2's field set/copy (Forgot? link, Sign In copy)
+ *    dropped into that shell rather than inventing a second layout.
+ *    82:2's redundant "Don't have an account? Sign up" footer link was
+ *    dropped since the segmented control above already switches tabs.
+ *  - Brand icon: swapped the placeholder inline location-pin SVG for the
+ *    real app logo (`public/android-chrome-512x512.png`), per explicit
+ *    instruction — plain `<img>`, no new asset processing.
+ *  - Font gap, same call as the Search Results session: both frames'
+ *    exported code shows "Liberation Serif" (82:2, a Figma-export
+ *    fallback for missing font data, not a real pick) and "Geist" (82:58
+ *    — in Section 4's shortlist, but not yet bundled anywhere else in
+ *    the app). Neither is treated as a deliberate new-font pick for this
+ *    screen; mapped to the already-bundled `var(--font-display)`
+ *    (headings) / `var(--font-ui)` (body/labels) instead, consistent
+ *    with every other v2 screen. Flag if Geist is explicitly requested
+ *    later.
+ *  - One literal override, same precedent as every other v2 screen: both
+ *    frames' primary button/link color is a flat `#630ed4` — used the
+ *    authoritative `--v2-primary` (`#7c3aed`) instead.
+ *  - New content, per explicit instruction: added a "Terms" / "Privacy
+ *    Policy" line under the signup form (82:58 shows this copy) as real
+ *    `react-router-dom` `Link`s to the app's existing `/terms` and
+ *    `/privacy` routes (`src/pages/legal/*`, already wired in `App.jsx`)
+ *    — same same-tab in-app navigation pattern the landing page's
+ *    `Footer.jsx` already uses for those routes. Plain links, no new
+ *    props/handlers.
+ *  - Motion: overlay fade + modal pop-in reused from the existing
+ *    keyframes, retimed to `var(--v2-duration-standard)`/
+ *    `var(--v2-ease-standard)` and guarded by `prefers-reduced-motion:
+ *    reduce`, matching every other v2 modal-style surface.
  */
 export default function AuthModal({ initialTab, user, onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword, signOut, friendlyError, message }) {
   const [tab, setTab] = useState(initialTab);
@@ -156,20 +200,15 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
     <div className={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={styles.modal}>
         <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <X size={16} strokeWidth={2.5} />
         </button>
 
         <div className={styles.brand}>
           <div className={styles.brandIcon}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="10" r="4" stroke="var(--primary)" strokeWidth="1.8" />
-              <path d="M12 2C7.03 2 3 6.03 3 11c0 5.25 7.5 11 9 11s9-5.75 9-11c0-4.97-4.03-9-9-9z" stroke="var(--primary)" strokeWidth="1.8" fill="rgba(221,183,255,0.10)" />
-            </svg>
+            <img src="/android-chrome-512x512.png" alt="" width={48} height={48} />
           </div>
-          <div className={styles.brandText}>Maps By Futa</div>
-          <div className={styles.brandSub}>Your campus, navigated.</div>
+          <div className={styles.brandText}>MAPSBYFUTA</div>
+          <div className={styles.brandSub}>Navigate campus with ease.</div>
         </div>
 
         {message && <div className={styles.limitMessage}>{message}</div>}
@@ -189,13 +228,13 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
           <div className={styles.panel}>
             <GoogleButton label="Continue with Google" onClick={handleGoogle} />
             <Divider />
-            <Field label="Email">
-              <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="your@email.com" autoComplete="email" onKeyDown={enterSubmits(handleLogin)} />
+            <Field label="Email Address" trailing={<button type="button" className={styles.forgotLink} onClick={handleForgot}>Forgot?</button>}>
+              <div className={styles.inputIcon}><Mail size={16} /></div>
+              <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Enter your student or staff email" autoComplete="email" onKeyDown={enterSubmits(handleLogin)} />
             </Field>
             <Field label="Password">
-              <PasswordInput value={loginPw} onChange={setLoginPw} show={loginShowPw} onToggleShow={() => setLoginShowPw((s) => !s)} autoComplete="current-password" onKeyDown={enterSubmits(handleLogin)} />
+              <PasswordInput value={loginPw} onChange={setLoginPw} show={loginShowPw} onToggleShow={() => setLoginShowPw((s) => !s)} placeholder="Enter your password" autoComplete="current-password" onKeyDown={enterSubmits(handleLogin)} />
             </Field>
-            <button type="button" className={styles.forgotLink} onClick={handleForgot}>Forgot password?</button>
             {loginStatus && <StatusMsg status={loginStatus} />}
             <button type="button" className={styles.submitBtn} onClick={handleLogin} disabled={loginBusy}>
               {loginBusy ? 'Please wait…' : 'Sign In'}
@@ -208,18 +247,25 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
             <GoogleButton label="Sign up with Google" onClick={handleGoogle} />
             <Divider />
             <Field label="Full Name">
-              <input type="text" value={signupName} onChange={(e) => setSignupName(e.target.value)} placeholder="e.g. Ayo Adeleke" autoComplete="name" onKeyDown={enterSubmits(handleSignup)} />
+              <div className={styles.inputIcon}><User size={16} /></div>
+              <input type="text" value={signupName} onChange={(e) => setSignupName(e.target.value)} placeholder="John Doe" autoComplete="name" onKeyDown={enterSubmits(handleSignup)} />
             </Field>
-            <Field label="Email">
-              <input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="your@email.com" autoComplete="email" onKeyDown={enterSubmits(handleSignup)} />
+            <Field label="Email Address">
+              <div className={styles.inputIcon}><Mail size={16} /></div>
+              <input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="student@futa.edu.ng" autoComplete="email" onKeyDown={enterSubmits(handleSignup)} />
             </Field>
-            <Field label="Password">
-              <PasswordInput value={signupPw} onChange={setSignupPw} show={signupShowPw} onToggleShow={() => setSignupShowPw((s) => !s)} placeholder="Min. 6 characters" autoComplete="new-password" onKeyDown={enterSubmits(handleSignup)} />
+            <Field label="Password" hint="Min. 6 characters.">
+              <PasswordInput value={signupPw} onChange={setSignupPw} show={signupShowPw} onToggleShow={() => setSignupShowPw((s) => !s)} placeholder="••••••••" autoComplete="new-password" onKeyDown={enterSubmits(handleSignup)} />
             </Field>
             {signupStatus && <StatusMsg status={signupStatus} />}
             <button type="button" className={styles.submitBtn} onClick={handleSignup} disabled={signupBusy}>
               {signupBusy ? 'Please wait…' : 'Create Account'}
             </button>
+            <p className={styles.legalLine}>
+              By signing up, you agree to our{' '}
+              <Link to="/terms" onClick={onClose}>Terms</Link> and{' '}
+              <Link to="/privacy" onClick={onClose}>Privacy Policy</Link>.
+            </p>
           </div>
         )}
 
@@ -248,9 +294,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
             </div>
 
             <button type="button" className={styles.signoutBtn} onClick={handleSignOut}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
+              <LogOut size={14} />
               Sign Out
             </button>
           </div>
@@ -278,19 +322,25 @@ function Divider() {
   return <div className={styles.divider}><span>or</span></div>;
 }
 
-function Field({ label, children }) {
+function Field({ label, hint, trailing, children }) {
   return (
     <div className={styles.field}>
-      <label>{label}</label>
-      {children}
+      <div className={styles.fieldLabelRow}>
+        <label>{label}</label>
+        {trailing}
+      </div>
+      <div className={styles.inputWrap}>{children}</div>
+      {hint && <div className={styles.fieldHint}>{hint}</div>}
     </div>
   );
 }
 
 function PasswordInput({ value, onChange, show, onToggleShow, placeholder = '••••••••', autoComplete, onKeyDown }) {
   return (
-    <div className={styles.passwordWrap}>
+    <>
+      <div className={styles.inputIcon}><Lock size={16} /></div>
       <input
+        className={styles.hasToggle}
         type={show ? 'text' : 'password'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -298,20 +348,10 @@ function PasswordInput({ value, onChange, show, onToggleShow, placeholder = '•
         autoComplete={autoComplete}
         onKeyDown={onKeyDown}
       />
-      <button type="button" className={styles.pwToggle} onClick={onToggleShow}>
-        {show ? (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
-            <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
-            <line x1="1" y1="1" x2="23" y2="23" />
-          </svg>
-        ) : (
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
-          </svg>
-        )}
+      <button type="button" className={styles.pwToggle} onClick={onToggleShow} aria-label={show ? 'Hide password' : 'Show password'}>
+        {show ? <EyeOff size={16} /> : <Eye size={16} />}
       </button>
-    </div>
+    </>
   );
 }
 
