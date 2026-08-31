@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Star, CheckCircle2, TriangleAlert } from 'lucide-react';
-import Modal from '../../components/ui/Modal';
-import modalStyles from '../../components/ui/Modal.module.css';
+import { Star, CheckCircle2, TriangleAlert, X } from 'lucide-react';
 import styles from './ReviewModal.module.css';
 import { submitReview } from './submitReview';
 import { track } from '../../lib/analytics';
@@ -40,6 +38,33 @@ import { track } from '../../lib/analytics';
  * `isRateablePOI` either — the gate happens once, at the call site above,
  * before `open()` is ever invoked. Matched here on purpose rather than
  * adding a redundant internal check.
+ *
+ * v2 (this session): redesigned against Figma node 59:2 ("Rating
+ * Screen"), pulled via the Figma MCP connection. Same props
+ * (`dest`, `onClose`, `onSubmitted`, `user`), same state, same
+ * `handleSubmit`/`submitReview` flow, same reset-on-`dest`-change
+ * effect — no functionality changes.
+ *
+ * **Structural decision, flagged:** the frame is a bottom sheet
+ * (rounded top corners only, anchored to the viewport bottom, grabber
+ * handle, max-width 672px staying bottom-anchored even at that width)
+ * — not the shared `Modal` component's centered card. Rather than add
+ * a new prop to the shared `Modal.jsx`/`Modal.module.css` (out of
+ * scope per Rule 1 — that file is still used unmodified by
+ * `AuthModal`/`SaveModal`/`DetailModal`/`AdminEditModal`, all still
+ * "Not started," and a new variant prop there is exactly the kind of
+ * shared-component change this pass avoids), this component now
+ * builds its own self-contained overlay + sheet markup, matching
+ * `Modal.jsx`'s existing externally-visible behavior exactly: X-button
+ * close, backdrop-click-to-close (this modal already had
+ * `closeOnBackdrop` on, see the removed comment above), and the same
+ * optional footer-button pattern — just no longer sharing the actual
+ * `Modal` component or its CSS module. No other modal is affected.
+ * The frame's grabber handle was left out entirely (not just left
+ * decorative) — a static handle with no drag-to-dismiss behind it
+ * reads as broken affordance, and adding that gesture would be new
+ * interaction behavior, out of scope per Rule 1/7. Top of the sheet is
+ * plain instead.
  */
 // `user` (Slice 10, optional): when signed in, attributes the review via
 // `submitReview`'s `userId` so it counts toward the signer's profile
@@ -92,7 +117,7 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
     <>
       <button
         type="button"
-        className={`${modalStyles.btn} ${modalStyles.btnSecondary}`}
+        className={styles.btnSkip}
         onClick={onClose}
         disabled={submitting}
       >
@@ -100,7 +125,7 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
       </button>
       <button
         type="button"
-        className={`${modalStyles.btn} ${modalStyles.btnPrimary}`}
+        className={styles.btnSubmit}
         onClick={handleSubmit}
         disabled={rating < 1 || submitting}
       >
@@ -110,40 +135,56 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
   );
 
   return (
-    <Modal title="RATE THIS PLACE" onClose={onClose} footer={footer} closeOnBackdrop>
-      <div className={styles.placeName}>How was your visit to {dest?.name}?</div>
-
-      <div
-        className={styles.stars}
-        onMouseLeave={() => setHoverRating(0)}
-      >
-        {[1, 2, 3, 4, 5].map((val) => (
-          <span
-            key={val}
-            className={`${styles.star} ${val <= displayRating ? styles.active : ''}`}
-            onClick={() => setRating(val)}
-            onMouseEnter={() => setHoverRating(val)}
-          >
-            <Star size={22} fill={val <= displayRating ? 'currentColor' : 'none'} />
-          </span>
-        ))}
-      </div>
-
-      <div className={styles.field}>
-        <label>Comment (optional)</label>
-        <textarea
-          rows={3}
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="How was the service, quality, price...?"
-        />
-      </div>
-
-      {status && (
-        <div className={`${styles.status} ${styles[status.kind]}`}>
-          {status.kind === 'success' ? <CheckCircle2 size={13} /> : <TriangleAlert size={13} />} {status.text}
+    <div
+      className={styles.overlay}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className={styles.sheet}>
+        <div className={styles.header}>
+          <div className={styles.eyebrow}>RATE THIS PLACE</div>
+          <button type="button" className={styles.closeBtn} onClick={onClose}>
+            <X size={17} />
+          </button>
         </div>
-      )}
-    </Modal>
+
+        <div className={styles.question}>
+          How was your visit to <span className={styles.destName}>{dest?.name}</span>?
+        </div>
+
+        <div
+          className={styles.stars}
+          onMouseLeave={() => setHoverRating(0)}
+        >
+          {[1, 2, 3, 4, 5].map((val) => (
+            <span
+              key={val}
+              className={`${styles.star} ${val <= displayRating ? styles.active : ''}`}
+              onClick={() => setRating(val)}
+              onMouseEnter={() => setHoverRating(val)}
+            >
+              <Star size={26} fill={val <= displayRating ? 'currentColor' : 'none'} />
+            </span>
+          ))}
+        </div>
+
+        <div className={styles.field}>
+          <label>Comment (optional)</label>
+          <textarea
+            rows={3}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="How was the service, quality, price...?"
+          />
+        </div>
+
+        {status && (
+          <div className={`${styles.status} ${styles[status.kind]}`}>
+            {status.kind === 'success' ? <CheckCircle2 size={13} /> : <TriangleAlert size={13} />} {status.text}
+          </div>
+        )}
+
+        <div className={styles.actions}>{footer}</div>
+      </div>
+    </div>
   );
 }

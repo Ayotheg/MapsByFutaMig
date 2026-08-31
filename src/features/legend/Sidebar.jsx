@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { Compass, Rss, Navigation, CirclePlus, CircleUser, Shield, Sparkles } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
-import NavPanel from '../navigation/NavPanel';
 import ExplorePanel from '../explore/ExplorePanel';
 import { displayName } from '../auth/useAuth';
 import { track } from '../../lib/analytics';
@@ -58,6 +57,11 @@ export default function Sidebar({
   collapsed,
   onCollapsedChange,
   gps,
+  // No longer read directly now that `NavPanel` (its only consumer) is
+  // unreachable from this rail — accepted rather than removed since
+  // MapPage still passes it, and it's the natural hook if the desktop
+  // rail ever gets its own nav-active treatment (mobile's navbar already
+  // has one, see MobileSheet.module.css's `.navbarNavActive`).
   navActive,
   onNavLaunch,
   user,
@@ -85,6 +89,19 @@ export default function Sidebar({
   }, [collapsed]);
 
   function handleRailClick(item) {
+    // Bug fix (reported directly for the mobile search bar + navbar; the
+    // desktop rail's "Nav" item had the identical problem — opening its
+    // own panel body, `NavPanel`, a plain "START NAVIGATION" card,
+    // instead of handing off to `onNavLaunch` the way `DesktopSearchBar`'s
+    // own nav button already did). Same fix as `MobileSheet.jsx`'s
+    // `handleTabClick`: skip the panel entirely and call `onNavLaunch`
+    // directly, so this rail item and the search bar's nav button now
+    // agree. `NavPanel` is no longer reachable from here either.
+    if (item.key === 'navigate') {
+      onCollapsedChange(true);
+      onNavLaunch?.();
+      return;
+    }
     const isAlreadyActive = activeKey === item.key && !collapsed;
     if (isAlreadyActive) {
       onCollapsedChange(true);
@@ -170,17 +187,6 @@ export default function Sidebar({
           <Suspense fallback={null}>
             <GpsPanel gps={gps} />
           </Suspense>
-        </div>
-      )}
-
-      {!collapsed && activeKey === 'navigate' && (
-        <div className={styles.panel}>
-          <div className={styles.panelHeaderGeneric}>
-            <span className={styles.panelTitleGeneric}>Navigate</span>
-          </div>
-          <div className={styles.panelBody}>
-            <NavPanel navActive={navActive} onLaunch={onNavLaunch} />
-          </div>
         </div>
       )}
 

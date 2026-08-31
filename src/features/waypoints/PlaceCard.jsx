@@ -38,10 +38,11 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  * rating badge. Pass `data={null}` to render closed.
  *
  * Photo full-view: legacy's thumbnail click called a segment-scoped
- * `openPhoto(idx, segmentId)` lightbox. Waypoint photos aren't
- * segment-scoped, so clicking a thumbnail/hero image here just opens the
- * full-res image in a new tab directly — same end result, no dependency on
- * Slice 4's segment registry. Revisit if a proper in-app lightbox is wanted.
+ * `openPhoto(idx, segmentId)` lightbox. This previously opened the
+ * full-res image in a new tab on click (no in-app lightbox existed
+ * yet); removed by direct instruction — the hero image is no longer
+ * clickable, only the prev/next photo-nav buttons change `photoIdx`.
+ * Revisit if a proper in-app lightbox is wanted later.
  *
  * UI_REDESIGN_GUIDE.md pass (this session): restyled to v2 light theme
  * per Figma node 7:943 ("Bottom Sheet Card") — see PlaceCard.module.css's
@@ -130,8 +131,6 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
             <img
               src={photos[photoIdx]}
               alt=""
-              style={{ cursor: 'pointer' }}
-              onClick={() => window.open(photos[photoIdx], '_blank')}
             />
             <div className={styles.heroOverlay} />
             <button className={styles.closeOnHero} aria-label="Close" onClick={onClose}>

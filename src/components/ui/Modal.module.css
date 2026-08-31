@@ -2,122 +2,184 @@
  * Shared Modal shell — see Modal.jsx for the extraction rationale.
  * Legacy source: style.css ~1406–1449 (overlay/modal/header/title/close/
  * body), ~1534–1586 (modal-footer/modal-btn variants).
+ *
+ * v2 (this session — Waypoint suggestion, Figma node 1:253): FIRST
+ * modal screen redesigned, so this file now sets the v2 Modal contract
+ * (Section 5 of UI_REDESIGN_GUIDE.md) that every later modal session
+ * (Auth modal, Review modal, Admin panel's AdminEditModal, plus
+ * SaveModal/DetailModal which also reuse this shell) inherits for the
+ * overlay/header/close/footer chrome — same "first session sets it"
+ * precedent the Loading Screen established for the palette. Those
+ * screens' own body content (their own .module.css files) is untouched
+ * and stays on v1 styling until their own session runs — see this
+ * session's flag in UI_REDESIGN_GUIDE.md for what that means visually
+ * in the meantime.
+ *
+ * `.btnPrimary` = Section 5's "Button — Primary" contract.
+ * `.btnOutlined` is new: Section 5's "Button — Outlined" contract,
+ * confirmed against this frame's actual "Cancel" button (white fill,
+ * thin border, dark text) — border color was "not yet tokenized,
+ * define when first built"; it's --v2-track (#e2e7ff exact match).
+ * `.btnSecondary`/`.btnDanger` are DELIBERATELY left on v1 styling —
+ * no Figma reference has shown a true lavender-tint "Secondary" button
+ * or a destructive "Danger" button yet, so per Rule 7 ("don't guess —
+ * flag it") their v2 versions aren't invented here. Whichever screen
+ * first needs one should define --v2-primary-container /
+ * --v2-error-container-fill against a real reference then, not a guess
+ * made here for a button nothing in this screen uses.
  */
 
 .overlay {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--v2-scrim);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  animation: overlayFadeIn var(--v2-duration-standard) var(--v2-ease-standard);
 }
 
 .modal {
-  background: #0e1628;
-  border: 1px solid var(--outline-dim);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-track);
   border-radius: var(--r-xl);
   width: 100%;
   max-width: 480px;
   max-height: 88vh;
   overflow-y: auto;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(221, 183, 255, 0.08);
+  box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.08);
+  animation: modalPopIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .modal {
+    animation: none;
+  }
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalPopIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid var(--outline-dim);
+  padding: 16px 16px 17px;
+  border-bottom: 1px solid var(--v2-track);
   position: sticky;
   top: 0;
-  background: #0e1628;
+  background: var(--v2-surface);
   z-index: 1;
 }
 
 .title {
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: var(--primary);
-  text-transform: uppercase;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 32px;
+  color: var(--v2-neutral);
 }
 
 .close {
-  background: rgba(255, 255, 255, 0.06);
+  background: transparent;
   border: none;
   border-radius: var(--r-sm);
-  color: var(--muted);
-  font-size: 14px;
+  color: var(--v2-text);
   width: 28px;
   height: 28px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s, color 0.2s;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+              color var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .close:hover {
-  background: rgba(255, 180, 171, 0.2);
-  color: var(--error);
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+.close:active {
+  transform: scale(0.94);
 }
 
 .body {
-  padding: 16px 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  color: var(--v2-text);
 }
 
 .footer {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px 16px;
-  border-top: 1px solid rgba(183, 109, 255, 0.1);
-  background: rgba(183, 109, 255, 0.02);
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 12px;
+  padding: 20px 16px 24px;
+  border-top: 1px solid var(--v2-track);
+  background: var(--v2-surface);
 }
 
-/* ── Footer button variants, for use inside a Modal's `footer` prop ───── */
+/* ── Footer button variants, for use inside a Modal's `footer` prop
+   or directly in a form's own body (SuggestWaypointModal's duplicate-
+   match nudge) ────────────────────────────────────────────────────── */
 .btn {
-  flex: 1;
-  border-radius: var(--r-lg);
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  padding: 11px 10px;
+  border-radius: var(--r-md);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.14px;
+  padding: 13px 24px;
   cursor: pointer;
-  transition: all 0.18s;
-  text-transform: uppercase;
+  transition: all var(--v2-duration-quick) var(--v2-ease-standard);
   white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  position: relative;
-  overflow: hidden;
+  gap: 6px;
   border: none;
 }
 .btn:disabled {
   opacity: 0.6;
   cursor: default;
 }
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
 .btnPrimary {
-  background: linear-gradient(135deg, var(--primary-container) 0%, #9040e0 100%);
-  color: #fff;
-  border: 1px solid rgba(221, 183, 255, 0.2);
-  box-shadow: 0 4px 16px rgba(183, 109, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  box-shadow: 0 4px 12px var(--v2-primary-glow);
 }
 .btnPrimary:hover:not(:disabled) {
-  box-shadow: 0 6px 24px rgba(183, 109, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 18px var(--v2-primary-glow-strong);
   transform: translateY(-1px);
 }
+
+.btnOutlined {
+  background: #ffffff;
+  border: 1px solid var(--v2-track);
+  color: var(--v2-neutral);
+}
+.btnOutlined:hover:not(:disabled) {
+  border-color: var(--v2-primary-outline);
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+
+/* ── v1, unchanged — no Figma reference for these variants yet ──────── */
 .btnSecondary {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);

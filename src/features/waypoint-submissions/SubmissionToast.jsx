@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { CheckCircle2 } from 'lucide-react';
 import styles from './SubmissionToast.module.css';
 
 /**
@@ -18,6 +19,7 @@ export default function SubmissionToast({ message, onDismiss }) {
 
   return (
     <div className={styles.toast} role="status">
+      <CheckCircle2 size={16} />
       {message}
     </div>
   );

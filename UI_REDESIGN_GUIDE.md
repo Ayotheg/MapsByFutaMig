@@ -229,9 +229,10 @@ later sessions should match these, not reinvent them:
 | Button — Outlined | Transparent/white fill, thin border, dark text — border color not yet tokenized, define when first built |
 | Search bar | Light rounded-pill container, muted placeholder + leading search icon, no heavy border |
 | Icon action cluster | Small filled circular buttons, one per accent color (primary/secondary/tertiary + a destructive variant) — pattern used for grouped quick-actions |
-| Modal | *(not yet defined — TBD by first modal screen)* |
+| Modal | Set this session (Waypoint suggestion, Figma node 1:253): `var(--v2-surface)` body, `var(--v2-track)` borders, `var(--font-display)` title, fade+scale-in per Section 6. See `Modal.module.css`. |
+| Button — Outlined | Set this session: white fill, `var(--v2-track)` border, `var(--v2-neutral)` text — confirmed against the "Cancel" button on node 1:253. New `.btnOutlined` class in `Modal.module.css`. |
 | Panel / card | *(not yet defined — TBD)* |
-| Input field | *(not yet defined — TBD)* |
+| Input field | Set this session: floating label overlapping a `var(--v2-track)`-bordered, `var(--v2-hud-upnext-bg)`-filled field — see `SuggestWaypointModal.module.css`'s `.floatWrap`. |
 | Icons | `lucide-react`, stays as-is — confirm consistent stroke width/size across redesigned screens |
 
 ---
@@ -298,10 +299,10 @@ JSX/logic change).
 | Layers panel — mobile shell | `src/features/legend/MobileSheet.*` | Mobile — drag handle, peek/half/full sheet states | Inter (already bundled) | Tab strip done; 'layers'-keyed tab body now Explore Panel (see flag) |
 | Layers panel — desktop shell | `src/features/legend/Sidebar.*` | Desktop — rail + fixed-width panel | Inter (already bundled) | Rail icons done; Explore panel added this session, Layers panel body still pending
 | Place card | `src/features/waypoints/PlaceCard.*` | Mobile (drag-to-dismiss sheet) + desktop float, single component | Bricolage Grotesque + Inter (v2 tokens) | Done |
-| Nav/GPS HUD | `src/features/navigation/NavHud.*`, `NavPanel.*`, `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 this session against Figma node 1:311, see flag below; `NavPanel`/`GpsPanel`/`NavArrivedBanner`/`MobFabCluster` still on v1 dark tokens — no reference yet for those |
+| Nav/GPS HUD | `src/features/navigation/NavHud.*`, ~~`NavPanel.*`~~ (dead, see flag below), `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 against Figma node 1:311; `GpsPanel` redesigned to v2 against Figma node 31:52 this session, see flag below; `NavArrivedBanner` redesigned to v2 against Figma node 67:130 this session, see flag below; every nav entry point (mobile search bar, mobile navbar, desktop rail, desktop search bar) now routes straight to `NavigationController`/`NavDestPanel` instead of `NavPanel`, which is now unreachable/dead — see flag below; `MobFabCluster` still on v1 dark tokens — no reference yet |
 | Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
-| Review modal | `src/features/reviews/ReviewModal.*` | Both | — | Not started |
-| Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | — | Not started |
+| Review modal | `src/features/reviews/ReviewModal.*` | Both | Bricolage Grotesque (question) + Inter (v2 tokens) | Done — see flag below for why it no longer uses the shared `Modal` shell |
+| Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | Bricolage Grotesque (title) + Inter (v2 tokens) | Done — this session also redesigned the shared `components/ui/Modal.*` shell (first modal screen, see flag) |
 | Map shell | `src/features/map/MapShell.jsx`, `.module.css` | Both | — | Not started |
 | Admin panel | `src/features/admin/AdminPanel.*`, `AdminEditModal.*`, tabs (`KmlTab`, `PendingTab`, `PointsTab`, `RoutesTab`, `QuickChipsTab`) | Desktop | — | Not started |
 
@@ -699,6 +700,86 @@ migration-slice convention), with this table updated.
 
 ---
 
+- **`GpsPanel` — the GPS Signal screen (this session, Figma node 31:52
+  "GPS Screen", pulled via the Figma MCP connection):** redesigned to v2
+  light tokens. UI/CSS only — no functionality changes; `gps` still
+  carries every value from `useGpsTracking.js` unchanged.
+  - **Header shown in both embedded and non-embedded now, superseding
+    the earlier "hide title when embedded" behavior** (set back when
+    `LayersPanel` was the only precedent and no GPS-specific reference
+    existed): the Figma frame *is* the mobile/embedded view and shows
+    the full title ("GPS Status") + subtitle + badge, so that's now
+    rendered in both contexts; `embedded` still exists as a prop and
+    still governs content padding/density (mobile vs. desktop Sidebar),
+    just no longer toggles the header's visibility.
+  - **Subtitle line is new copy, computed inline from data already
+    passed in** (`gpsBtnDisabled`/`isTracking`/`tier`/`warning`) — no
+    new prop or state, same precedent as `ChipResultsPanel`'s status-
+    line consolidation. The frame's exact copy, "Acquiring high-accuracy
+    lock," is used for the tracking-but-not-`good` case.
+  - **Kept, not in the frame:** the 5-bar signal-strength meter. Unlike
+    the from/to rows dropped from `NavDestPanel`, these bars are bound
+    to real live data (`activeBars`/`tier`), not unbound decorative
+    markup, so removing a real data visualization wasn't assumed without
+    an explicit instruction — restyled to v2 tokens (bars use
+    `--v2-secondary`/`--v2-tertiary`/`--v2-error` by tier, track color
+    reuses the already-defined `--v2-track`) and kept as a compact strip
+    under the header instead.
+  - **Not built: the "Altitude" stat cell the frame shows.**
+    `useGpsTracking.js` has no altitude field — inventing a static value
+    would misrepresent live GPS data, so the stat grid keeps the three
+    real fields (Accuracy, Speed, Heading) with Heading spanning the
+    second row, rather than a fabricated fourth cell.
+  - Value strings (`accuracyText`/`speedText`/`headingText`) render as
+    the single already-formatted string the hook returns (handles edge
+    cases like "GPS unavailable"/"Warming up…") rather than split into a
+    big-number + small-unit pair like the frame — splitting would mean
+    parsing that string's format here, reaching into `.js`-owned
+    formatting logic, out of scope for a markup/CSS-only pass.
+  - Colors: the frame's `#630ed4` (LIVE badge) maps to `var(--v2-primary)`
+    per Section 3's established substitution, not the literal hex; the
+    frame's `rgba(204,195,216,*)` card borders reuse the same
+    near-duplicate-of-`--v2-border` plain-rgba treatment `NavHud` already
+    set; stat-value text (`#131b2e`) reuses `--v2-neutral`, same
+    tolerance already used for the Search Results pass. One genuinely new
+    token: `--v2-error-text` (`#ba1a1a`), the "End Session" button's
+    outlined-state text/icon color — distinct from `--v2-error`
+    (`#93000a`), not a tint step of it.
+  - `MobileSheet.jsx`'s `.panelLight` override (previously only applied
+    to the `layers`/Explore tab) now also applies to the `gps` tab, same
+    precedent — `GpsPanel` is real v2 light content now, not a
+    placeholder that needs the sheet's v1 dark background showing
+    through. Desktop's `Sidebar.jsx` needed no wrapper change: `GpsPanel`
+    owns its own light card (`--v2-surface`, rounded), same "self-
+    contained card floating in the still-dark rail panel" pattern
+    `ExplorePanel` already uses there.
+  - Icons: stat-cell icons (`Crosshair`/`Gauge`/`Compass`) and the
+    start/stop button icons (`LocateFixed`/`CircleStop`) are new
+    `lucide-react` additions — markup only, matching Section 5's icon
+    contract and this row's existing icon language (`LocateFixed`
+    already used by `MobFabCluster`'s locate button).
+  - **Follow-up (this session), Figma node 64:2:** the bar section was
+    restyled into a full "Visualization Card" (soft violet card, taller
+    bars, decorative blurred orb, big number + caption underneath) per
+    this second frame. Per explicit instruction, the frame's own readout
+    — "8/12 Satellites in view" — was dropped (no satellite data exists
+    anywhere in this app) and replaced with a real one built from the
+    same `activeBars`/`tier` values already driving the bars:
+    `{activeBars}/5` + a tier-derived caption ("Strong/Fair/Weak
+    signal"). Bar count stayed at 5 (real `activeBars` granularity)
+    rather than the frame's 15 decorative bars, so as not to fake
+    precision the app doesn't have. Card shadow reuses `NavHud`'s
+    `.topCard` spec verbatim for continuity across this row; card
+    background is an exact match for the already-defined
+    `--v2-hud-upnext-bg`, no new token needed.
+  - Motion: the "End Session" (tracking) button gets a slow breathing
+    pulse (`--v2-duration-breathe`/`--v2-ease-standard`, wrapped in
+    `@media (prefers-reduced-motion: reduce)`) rather than the old sharp
+    1.5s `btnPulse` — matches Section 6's "calm, not urgent" guidance;
+    the idle/primary button gets the standard press-scale feedback.
+
+---
+
 - Search results — mobile overlay + shared dropdown list (this session,
   Figma node 4:249, "Search Results Redesign"): completes both
   previously-pending Search rows in one pass, since `MobileSearchOverlay`
@@ -745,6 +826,275 @@ migration-slice convention), with this table updated.
     tints on rows/back/clear buttons — `visibility`/`pointer-events` on
     the closed state keep it exactly as unreachable as `display: none`
     was, no behavior change.
+- **Every nav entry point now routes to `NavDestPanel`, not `NavPanel`**
+  (reported directly: "all navigation buttons should lead to the newly
+  built one, not the old card... one navigation logo at the search bar
+  and one on the navbar so both should have the new one") — real
+  functionality change (what a tap does), flagged per Rule 7, made on
+  direct explicit instruction, not guessed. Root cause: `NavPanel.jsx`
+  (a plain "START NAVIGATION" card + hint text, still v1 dark tokens) was
+  never actually the same thing as `NavDestPanel.jsx` (the redesigned
+  "Where to?" panel, Figma node 1:311, flagged above) — it was a separate,
+  older pre-launch screen that sat *in front of* it. Every nav trigger
+  used to open `NavPanel` first and require a second tap on its own
+  button to reach `NavigationController` (whose `destPanelOpen` already
+  defaults to `true` — i.e. `NavDestPanel` was always one extra,
+  redundant tap away). Fixed at all four entry points to call
+  `onNavLaunch` (`MapPage.jsx`'s `handleNavLaunch`) directly instead:
+  - **Mobile navbar's "Nav" tab** (`MobileSheet.jsx`): `handleTabClick`
+    special-cases `tab.key === 'navigate'` now — collapses the sheet and
+    calls `onNavLaunch` directly, the same way the `isAction` tabs
+    (Suggest/Profile) already hand off to a callback instead of opening
+    a panel body.
+  - **Mobile search bar's nav icon** (`MapPage.jsx`): its `onNavigate`
+    prop was `handleMobNavTrigger`, a function whose *entire job* was
+    opening the sheet to the 'navigate' tab (i.e., to `NavPanel`) — now
+    points at `handleNavLaunch` directly instead; `handleMobNavTrigger`
+    itself deleted, no longer serves any purpose.
+  - **Desktop rail's "Nav" item** (`Sidebar.jsx`): identical bug, same
+    fix — `handleRailClick` special-cases `item.key === 'navigate'` to
+    collapse the rail and call `onNavLaunch` directly rather than opening
+    its own panel body.
+  - **Desktop search bar's nav button** (`DesktopSearchBar.jsx`): already
+    correct before this session (`onNavigateClick={handleNavLaunch}`
+    directly) — untouched, included here only to confirm all four were
+    checked, not just the two the report named.
+
+  `NavPanel.jsx`/`.module.css` are consequently **dead code** — no
+  import anywhere renders them anymore (confirmed by grepping the whole
+  `src` tree post-fix). Left in place rather than deleted: removing a
+  whole component file is a bigger call than this session's brief, and
+  someone may want to know how the old pre-launch flow worked. Flagging
+  here rather than deleting silently — worth an explicit decision (and a
+  follow-up pass to delete + drop `NavPanel.jsx`'s import list) once
+  confirmed nothing else needs it. `Sidebar.module.css`'s
+  `.panelHeaderGeneric`/`.panelTitleGeneric` are now similarly unused
+  (only consumer was the deleted `Sidebar.jsx` navigate-panel block) —
+  left in place for the same reason.
+
+- **Three cross-app mobile bugs, reported directly, not scoped to one
+  screen** — real functionality changes, flagged per Rule 7, made on
+  direct explicit instruction, not guessed.
+  - **Page zooms when a keyboard opens (search bar, suggest-a-place,
+    etc.).** Root cause confirmed as suspected: mobile Safari/Chrome
+    auto-zoom the whole page on focusing any `input`/`textarea`/`select`
+    whose computed font-size is under 16px. Rather than hunt down and
+    patch every input's own component CSS individually (17 files have
+    at least one), added one global rule (`src/index.css`) that floors
+    `input, textarea, select` to `16px !important` under
+    `max-width: 768px` (this codebase's own mobile breakpoint) — desktop
+    untouched, since this browser behavior is mobile-only.
+  - **"Elements clash — I can open three things at once and they won't
+    give room for each other."** `MapPage.jsx` owned roughly ten
+    independent open/closed booleans (`selected`, `selectedSegmentId`,
+    `activeChip`, `mobileSearchOpen`, `sheetState`, `suggestModalOpen`,
+    `mySubmissionsOpen`, `reviewTarget`, `adminPanelOpen`,
+    `authModalOpen`) and none of them closed any of the others — each
+    was only ever opened or closed on its own, so any combination could
+    end up stacked on screen simultaneously. Added one
+    `closeOtherOverlays(keep)` helper that closes every surface except
+    the one about to open, called at every place that actually opens one
+    (`handleSelectPlace`, `handleViewSegment`, `handleChipClick`,
+    `handleSheetStateChange`, the search bar's open/toggle handlers,
+    `openAuthModal`, `handleSuggestPlaceClick`, the admin-panel-open
+    success callback, `onArrival`'s auto-opened review modal, and
+    "view my submissions"). `handleSheetStateChange` wraps
+    `onSheetStateChange` specifically so every way of opening the mobile
+    sheet (tab taps inside `MobileSheet.jsx`, the search bar's toggle
+    button) is covered by wrapping that one prop, rather than editing
+    each call site inside that file individually. This is the same
+    principle as this session's earlier `navActive`-triggered overlay
+    close (still in place, untouched) — generalized from "clear
+    everything when nav starts" to "clear everything whenever anything
+    else opens."
+  - **Pinching to zoom the map sometimes zooms/moves the whole page
+    instead, requiring a refresh.** `index.html`'s `<meta
+    name="viewport">` only ever set `initial-scale=1`, with no
+    `maximum-scale`/`user-scalable` — nothing stopped the browser's own
+    page-level pinch-zoom from competing with Leaflet's own zoom
+    handling on `.map` (which already sets `touch-action: none`,
+    `MapShell.module.css`, specifically so the browser hands raw touch
+    events to Leaflet instead of handling them itself — which only
+    works if the page beneath it isn't *also* zoomable). Rather than
+    change the global, SEO-facing `index.html` meta tag (which would
+    also lock pinch-zoom on the landing page — an accessibility
+    regression, WCAG 1.4.4, for a normal scrollable content page that
+    has no reason to disable it), `HomeRoute.jsx` now swaps the meta
+    tag's `content` to add `maximum-scale=1, user-scalable=no,
+    viewport-fit=cover` only while the `/map` route is mounted, restoring
+    the original on unmount — same scoping pattern as the
+    `map-viewport` body class right below it in that same file, added
+    in an earlier slice for the identical "only this route needs this"
+    reason. Not airtight on every browser (recent Safari/Chrome versions
+    deliberately ignore `user-scalable=no` for that same accessibility
+    reason) but removes the page-level zoom as a competing gesture
+    handler on the browsers that do respect it — the actual mechanism
+    behind the "interface moves/gets stuck" symptom.
+
+- **Review modal / rating screen (this session):** redesigned
+  `ReviewModal.jsx`/`.module.css` against Figma node 59:2 ("Rating
+  Screen"), pulled via the Figma MCP connection. Same props (`dest`,
+  `onClose`, `onSubmitted`, `user`), same state variables, same
+  `handleSubmit`/`submitReview` call, same reset-on-`dest`-change
+  effect — no functionality changes. `MapPage.jsx`'s
+  `<ReviewModal dest={reviewTarget} onClose={...} onSubmitted={...}
+  user={auth.user} />` call site untouched and confirmed compatible.
+  - **Structural decision, flagged:** the frame is a bottom sheet
+    (rounded top corners only, anchored to the viewport bottom,
+    grabber handle, `max-width: 672px` staying bottom-anchored even at
+    that width) — not the shared `Modal` component's centered card
+    that `Modal.module.css` established on the Waypoint suggestion
+    session. Adding a variant prop to `Modal.jsx` to support this
+    would be a shared-component change touching
+    `AuthModal`/`SaveModal`/`DetailModal`/`AdminEditModal` (all still
+    "Not started") — out of scope per Rule 1. Instead, `ReviewModal`
+    now builds its own overlay/sheet markup and no longer imports
+    `Modal`/`Modal.module.css` at all. Externally-visible behavior is
+    unchanged from before: X-button close, backdrop-click-to-close
+    (this modal already had `closeOnBackdrop` on — same behavior, just
+    now implemented locally instead of via that prop), same
+    Skip/Submit Review footer buttons and disabled states. No other
+    modal is affected by this change.
+  - **Grabber handle omitted, not just left decorative:** the frame
+    shows one, but a static handle with no drag-to-dismiss behind it
+    reads as a broken affordance — and wiring up real swipe-to-dismiss
+    would be new interaction behavior, out of scope per Rule 1/7. Left
+    off entirely (confirmed by direct instruction this session, after
+    initially shipping it decorative); top of the sheet is plain.
+    Flag if a future session is asked to add the real gesture as an
+    explicit, separate instruction.
+  - One literal override, same precedent as the Destination Arrived
+    and Waypoint suggestion sessions: the frame's destination-name
+    accent and "Submit Review" button are a flat `#630ed4` — used the
+    authoritative `--v2-primary` (`#7c3aed`) instead.
+  - Star color: kept the app's existing literal `#ffc857` for a
+    *filled* star (same precedent this file already documented
+    pre-redesign, matching `PlaceCard.module.css`'s `.ratingFilled`) —
+    no Figma reference showed a different filled-star color. The
+    frame's *unfilled* stars are a pale lavender-gray with no exact
+    hex confirmable from the exported node (vector fill wasn't
+    inspectable via the MCP connection) — used the closest existing
+    token, `--v2-muted`, rather than inventing a new one. Flag if an
+    exact literal surfaces later.
+  - Motion: overlay fade + sheet slide-up-in on open
+    (`var(--v2-duration-standard)`/`var(--v2-ease-standard)`), guarded
+    by `prefers-reduced-motion: reduce`; Submit button gets the
+    standard hover lift + `:active` scale-down, no idle motion, same
+    as every other v2 primary button in this guide.
+
+- **Destination Arrived banner (this session):** redesigned
+  `NavArrivedBanner.jsx`/`.module.css` against Figma node 67:130
+  ("Destination Arrived"), pulled via the Figma MCP connection. Same
+  props (`destName`, `onDismiss`) and the same 8s auto-dismiss
+  `useEffect`/`setTimeout` — no functionality changes.
+  - Reused the shared v2 Modal contract (`.overlay`'s `var(--v2-scrim)`
+    backdrop + blur, `.banner`'s `var(--v2-surface)`/`var(--v2-track)`
+    card, both animation curves) that `Modal.module.css` set on the
+    Waypoint suggestion session, even though this component doesn't
+    render through `Modal.jsx` — it never has (standalone fixed
+    banner, not a dismiss-on-backdrop-click modal), and adding that
+    wiring now would be a functionality change per Rule 1/7, so kept
+    as its own component with matching v2 visual language instead.
+  - **Content decision, flagged:** the Figma frame's subtitle is the
+    literal static string "Destination Reached" with no destination
+    name shown. Rule 3 ("same data in, same data out") means
+    `destName` still needed to render somewhere real — kept it in the
+    subtitle's position, just restyled to the frame's subtitle
+    typography (`var(--font-ui)`, 16px, `var(--v2-text-variant)`)
+    instead of adopting the frame's literal copy.
+  - **New content, per explicit instruction:** added a "Support FUTA
+    Maps" link (heart icon, `lucide-react`) above the Done button,
+    pointing at the same Crowdr campaign URL the landing page's donate
+    CTA already uses (`CrowdrCampaignCard.jsx`/`Footer.jsx`) — kept as
+    a local `CROWDR_CAMPAIGN_URL` const in this file rather than
+    importing from `src/pages/landing/`, since Rule 5 keeps this
+    in-app surface decoupled from that (separately redesigned)
+    directory. Plain `<a target="_blank" rel="noopener noreferrer">`,
+    doesn't touch `onDismiss` or any existing handler.
+  - **One literal override:** the frame's "DONE" button and the
+    support link are both a flat `#630ed4` — per `tokens-v2.css`'s own
+    note (and the same call the Waypoint suggestion session made on
+    its "Submit for Review" button), that's the superseded
+    pre-style-guide violet, not the authoritative `--v2-primary`
+    (`#7c3aed`). Used the token.
+  - Icon ring background reuses the existing `--v2-primary-outline`
+    token (`rgba(124,58,237,0.2)`) — an exact match for the frame's
+    literal, no new token needed.
+  - Motion: overlay/banner reuse the Modal shell's fade+scale-in
+    (`var(--v2-duration-standard)`/`var(--v2-ease-standard)`, guarded
+    by `prefers-reduced-motion: reduce`); added a slow breathing pulse
+    (`var(--v2-duration-breathe)`) on the icon ring per Section 6's
+    loading-indicator guidance — this card doesn't have a spinner, but
+    the confetti icon is the equivalent "something is actively
+    happening" moment, guarded by
+    `prefers-reduced-motion: no-preference`; Done button gets the
+    standard hover lift + `:active` scale-down (0.97), no idle motion.
+  - Kept the existing `PartyPopper` icon (already used pre-redesign)
+    for the "Confetti / Flair" icon slot rather than sourcing a new
+    icon for the frame's custom cursor-sparkle artwork — same
+    `lucide-react`-stays-as-is precedent as every other icon swap in
+    this guide, and conceptually the closest match already in the
+    library.
+
+- **Waypoint suggestion (this session):** redesigned `SuggestWaypointModal`,
+  `MyWaypointSubmissionsPanel`, and `SubmissionToast` against Figma node
+  1:253 ("Suggest a Place"), pulled via the Figma MCP connection. No
+  functionality changes — same props, state, handlers, and data flow on
+  all three components; the file-input element for photos is unchanged
+  (just relabeled/hidden behind a styled `<label>`, same `onChange`).
+  - **This is the first modal screen redesigned**, so per Section 5's
+    "Modal — not yet defined, TBD by first modal screen," this session
+    also redesigned the **shared** `src/components/ui/Modal.jsx`'s
+    `Modal.module.css` (overlay/header/title/close/body/footer/`.btn*`
+    variants) to v2 — same "first session sets the contract" precedent
+    the Loading Screen established for the palette. `Modal.jsx` itself
+    (the JSX/props) is untouched, only its CSS module.
+  - **Real consequence, flagged explicitly:** `Modal.module.css` is also
+    imported by `AuthModal`, `ReviewModal`, `SaveModal` (kml),
+    `DetailModal` (segments), and `AdminEditModal` — all still "Not
+    started" in this table. Their overlay/header/footer chrome will now
+    render in the v2 light theme immediately, while their own body
+    content (each screen's own `.module.css`) is still v1 dark-styled,
+    until each of those screens gets its own session. This mismatch is
+    expected and temporary, not a bug — same tradeoff as any shared
+    token/component the guide's "first session sets it" pattern
+    produces, just more visually obvious here than a color token would
+    be. Whoever runs Auth modal / Review modal / Admin panel next should
+    expect the shell to already look right and only need to redo the
+    body.
+  - Added one new button variant, `.btnOutlined` (white fill, thin
+    `var(--v2-track)` border, `var(--v2-neutral)` text) rather than
+    repurposing `.btnSecondary` — the frame's "Cancel" button matches
+    Section 5's "Outlined" contract description, not "Secondary"'s
+    lavender-tint fill. Left `.btnSecondary`/`.btnDanger` on v1 styling
+    since no Figma reference has shown those variants yet (Rule 7: don't
+    guess a fill color nothing in this screen needed).
+  - `SuggestWaypointModal` switched to passing its Cancel/Submit buttons
+    through `Modal`'s existing (already-supported, previously unused by
+    this component) `footer` prop instead of rendering them inline in
+    the body — matches the grid footer the Figma frame shows (1fr/2fr
+    split) and is a purely structural JSX change, no new props on
+    `Modal` itself.
+  - `MyWaypointSubmissionsPanel.jsx` needed **no JSX changes at all** —
+    same class names throughout, only its CSS module moved to v2 tokens.
+  - No Figma frame was supplied for `MyWaypointSubmissionsPanel` or
+    `SubmissionToast` specifically (only "Suggest a Place," node 1:253)
+    — both restyled to the v2 tokens/contracts that frame set (borders,
+    type, badge shapes already established elsewhere in the app) rather
+    than left on v1 dark styling, which would have looked broken inside
+    the now-light modal shell. Flag if a real reference for either
+    surfaces later.
+  - One deliberate override of the frame's literal pixel value: the
+    "Submit for Review" button in the Figma export is a flat `#630ed4`
+    fill — per `tokens-v2.css`'s own existing note, that's the
+    superseded pre-style-guide violet, not the authoritative
+    `--v2-primary` (`#7c3aed`). Used the token, not the frame's literal
+    hex.
+  - Motion added: modal fade+scale-in/out (Section 6's modal guidance,
+    this shell had none before), coordinates-confirmed banner fades in
+    on appearance, and the submission toast now fades+slides up instead
+    of an instant appear — all wrapped in
+    `prefers-reduced-motion: reduce` guards.
 
 ## 8. Open decisions (fill in as they're made)
 

@@ -1,19 +1,45 @@
+/*
+ * v2 (this session): no direct Figma frame for the toast itself — restyled
+ * to the v2 light surface/tokens so it doesn't look like stray v1 dark UI
+ * floating over the now-light Suggest flow. Success-toned border/icon
+ * (v2-secondary) since this only ever confirms a successful submission.
+ * Motion: fade + slide up on appear, per Section 6's toast-adjacent
+ * "panels slide" guidance — it didn't have motion before (instant show).
+ */
+
 .toast {
   position: fixed;
   left: 50%;
   bottom: 28px;
   transform: translateX(-50%);
   z-index: 2500;
-  background: #0e1628;
-  border: 1px solid rgba(68, 226, 205, 0.3);
-  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-track);
+  color: var(--v2-neutral);
   font-family: var(--font-ui);
   font-size: 13px;
   padding: 12px 18px;
-  border-radius: var(--r-lg, 10px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  border-radius: var(--r-lg);
+  box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.12);
   max-width: 90vw;
   text-align: center;
+  animation: toastIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.toast svg {
+  flex-shrink: 0;
+  color: var(--v2-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 @media (max-width: 768px) {

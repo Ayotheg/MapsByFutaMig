@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Compass, Rss, Navigation, CirclePlus, CircleUser } from 'lucide-react';
 import styles from './MobileSheet.module.css';
-import NavPanel from '../navigation/NavPanel';
 import ExplorePanel from '../explore/ExplorePanel';
 import { track } from '../../lib/analytics';
 
@@ -137,6 +136,24 @@ export default function MobileSheet({
 
   const handleTabClick = useCallback(
     (tab) => {
+      // Bug fix (reported directly): both the navbar's "Nav" tab and the
+      // search bar's nav icon (`MapPage.jsx`'s `onNavigate` prop, fixed
+      // the same way) used to open this sheet to the 'navigate' tab,
+      // whose body was `NavPanel` — a plain "START NAVIGATION" card that
+      // then required a *second* tap on its own button to actually call
+      // `onNavLaunch` and mount `NavigationController` (whose
+      // `destPanelOpen` already defaults to true, i.e. `NavDestPanel`,
+      // the redesigned destination picker, was always one extra tap
+      // away). Both entry points now call `onNavLaunch` directly instead,
+      // matching how Sidebar's/DesktopSearchBar's equivalent nav buttons
+      // already behaved on desktop. `NavPanel` is no longer reachable
+      // from either — see this session's flag in UI_REDESIGN_GUIDE.md.
+      if (tab.key === 'navigate') {
+        setActiveTab(null);
+        setSheetState('peek');
+        onNavLaunch?.();
+        return;
+      }
       if (tab.isAction) {
         // Legacy: an action tab is caught by *two* listeners — the generic
         // `.mob-tab` loop (which strips `active` off every tab first, then
@@ -166,7 +183,7 @@ export default function MobileSheet({
       setSheetState('half');
       track('feature_panel_open', { panel: tab.key });
     },
-    [activeTab, sheetState, setSheetState, setActiveTab, onSuggestPlaceClick, onAuthClick]
+    [activeTab, sheetState, setSheetState, setActiveTab, onSuggestPlaceClick, onAuthClick, onNavLaunch]
   );
 
   const panelOpen = sheetState !== 'peek';
@@ -180,7 +197,7 @@ export default function MobileSheet({
       <div
         className={`${styles.panel} ${
           !panelOpen ? styles.panelClosed : sheetState === 'full' ? styles.panelFull : styles.panelHalf
-        } ${activeTab === 'layers' ? styles.panelLight : ''}`}
+        } ${activeTab === 'layers' || activeTab === 'gps' ? styles.panelLight : ''}`}
         aria-hidden={!panelOpen}
       >
         <div className={styles.body}>
@@ -210,7 +227,6 @@ export default function MobileSheet({
               <GpsPanel gps={gps} embedded />
             </Suspense>
           )}
-          {activeTab === 'navigate' && <NavPanel navActive={navActive} onLaunch={onNavLaunch} />}
         </div>
       </div>
       {/* UI redesign (per UI_REDESIGN_GUIDE.md, Nav/GPS HUD session, Figma

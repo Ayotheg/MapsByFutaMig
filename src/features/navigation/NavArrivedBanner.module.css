@@ -1,55 +1,181 @@
-.banner {
+/*
+ * v2 (this session): redesigned against Figma node 67:130
+ * ("Destination Arrived"), pulled via the Figma MCP connection.
+ *
+ * Reuses the shared v2 Modal contract for the overlay/scrim/pop-in
+ * animation (Section 5 of UI_REDESIGN_GUIDE.md, first set by
+ * `Modal.module.css` — same var(--v2-scrim) backdrop, same
+ * var(--v2-duration-standard)/var(--v2-ease-standard) timing) even
+ * though this component isn't rendered through `Modal.jsx` (see the
+ * .jsx file's comment for why). `.banner`'s surface/border/radius also
+ * match that same shell contract (var(--v2-surface) + var(--v2-track)
+ * border, var(--r-xl) radius) rather than the frame's literal flat
+ * white fill, for consistency with every other v2 modal-style card in
+ * the app — the two are a hair apart and indistinguishable in the
+ * screenshot.
+ *
+ * One deliberate override of a frame literal: the "DONE" button and
+ * "Support FUTA Maps" link are both a flat #630ed4 in the Figma export.
+ * Per tokens-v2.css's own note (and the same call made on the Waypoint
+ * suggestion screen's "Submit for Review" button), that's the
+ * superseded pre-style-guide violet, not the authoritative
+ * var(--v2-primary) (#7c3aed) — used the token instead.
+ *
+ * Icon ring background: the frame's rgba(124,58,237,0.2) is an exact
+ * match for the existing var(--v2-primary-outline) token — reused
+ * rather than adding a near-duplicate.
+ */
+
+.overlay {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
   z-index: 3000;
-  background: #080f1f;
-  border: 2px solid var(--primary-container);
+  background: var(--v2-scrim);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: arrivedOverlayFadeIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+.banner {
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-track);
   border-radius: var(--r-xl);
-  padding: 28px 36px;
+  width: 100%;
+  max-width: 340px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.85), 0 0 0 1px var(--primary-glow);
-  animation: arrivedPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0px 20px 40px -10px rgba(99, 14, 212, 0.15);
+  animation: arrivedPopIn var(--v2-duration-standard) var(--v2-ease-standard);
 }
-@keyframes arrivedPop {
-  from {
-    transform: translate(-50%, -50%) scale(0.6);
-    opacity: 0;
-  }
-  to {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 1;
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .banner {
+    animation: none;
   }
 }
-.banner h2 {
+
+@keyframes arrivedOverlayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes arrivedPopIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.iconRing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-outline);
+  color: var(--v2-primary);
+  margin-bottom: 24px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .iconRing {
+    animation: arrivedIconBreathe var(--v2-duration-breathe) var(--v2-ease-standard) infinite;
+  }
+}
+
+@keyframes arrivedIconBreathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 40px;
+  letter-spacing: -0.64px;
+  color: var(--v2-neutral);
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--v2-text-variant);
+  margin: 0 0 32px;
+  word-break: break-word;
+}
+
+.supportRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+.divider {
+  width: 138px;
+  height: 1px;
+  background: var(--v2-border);
+  opacity: 0.4;
+  margin-bottom: 16px;
+}
+
+.supportLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.3px;
+  color: var(--v2-primary);
+  text-decoration: none;
+  transition: opacity var(--v2-duration-quick) var(--v2-ease-standard);
+}
+
+.supportLink:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+}
+
+.doneBtn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-family: 'Geist', var(--font-ui);
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--primary);
-  margin: 0 0 6px;
-  letter-spacing: -0.02em;
-}
-.banner p {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  margin: 0 0 18px;
-}
-.banner button {
-  background: var(--primary-container);
-  color: var(--on-primary);
+  width: 100%;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
   border: none;
-  border-radius: var(--r-md);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  padding: 11px 22px;
+  border-radius: var(--r-full);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 24px;
+  padding: 16px 24px;
   cursor: pointer;
-  text-transform: uppercase;
+  box-shadow: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.1);
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
+}
+
+.doneBtn:hover {
+  box-shadow: 0 6px 18px var(--v2-primary-glow-strong);
+  transform: translateY(-1px);
+}
+
+.doneBtn:active {
+  transform: scale(0.97);
 }

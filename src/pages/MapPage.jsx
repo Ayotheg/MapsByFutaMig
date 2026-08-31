@@ -251,6 +251,7 @@ export default function MapPage({ onReadinessChange }) {
   // Legacy's `openModal(tab)` (app.js ~7185–7189): always lands on the
   // profile tab if already signed in, regardless of the tab requested.
   function openAuthModal(tab, message = null) {
+    closeOtherOverlays('auth');
     setAuthModalTab(auth.user ? 'profile' : (tab || 'login'));
     setAuthModalMessage(message);
     setAuthModalOpen(true);
@@ -324,6 +325,7 @@ export default function MapPage({ onReadinessChange }) {
 
   function handleAdminClick() {
     adminPin.requestAdminAccess(() => {
+      closeOtherOverlays('admin');
       setAdminPanelOpen(true);
       presence.updatePresence('in admin panel');
     });
@@ -349,6 +351,66 @@ export default function MapPage({ onReadinessChange }) {
     [map]
   );
 
+  // Bug fix (reported directly): "I can open three different things at
+  // once and they won't give room for each other, the whole screen now
+  // looks clustered." Every surface below (`selected`'s `PlaceCard`,
+  // `selectedSegmentId`'s `DetailModal`, `activeChip`'s
+  // `ChipResultsPanel`, `mobileSearchOpen`'s full-screen overlay,
+  // `sheetState`'s mobile sheet, and the suggest/submissions/auth/admin/
+  // review modals) used to be able to be open at the same time as any
+  // other, since each was only ever opened or closed on its own. This
+  // enforces the opposite: opening any one of them closes every other
+  // one first, so at most one thing is ever stacked on top of the map —
+  // matches this session's earlier `navActive` version of the same idea
+  // (see the effect right below), just generalized to every open/close
+  // path instead of only the nav-start moment. `keep` is whichever
+  // surface is about to open, so its own state isn't clobbered by the
+  // call that's opening it.
+  const closeOtherOverlays = useCallback((keep) => {
+    if (keep !== 'selected') setSelected(null);
+    if (keep !== 'segment') setSelectedSegmentId(null);
+    if (keep !== 'chip') setActiveChip(null);
+    if (keep !== 'search') setMobileSearchOpen(false);
+    if (keep !== 'sheet') setSheetState('peek');
+    if (keep !== 'suggest') setSuggestModalOpen(false);
+    if (keep !== 'submissions') setMySubmissionsOpen(false);
+    if (keep !== 'review') setReviewTarget(null);
+    if (keep !== 'admin') setAdminPanelOpen(false);
+    if (keep !== 'auth') setAuthModalOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Same principle as `closeOtherOverlays` above, applied to the mobile
+  // sheet specifically: every path that opens it (tab taps inside
+  // `MobileSheet.jsx`, the search bar's "toggle sheet" button) goes
+  // through `onSheetStateChange`, so wrapping that one prop covers all of
+  // them at once rather than editing each call site inside that file.
+  // Collapsing the sheet (`next === 'peek'`) doesn't need to close
+  // anything else — only opening it does.
+  const handleSheetStateChange = useCallback(
+    (next) => {
+      if (next !== 'peek') closeOtherOverlays('sheet');
+      setSheetState(next);
+    },
+    [closeOtherOverlays]
+  );
+
+  const handleSelectPlace = useCallback(
+    (wp) => {
+      closeOtherOverlays('selected');
+      setSelected(wp);
+    },
+    [closeOtherOverlays]
+  );
+
+  const handleViewSegment = useCallback(
+    (id) => {
+      closeOtherOverlays('segment');
+      setSelectedSegmentId(id);
+    },
+    [closeOtherOverlays]
+  );
+
   function handleSuggestPlaceClick() {
     // A sign-in prompt instead of letting the form open and fail at the
     // RLS layer.
@@ -356,6 +418,7 @@ export default function MapPage({ onReadinessChange }) {
       openAuthModal('login', 'Sign in to suggest a place on the map.');
       return;
     }
+    closeOtherOverlays('suggest');
     setSuggestModalOpen(true);
   }
 
@@ -393,11 +456,6 @@ export default function MapPage({ onReadinessChange }) {
     presence.updatePresence(`navigating to ${entry?.name || 'a destination'}`);
   }
 
-  function handleMobNavTrigger() {
-    setSheetActiveTab('navigate');
-    setSheetState((s) => (s === 'peek' ? 'half' : s));
-  }
-
   // Legacy: `map.on('click', function() { if (_activeChip) closeResultsPanel(); })`
   // (app.js ~6857–6859) — a map click also dismisses the place card
   // (handled by the effect just below); both listen independently, same
@@ -420,10 +478,13 @@ export default function MapPage({ onReadinessChange }) {
   }, [map]);
 
   function handleChipClick(chip) {
-    setActiveChip((prev) => {
-      const same = prev && (chip.id ? prev.id === chip.id : prev.label === chip.label);
-      return same ? null : chip;
-    });
+    const same = activeChip && (chip.id ? activeChip.id === chip.id : activeChip.label === chip.label);
+    if (same) {
+      setActiveChip(null);
+      return;
+    }
+    closeOtherOverlays('chip');
+    setActiveChip(chip);
   }
 
   return (
@@ -434,24 +495,24 @@ export default function MapPage({ onReadinessChange }) {
           map={map}
           waypoints={waypoints}
           isTypeVisible={typeVisibilityProps.isVisible}
-          onSelect={setSelected}
+          onSelect={handleSelectPlace}
           snaps={osmSnaps}
           badgeMerges={osmBadgeMerges}
         />
       )}
       {map && (
-        <SegmentsLayer map={map} segments={segments} onViewDetails={setSelectedSegmentId} />
+        <SegmentsLayer map={map} segments={segments} onViewDetails={handleViewSegment} />
       )}
       {map && (
         <StaticKmlLayer
           map={map}
-          onSelect={setSelected}
+          onSelect={handleSelectPlace}
           onAnnotationsChange={setKmlAnnotations}
           dedupSnaps={osmSnaps}
           dedupBadges={osmBadgeMerges}
         />
       )}
-      {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={setSelected} />}
+      {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleSelectPlace} />}
       {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
       <PlaceCard
         data={selected}
@@ -470,7 +531,7 @@ export default function MapPage({ onReadinessChange }) {
           map={map}
           typeVisibilityProps={typeVisibilityProps}
           sheetState={sheetState}
-          onSheetStateChange={setSheetState}
+          onSheetStateChange={handleSheetStateChange}
           activeTab={sheetActiveTab}
           onActiveTabChange={setSheetActiveTab}
           gps={gps}
@@ -482,7 +543,7 @@ export default function MapPage({ onReadinessChange }) {
           onAuthClick={() => openAuthModal('login')}
           explorePicks={explorePicksState.picks}
           explorePicksLoading={waypointsLoading}
-          onExploreSelect={setSelected}
+          onExploreSelect={handleSelectPlace}
         />
       ) : (
         <Sidebar
@@ -500,7 +561,7 @@ export default function MapPage({ onReadinessChange }) {
           guestNavRemaining={auth.user ? null : guestUsage.remaining}
           explorePicks={explorePicksState.picks}
           explorePicksLoading={waypointsLoading}
-          onExploreSelect={setSelected}
+          onExploreSelect={handleSelectPlace}
         />
       )}
 
@@ -509,19 +570,19 @@ export default function MapPage({ onReadinessChange }) {
         <>
           <MobileSearchBar
             onOpenSearch={() => {
+              closeOtherOverlays('search');
               setMobileSearchOpen(true);
-              setSheetState('peek');
               presence.updatePresence('searching');
             }}
-            onToggleSheet={() => setSheetState((s) => (s === 'peek' ? 'half' : 'peek'))}
-            onNavigate={handleMobNavTrigger}
+            onToggleSheet={() => handleSheetStateChange(sheetState === 'peek' ? 'half' : 'peek')}
+            onNavigate={handleNavLaunch}
             activeChipLabel={activeChip?.label}
           />
           <MobileSearchOverlay
             open={mobileSearchOpen}
             map={map}
             searchIndex={searchIndex}
-            onSelect={setSelected}
+            onSelect={handleSelectPlace}
             onClose={() => setMobileSearchOpen(false)}
           />
         </>
@@ -529,7 +590,7 @@ export default function MapPage({ onReadinessChange }) {
         <DesktopSearchBar
           map={map}
           searchIndex={searchIndex}
-          onSelect={setSelected}
+          onSelect={handleSelectPlace}
           collapsed={collapsed}
           onToggleCollapsed={setCollapsed}
           onManualType={() => setActiveChip(null)}
@@ -545,7 +606,7 @@ export default function MapPage({ onReadinessChange }) {
         waypointsLoaded={!waypointsLoading}
         searchIndex={searchIndex}
         map={map}
-        onSelect={setSelected}
+        onSelect={handleSelectPlace}
         onNavigate={handlePlaceCardNavigate}
         onClose={() => setActiveChip(null)}
         isMobile={isMobile}
@@ -579,6 +640,7 @@ export default function MapPage({ onReadinessChange }) {
             }}
             onActiveChange={setNavActive}
             onArrival={(dest) => {
+              closeOtherOverlays('review');
               setReviewTarget(dest);
               presence.updatePresence(`reviewing ${dest?.name || 'a place'}`);
             }}
@@ -633,7 +695,7 @@ export default function MapPage({ onReadinessChange }) {
             onClose={() => setAdminPanelOpen(false)}
             onWaypointsChanged={refetchWaypoints}
             onSegmentsChanged={refetchSegments}
-            onSelect={setSelected}
+            onSelect={handleSelectPlace}
             searchRegister={searchIndex.register}
           />
         </Suspense>
@@ -651,7 +713,7 @@ export default function MapPage({ onReadinessChange }) {
             onClose={() => setSuggestModalOpen(false)}
             onSubmitted={(message) => setSubmissionToast(message)}
             onViewSubmissions={() => {
-              setSuggestModalOpen(false);
+              closeOtherOverlays('submissions');
               setMySubmissionsOpen(true);
             }}
           />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LocateFixed, Target, ChevronRight } from 'lucide-react';
+import { LocateFixed, Map, ChevronRight, ChevronDown, MapPin, CheckCircle2, Camera } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
 import modalStyles from '../../components/ui/Modal.module.css';
 import styles from './SuggestWaypointModal.module.css';
@@ -157,48 +157,79 @@ export default function SuggestWaypointModal({
   }
 
   return (
-    <Modal title="Suggest a Place" onClose={onClose}>
+    <Modal
+      title="Suggest a Place"
+      onClose={onClose}
+      footer={
+        !duplicateMatch && (
+          <>
+            <button type="button" className={modalStyles.btn + ' ' + modalStyles.btnOutlined} onClick={onClose}>
+              Cancel
+            </button>
+            <button type="button" className={modalStyles.btn + ' ' + modalStyles.btnPrimary} onClick={handleSubmit} disabled={busy}>
+              {busy ? 'Submitting…' : 'Submit for Review'}
+            </button>
+          </>
+        )
+      }
+    >
       <div className={styles.fieldGroup}>
-        <label>Name *</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bench near Faculty of Engineering" />
-      </div>
-      <div className={styles.fieldGroup}>
-        <label>Description</label>
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What's here, and anything that'll help an admin verify it (optional)" />
-      </div>
-      <div className={styles.fieldGroup}>
-        <label>Type</label>
-        <select value={type} onChange={(e) => setType(e.target.value)}>
-          {WP_ALL_TYPES.map(([t, label]) => (
-            <option key={t} value={t}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <div className={styles.floatWrap}>
+          <label className={styles.floatLabel}>Place Name</label>
+          <input className={styles.placeNameInput} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. New Engineering Block" />
+        </div>
+        <div className={styles.floatWrap}>
+          <label className={styles.floatLabel}>Description (Optional)</label>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief details about this place…" />
+        </div>
       </div>
 
       <div className={styles.fieldGroup}>
-        <label>Location *</label>
+        <div className={styles.sectionHeading}>Type</div>
+        <div className={styles.selectWrap}>
+          <select value={type} onChange={(e) => setType(e.target.value)}>
+            {WP_ALL_TYPES.map(([t, label]) => (
+              <option key={t} value={t}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={16} className={styles.selectChevron} />
+        </div>
+      </div>
+
+      <div className={styles.fieldGroup}>
+        <div className={styles.sectionHeading}>
+          Location <MapPin size={14} />
+        </div>
         <div className={styles.locationRow}>
           <button type="button" className={styles.locBtn} onClick={handleUseGps}>
-            <LocateFixed size={14} />
-            Use my current GPS
+            <LocateFixed size={20} />
+            Use Current GPS
           </button>
           <button type="button" className={styles.locBtn} onClick={() => onRequestMapPick?.()}>
-            <Target size={14} />
-            Tap a spot on the map
+            <Map size={18} />
+            Pick on Map
           </button>
         </div>
         {lat !== '' && lng !== '' && (
-          <div className={styles.coordDisplay}>
-            {Number(lat).toFixed(5)}, {Number(lng).toFixed(5)}
+          <div className={styles.coordBanner}>
+            <CheckCircle2 size={18} />
+            Coordinates selected ({Number(lat).toFixed(5)}, {Number(lng).toFixed(5)})
           </div>
         )}
       </div>
 
       <div className={styles.fieldGroup}>
-        <label>Photos (optional, up to {MAX_IMAGES})</label>
-        <input type="file" accept="image/*" multiple onChange={handleFilesChange} />
+        <div className={styles.sectionHeading}>Photos</div>
+        <label className={styles.dropzone}>
+          <input type="file" accept="image/*" multiple onChange={handleFilesChange} className={styles.hiddenFileInput} />
+          <span className={styles.dropzoneIconBadge}>
+            <Camera size={20} />
+          </span>
+          <span className={styles.dropzoneTitle}>Tap to upload a photo</span>
+          <span className={styles.dropzoneHint}>JPG, PNG — up to {MAX_IMAGES} photos</span>
+        </label>
         {files.length > 0 && <div className={styles.fileCount}>{files.length} photo{files.length === 1 ? '' : 's'} selected</div>}
       </div>
 
@@ -206,7 +237,7 @@ export default function SuggestWaypointModal({
         <div className={styles.duplicateNudge}>
           <div>This might already be "{duplicateMatch.name}" — add your photo there instead, or continue as a new place?</div>
           <div className={styles.duplicateActions}>
-            <button type="button" className={modalStyles.btn + ' ' + modalStyles.btnSecondary} onClick={onClose}>
+            <button type="button" className={modalStyles.btn + ' ' + modalStyles.btnOutlined} onClick={onClose}>
               I'll add to the existing one
             </button>
             <button type="button" className={modalStyles.btn + ' ' + modalStyles.btnPrimary} onClick={handleSubmit}>
@@ -219,17 +250,6 @@ export default function SuggestWaypointModal({
       {status && (
         <div className={`${styles.saveStatus} ${status.error ? styles.saveStatusError : styles.saveStatusSuccess}`}>
           {status.text}
-        </div>
-      )}
-
-      {!duplicateMatch && (
-        <div className={styles.formActions}>
-          <button type="button" className={modalStyles.btn + ' ' + modalStyles.btnSecondary} onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className={modalStyles.btn + ' ' + modalStyles.btnPrimary} onClick={handleSubmit} disabled={busy}>
-            {busy ? 'Submitting…' : 'Submit for review'}
-          </button>
         </div>
       )}
 

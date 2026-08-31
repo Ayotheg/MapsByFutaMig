@@ -54,6 +54,35 @@ function HomeRoute() {
   const fontsReady = useFontsReady();
   const [booted, setBooted] = useState(false);
 
+  // Bug fix (reported directly): "only the map should be able to be
+  // zoomed in or out, sometimes when you try to zoom the map, the
+  // interface moves along... forcing you to refresh the page." Root
+  // cause: index.html's `<meta name="viewport">` only ever set
+  // `initial-scale=1`, with no `maximum-scale`/`user-scalable` — so nothing
+  // stopped the *browser's own page-level* pinch-zoom from firing instead
+  // of (or alongside) Leaflet's own zoom handling on `.map` (which already
+  // sets `touch-action: none`, MapShell.module.css, specifically so the
+  // browser hands raw touch events to Leaflet instead of doing anything
+  // with them itself — that only works if the page beneath it isn't also
+  // zoomable). Same scoping as the `map-viewport` body class right below:
+  // only while this route is mounted, restored after, since the landing
+  // page is normal scrollable content that should stay pinch-zoomable for
+  // accessibility (WCAG 1.4.4) — this app's map view is the one screen
+  // that specifically needs to behave like a native map, not a webpage.
+  // Not airtight on every browser — recent Safari/Chrome versions
+  // deliberately ignore `user-scalable=no` for the same accessibility
+  // reason — but this removes the page-level zoom as a *competing*
+  // gesture handler on the browsers that do respect it, which is what was
+  // producing the "interface moves/gets stuck" symptom.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="viewport"]');
+    const original = meta?.getAttribute('content') ?? null;
+    meta?.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+    return () => {
+      if (original !== null) meta?.setAttribute('content', original);
+    };
+  }, []);
+
   // Lock the viewport for the map's fixed-canvas layout, only while
   // this route is mounted — the landing page at "/" needs normal
   // document scroll instead. See the .map-viewport rule in index.css.
