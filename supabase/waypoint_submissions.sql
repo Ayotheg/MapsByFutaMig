@@ -90,19 +90,25 @@ alter table profiles
 -- Ensure every Supabase Auth user has a profile row even if the client never
 -- calls a separate profile-create API. This is the production-safe backend
 -- equivalent of the app's earlier "assume profiles exists" behavior.
-create or replace function handle_new_user() returns trigger as $$
+create or replace function public.handle_new_user() returns trigger
+  security definer
+  set search_path = public
+as $$
 begin
-  insert into profiles (id)
+  insert into public.profiles (id)
   values (new.id)
   on conflict (id) do nothing;
   return new;
+exception when others then
+  raise warning 'handle_new_user failed for user %: %', new.id, sqlerrm;
+  return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
-  for each row execute function handle_new_user();
+  for each row execute function public.handle_new_user();
 
 -- Manually set true for the known admin account(s) after running this file:
 --   update profiles set is_admin = true where id = '<admin-auth-uid>';

@@ -135,7 +135,7 @@ const ERROR_MESSAGES = {
   invalid_credentials: 'Email or password is incorrect.',
   user_already_exists: 'This email is already registered. Sign in instead.',
   weak_password: 'Password must be at least 6 characters.',
-  email_not_confirmed: 'Please confirm your email before signing in.',
+  email_not_confirmed: 'Please confirm your email before signing in (Check your email for the confirmation link).',
   over_email_send_rate_limit: 'Too many attempts. Try again later.',
   validation_failed: 'Please enter a valid email address.',
 };
