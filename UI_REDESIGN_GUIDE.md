@@ -229,9 +229,10 @@ later sessions should match these, not reinvent them:
 | Button — Outlined | Transparent/white fill, thin border, dark text — border color not yet tokenized, define when first built |
 | Search bar | Light rounded-pill container, muted placeholder + leading search icon, no heavy border |
 | Icon action cluster | Small filled circular buttons, one per accent color (primary/secondary/tertiary + a destructive variant) — pattern used for grouped quick-actions |
-| Modal | *(not yet defined — TBD by first modal screen)* |
+| Modal | Set this session (Waypoint suggestion, Figma node 1:253): `var(--v2-surface)` body, `var(--v2-track)` borders, `var(--font-display)` title, fade+scale-in per Section 6. See `Modal.module.css`. |
+| Button — Outlined | Set this session: white fill, `var(--v2-track)` border, `var(--v2-neutral)` text — confirmed against the "Cancel" button on node 1:253. New `.btnOutlined` class in `Modal.module.css`. |
 | Panel / card | *(not yet defined — TBD)* |
-| Input field | *(not yet defined — TBD)* |
+| Input field | Set this session: floating label overlapping a `var(--v2-track)`-bordered, `var(--v2-hud-upnext-bg)`-filled field — see `SuggestWaypointModal.module.css`'s `.floatWrap`. |
 | Icons | `lucide-react`, stays as-is — confirm consistent stroke width/size across redesigned screens |
 
 ---
@@ -301,7 +302,7 @@ JSX/logic change).
 | Nav/GPS HUD | `src/features/navigation/NavHud.*`, ~~`NavPanel.*`~~ (dead, see flag below), `NavDestPanel.*`, `GpsPanel.*`, `NavArrivedBanner.*`, `MobFabCluster.*` | Mobile | Inter (labels) + Bricolage Grotesque (headline/distance) — matches the rest of the v2 pass | Partially done, see flags below — `NavHud` fully redesigned to v2 against Figma node 4:429 (confirmed via the Figma MCP connection) + the mobile navbar's nav-active color state landed (in `MobileSheet.*`, not this row's own files); `NavDestPanel` redesigned to v2 against Figma node 1:311; `GpsPanel` redesigned to v2 against Figma node 31:52 this session, see flag below; every nav entry point (mobile search bar, mobile navbar, desktop rail, desktop search bar) now routes straight to `NavigationController`/`NavDestPanel` instead of `NavPanel`, which is now unreachable/dead — see flag below; `NavArrivedBanner`/`MobFabCluster` still on v1 dark tokens — no reference yet for those |
 | Auth modal | `src/features/auth/AuthModal.*` | Both | — | Not started |
 | Review modal | `src/features/reviews/ReviewModal.*` | Both | — | Not started |
-| Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | — | Not started |
+| Waypoint suggestion | `src/features/waypoint-submissions/SuggestWaypointModal.*`, `MyWaypointSubmissionsPanel.*`, `SubmissionToast.*` | Both | Bricolage Grotesque (title) + Inter (v2 tokens) | Done — this session also redesigned the shared `components/ui/Modal.*` shell (first modal screen, see flag) |
 | Map shell | `src/features/map/MapShell.jsx`, `.module.css` | Both | — | Not started |
 | Admin panel | `src/features/admin/AdminPanel.*`, `AdminEditModal.*`, tabs (`KmlTab`, `PendingTab`, `PointsTab`, `RoutesTab`, `QuickChipsTab`) | Desktop | — | Not started |
 
@@ -929,6 +930,66 @@ migration-slice convention), with this table updated.
     reason) but removes the page-level zoom as a competing gesture
     handler on the browsers that do respect it — the actual mechanism
     behind the "interface moves/gets stuck" symptom.
+
+- **Waypoint suggestion (this session):** redesigned `SuggestWaypointModal`,
+  `MyWaypointSubmissionsPanel`, and `SubmissionToast` against Figma node
+  1:253 ("Suggest a Place"), pulled via the Figma MCP connection. No
+  functionality changes — same props, state, handlers, and data flow on
+  all three components; the file-input element for photos is unchanged
+  (just relabeled/hidden behind a styled `<label>`, same `onChange`).
+  - **This is the first modal screen redesigned**, so per Section 5's
+    "Modal — not yet defined, TBD by first modal screen," this session
+    also redesigned the **shared** `src/components/ui/Modal.jsx`'s
+    `Modal.module.css` (overlay/header/title/close/body/footer/`.btn*`
+    variants) to v2 — same "first session sets the contract" precedent
+    the Loading Screen established for the palette. `Modal.jsx` itself
+    (the JSX/props) is untouched, only its CSS module.
+  - **Real consequence, flagged explicitly:** `Modal.module.css` is also
+    imported by `AuthModal`, `ReviewModal`, `SaveModal` (kml),
+    `DetailModal` (segments), and `AdminEditModal` — all still "Not
+    started" in this table. Their overlay/header/footer chrome will now
+    render in the v2 light theme immediately, while their own body
+    content (each screen's own `.module.css`) is still v1 dark-styled,
+    until each of those screens gets its own session. This mismatch is
+    expected and temporary, not a bug — same tradeoff as any shared
+    token/component the guide's "first session sets it" pattern
+    produces, just more visually obvious here than a color token would
+    be. Whoever runs Auth modal / Review modal / Admin panel next should
+    expect the shell to already look right and only need to redo the
+    body.
+  - Added one new button variant, `.btnOutlined` (white fill, thin
+    `var(--v2-track)` border, `var(--v2-neutral)` text) rather than
+    repurposing `.btnSecondary` — the frame's "Cancel" button matches
+    Section 5's "Outlined" contract description, not "Secondary"'s
+    lavender-tint fill. Left `.btnSecondary`/`.btnDanger` on v1 styling
+    since no Figma reference has shown those variants yet (Rule 7: don't
+    guess a fill color nothing in this screen needed).
+  - `SuggestWaypointModal` switched to passing its Cancel/Submit buttons
+    through `Modal`'s existing (already-supported, previously unused by
+    this component) `footer` prop instead of rendering them inline in
+    the body — matches the grid footer the Figma frame shows (1fr/2fr
+    split) and is a purely structural JSX change, no new props on
+    `Modal` itself.
+  - `MyWaypointSubmissionsPanel.jsx` needed **no JSX changes at all** —
+    same class names throughout, only its CSS module moved to v2 tokens.
+  - No Figma frame was supplied for `MyWaypointSubmissionsPanel` or
+    `SubmissionToast` specifically (only "Suggest a Place," node 1:253)
+    — both restyled to the v2 tokens/contracts that frame set (borders,
+    type, badge shapes already established elsewhere in the app) rather
+    than left on v1 dark styling, which would have looked broken inside
+    the now-light modal shell. Flag if a real reference for either
+    surfaces later.
+  - One deliberate override of the frame's literal pixel value: the
+    "Submit for Review" button in the Figma export is a flat `#630ed4`
+    fill — per `tokens-v2.css`'s own existing note, that's the
+    superseded pre-style-guide violet, not the authoritative
+    `--v2-primary` (`#7c3aed`). Used the token, not the frame's literal
+    hex.
+  - Motion added: modal fade+scale-in/out (Section 6's modal guidance,
+    this shell had none before), coordinates-confirmed banner fades in
+    on appearance, and the submission toast now fades+slides up instead
+    of an instant appear — all wrapped in
+    `prefers-reduced-motion: reduce` guards.
 
 ## 8. Open decisions (fill in as they're made)
 

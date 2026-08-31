@@ -1,105 +1,279 @@
 /*
- * Body-content styles for SuggestWaypointModal. The overlay/modal/header/
- * title/close/body shell comes from `src/components/ui/Modal.module.css`
- * (same reuse `AdminEditModal.module.css` established) — field styling
- * below mirrors that file's `.fieldGroup`/`.saveStatus*` rules for visual
- * consistency between the admin and student-facing forms.
+ * Body-content styles for SuggestWaypointModal. Shell (overlay/modal/
+ * header/title/close/body/footer) comes from
+ * src/components/ui/Modal.module.css (v2 as of this session).
+ *
+ * v2 (this session, Figma node 1:253, "Suggest a Place" — pulled via
+ * the Figma MCP connection): floating-label inputs, a dashed photo
+ * dropzone, card-style location buttons, and a light "coordinates
+ * confirmed" banner replace the v1 flat dark form. Token reuse — see
+ * tokens-v2.css's own comment for this session for the full mapping;
+ * summary: --v2-text (labels/body), --v2-neutral (section headings),
+ * --v2-track (input/card borders), --v2-border (dropzone dashed
+ * border), --v2-hud-upnext-bg (input/dropzone/banner fill, reused
+ * across screens despite its HUD-specific name).
+ *
+ * Follow-up polish pass (same session, direct feedback): Place Name
+ * bumped to Bricolage Grotesque 18px semibold (`.placeNameInput`) so
+ * the "headline" field of the form reads with more weight than a
+ * generic text box; Description bumped 14→15px with 1.5 line-height
+ * for legibility; both inputs/textarea now use `--r-lg` (12px) instead
+ * of `--r-md` (8px) for a softer, "alive" corner radius; the Type
+ * select gained the same purple focus ring
+ * (`var(--v2-primary)` border + `var(--v2-primary-glow)` box-shadow)
+ * the text inputs already had, plus a hover tint and matching `--r-lg`
+ * radius — it previously had no focus/hover state at all.
  */
 
+.sectionHeading {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 24px;
+  color: var(--v2-neutral);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Floating-label text/select inputs ───────────────────────────── */
 .fieldGroup {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
+  gap: 6px;
 }
-.fieldGroup label {
-  font-family: var(--font-mono);
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  color: var(--muted);
-  text-transform: uppercase;
+.floatWrap {
+  position: relative;
+  margin-top: 8px;
 }
-.fieldGroup input,
-.fieldGroup select,
-.fieldGroup textarea {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: var(--text);
+.floatLabel {
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  background: var(--v2-surface);
+  padding: 0 4px;
   font-family: var(--font-ui);
+  font-weight: 500;
   font-size: 12px;
-  padding: 7px 10px;
+  letter-spacing: 0.24px;
+  color: var(--v2-text);
+  z-index: 1;
+}
+.floatWrap input,
+.floatWrap textarea {
+  width: 100%;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-lg);
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  padding: 12px 16px;
   outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
 }
-.fieldGroup input:focus,
-.fieldGroup select:focus,
-.fieldGroup textarea:focus {
-  border-color: rgba(183, 109, 255, 0.45);
-  box-shadow: 0 0 0 3px rgba(183, 109, 255, 0.08);
+.floatWrap input::placeholder,
+.floatWrap textarea::placeholder {
+  color: var(--v2-border);
 }
-.fieldGroup select option {
-  background: #080d1a;
+.floatWrap input:focus,
+.floatWrap textarea:focus {
+  border-color: var(--v2-primary);
+  box-shadow: 0 0 0 3px var(--v2-primary-glow);
 }
-.fieldGroup textarea {
+.floatWrap textarea {
   resize: vertical;
-  min-height: 60px;
+  min-height: 92px;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
 }
 
+/* Place Name — the "headline" field for a suggestion, sized/weighted
+   up (Bricolage Grotesque, same display font as section headings) so
+   it doesn't read as flat as a generic text input. */
+.placeNameInput {
+  font-family: var(--font-display) !important;
+  font-weight: 600 !important;
+  font-size: 18px !important;
+  letter-spacing: 0.1px;
+}
+
+/* ── Type selector (native <select>, custom chevron overlay) ────────── */
+.selectWrap {
+  position: relative;
+}
+.selectWrap select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-lg);
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  padding: 12px 40px 12px 16px;
+  box-sizing: border-box;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-quick) var(--v2-ease-standard),
+              background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.selectWrap select:hover {
+  border-color: var(--v2-primary-outline);
+  background: var(--v2-primary-glow);
+}
+.selectWrap select:focus {
+  border-color: var(--v2-primary);
+  box-shadow: 0 0 0 3px var(--v2-primary-glow);
+}
+.selectChevron {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--v2-primary);
+  pointer-events: none;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.selectWrap select:focus ~ .selectChevron {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+/* ── Location ─────────────────────────────────────────────────────── */
 .locationRow {
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
 }
 .locBtn {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
-  min-width: 140px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: var(--text);
+  background: #ffffff;
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-lg);
+  color: var(--v2-text);
   font-family: var(--font-ui);
+  font-weight: 500;
   font-size: 12px;
-  padding: 9px 10px;
+  letter-spacing: 0.24px;
+  padding: 17px 10px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
+              background var(--v2-duration-quick) var(--v2-ease-standard),
+              transform var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .locBtn svg {
   flex-shrink: 0;
+  color: var(--v2-primary);
 }
 .locBtn:hover {
-  border-color: rgba(183, 109, 255, 0.35);
-  background: rgba(183, 109, 255, 0.07);
+  border-color: var(--v2-primary-outline);
+  background: var(--v2-primary-glow);
+}
+.locBtn:active {
+  transform: scale(0.98);
 }
 
-.coordDisplay {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: rgba(218, 226, 253, 0.4);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 7px;
-  padding: 8px 12px;
-  margin-top: 6px;
+.coordBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-md);
+  padding: 9px 12px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--v2-text);
+  animation: bannerIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.coordBanner svg {
+  flex-shrink: 0;
+  color: var(--v2-secondary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .coordBanner { animation: none; }
+}
+@keyframes bannerIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Photos dropzone (hidden file input, styled label) ───────────── */
+.dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--v2-hud-upnext-bg);
+  border: 2px dashed var(--v2-border);
+  border-radius: var(--r-lg);
+  padding: 34px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
+              background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.dropzone:hover {
+  border-color: var(--v2-primary-outline);
+  background: var(--v2-primary-glow);
+}
+.hiddenFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  clip: rect(0, 0, 0, 0);
+}
+.dropzoneIconBadge {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-full);
+  background: var(--v2-track);
+  color: var(--v2-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dropzoneTitle {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.14px;
+  color: var(--v2-neutral);
+}
+.dropzoneHint {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--v2-text);
+}
 .fileCount {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 6px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--v2-text);
+  margin-top: 2px;
 }
 
+/* ── Duplicate-match nudge ───────────────────────────────────────── */
 .duplicateNudge {
-  background: rgba(255, 200, 87, 0.08);
-  border: 1px solid rgba(255, 200, 87, 0.25);
-  border-radius: 10px;
+  background: rgba(161, 81, 0, 0.08);
+  border: 1px solid rgba(161, 81, 0, 0.25);
+  border-radius: var(--r-md);
   padding: 12px;
-  font-size: 12px;
-  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--v2-text);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -109,26 +283,22 @@
   gap: 8px;
 }
 
+/* ── Status messages ─────────────────────────────────────────────── */
 .saveStatus {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 8px 12px;
-  border-radius: 7px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 9px 12px;
+  border-radius: var(--r-md);
 }
 .saveStatusSuccess {
-  background: rgba(68, 226, 205, 0.08);
-  color: var(--secondary);
-  border: 1px solid rgba(68, 226, 205, 0.18);
+  background: rgba(13, 148, 136, 0.08);
+  color: var(--v2-secondary);
+  border: 1px solid rgba(13, 148, 136, 0.2);
 }
 .saveStatusError {
-  background: rgba(255, 180, 171, 0.08);
-  color: var(--error);
-  border: 1px solid rgba(255, 180, 171, 0.18);
-}
-
-.formActions {
-  display: flex;
-  gap: 8px;
+  background: var(--v2-error-container);
+  color: var(--v2-error-text);
+  border: 1px solid rgba(186, 26, 26, 0.25);
 }
 
 .viewSubmissionsLink {
@@ -137,14 +307,15 @@
   gap: 3px;
   background: none;
   border: none;
-  color: var(--primary);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 13px;
   cursor: pointer;
   align-self: center;
   padding: 4px;
+  transition: opacity var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .viewSubmissionsLink:hover {
-  text-decoration: underline;
+  opacity: 0.75;
 }

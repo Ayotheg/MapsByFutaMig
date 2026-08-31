@@ -124,6 +124,30 @@
   --v2-divider:       #e2e8f0; /* header bottom border + between-row divider */
   --v2-input-surface: #f1f5f9; /* overlay's own search-input fill */
 
+  /* Waypoint suggestion (this session, Figma node 1:253, "Suggest a
+     Place" — pulled via the Figma MCP connection): this is the FIRST
+     modal screen redesigned, so it also sets the shared Modal.jsx /
+     Modal.module.css v2 shell contract (Section 5's "Modal — not yet
+     defined, TBD by first modal screen"). No new palette tokens needed
+     — every hex in the frame reused an existing token within a hair:
+     #faf8ff/#4a4455 are exact --v2-surface/--v2-text; #131b2e (headings)
+     reuses --v2-neutral (#0f172a) same as the Search Results precedent;
+     #e2e7ff (input/card borders, header divider, icon-circle fill)
+     reuses --v2-track; #ccc3d8 (select border, dashed dropzone border)
+     reuses --v2-border, same call as Quick Chips' inactive-chip border;
+     #f2f3ff (input fill, dropzone fill, coordinates-banner fill) reuses
+     --v2-hud-upnext-bg — a HUD-named token, but it's an exact hex match
+     and this app-wide palette is meant to be reused by name, not
+     re-derived per screen. The one deliberate NON-reuse: the frame's
+     "Submit for Review" button is a literal #630ed4 fill — per this
+     file's own note above, that's the superseded pre-style-guide
+     violet, not the authoritative --v2-primary (#7c3aed). Used
+     --v2-primary instead, matching the token file over the frame's
+     literal pixel value. Only one genuinely new token: */
+  --v2-scrim: rgba(15, 23, 42, 0.4); /* modal/overlay backdrop — was a
+     flat rgba(0,0,0,0.7) in v1; a cooler, lighter navy scrim reads
+     correctly behind a light-theme modal instead of muddying it */
+
   /* Motion (Section 6) — first used by the Loading Screen's icon pulse */
   --v2-ease-standard:     cubic-bezier(0.4, 0, 0.2, 1);
   --v2-duration-quick:    150ms;
