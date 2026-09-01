@@ -1,0 +1,254 @@
+/* ── Desktop dropdown — anchored directly under the Quick Chips bar,
+   same left/right/max-width math as QuickChips.module.css's `.bar` so it
+   lines up under it exactly instead of floating independently. ───────── */
+.panel {
+  display: none;
+}
+@media (min-width: 769px) {
+  .panel {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    z-index: 1092;
+    top: 128px;
+    left: calc(var(--sidebar-total-w) + 16px);
+    right: 16px;
+    max-width: 580px;
+    max-height: min(420px, calc(100vh - 160px));
+    margin-left: auto;
+    margin-right: auto;
+    background: var(--v2-surface);
+    border: 1px solid var(--v2-border);
+    border-radius: var(--r-xl);
+    box-shadow:
+      0 10px 40px -10px rgba(15, 23, 42, 0.2);
+    overflow: hidden;
+    transition: left 0.3s var(--v2-ease-standard);
+    /* QuickChips.jsx renders this panel inside `.bar`, which sets
+       `pointer-events: none` on itself (only `.scroll`, the chip row,
+       opts back in) so the fixed-position bar doesn't block map clicks
+       in the empty space around the chips. This panel is a sibling of
+       `.scroll`, not a descendant of it, so it inherits that `none`
+       unless reset here — without this line every button in the grid
+       looks clickable but every click falls straight through to the
+       map underneath. */
+    pointer-events: auto;
+  }
+}
+@media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
+  .panel {
+    animation: dropIn var(--v2-duration-standard) var(--v2-ease-standard) both;
+  }
+}
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Mobile card + scrim — same shape/offsets as ChipResultsPanel's
+   mobile card, just anchored higher (right under the chip row instead
+   of taking most of the screen) since this panel's content is short. */
+.scrim {
+  display: none;
+}
+.mobileCard {
+  display: none;
+}
+@media (max-width: 768px) {
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: var(--v2-scrim);
+    z-index: 1091;
+    /* Same `.bar` inheritance issue as `.panel` above — without this the
+       scrim can't even receive the tap that's supposed to dismiss it. */
+    pointer-events: auto;
+  }
+  .mobileCard {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: fixed;
+    top: calc(112px + var(--mob-safe-top));
+    left: 12px;
+    right: 12px;
+    max-height: calc(100vh - 220px - var(--mob-safe-bottom));
+    z-index: 1093;
+    background: var(--v2-surface);
+    border: 1px solid var(--v2-border);
+    border-radius: var(--r-xl);
+    box-shadow: 0 10px 40px -10px rgba(15, 23, 42, 0.2);
+    /* Same `.bar` inheritance issue as `.panel` above — this is the one
+       that actually explains the reported bug: the grid's buttons
+       looked clickable but every tap fell through to the map below. */
+    pointer-events: auto;
+  }
+}
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .mobileCard {
+    animation: cardIn var(--v2-duration-standard) var(--v2-ease-standard) both;
+  }
+}
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Shared header — search input + close, same pattern as the Figma
+   reference's "Header & Search Area" (node 89:6), condensed to one row
+   since a dropdown doesn't need a separate title line. ──────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--v2-track);
+  flex-shrink: 0;
+  background: var(--v2-surface);
+}
+.searchWrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--v2-text-variant);
+  pointer-events: none;
+}
+.search {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px 0 38px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--r-md);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--v2-text);
+}
+.search::placeholder {
+  color: var(--v2-text-variant);
+}
+.search:focus {
+  outline: none;
+  border-color: var(--v2-primary);
+}
+.close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-glow);
+  border: none;
+  color: var(--v2-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.close:hover {
+  background: color-mix(in srgb, var(--v2-primary) 20%, transparent);
+}
+
+/* ── Category grid — Figma node 89:20/89:21's 3-column icon grid,
+   scrollable when the filtered list runs long. ──────────────────────── */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--v2-primary-outline) transparent;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  transition:
+    background var(--v2-duration-quick) var(--v2-ease-standard),
+    border-color var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.item:hover {
+  border-color: var(--v2-primary-outline);
+  transform: translateY(-1px);
+}
+.item:active {
+  transform: translateY(0) scale(0.97);
+}
+.item.active {
+  background: var(--v2-primary-glow);
+  border-color: var(--v2-primary);
+}
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
+  .item:hover {
+    transform: none;
+  }
+}
+.itemIcon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background: var(--v2-track);
+  color: var(--v2-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.item.active .itemIcon {
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+}
+.itemLabel {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--v2-text);
+  text-align: center;
+  line-height: 1.2;
+}
+.item.active .itemLabel {
+  color: var(--v2-primary);
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--v2-text-variant);
+}
