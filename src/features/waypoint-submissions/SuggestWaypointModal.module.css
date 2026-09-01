@@ -281,6 +281,29 @@
 .duplicateActions {
   display: flex;
   gap: 8px;
+  align-items: stretch;
+}
+
+.duplicateActions > button {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: calc(50% - 4px);
+  white-space: normal;
+  line-height: 1.2;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+@media (max-width: 420px) {
+  .duplicateActions {
+    gap: 6px;
+  }
+
+  .duplicateActions > button {
+    font-size: 13px;
+    padding: 12px 10px;
+    max-width: none;
+  }
 }
 
 /* ── Status messages ─────────────────────────────────────────────── */
