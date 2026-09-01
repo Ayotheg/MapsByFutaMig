@@ -1,0 +1,50 @@
+/* ── Search result map pin ────────────────────────────────────────────
+   Bug fix (reported directly): `useSelectResult.js` used to build this
+   marker with a fully inline-styled `L.divIcon` — flat #60a5fa blue box,
+   black text, DM Mono — none of it drawn from tokens-v2.css, so it read
+   as an unstyled placeholder against every other on-brand surface in the
+   app. Restyled to the same "coloured dot + pill label" language the
+   waypoint pins already use (see waypointMarkers.css's `.gm-pin-*`), just
+   in the app's violet primary rather than a per-type color, since a
+   search hit isn't a fixed POI category.
+
+   Plain global .css, not a CSS Module, for the same reason as
+   waypointMarkers.css/navMapLayers.css: Leaflet injects this HTML
+   directly via divIcon, so a CSS-Module hashed class name would never
+   match it.
+   ────────────────────────────────────────────────────────────────────── */
+
+.search-hit-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-hit-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--v2-primary, #7c3aed);
+  color: var(--v2-on-primary, #fff);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.45), 0 0 0 3px rgba(255, 255, 255, 0.9);
+}
+.search-hit-dot svg {
+  display: block;
+}
+
+.search-hit-label {
+  font-family: var(--font-ui, 'Inter', system-ui, sans-serif);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2-neutral, #0f172a);
+  background: var(--v2-surface, #faf8ff);
+  padding: 5px 12px;
+  border-radius: var(--r-full, 9999px);
+  white-space: nowrap;
+  border: 1px solid var(--v2-border, #d1d5db);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
+}

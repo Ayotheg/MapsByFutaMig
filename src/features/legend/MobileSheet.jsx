@@ -136,6 +136,18 @@ export default function MobileSheet({
 
   const handleTabClick = useCallback(
     (tab) => {
+      // Bug fix (reported directly, with a screenshot): once turn-by-turn
+      // is running the navbar switches to its "in navigation" color
+      // (`.navbarNavActive`, see MobileSheet.module.css) but every tab
+      // stayed clickable — tapping one opened `.panel` right on top of
+      // NavHud's floating cards, overlapping them. The CSS side
+      // (`pointer-events: none` on `.navbarNavActive .tab`) already blocks
+      // real taps, but this guard is the actual source of truth (also
+      // covers any programmatic/keyboard activation the CSS wouldn't
+      // catch). Cancel/finish goes through NavHud's own "End" button
+      // instead, not through this bar, so nothing here needs to work again
+      // until `navActive` flips back to false.
+      if (navActive) return;
       // Bug fix (reported directly): both the navbar's "Nav" tab and the
       // search bar's nav icon (`MapPage.jsx`'s `onNavigate` prop, fixed
       // the same way) used to open this sheet to the 'navigate' tab,
@@ -183,7 +195,7 @@ export default function MobileSheet({
       setSheetState('half');
       track('feature_panel_open', { panel: tab.key });
     },
-    [activeTab, sheetState, setSheetState, setActiveTab, onSuggestPlaceClick, onAuthClick, onNavLaunch]
+    [navActive, activeTab, sheetState, setSheetState, setActiveTab, onSuggestPlaceClick, onAuthClick, onNavLaunch]
   );
 
   const panelOpen = sheetState !== 'peek';
@@ -245,6 +257,8 @@ export default function MobileSheet({
                 activeTab === tab.key && panelOpen ? styles.tabActive : ''
               }`}
               onClick={() => handleTabClick(tab)}
+              disabled={navActive}
+              aria-disabled={navActive}
             >
               <tab.Icon className={styles.tabIcon} size={18} strokeWidth={1.8} />
               <span className={styles.tabLabel}>{tab.label}</span>

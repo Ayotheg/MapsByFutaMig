@@ -47,8 +47,19 @@
 .navbarNavActive {
   background: var(--v2-nav-active-bg);
 }
+/* Bug fix (reported directly): the color swap above signals "you're
+   navigating", but the tabs underneath stayed fully clickable — tapping
+   Explore/Signal/etc. mid-navigation still opened `.panel` right on top
+   of NavHud's floating cards, overlapping them. Cancel/finish already has
+   its own dedicated control (NavHud's own "End" button), so nothing here
+   needs to stay tappable while `navActive` is true. `pointer-events: none`
+   is the actual fix; `disabled` on each `<button>` (MobileSheet.jsx) backs
+   it up for keyboard/a11y and screen readers. Lower opacity is just the
+   visual affordance that matches the now-inert state. */
 .navbarNavActive .tab {
   color: var(--v2-nav-active-tab-text);
+  pointer-events: none;
+  opacity: 0.55;
 }
 .navbarNavActive .tabActive {
   background: rgba(255, 255, 255, 0.14);
