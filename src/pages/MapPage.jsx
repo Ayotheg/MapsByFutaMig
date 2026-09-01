@@ -149,22 +149,29 @@ export default function MapPage({ onReadinessChange }) {
   const { items: osmItems, snaps: osmSnaps, badgeMerges: osmBadgeMerges } = useOSMAnnotations(dedupIndex);
   const { viewMode, toggle: toggleViewMode, setViewMode } = useViewMode();
 
-  const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations });
-  const quickChips = useQuickChips();
-  // Explore panel (mobile navbar "Explore" tab + desktop rail button):
-  // derived straight from `waypoints` (no separate fetch/table — see
-  // useExplorePicks.js's own header comment).
-  const explorePicksState = useExplorePicks(waypoints);
-
   // ── Slice 9: GPS + Navigation ──────────────────────────────────────
-  // `navOpen` gates whether <NavigationController> is mounted at all
-  // (the actual lazy-load boundary — see its import comment above).
+  // Moved up so it can be used by useSearchIndex for distance-based ranking.
   // `navActive` mirrors legacy's `navActive` flag (true only once a route
   // is found and turn-by-turn has started, not just while "Where to?" is
   // open) and is what forces RAW view mode / hides the GPS dot, matching
   // legacy's `_prevInfoMode` save-restore (app.js ~5058–5063, ~5160–5163).
   const [navOpen, setNavOpen] = useState(() => readPersistentState('navigation-open', false));
   const [navActive, setNavActive] = useState(false);
+  const gps = useGpsTracking(map, { hidden: navActive, navigationMode: navActive });
+
+  const searchIndex = useSearchIndex({ 
+    waypoints, 
+    segments, 
+    kmlAnnotations,
+    userLocation: gps?.lastKnownPosRef?.current || null
+  });
+  const quickChips = useQuickChips();
+  // Explore panel (mobile navbar "Explore" tab + desktop rail button):
+  // derived straight from `waypoints` (no separate fetch/table — see
+  // useExplorePicks.js's own header comment).
+  const explorePicksState = useExplorePicks(waypoints);
+
+  // Continue nav state setup (moved variables after gps)
   const [navSeedDest, setNavSeedDest] = useState(() => readPersistentState('navigation-seeded-destination', null));
   const [reviewTarget, setReviewTarget] = useState(null);
   const navControllerRef = useRef(null);
@@ -187,8 +194,6 @@ export default function MapPage({ onReadinessChange }) {
   useEffect(() => writePersistentState('navigation-open', navOpen), [navOpen]);
   useEffect(() => writePersistentState('navigation-seeded-destination', navSeedDest), [navSeedDest]);
   useEffect(() => writePersistentState('mobile-search-open', mobileSearchOpen), [mobileSearchOpen]);
-
-  const gps = useGpsTracking(map, { hidden: navActive });
 
   // ── Slice 10: Auth ────────────────────────────────────────────────
   // Called once here, same "lift shared state up, pass down as props"

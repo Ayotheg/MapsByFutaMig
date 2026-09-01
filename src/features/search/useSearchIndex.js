@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { TYPE_ICON_KEYS } from '../../lib/typeIcons';
+import { haversine } from '../../lib/geoUtils';
+import { 
+  scoreEnhanced,
+  scoreText,
+  parseSearchQuery, 
+  filterByType, 
+  filterByDistance, 
+  filterByRating,
+  getSynonyms,
+} from './searchEnhancements';
 
 /**
  * React port of legacy's `window.FUTA_SEARCH` (app.js ~547–648).
@@ -35,31 +45,6 @@ import { TYPE_ICON_KEYS } from '../../lib/typeIcons';
 
 const TYPE_ICONS = { waypoint: 'geo-alt-fill', segment: 'route', osm: 'globe', kml: 'folder' };
 
-function norm(s) {
-  return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-}
-
-function score(entry, q) {
-  if (!q) return 0;
-  const nq = norm(q);
-  const nn = norm(entry.name);
-  const nd = norm(entry.desc || '');
-  const words = nq.split(/\s+/);
-
-  let s = 0;
-  if (nn === nq) s += 100;
-  if (nn.startsWith(nq)) s += 60;
-  if (nn.includes(nq)) s += 40;
-  words.forEach((w) => {
-    if (nn.includes(w)) s += 20;
-    if (nd.includes(w)) s += 8;
-  });
-
-  if (entry.source === 'waypoint') s += 15;
-  if (entry.source === 'segment') s += 10;
-  return s;
-}
-
 function icon(entry) {
   return TYPE_ICON_KEYS[entry.subtype] || TYPE_ICONS[entry.subtype] || TYPE_ICONS[entry.type] || 'geo-alt-fill';
 }
@@ -70,7 +55,7 @@ function highlight(text, q) {
   return text.replace(re, '<mark>$1</mark>');
 }
 
-export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
+export function useSearchIndex({ waypoints, segments, kmlAnnotations, userLocation = null }) {
   // Mutable, not React state — legacy's FUTA_SEARCH.index is queried
   // synchronously from event handlers (keystrokes, clicks), never drives
   // a render on its own. Matches the imperative-Leaflet-ref pattern this
@@ -78,6 +63,7 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
   const indexRef = useRef([]);
   const idSetRef = useRef(new Set());
   const nameCoordSetRef = useRef(new Set());
+  const userLocationRef = useRef(userLocation);
 
   const register = useCallback((entry) => {
     const idKey = entry.id || '';
@@ -100,6 +86,10 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
   }, []);
 
   // ── Resync the static (waypoint/segment/kml) portion on data change ──
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+  }, [userLocation]);
+
   useEffect(() => {
     indexRef.current = indexRef.current.filter(
       (e) => e.source !== 'waypoint' && e.source !== 'segment' && e.source !== 'kml'
@@ -164,11 +154,71 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
 
   const query = useCallback((q, limit = 6) => {
     if (!q || q.trim().length < 1) return [];
-    return indexRef.current
-      .map((e) => ({ ...e, _score: score(e, q) }))
-      .filter((e) => e._score > 0)
-      .sort((a, b) => b._score - a._score)
-      .slice(0, limit);
+    
+    // Parse query for natural language intent (no special syntax needed)
+    const parsed = parseSearchQuery(q);
+    const queryText = parsed.query || q;
+    
+    // Score all entries with improved scoring (includes fuzzy, partial matching, synonyms, distance + rating)
+    let results = indexRef.current
+      .map((e) => ({ 
+        ...e, 
+        _score: scoreEnhanced(e, queryText, userLocationRef.current, {
+          includeDistance: true,
+          includeRating: true,
+        })
+      }))
+      .filter((e) => e._score > 0);
+    
+    // ── Apply implicit type filtering (improved) ────────────────────────
+    // If a type was detected (explicit @cafe or implicit "show me cafes"),
+    // filter results. But ALSO include synonyms!
+    if (parsed.typeFilter) {
+      // Get all synonyms for this type
+      const syns = getSynonyms(parsed.typeFilter);
+      results = results.filter(e => {
+        const subtype = (e.subtype || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const type = (e.type || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const combined = `${subtype}${type}`.toLowerCase();
+        
+        // Check if entry type matches ANY synonym
+        return syns.some(syn => {
+          const synNorm = syn.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return combined.includes(synNorm) || subtype.includes(synNorm) || type.includes(synNorm);
+        });
+      });
+    }
+    
+    // Apply rating filter if specified
+    if (parsed.ratingFilter) {
+      results = filterByRating(results, parsed.ratingFilter);
+    }
+    
+    // Apply distance filter if specified or if "near me" intent detected
+    if (parsed.distanceFilter) {
+      results = filterByDistance(results, parsed.distanceFilter, userLocationRef.current?.lat, userLocationRef.current?.lng);
+    } else if (parsed.nearMe && userLocationRef.current?.lat && userLocationRef.current?.lng) {
+      // Default "near me" radius: 2km
+      results = filterByDistance(results, 2000, userLocationRef.current.lat, userLocationRef.current.lng);
+    }
+    
+    // ── SORTING by user intent ────────────────────────────────────────
+    // If user asked for "best" or "top rated", sort by rating
+    // If user asked for "closest" or "near me", sort by distance (already filtered)
+    if (parsed.sortBy === 'rating') {
+      results.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
+    } else if (parsed.sortBy === 'distance' && userLocationRef.current?.lat && userLocationRef.current?.lng) {
+      results.sort((a, b) => {
+        const distA = haversine(userLocationRef.current.lat, userLocationRef.current.lng, a.lat, a.lng);
+        const distB = haversine(userLocationRef.current.lat, userLocationRef.current.lng, b.lat, b.lng);
+        return distA - distB;
+      });
+    } else {
+      // Default: sort by enhanced score
+      results.sort((a, b) => b._score - a._score);
+    }
+    
+    return results.slice(0, limit);
   }, []);
 
   const resolve = useCallback(

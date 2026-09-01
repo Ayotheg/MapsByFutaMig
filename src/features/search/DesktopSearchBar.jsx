@@ -7,6 +7,7 @@ import SearchDropdownList from './SearchDropdownList';
 import styles from './DesktopSearchBar.module.css';
 import { track } from '../../lib/analytics';
 import { readPersistentState, writePersistentState } from '../../lib/persistentState';
+import { saveRecentSearch } from './searchEnhancements';
 
 /**
  * Ported from legacy's `initDeskSearch` IIFE (app.js ~895–1131) — the
@@ -83,6 +84,7 @@ export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed
   function handleSelect(entry) {
     if (!entry.lat || !entry.lng) return;
     selectResult(entry);
+    saveRecentSearch(entry.name);
     setQuery(entry.name);
     setOpen(false);
     setActiveIdx(-1);
@@ -124,6 +126,7 @@ export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed
   async function doFullSearch() {
     const q = query.trim();
     if (!q) return;
+    saveRecentSearch(q);
     const local = searchIndex.resolve(q);
     if (local) {
       // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).

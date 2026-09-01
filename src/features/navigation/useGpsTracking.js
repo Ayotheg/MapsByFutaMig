@@ -151,7 +151,7 @@ const TIER_COLOR = { good: '#00c896', fair: '#ffc107', poor: '#ff4d4d' };
  * (app.js ~5067–5068, ~5137–5138) — not this hook's own concern to
  * recreate them, so the marker instances persist and just fade.
  */
-export function useGpsTracking(map, { hidden = false } = {}) {
+export function useGpsTracking(map, { hidden = false, navigationMode = false } = {}) {
   const [state, setState] = useState({
     tier: 'poor',
     isTracking: false,
@@ -172,7 +172,40 @@ export function useGpsTracking(map, { hidden = false } = {}) {
   const isWarmedUpRef = useRef(false);
   const isTrackingRef = useRef(false);
   const hiddenRef = useRef(hidden);
+  const navigationModeRef = useRef(navigationMode);
   hiddenRef.current = hidden;
+  navigationModeRef.current = navigationMode;
+
+  const mapRotationRef = useRef(0);
+  const rotationThrottleRef = useRef(0);
+
+  const applyMapRotation = useCallback((headingDeg, speedKmh) => {
+    if (!map || !map.getContainer) return;
+    const container = map.getContainer();
+    if (!Number.isFinite(headingDeg) || headingDeg < 0 || headingDeg > 360) {
+      if (!navigationModeRef.current && Math.abs(mapRotationRef.current) > 0.1) {
+        container.style.transition = 'transform 700ms ease-out';
+        container.style.transform = 'rotate(0deg)';
+        mapRotationRef.current = 0;
+      }
+      return;
+    }
+
+    const moving = speedKmh !== null && speedKmh >= 1.5;
+    const target = -headingDeg;
+    const current = mapRotationRef.current || 0;
+    const delta = Math.abs((((target - current) + 540) % 360) - 180);
+    const threshold = navigationModeRef.current ? 3 : moving ? 8 : 12;
+    const now = Date.now();
+
+    if (delta < threshold && now - rotationThrottleRef.current < 900 && !navigationModeRef.current) return;
+    if (!moving && !navigationModeRef.current && delta < 15) return;
+
+    container.style.transition = navigationModeRef.current ? 'transform 180ms ease-out' : 'transform 420ms ease-out';
+    container.style.transform = `rotate(${target}deg)`;
+    mapRotationRef.current = target;
+    rotationThrottleRef.current = now;
+  }, [map]);
 
   const warmupWatchIdRef = useRef(null);
   const watchIdRef = useRef(null);
@@ -288,6 +321,7 @@ export function useGpsTracking(map, { hidden = false } = {}) {
       updateGauge(accuracy, spd, hdg);
       const { lat: sLat, lng: sLng } = smoothPos(rawLat, rawLng, spd);
       const ll = [sLat, sLng];
+      applyMapRotation(hdg, spd);
 
       drRef.current.anchor(sLat, sLng);
       const t = tier(accuracy);
@@ -425,9 +459,13 @@ export function useGpsTracking(map, { hidden = false } = {}) {
   useEffect(() => {
     return () => {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (map && map.getContainer) {
+        map.getContainer().style.transform = 'rotate(0deg)';
+        map.getContainer().style.transition = 'transform 200ms ease-out';
+      }
       drRef.current.stop();
     };
-  }, []);
+  }, [map]);
 
   return {
     ...state,

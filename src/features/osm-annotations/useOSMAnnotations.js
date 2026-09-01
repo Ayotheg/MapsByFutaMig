@@ -64,6 +64,15 @@ export function useOSMAnnotations(dedupIndex) {
         /* sessionStorage unavailable/corrupt — fall through to a live fetch */
       }
 
+      // Local dev browsers often block external Overpass requests with CORS/
+      // 502 failures. OSM annotations are optional map metadata, not core app
+      // data, so skip the remote fetch instead of spamming the console and
+      // failing the rest of the map.
+      if (typeof window !== 'undefined' && /localhost|127\.0\.0\.1|0\.0\.0\.0/.test(window.location.hostname)) {
+        if (!cancelled) setRawItems([]);
+        return;
+      }
+
       const S = CAMPUS_BOUNDS.getSouth();
       const W = CAMPUS_BOUNDS.getWest();
       const N = CAMPUS_BOUNDS.getNorth();

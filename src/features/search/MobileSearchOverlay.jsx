@@ -6,6 +6,7 @@ import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
 import SearchDropdownList from './SearchDropdownList';
 import styles from './MobileSearchOverlay.module.css';
 import { readPersistentState, writePersistentState } from '../../lib/persistentState';
+import { saveRecentSearch } from './searchEnhancements';
 
 /**
  * Ported from legacy's dynamically-built `#mobSearchOverlay` (app.js
@@ -64,6 +65,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   }, [open, query]);
 
   function handleSelect(entry) {
+    saveRecentSearch(entry.name);
     selectResult(entry);
     onClose();
   }
@@ -97,6 +99,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
     if (e.key === 'Enter') {
       const q = query.trim();
       if (!q) return;
+      saveRecentSearch(q);
       const local = searchIndex.resolve(q);
       if (local) handleSelect(local);
     } else if (e.key === 'Escape') {
