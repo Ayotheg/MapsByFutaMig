@@ -157,6 +157,24 @@ const NavigationController = forwardRef(function NavigationController(
   }, []);
 
   // ── Voice (Web Speech API) — ported from app.js ~4433–4442 ────────────
+  // Safari (desktop & iOS) only lets speechSynthesis.speak() actually
+  // produce audio when it's called inside — or immediately after — a real
+  // user gesture's synchronous call stack. Once it's succeeded once from a
+  // genuine tap, Safari keeps allowing *programmatic* speak() calls (e.g.
+  // from the GPS watchPosition callback, which has no gesture of its own)
+  // for the rest of the page session. unlockSpeech() "primes" the engine
+  // with a silent utterance from real taps (Go button, voice toggle) so
+  // every later speak() call — including the async ones — actually plays.
+  const speechUnlockedRef = useRef(false);
+  const unlockSpeech = useCallback(() => {
+    if (speechUnlockedRef.current) return;
+    if (!('speechSynthesis' in window)) return;
+    const primer = new SpeechSynthesisUtterance(' ');
+    primer.volume = 0;
+    window.speechSynthesis.speak(primer);
+    speechUnlockedRef.current = true;
+  }, []);
+
   const speak = useCallback((text) => {
     if (!voiceEnabledRef.current) return;
     if (!('speechSynthesis' in window)) return;
@@ -167,6 +185,22 @@ const NavigationController = forwardRef(function NavigationController(
     utt.volume = 1.0;
     window.speechSynthesis.speak(utt);
   }, []);
+
+  // Chrome (desktop + Android) has a long-standing bug where speechSynthesis
+  // auto-pauses after ~15s of continuous speaking, especially once the tab
+  // loses focus — a pause()/resume() nudge is the standard workaround.
+  // Harmless no-op on browsers that don't have the bug.
+  useEffect(() => {
+    if (!navActive) return undefined;
+    if (!('speechSynthesis' in window)) return undefined;
+    const id = setInterval(() => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      }
+    }, 10000);
+    return () => clearInterval(id);
+  }, [navActive]);
 
   // ── Set destination (from dropdown pick, map click, or "Navigate Here") ──
   const setNavDest = useCallback((entry) => {
@@ -361,6 +395,69 @@ const NavigationController = forwardRef(function NavigationController(
   // ── Arrived ─────────────────────────────────────────────────────────
   const stopNavigationRef = useRef(null); // set below, forward-declared for arrivedAtDestination
 
+  // GPS fixes noisier than this (metres) are ignored for position/step
+  // matching — buildings on campus cause multipath reflections that can
+  // report a position 20–50m off, which is enough to flip the matched
+  // route step and announce a turn that doesn't match where the user
+  // actually is. The user-facing dot just holds its last good fix instead
+  // of jumping around on garbage data.
+  const MAX_USEFUL_ACCURACY_M = 35;
+  // How far off the *planned* route (not just a noisy single fix) before
+  // we treat it as "the user actually went a different way" and ask OSRM
+  // for a fresh route from here.
+  const OFF_ROUTE_THRESHOLD_M = 40;
+  // Require this many consecutive off-route HUD ticks before rerouting,
+  // so one bad fix (see MAX_USEFUL_ACCURACY_M above, which already
+  // filters most of these, but not all) can't trigger a spurious reroute.
+  const OFF_ROUTE_TICKS_REQUIRED = 3;
+  const MIN_REROUTE_INTERVAL_MS = 20000;
+
+  const rerouteInFlightRef = useRef(false);
+  const lastRerouteAtRef = useRef(0);
+  const offRouteTicksRef = useRef(0);
+
+  // ── Reroute when the live route drifts too far from reality ───────────
+  // OSRM's foot-routing steps are fixed at fetch time and never update on
+  // their own — if the campus paths don't match OSM's footway data (very
+  // common) or the user just takes a different route, the announced turns
+  // silently go stale. This re-fetches from the user's *current* position
+  // once they've been consistently far enough off the original route.
+  const maybeReroute = useCallback(
+    (lat, lng, offRouteMeters) => {
+      const dest = navDestRef.current;
+      if (!dest || rerouteInFlightRef.current) return;
+
+      if (offRouteMeters < OFF_ROUTE_THRESHOLD_M) {
+        offRouteTicksRef.current = 0;
+        return;
+      }
+      offRouteTicksRef.current++;
+      if (offRouteTicksRef.current < OFF_ROUTE_TICKS_REQUIRED) return;
+      if (Date.now() - lastRerouteAtRef.current < MIN_REROUTE_INTERVAL_MS) return;
+
+      rerouteInFlightRef.current = true;
+      offRouteTicksRef.current = 0;
+      lastRerouteAtRef.current = Date.now();
+
+      fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current)
+        .then((fresh) => {
+          if (!navActiveRef.current || navDestRef.current !== dest) return; // nav ended/changed while fetching
+          navRouteDataRef.current = fresh;
+          navStepIndexRef.current = 0;
+          lastSpokenStepRef.current = -1;
+          spokenTurnNowRef.current = false;
+          drawRoute(fresh.coords, 0, true);
+          persistNavigation();
+          track('nav_rerouted', { to: dest.name });
+        })
+        .catch((e) => console.warn('Reroute failed:', e.message))
+        .finally(() => {
+          rerouteInFlightRef.current = false;
+        });
+    },
+    [drawRoute, persistNavigation]
+  );
+
   const arrivedAtDestination = useCallback(() => {
     if (navArrivedRef.current) return;
     navArrivedRef.current = true;
@@ -406,6 +503,7 @@ const NavigationController = forwardRef(function NavigationController(
 
     const routePos = routePosition(routeData.coords, lat, lng);
     const distToDest = routeData.distance * (routePos.distanceRemaining / routePos.distanceTotal || 0);
+    maybeReroute(lat, lng, routePos.offRouteMeters);
     const steps = routeData.steps;
     let nearest = navStepIndexRef.current;
     let minD = Infinity;
@@ -485,7 +583,45 @@ const NavigationController = forwardRef(function NavigationController(
     setHud((h) => ({ ...h, ...nextHud }));
 
     if (!map._userInteracting) map.panTo([lat, lng], { animate: true, duration: 0.6 });
-  }, [map, drawRoute, speak, arrivedAtDestination]);
+  }, [map, drawRoute, speak, arrivedAtDestination, maybeReroute]);
+
+  // ── Single entry point for every GPS fix, live or resumed-from-
+  // background — used by the fresh-start watch, the restored-session
+  // watch, and the visibility-change "just came back" one-off fix below,
+  // so all three apply the same accuracy filter and staleness handling
+  // instead of three slightly-different copies of this logic. ──────────
+  const handleGpsFix = useCallback(
+    (p) => {
+      const { latitude, longitude, accuracy } = p.coords;
+      gps.lastKnownPosRef.current = p;
+
+      if (typeof accuracy === 'number' && accuracy > MAX_USEFUL_ACCURACY_M) return;
+
+      navUserPosRef.current = { lat: latitude, lng: longitude };
+      navGpsTicksRef.current++;
+
+      clearTimeout(navGpsStaleTimerRef.current);
+      navGpsStaleTimerRef.current = setTimeout(() => {
+        if (navActiveRef.current) setHud((h) => ({ ...h, turnInstruction: 'GPS signal lost — waiting…' }));
+      }, 15000);
+
+      updateNavUserDot(latitude, longitude);
+      updateHUD();
+      persistNavigation();
+    },
+    [gps, updateNavUserDot, updateHUD, persistNavigation]
+  );
+
+  const startWatch = useCallback(() => {
+    if (navWatchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(navWatchIdRef.current);
+    }
+    navWatchIdRef.current = navigator.geolocation.watchPosition(
+      handleGpsFix,
+      (err) => console.warn('Nav GPS err:', err.message),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    );
+  }, [handleGpsFix]);
 
   // Rebuild the live map layers and GPS watch after the browser recreates
   // this component from a persisted navigation session.
@@ -506,18 +642,7 @@ const NavigationController = forwardRef(function NavigationController(
     updateNavUserDot(navUserPosRef.current.lat, navUserPosRef.current.lng);
     updateHUD();
 
-    navWatchIdRef.current = navigator.geolocation?.watchPosition(
-      (p) => {
-        navUserPosRef.current = { lat: p.coords.latitude, lng: p.coords.longitude };
-        gps.lastKnownPosRef.current = p;
-        navGpsTicksRef.current++;
-        updateNavUserDot(p.coords.latitude, p.coords.longitude);
-        updateHUD();
-        persistNavigation();
-      },
-      (err) => console.warn('Nav GPS err:', err.message),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
-    );
+    startWatch();
 
     return () => {
       if (navWatchIdRef.current !== null) navigator.geolocation?.clearWatch(navWatchIdRef.current);
@@ -527,15 +652,33 @@ const NavigationController = forwardRef(function NavigationController(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
+  // Mobile browsers (iOS Safari especially, often within ~30s) throttle or
+  // fully suspend watchPosition + JS timers while the tab is backgrounded,
+  // so navigation can silently go stale while the user is away. Backgrounding
+  // just persists state (unchanged); coming back to a still-active session
+  // grabs one fresh fix immediately — rather than waiting on whatever's left
+  // of the old watch — and restarts the watch in case it died while hidden.
   useEffect(() => {
-    const saveBeforeSuspension = () => persistNavigation();
-    document.addEventListener('visibilitychange', saveBeforeSuspension);
-    window.addEventListener('pagehide', saveBeforeSuspension);
-    return () => {
-      document.removeEventListener('visibilitychange', saveBeforeSuspension);
-      window.removeEventListener('pagehide', saveBeforeSuspension);
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') {
+        persistNavigation();
+        return;
+      }
+      if (!navActiveRef.current) return;
+      navigator.geolocation.getCurrentPosition(
+        handleGpsFix,
+        (err) => console.warn('Nav GPS resume err:', err.message),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+      );
+      startWatch();
     };
-  }, [persistNavigation]);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('pagehide', persistNavigation);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('pagehide', persistNavigation);
+    };
+  }, [persistNavigation, handleGpsFix, startWatch]);
 
   // ── Start / stop navigation ────────────────────────────────────────
   const startNavigation = useCallback(async () => {
@@ -553,6 +696,11 @@ const NavigationController = forwardRef(function NavigationController(
       alert('Your device does not support GPS.');
       return;
     }
+
+    // Prime speechSynthesis synchronously, while still inside the Go
+    // button's click gesture — before the geolocation/route awaits below
+    // burn through it. See unlockSpeech() above for why.
+    unlockSpeech();
 
     setGoDisabled(true);
     setGoLabel('Getting your location…');
@@ -648,29 +796,11 @@ const NavigationController = forwardRef(function NavigationController(
     // zoom stay untouched, so the user is always free to zoom back out.
     map.setView([lat, lng], NAV_START_ZOOM, { animate: true });
 
-    navWatchIdRef.current = navigator.geolocation.watchPosition(
-      (p) => {
-        const { latitude, longitude } = p.coords;
-        navUserPosRef.current = { lat: latitude, lng: longitude };
-        gps.lastKnownPosRef.current = p;
-        navGpsTicksRef.current++;
-
-        clearTimeout(navGpsStaleTimerRef.current);
-        navGpsStaleTimerRef.current = setTimeout(() => {
-          if (navActiveRef.current) setHud((h) => ({ ...h, turnInstruction: 'GPS signal lost — waiting…' }));
-        }, 15000);
-
-        updateNavUserDot(latitude, longitude);
-        updateHUD();
-        persistNavigation();
-      },
-      (err) => console.warn('Nav GPS err:', err.message),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
-    );
+    startWatch();
 
     setGoDisabled(false);
     setGoLabel('Start Navigation');
-  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, updateHUD, persistNavigation, onActiveChange, onGuestBlocked]);
+  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onGuestBlocked, startWatch]);
 
   const stopNavigation = useCallback(() => {
     navActiveRef.current = false;
@@ -843,6 +973,10 @@ const NavigationController = forwardRef(function NavigationController(
           onToggleVoice={() => {
             setVoiceEnabled((v) => {
               const next = !v;
+              // Turning voice back on is also a real tap — use it to prime
+              // speechSynthesis in case the Go-button priming never landed
+              // (e.g. voice was off when navigation started).
+              if (next) unlockSpeech();
               if (!next && 'speechSynthesis' in window) window.speechSynthesis.cancel();
               return next;
             });

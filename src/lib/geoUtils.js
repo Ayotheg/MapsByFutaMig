@@ -80,6 +80,12 @@ export function routePosition(coords, lat, lng) {
     progress: distanceTotal ? distanceAtClosest / distanceTotal : 0,
     distanceRemaining: Math.max(0, distanceTotal - distanceAtClosest),
     distanceTotal,
+    // Perpendicular distance (metres) from (lat,lng) to the nearest point
+    // ON the route polyline — i.e. how far off-course the user currently
+    // is, not how far along the route they've travelled. `closestDistance`
+    // is already computed above from the same meter-projected coordinates
+    // used for `distanceAtClosest`, just not previously returned.
+    offRouteMeters: closestDistance === Infinity ? 0 : closestDistance,
   };
 }
 
