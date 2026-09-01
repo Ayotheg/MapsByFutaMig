@@ -6,6 +6,10 @@
 // Same underlying inconsistency BRAND_GUIDELINES.md already flags for
 // legend swatches vs. map-pin colors on this exact set of types — not a
 // transcription gap here, a real pre-existing legacy one.
+// Sept 2026: updated for the 24-type consolidation (adminTypeOptions.js).
+// Pre-merge keys kept alongside the new ones so any lingering raw DB value
+// (or KML/OSM subtype) still gets a real badge color instead of falling
+// through to DEFAULT_BADGE.
 export const ADMIN_BADGE_COLORS = {
   seg: { bg: 'rgba(68,226,205,0.1)', color: 'var(--secondary)', border: 'rgba(68,226,205,0.22)' },
   road: { bg: 'rgba(68,226,205,0.1)', color: 'var(--secondary)', border: 'rgba(68,226,205,0.22)' },
@@ -17,14 +21,16 @@ export const ADMIN_BADGE_COLORS = {
   workshop: { bg: 'rgba(29,158,117,0.12)', color: '#1D9E75', border: 'rgba(29,158,117,0.28)' },
   library: { bg: 'rgba(159,225,203,0.12)', color: '#9FE1CB', border: 'rgba(159,225,203,0.28)' },
 
+  admin: { bg: 'rgba(127,119,221,0.12)', color: '#7F77DD', border: 'rgba(127,119,221,0.28)' },
   senate: { bg: 'rgba(127,119,221,0.12)', color: '#7F77DD', border: 'rgba(127,119,221,0.28)' },
-  admin: { bg: 'rgba(175,169,236,0.12)', color: '#AFA9EC', border: 'rgba(175,169,236,0.28)' },
-  bursary: { bg: 'rgba(206,203,246,0.12)', color: '#AFA9EC', border: 'rgba(206,203,246,0.28)' },
-  student_affairs: { bg: 'rgba(83,74,183,0.12)', color: '#AFA9EC', border: 'rgba(83,74,183,0.28)' },
+  bursary: { bg: 'rgba(206,203,246,0.12)', color: '#7F77DD', border: 'rgba(206,203,246,0.28)' },
+  student_affairs: { bg: 'rgba(83,74,183,0.12)', color: '#7F77DD', border: 'rgba(83,74,183,0.28)' },
 
   hostel: { bg: 'rgba(239,159,39,0.12)', color: '#EF9F27', border: 'rgba(239,159,39,0.28)' },
   staff_quarters: { bg: 'rgba(186,117,23,0.12)', color: '#FAC775', border: 'rgba(186,117,23,0.28)' },
 
+  food: { bg: 'rgba(249,115,22,0.12)', color: '#F97316', border: 'rgba(249,115,22,0.28)' },
+  shop: { bg: 'rgba(216,90,48,0.12)', color: '#D85A30', border: 'rgba(216,90,48,0.28)' },
   shopping: { bg: 'rgba(216,90,48,0.12)', color: '#F0997B', border: 'rgba(216,90,48,0.28)' },
   kiosk: { bg: 'rgba(240,153,123,0.12)', color: '#F0997B', border: 'rgba(240,153,123,0.28)' },
   bank: { bg: 'rgba(153,60,29,0.12)', color: '#F0997B', border: 'rgba(153,60,29,0.28)' },
@@ -37,10 +43,11 @@ export const ADMIN_BADGE_COLORS = {
 
   garage: { bg: 'rgba(136,135,128,0.12)', color: '#B4B2A9', border: 'rgba(136,135,128,0.28)' },
   bus_stop: { bg: 'rgba(95,94,90,0.12)', color: '#B4B2A9', border: 'rgba(95,94,90,0.28)' },
+  infrastructure: { bg: 'rgba(180,178,169,0.12)', color: '#B4B2A9', border: 'rgba(180,178,169,0.28)' },
   utility: { bg: 'rgba(180,178,169,0.12)', color: '#B4B2A9', border: 'rgba(180,178,169,0.28)' },
 
   mosque: { bg: 'rgba(250,199,117,0.12)', color: '#FAC775', border: 'rgba(250,199,117,0.28)' },
-  chapel: { bg: 'rgba(239,159,39,0.12)', color: '#FAC775', border: 'rgba(239,159,39,0.28)' },
+  chapel: { bg: 'rgba(192,132,252,0.12)', color: '#C084FC', border: 'rgba(192,132,252,0.28)' },
 
   gate: { bg: 'rgba(226,75,74,0.12)', color: '#E24B4A', border: 'rgba(226,75,74,0.28)' },
   entrance: { bg: 'rgba(226,75,74,0.12)', color: '#E24B4A', border: 'rgba(226,75,74,0.28)' },

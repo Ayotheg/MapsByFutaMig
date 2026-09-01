@@ -1,59 +1,76 @@
-// Ported verbatim from legacy app.js ~2459–2496 (`WP_ALL_TYPES`) — the
-// ordered [value, label] list used by the admin "Type" `<select>` in both
-// the edit-waypoint form and the add-point form. Order matters (it's the
-// dropdown's visual order), so this isn't derived from `wpTypeMeta.js`'s
-// `WP_TYPE_LABELS` object (whose key order isn't a contract) — kept as its
-// own explicit list, same as legacy.
+// ── Place-type dropdown options ──────────────────────────────────────────
+// Consolidated from the original 38-entry legacy-ported list down to 24
+// broad buckets, based on real DB usage data (three count/name queries run
+// against the live `waypoints` table — see chat/migration for the full
+// reasoning per merge) plus the person's own experience of having to
+// force-fit real campus places (gas shops, car washes, footwear, clothing)
+// into whatever was closest, because no correct option existed.
 //
-// One real difference from `WP_TYPE_LABELS`: legacy's dropdown list omits
-// `entrance` (which exists in `WP_TYPE_LABELS` but was seemingly dropped
-// from the selectable-types list — `gate` already covers the same
-// "Gate / Entrance" wording). Kept faithfully missing here too.
+// Two-layer model this list is part of:
+//   - `type` (this list): "what does the pin look like" — kept broad on
+//     purpose, so it never runs out of the same way again.
+//   - Quick Chip categories (`shared/placeCategories.js`'s
+//     CATEGORY_KEYWORDS): "what can someone search for" — carries all the
+//     specific vocabulary (shawarma, car wash, footwear, gas...) via
+//     keyword-matching against the waypoint's NAME, so consolidating `type`
+//     doesn't lose any search precision.
 //
-// `toilet` is a deliberate, person-requested addition on top of the
-// legacy list (no equivalent in legacy at all) — see wpTypeMeta.js's
-// header comment for why the rest of this list was otherwise left as-is
-// rather than pruned: the badge/dropdown mismatch the person reported
-// wasn't caused by garbage options *in* this list, it was caused by raw
-// DB `type` values that were never in this list to begin with. Fixed via
-// `resolveWaypointType()` instead of deleting real options here.
+// Merges folded into this list (old → new):
+//   admin       ← senate, bursary, student_affairs, admin, government, office
+//   food        ← cafe, restaurant, kiosk, fast_food
+//   shop        ← shopping, furniture, barber, laundry, convenience, beauty,
+//                 hairdresser, clothes, shoes, mobile_phone, computer,
+//                 interior_decoration, supermarket, beverages, vending_machine,
+//                 + gas shops / car washes previously force-fit into
+//                 utility/landmark (this is the bucket that fixes that)
+//   hall        ← hall, auditorium, arts_centre, social_centre
+//   clinic      ← clinic, pharmacy, hospital, chemist
+//   hostel      ← hostel, dormitory, off_campus_lodge, townhall (confirmed by
+//                 name to be student-accommodation naming, not event halls)
+//   infrastructure ← utility, security_post/security, police, fire_station,
+//                 warehouse, parking, parking_space
+//   landmark    ← landmark, poi, hazard, junction, and the true unclassifiable
+//                 remainder of the old OSM-import garbage types
+//   gate        ← gate, entrance (entrance was already dead/unselectable)
+// See waypoint_type_migration.sql for the full DB-side mapping.
 export const WP_ALL_TYPES = [
+  // Academic
   ['lecture_hall', 'Lecture Hall'],
   ['faculty', 'Faculty Building'],
   ['laboratory', 'Laboratory'],
   ['workshop', 'Workshop / Studio'],
   ['library', 'Library'],
-  ['senate', 'Senate Building'],
+
+  // Administration
   ['admin', 'Admin / Registry'],
-  ['bursary', 'Bursary / Finance'],
-  ['student_affairs', 'Student Affairs'],
+
+  // Residential
   ['hostel', 'Student Hostel'],
   ['staff_quarters', 'Staff Quarters'],
-  ['shopping', 'Shopping Complex'],
-  ['furniture', 'Furniture Shop'],
-  ['kiosk', 'Kiosk / Canteen'],
+
+  // Commercial
+  ['food', 'Food & Drinks'],
+  ['shop', 'Shop / Services'],
   ['printing_shop', 'Print Shop / Business Centre'],
-  ['cafe', 'Café / Snack Bar'],
-  ['restaurant', 'Restaurant / Eatery'],
-  ['pharmacy', 'Pharmacy / Chemist'],
-  ['barber', 'Barber / Salon'],
-  ['laundry', 'Laundry Service'],
   ['fuel', 'Fuel Station'],
   ['bank', 'Bank / ATM'],
+
+  // Recreational & health
   ['sports', 'Sports Facility'],
   ['hall', 'Multipurpose Hall'],
   ['clinic', 'Clinic / Health Centre'],
   ['toilet', 'Toilet / Restroom'],
-  ['auditorium', 'Auditorium'],
-  ['garage', 'Garage / Car Park'],
+
+  // Operational
+  ['garage', 'Garage / Motor Park'],
   ['bus_stop', 'Bus Stop'],
-  ['utility', 'Utility / Power'],
-  ['security_post', 'Security Post'],
+  ['infrastructure', 'Infrastructure / Utility'],
+
+  // Religious
   ['mosque', 'Mosque'],
   ['chapel', 'Chapel / Church'],
+
+  // Gates & campus zones
   ['gate', 'Gate / Entrance'],
   ['landmark', 'Landmark'],
-  ['poi', 'Point of Interest'],
-  ['hazard', 'Hazard'],
-  ['junction', 'Junction'],
 ];

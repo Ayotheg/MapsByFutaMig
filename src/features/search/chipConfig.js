@@ -36,17 +36,25 @@ import {
  *     instead of importing a static `CHIPS` constant.
  */
 
+// Sept 2026: updated for the 24-type consolidation (adminTypeOptions.js).
+// Pre-merge keys (kiosk, shopping, cafe, restaurant, pharmacy, barber,
+// laundry, senate, bursary, student_affairs, auditorium, utility,
+// security_post, entrance, junction, poi) kept alongside the new ones —
+// KML/OSM annotation data can still carry these as a raw `subtype`
+// independent of the waypoints table's now-consolidated `type` column.
 export const TYPE_COLORS = {
+  food: '#F97316', shop: '#D85A30',
   kiosk: '#F59E0B', shopping: '#F59E0B', bank: '#10B981',
   printing_shop: '#6366F1', cafe: '#F97316', restaurant: '#EF4444',
   pharmacy: '#EC4899', barber: '#0EA5E9', laundry: '#06B6D4', fuel: '#84CC16',
   library: '#9FE1CB', hostel: '#60A5FA', staff_quarters: '#60A5FA',
-  mosque: '#A78BFA', chapel: '#A78BFA', bus_stop: '#34D399',
+  mosque: '#A78BFA', chapel: '#C084FC', bus_stop: '#34D399',
   clinic: '#F87171', sports: '#FBBF24', hall: '#FBBF24', auditorium: '#FBBF24',
-  garage: '#94A3B8', utility: '#94A3B8', security_post: '#64748B', gate: '#E2E8F0',
+  garage: '#94A3B8', infrastructure: '#94A3B8', utility: '#94A3B8',
+  security_post: '#64748B', gate: '#E2E8F0',
   landmark: '#CBD5E1', entrance: '#CBD5E1', junction: '#CBD5E1', poi: '#CBD5E1',
   lecture_hall: '#378ADD', faculty: '#185FA5', laboratory: '#5DCAA5',
-  workshop: '#1D9E75', admin: '#AFA9EC', senate: '#7F77DD',
+  workshop: '#1D9E75', admin: '#7F77DD', senate: '#7F77DD',
   bursary: '#7F77DD', student_affairs: '#7F77DD', toilet: '#38BDF8',
 };
 export function dotColor(t) {

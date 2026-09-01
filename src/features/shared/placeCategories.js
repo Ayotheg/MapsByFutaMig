@@ -26,6 +26,17 @@
 // category. Narrow, specific keywords go first; broad catch-alls like
 // `kiosk` ("shop", "spot", "shopping") go last so they don't steal
 // matches that a more specific category should have owned.
+//
+// Sept 2026 addition: the underlying `type` field was consolidated from
+// 38 raw values down to 24 broad buckets (see `wpTypeMeta.js`/
+// `adminTypeOptions.js`). Several of the merged-away types (gas shops,
+// car washes, footwear, clothing, furniture, barber, laundry, fuel) had
+// no chip of their own before — this is the fix for that, and the reason
+// it's *possible* without adding back dropdown clutter: chip categories
+// match on NAME as much as TYPE, so a broad `type: 'shop'` waypoint named
+// "FUTA Car Wash" still resolves to the `car_wash` chip correctly. New
+// keys added below this line: shawarma, footwear, clothing, gas, fuel,
+// furniture, barber, laundry, car_wash.
 export const CHIP_CATEGORY_KEYS = [
   'toilet',
   'mosque',
@@ -37,6 +48,15 @@ export const CHIP_CATEGORY_KEYS = [
   'bus_stop',
   'gate',
   'bank',
+  'shawarma',
+  'car_wash',
+  'footwear',
+  'clothing',
+  'gas',
+  'fuel',
+  'furniture',
+  'barber',
+  'laundry',
   'restaurant',
   'sports',
   'lecture_hall',
@@ -49,7 +69,8 @@ export const CHIP_CATEGORY_KEYS = [
 // them in, which is deliberately NOT the same as the classification
 // priority order above (that one's optimized to avoid false-positive
 // overlaps between categories, this one's just "what order do the chips
-// appear in").
+// appear in"). New chips appended at the end rather than interleaved, so
+// the original 16 stay where admins already expect them.
 export const CHIP_DISPLAY_ORDER = [
   'toilet',
   'hostel',
@@ -67,13 +88,24 @@ export const CHIP_DISPLAY_ORDER = [
   'sports',
   'lecture_hall',
   'faculty',
+  'shawarma',
+  'car_wash',
+  'footwear',
+  'clothing',
+  'gas',
+  'fuel',
+  'furniture',
+  'barber',
+  'laundry',
 ];
 
-// Keyword lists ported directly from the person's spec. Matching is
-// substring-based against a normalized "name + type" string (underscores
-// -> spaces, lowercased), so "off_campus_lodge" as a TYPE matches the
-// `hostel` category's "lodge" keyword, and "Redemption Mansion Lodge" as
-// a NAME matches it too — either one bearing the keyword is enough.
+// Keyword lists ported directly from the person's spec (original 16),
+// plus the Sept 2026 additions covering what `type` consolidation folded
+// into the new `shop`/`food` buckets. Matching is substring-based against
+// a normalized "name + type" string (underscores -> spaces, lowercased),
+// so "off_campus_lodge" as a TYPE matches the `hostel` category's "lodge"
+// keyword, and "Redemption Mansion Lodge" as a NAME matches it too —
+// either one bearing the keyword is enough.
 export const CATEGORY_KEYWORDS = {
   toilet: ['toilet', 'restroom'],
   hostel: ['hostel', 'lodges', 'lodge', 'hall of residence', 'off campus lodge'],
@@ -99,11 +131,25 @@ export const CATEGORY_KEYWORDS = {
   sports: ['gym', 'gym center', 'gym centre', 'pitch', 'sport complex', 'sports complex', 'sport'],
   lecture_hall: ['lecture halls', 'lecture hall', 'lecture theatre', 'lecture theater'],
   faculty: ['faculty'],
+
+  // ── Sept 2026 additions — see CHIP_CATEGORY_KEYS header note ──────────
+  shawarma: ['shawarma'],
+  car_wash: ['car wash', 'carwash'],
+  footwear: ['footwear', 'shoe', 'shoes'],
+  clothing: ['clothes', 'clothing', 'boutique', 'wears'],
+  // 'gas' here means cooking-gas refill (common campus shop type),
+  // deliberately separate from 'fuel' (petrol/diesel stations) below —
+  // confirmed distinct in the person's own DB data.
+  gas: ['gas shop', 'cooking gas', 'gas refill', ' gas '],
+  fuel: ['fuel', 'petrol', 'diesel', 'filling station'],
+  furniture: ['furniture'],
+  barber: ['barber', 'salon', 'hairdresser', 'barbing'],
+  laundry: ['laundry', 'dry clean', 'dry cleaning'],
 };
 
-// Display metadata for the 16 default Quick Chips (label/icon).
-// `iconKey` looks up `lib/legacyIconMap.js`; every category has one, so
-// there's no emoji fallback to fall back to anymore.
+// Display metadata for the Quick Chips (label/icon). `iconKey` looks up
+// `lib/legacyIconMap.js`; every category has one, so there's no emoji
+// fallback to fall back to anymore.
 export const CATEGORY_LABELS = {
   toilet: 'Toilet',
   hostel: 'Hostel / Lodges',
@@ -121,6 +167,15 @@ export const CATEGORY_LABELS = {
   sports: 'Sports',
   lecture_hall: 'Lecture Halls',
   faculty: 'Faculty',
+  shawarma: 'Shawarma',
+  car_wash: 'Car Wash',
+  footwear: 'Footwear',
+  clothing: 'Clothing',
+  gas: 'Gas',
+  fuel: 'Fuel Station',
+  furniture: 'Furniture',
+  barber: 'Barber / Salon',
+  laundry: 'Laundry',
 };
 
 export const CATEGORY_ICON_KEYS = {
@@ -142,6 +197,15 @@ export const CATEGORY_ICON_KEYS = {
   sports: 'football',
   lecture_hall: 'building-fill',
   faculty: 'building-fill',
+  shawarma: 'restaurant-fill', // no dedicated shawarma icon in the inventory
+  car_wash: 'car-front',
+  footwear: 'shop', // no dedicated footwear/shoe icon in legacyIconMap.js
+  clothing: 'shop', // no dedicated clothing icon in legacyIconMap.js
+  gas: 'fuel', // closest available icon; distinct chip from `fuel` by keyword
+  fuel: 'fuel',
+  furniture: 'armchair',
+  barber: 'scissors',
+  laundry: 'shirt',
 };
 
 function norm(s) {

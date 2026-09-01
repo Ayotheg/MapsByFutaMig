@@ -41,6 +41,13 @@ export const TYPE_ICON_KEYS = {
   hall_of_residence: 'house-door-fill',
 
   // Commerce / services
+  // `food` and `shop` are the Sept 2026 consolidated broad types (see
+  // adminTypeOptions.js header) — the raw pre-merge keys below (shopping,
+  // furniture, cafe, restaurant, pharmacy, barber, laundry, fast_food) are
+  // kept too since KML/OSM annotation data can still carry those as a
+  // `subtype` string independent of the waypoints table's `type` column.
+  food: 'restaurant-fill',
+  shop: 'shop',
   shopping: 'shop',
   furniture: 'armchair',
   kiosk: 'shop',
@@ -68,6 +75,7 @@ export const TYPE_ICON_KEYS = {
   garage: 'car-front',
   parking: 'car-front',
   bus_stop: 'bus-front-fill',
+  infrastructure: 'zap', // Sept 2026 consolidated type (utility + security_post)
   utility: 'zap',
   security_post: 'shield',
   gate: 'gate-barrier',
