@@ -342,6 +342,7 @@ export default function MapPage({ onReadinessChange }) {
   const [mySubmissionsOpen, setMySubmissionsOpen] = useState(false);
   const [suggestPickedCoord, setSuggestPickedCoord] = useState(null);
   const [submissionToast, setSubmissionToast] = useState(null);
+  const dismissSubmissionToast = useCallback(() => setSubmissionToast(null), []);
   const suggestClickHandlerRef = useRef(null);
 
   useEffect(
@@ -724,7 +725,7 @@ export default function MapPage({ onReadinessChange }) {
           <MyWaypointSubmissionsPanel user={auth.user} onClose={() => setMySubmissionsOpen(false)} />
         </Suspense>
       )}
-      <SubmissionToast message={submissionToast} onDismiss={() => setSubmissionToast(null)} />
+      <SubmissionToast message={submissionToast} onDismiss={dismissSubmissionToast} />
     </>
   );
 }

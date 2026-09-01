@@ -11,7 +11,12 @@ import styles from './SubmissionToast.module.css';
  */
 export default function SubmissionToast({ message, onDismiss }) {
   useEffect(() => {
-    const t = setTimeout(onDismiss, 15000);
+    if (!message) return undefined;
+
+    const t = setTimeout(() => {
+      onDismiss?.();
+    }, 4000);
+
     return () => clearTimeout(t);
   }, [message, onDismiss]);
 
