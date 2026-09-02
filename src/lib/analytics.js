@@ -30,18 +30,39 @@ const ANON_ID_KEY = 'futa_anon_id';
 const SESSION_ID_KEY = 'futa_session_id';
 const FLUSH_INTERVAL_MS = 5000;
 
+function createStableUuid() {
+  const cryptoObj = typeof window !== 'undefined' ? window.crypto : globalThis.crypto;
+  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
+    return cryptoObj.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (cryptoObj && cryptoObj.getRandomValues) {
+    cryptoObj.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function readOrCreate(storage, key) {
   try {
     let v = storage.getItem(key);
     if (!v) {
-      v = crypto.randomUUID();
+      v = createStableUuid();
       storage.setItem(key, v);
     }
     return v;
   } catch {
     // Storage unavailable (private mode, disabled storage, etc.) — fall
     // back to an in-memory id for this page load rather than throwing.
-    return crypto.randomUUID();
+    return createStableUuid();
   }
 }
 

@@ -594,6 +594,8 @@ const NavigationController = forwardRef(function NavigationController(
     (p) => {
       const { latitude, longitude, accuracy } = p.coords;
       gps.lastKnownPosRef.current = p;
+      const speedKmh = (p.coords.speed || 0) * 3.6;
+      gps.applyMapRotation(p.coords.heading, speedKmh);
 
       if (typeof accuracy === 'number' && accuracy > MAX_USEFUL_ACCURACY_M) return;
 

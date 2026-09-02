@@ -181,11 +181,20 @@ export function useGpsTracking(map, { hidden = false, navigationMode = false } =
 
   const applyMapRotation = useCallback((headingDeg, speedKmh) => {
     if (!map || !map.getContainer) return;
+
     const container = map.getContainer();
+    if (!container) return;
+
+    const setContainerRotation = (deg) => {
+      container.style.transformOrigin = 'center center';
+      container.style.transform = `rotate(${deg}deg)`;
+      container.style.willChange = 'transform';
+    };
+
     if (!Number.isFinite(headingDeg) || headingDeg < 0 || headingDeg > 360) {
       if (!navigationModeRef.current && Math.abs(mapRotationRef.current) > 0.1) {
         container.style.transition = 'transform 700ms ease-out';
-        container.style.transform = 'rotate(0deg)';
+        setContainerRotation(0);
         mapRotationRef.current = 0;
       }
       return;
@@ -202,7 +211,7 @@ export function useGpsTracking(map, { hidden = false, navigationMode = false } =
     if (!moving && !navigationModeRef.current && delta < 15) return;
 
     container.style.transition = navigationModeRef.current ? 'transform 180ms ease-out' : 'transform 420ms ease-out';
-    container.style.transform = `rotate(${target}deg)`;
+    setContainerRotation(target);
     mapRotationRef.current = target;
     rotationThrottleRef.current = now;
   }, [map]);
@@ -382,7 +391,7 @@ export function useGpsTracking(map, { hidden = false, navigationMode = false } =
 
       if (!map._userInteracting) map.panTo(ll, { animate: true, duration: 0.8, easeLinearity: 0.5 });
     },
-    [map, smoothPos, updateGauge]
+    [map, smoothPos, updateGauge, applyMapRotation]
   );
 
   // Hide/restore dot+arrow markers when nav becomes active/inactive —
@@ -460,8 +469,9 @@ export function useGpsTracking(map, { hidden = false, navigationMode = false } =
     return () => {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
       if (map && map.getContainer) {
-        map.getContainer().style.transform = 'rotate(0deg)';
-        map.getContainer().style.transition = 'transform 200ms ease-out';
+        const container = map.getContainer();
+        container.style.transform = 'rotate(0deg)';
+        container.style.transition = 'transform 200ms ease-out';
       }
       drRef.current.stop();
     };
@@ -470,6 +480,7 @@ export function useGpsTracking(map, { hidden = false, navigationMode = false } =
   return {
     ...state,
     toggleTracking,
+    applyMapRotation,
     lastKnownPosRef,
   };
 }
