@@ -1,7 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { uploadImage, insertImageRows } from '../admin/adminSave';
 import { haversine } from '../../lib/geoUtils';
-import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
 import { track } from '../../lib/analytics';
 
 // ── Student waypoint submissions (Slice 13) ──────────────────────────────
@@ -21,8 +20,10 @@ const MAX_PENDING_PER_DAY = 5;
 const MAX_IMAGES_PER_SUBMISSION = 5;
 const DUPLICATE_RADIUS_METERS = 20;
 
-export function isWithinCampusBounds(lat, lng) {
-  return CAMPUS_BOUNDS.contains([lat, lng]);
+export function isWithinCampusBounds(_lat, _lng) {
+  // Campus-bounds restriction disabled — suggestions are no longer
+  // rejected for falling outside CAMPUS_BOUNDS.
+  return true;
 }
 
 /**
