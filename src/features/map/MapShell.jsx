@@ -39,8 +39,6 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     const map = L.map(containerRef.current, {
       center: initialView?.center || CAMPUS_CENTER,
       zoom: initialView?.zoom || 16,
-      maxBounds: CAMPUS_BOUNDS,
-      maxBoundsViscosity: 0.95,
       minZoom: 14,
       maxZoom: 19,
 
