@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
 
+import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
+import L from 'leaflet';
 // Same nudge constant/formula as legacy app.js `loadSavedWaypoints` — when
 // multiple waypoints share (near-)identical coordinates, fan them out in a
 // small spiral so pins don't render exactly on top of each other.
@@ -81,15 +83,15 @@ export function useWaypoints() {
 
     const shaped = [];
     for (const wp of wpRows || []) {
-      // Skip OSM-bulk-imported waypoints — rendered by the OSM layer
-      // instead (Slice 6), same as legacy. Rendering both here and there
-      // is exactly what causes the double-pin problem legacy avoided.
-      if (wp.source_type === 'osm_import') continue;
-
-      // numeric columns come back as strings over PostgREST — coerce
+            // numeric columns come back as strings over PostgREST — coerce
       // before doing any math or handing to Leaflet.
       const rawLat = Number(wp.lat);
       const rawLng = Number(wp.lng);
+
+      // Skip OSM-bulk-imported waypoints that fall inside the FUTA campus
+      // box — those still risk duplicating the live campus-only Overpass
+      // layer. Outside campus (e.g. Lagos/Ogun data), render normally.
+      if (wp.source_type === 'osm_import' && CAMPUS_BOUNDS.contains(L.latLng(rawLat, rawLng))) continue;
 
       const key = `${rawLat.toFixed(5)},${rawLng.toFixed(5)}`;
       posCount[key] = (posCount[key] || 0) + 1;
