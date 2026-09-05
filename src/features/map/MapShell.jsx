@@ -39,9 +39,17 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     const map = L.map(containerRef.current, {
       center: initialView?.center || CAMPUS_CENTER,
       zoom: initialView?.zoom || 16,
-      maxBounds: CAMPUS_BOUNDS,
-      maxBoundsViscosity: 0.95,
-      minZoom: 14,
+      // Deliberately NOT constrained to CAMPUS_BOUNDS here. The campus
+      // rectangle drawn below (`campusBoundaryRect`) stays exactly the
+      // same size/position as before — it's still shown as a reference
+      // overlay and still used everywhere else in the app (search bias,
+      // KML/waypoint validation, OSM annotation filtering — see
+      // `lib/campusBounds.js`). What's removed is *only* the hard drag/
+      // pan restriction, so students traveling in from other states can
+      // pan/zoom out to natural, real-world map context (their state,
+      // route into town, etc.) instead of being clamped to the campus
+      // box the moment they leave it.
+      minZoom: 5,
       maxZoom: 19,
 
       preferCanvas: true,
