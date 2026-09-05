@@ -35,3 +35,37 @@ export async function fetchNominatim(query, { limit = 4 } = {}) {
     source: 'osm',
   }));
 }
+
+/**
+ * Reverse-geocode a lat/lng via the same Nominatim (OSM) service
+ * `fetchNominatim` above already talks to — no new API, no key. Used by
+ * the "Find my location" speech announcement (see
+ * `features/navigation/announceLocation.js`) to turn a raw GPS fix into
+ * a road name + surrounding town/state, for students traveling in from
+ * other states who need "which expressway/town am I on" more than a
+ * coordinate pair.
+ *
+ * `zoom: 17` asks Nominatim for street-level detail (vs. the default
+ * ~city-level) so `address.road` is populated whenever OSM has the
+ * road/highway tagged, which is the specific detail the announcement
+ * leads with.
+ *
+ * Returns `null` (not a throw) on a malformed/error response so the
+ * caller's fallback logic doesn't need its own try/catch just to read
+ * `.address` — same "never block on geolocation" posture as
+ * `useOneShotLocation.js`/`chipConfig.js`.
+ */
+export async function reverseGeocode(lat, lng) {
+  const url =
+    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}` +
+    `&zoom=17&addressdetails=1`;
+
+  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+  const data = await res.json();
+  if (!data || data.error) return null;
+
+  return {
+    displayName: data.display_name || '',
+    address: data.address || {},
+  };
+}

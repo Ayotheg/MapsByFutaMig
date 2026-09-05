@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { haversine } from '../../lib/geoUtils';
 import { SMOOTH_WALK, SMOOTH_VEHICLE, VEHICLE_SPEED_KMH, TRAIL_MAX, tier } from './gpsConstants';
+import { announceCurrentLocation } from './announceLocation';
 import './navMapLayers.css';
 
 // ── Divicon caches, module-scope like legacy's `_dotIconCache`/`_arrowIconCache` ──
@@ -408,6 +409,19 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         navigator.geolocation.clearWatch(warmupWatchIdRef.current);
         warmupWatchIdRef.current = null;
       }
+
+      // Speak the current location out loud on every "Find my location"
+      // tap (both the mobile FAB and the desktop GPS panel call this
+      // same toggleTracking) — see announceLocation.js. Uses whatever
+      // fix the warm-up watcher already has (isWarmedUpRef is checked
+      // truthy above, so lastKnownPosRef.current is guaranteed set);
+      // fire-and-forget since it's a nice-to-have voice cue, not
+      // something tracking start should ever wait on or fail over.
+      const warmFix = lastKnownPosRef.current;
+      if (warmFix) {
+        announceCurrentLocation(warmFix.coords.latitude, warmFix.coords.longitude);
+      }
+
       isTrackingRef.current = true;
       smoothRef.current = { lat: null, lng: null };
       trailPtsRef.current = [];
