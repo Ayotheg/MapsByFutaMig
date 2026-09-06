@@ -1,5 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Camera, Cloud, CheckCircle2, CircleX, X } from 'lucide-react';
+import {
+  Camera,
+  Cloud,
+  CheckCircle2,
+  CircleX,
+  X,
+  MapPin,
+  Pencil,
+  ChevronDown,
+  Copy,
+  Lock,
+  Star,
+  Trash2,
+  Check,
+  ImagePlus,
+} from 'lucide-react';
 import styles from './AdminEditModal.module.css';
 import { WP_ALL_TYPES } from './adminTypeOptions';
 import { resolveWaypointType } from '../waypoints/wpTypeMeta';
@@ -145,6 +160,12 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
     return getPlaceImageUrl(storagePath);
   }
 
+  function handleCopyCoords() {
+    if (type !== 'waypoint') return;
+    const text = `${Number(editContext.data.lat).toFixed(6)}, ${Number(editContext.data.lng).toFixed(6)}`;
+    navigator.clipboard?.writeText(text).catch(() => {});
+  }
+
   function handleFilesChosen(e) {
     const files = Array.from(e.target.files || []);
     if (type === 'kml') {
@@ -258,10 +279,269 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
     }
   }
 
-  const title = type === 'waypoint' ? 'EDIT WAYPOINT' : type === 'segment' ? 'EDIT SEGMENT' : 'EDIT KML FEATURE';
+  const title = type === 'segment' ? 'EDIT SEGMENT' : 'EDIT KML FEATURE';
   const showDelete = type === 'waypoint' || type === 'segment';
 
   const kmlImageFiles = type === 'kml' ? adminKml.registry[editContext.path]?.features?.[editContext.idx]?.imageFiles || [] : [];
+
+  // ── Waypoint editor: redesigned desktop layout (Figma: MAPSBYFUTA /
+  // WAYPOINT, node 96:1928). Segment/KML editing below keeps the
+  // original console-style shell untouched.
+  if (type === 'waypoint') {
+    const shortId = editContext.id != null ? String(editContext.id).slice(0, 8) : '';
+    return (
+      <div className={styles.overlay}>
+        <div className={`${styles.modal} ${styles.modalWaypoint}`}>
+          <div className={styles.headerWaypoint}>
+            <div className={styles.headerWpLeft}>
+              <div className={styles.headerWpIcon}>
+                <MapPin size={20} />
+              </div>
+              <div>
+                <div className={styles.headerWpTitleRow}>
+                  <span className={styles.headerWpTitle}>Edit Waypoint</span>
+                  {shortId && (
+                    <span className={styles.headerWpBadge}>
+                      <span className={styles.headerWpBadgeDot} />
+                      Waypoint #{shortId}
+                    </span>
+                  )}
+                </div>
+                <div className={styles.headerWpSubtitle}>
+                  Manage details, coordinates, and public visibility for this campus spot
+                </div>
+              </div>
+            </div>
+            <button type="button" className={styles.closeWp} onClick={onClose}>
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className={`${styles.body} ${styles.bodyWaypoint}`}>
+            <div className={styles.wpField}>
+              <div className={styles.wpFieldHead}>
+                <span className={styles.wpLabel}>
+                  Place Name <span className={styles.wpLabelRequired}>*</span>
+                </span>
+                <span className={styles.wpHint}>Displayed to all users</span>
+              </div>
+              <div className={styles.wpInputWrap}>
+                <input
+                  className={styles.wpInput}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Waypoint name"
+                />
+                <span className={`${styles.wpInputIcon} ${styles.wpInputIconRight}`}>
+                  <Pencil size={14} />
+                </span>
+              </div>
+            </div>
+
+            <div className={styles.wpField}>
+              <div className={styles.wpFieldHead}>
+                <span className={styles.wpLabel}>Description / Note</span>
+                <span className={styles.wpHint}>Optional</span>
+              </div>
+              <textarea
+                className={styles.wpTextarea}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional note"
+              />
+            </div>
+
+            <div className={styles.wpRow}>
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>
+                    Category Type <span className={styles.wpLabelRequired}>*</span>
+                  </span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <select className={styles.wpSelect} value={wpType} onChange={(e) => setWpType(e.target.value)}>
+                    {WP_ALL_TYPES.map(([t, label]) => (
+                      <option key={t} value={t}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                    <MapPin size={16} />
+                  </span>
+                  <span className={styles.wpSelectChevron}>
+                    <ChevronDown size={16} />
+                  </span>
+                </div>
+              </div>
+
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>
+                    Coordinates <span className={styles.wpHintPill}>read-only</span>
+                  </span>
+                  <button type="button" className={styles.wpCopyBtn} onClick={handleCopyCoords}>
+                    <Copy size={12} /> Copy
+                  </button>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <div className={styles.wpCoordInput}>
+                    {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
+                  </div>
+                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                    <Lock size={16} />
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* "Feature in Explore" — the whole ask was "just me picking a
+                name on the map and featuring it", so this lives right in
+                the same edit form as everything else, no separate tab. */}
+            <div className={styles.wpExploreCard}>
+              <div className={styles.wpExploreLeft}>
+                <div className={styles.wpExploreIcon}>
+                  <Star size={16} />
+                </div>
+                <div>
+                  <div className={styles.wpExploreTitle}>Feature this place in Explore</div>
+                  <div className={styles.wpExploreSubtitle}>
+                    Spotlight this waypoint on the main campus discovery carousel
+                  </div>
+                </div>
+              </div>
+              <label className={styles.wpSwitch}>
+                <input type="checkbox" checked={isExplore} onChange={(e) => setIsExplore(e.target.checked)} />
+                <span className={styles.wpSwitchTrack} />
+                <span className={styles.wpSwitchThumb} />
+              </label>
+            </div>
+
+            {isExplore && (
+              <div className={styles.wpExploreExtra}>
+                <div className={styles.wpField}>
+                  <div className={styles.wpFieldHead}>
+                    <span className={styles.wpLabel}>Tags shown on the Explore card</span>
+                    <span className={styles.wpHint}>Comma separated</span>
+                  </div>
+                  <input
+                    className={styles.wpInput}
+                    style={{ paddingRight: 17 }}
+                    value={exploreTagsText}
+                    onChange={(e) => setExploreTagsText(e.target.value)}
+                    placeholder="e.g. Quick bite, Open late"
+                  />
+                </div>
+                <div className={styles.wpField}>
+                  <div className={styles.wpFieldHead}>
+                    <span className={styles.wpLabel}>Priority</span>
+                    <span className={styles.wpHint}>Higher shows first / more often</span>
+                  </div>
+                  <input
+                    className={styles.wpInput}
+                    style={{ paddingRight: 17 }}
+                    type="number"
+                    value={explorePriority}
+                    onChange={(e) => setExplorePriority(e.target.value)}
+                  />
+                </div>
+
+                <div className={styles.wpExploreCard}>
+                  <div className={styles.wpExploreLeft}>
+                    <div>
+                      <div className={styles.wpExploreTitle}>Promoted</div>
+                      <div className={styles.wpExploreSubtitle}>Shows an ad badge, pinned first</div>
+                    </div>
+                  </div>
+                  <label className={styles.wpSwitch}>
+                    <input type="checkbox" checked={isPromoted} onChange={(e) => setIsPromoted(e.target.checked)} />
+                    <span className={styles.wpSwitchTrack} />
+                    <span className={styles.wpSwitchThumb} />
+                  </label>
+                </div>
+
+                {isPromoted && (
+                  <div className={styles.wpRow}>
+                    <div className={styles.wpField}>
+                      <div className={styles.wpFieldHead}>
+                        <span className={styles.wpLabel}>Sponsor name</span>
+                      </div>
+                      <input
+                        className={styles.wpInput}
+                        style={{ paddingRight: 17 }}
+                        value={sponsorName}
+                        onChange={(e) => setSponsorName(e.target.value)}
+                        placeholder="e.g. Chicken Republic"
+                      />
+                    </div>
+                    <div className={styles.wpField}>
+                      <div className={styles.wpFieldHead}>
+                        <span className={styles.wpLabel}>Badge label</span>
+                      </div>
+                      <input
+                        className={styles.wpInput}
+                        style={{ paddingRight: 17 }}
+                        value={promoLabel}
+                        onChange={(e) => setPromoLabel(e.target.value)}
+                        placeholder="Promoted / Ad / Sponsored"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className={styles.wpField}>
+              <div className={styles.wpFieldHead}>
+                <span className={styles.wpLabel}>Place Photos</span>
+                <span className={styles.wpHint}>JPEG, PNG up to 10MB</span>
+              </div>
+              <div className={styles.wpPhotoGrid}>
+                {existingImages.map((img) => (
+                  <Thumb key={img.id} url={img.url} onRemove={() => removeExisting(img.id)} variant="grid" cover={img === existingImages[0]} />
+                ))}
+                {newFiles.map((f, i) => (
+                  <Thumb key={`new-${i}`} url={previewUrlFor(f)} onRemove={() => removeNew(i)} variant="grid" />
+                ))}
+                <div className={styles.wpDropzone} onClick={() => document.getElementById('adminImgInput')?.click()}>
+                  <div className={styles.wpDropzoneIcon}>
+                    <ImagePlus size={16} />
+                  </div>
+                  <div className={styles.wpDropzoneLabel}>
+                    Click to upload <span>or drag and drop</span>
+                  </div>
+                  <div className={styles.wpDropzoneNote}>
+                    {imagesLoading ? 'Loading…' : 'Add exterior or front-entrance photos'}
+                  </div>
+                </div>
+              </div>
+              <input id="adminImgInput" type="file" accept="image/*" multiple hidden onChange={handleFilesChosen} />
+            </div>
+
+            {status && (
+              <div className={`${styles.wpStatus} ${status.error ? styles.wpStatusError : styles.wpStatusSuccess}`}>
+                {status.icon && (status.error ? <CircleX size={13} /> : <CheckCircle2 size={13} />)} {status.text}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.footerWaypoint}>
+            <button type="button" className={styles.wpDeleteBtn} onClick={handleDelete} disabled={busy}>
+              <Trash2 size={16} /> Delete Waypoint
+            </button>
+            <div className={styles.wpFooterActions}>
+              <button type="button" className={styles.wpCancelBtn} onClick={onClose}>
+                Cancel
+              </button>
+              <button type="button" className={styles.wpSaveBtn} onClick={handleSave} disabled={busy}>
+                <Check size={16} /> Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.overlay}>
@@ -274,80 +554,6 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
         </div>
 
         <div className={styles.body}>
-        {type === 'waypoint' && (
-          <>
-            <Field label="Name *">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Waypoint name" />
-            </Field>
-            <Field label="Note / Description">
-              <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Optional note" />
-            </Field>
-            <Field label="Type">
-              <select value={wpType} onChange={(e) => setWpType(e.target.value)}>
-                {WP_ALL_TYPES.map(([t, label]) => (
-                  <option key={t} value={t}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Coordinates (read-only)">
-              <div className={styles.coordDisplay}>
-                {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
-              </div>
-            </Field>
-
-            {/* "Feature in Explore" — the whole ask was "just me picking a
-                name on the map and featuring it", so this lives right in
-                the same edit form as everything else, no separate tab. */}
-            <div className={styles.exploreSection}>
-              <label className={styles.checkboxRow}>
-                <input type="checkbox" checked={isExplore} onChange={(e) => setIsExplore(e.target.checked)} />
-                Feature this place in Explore
-              </label>
-
-              {isExplore && (
-                <>
-                  <Field label="Tags shown on the Explore card (comma separated)">
-                    <input
-                      value={exploreTagsText}
-                      onChange={(e) => setExploreTagsText(e.target.value)}
-                      placeholder="e.g. Quick bite, Open late"
-                    />
-                  </Field>
-                  <Field label="Priority (higher shows first / more often)">
-                    <input type="number" value={explorePriority} onChange={(e) => setExplorePriority(e.target.value)} />
-                  </Field>
-
-                  <label className={styles.checkboxRow}>
-                    <input type="checkbox" checked={isPromoted} onChange={(e) => setIsPromoted(e.target.checked)} />
-                    Promoted (shows an ad badge, pinned first)
-                  </label>
-
-                  {isPromoted && (
-                    <>
-                      <Field label="Sponsor name">
-                        <input
-                          value={sponsorName}
-                          onChange={(e) => setSponsorName(e.target.value)}
-                          placeholder="e.g. Chicken Republic"
-                        />
-                      </Field>
-                      <Field label="Badge label">
-                        <input
-                          value={promoLabel}
-                          onChange={(e) => setPromoLabel(e.target.value)}
-                          placeholder="Promoted / Ad / Sponsored"
-                        />
-                      </Field>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          </>
-        )}
-
         {type === 'segment' && (
           <>
             <Field label="Segment Name *">
@@ -507,7 +713,34 @@ function Field({ label, children }) {
   );
 }
 
-function Thumb({ url, onRemove }) {
+function Thumb({ url, onRemove, variant, cover }) {
+  if (variant === 'grid') {
+    return (
+      <div className={styles.wpThumbGridItem}>
+        <img
+          src={url}
+          onClick={(e) => {
+            e.stopPropagation();
+            window.open(url, '_blank');
+          }}
+          alt=""
+        />
+        {cover && <span className={styles.wpThumbCoverTag}>Cover</span>}
+        <button
+          type="button"
+          className={styles.wpThumbRemove}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          title="Remove"
+        >
+          <X size={12} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.imgThumbWrap}>
       <img
