@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { Fragment, useCallback, useState } from 'react';
 import styles from './LayersPanel.module.css';
 import PlaceTypeFilter from './PlaceTypeFilter';
 import { BASEMAP_STYLES, DEFAULT_BASEMAP_ID } from '../map/basemaps';
@@ -26,10 +26,17 @@ import { BASEMAP_STYLES, DEFAULT_BASEMAP_ID } from '../map/basemaps';
  * `map._setBasemap(id)` (wired in MapShell) to actually switch the tile
  * layer — a deliberate extension past legacy's single-option state, not
  * a re-port of it.
+ *
+ * `desktop` (Sept 2026, desktop Layers-panel light redesign, Figma node
+ * 96:1227): opt-in, defaults to false. `MobileSheet.jsx` never passes
+ * it, so mobile's render is byte-for-byte unchanged; `Sidebar.jsx`
+ * (desktop-only) passes it through to this component's own sections and
+ * down to `PlaceTypeFilter`. Presentational scope switch only.
  */
 export default function LayersPanel({
   map,
   typeVisibilityProps,
+  desktop = false,
 }) {
   // ── GPS Trail toggle — UI-only for now. Legacy guards every trail-layer
   // touch with `if (window.trailLine)`; that layer doesn't exist until
@@ -85,9 +92,12 @@ export default function LayersPanel({
     });
   }, []);
 
+  const Root = desktop ? 'div' : Fragment;
+  const rootProps = desktop ? { className: styles.desktopRoot } : {};
+
   return (
-    <>
-      <PlaceTypeFilter {...typeVisibilityProps} />
+    <Root {...rootProps}>
+      <PlaceTypeFilter {...typeVisibilityProps} desktop={desktop} />
 
       <div className={styles.sectionLabel}>Live Data</div>
       <div className={`${styles.layerRow} ${!trailOn ? styles.layerOff : ''}`}>
@@ -184,6 +194,6 @@ export default function LayersPanel({
           />
         </div>
       </div>
-    </>
+    </Root>
   );
 }

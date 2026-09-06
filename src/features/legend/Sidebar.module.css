@@ -39,12 +39,16 @@
 .logoIcon {
   width: 36px;
   height: 36px;
-  background: rgba(183, 109, 255, 0.15);
-  border: 1px solid rgba(183, 109, 255, 0.3);
+  background: var(--v2-primary-glow, rgba(183, 109, 255, 0.15));
+  border: 1px solid var(--v2-primary-outline, rgba(183, 109, 255, 0.3));
   border-radius: var(--r-lg);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.logoIcon img {
+  display: block;
+  object-fit: contain;
 }
 
 .rail {
@@ -90,11 +94,11 @@
 }
 .railBtn:hover {
   color: var(--text);
-  background: rgba(221, 183, 255, 0.06);
+  background: var(--v2-primary-glow, rgba(221, 183, 255, 0.06));
 }
 .railBtnActive {
-  color: var(--primary);
-  background: rgba(183, 109, 255, 0.14);
+  color: var(--v2-primary);
+  background: var(--v2-primary-outline, rgba(183, 109, 255, 0.14));
 }
 .railBtnActive::before {
   content: '';
@@ -104,7 +108,7 @@
   transform: translateY(-50%);
   width: 3px;
   height: 24px;
-  background: var(--primary);
+  background: var(--v2-primary);
   border-radius: 0 3px 3px 0;
 }
 
@@ -191,6 +195,48 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* ── Layers panel light redesign (Sept 2026, Figma node 96:1227) ─────────
+   Scoped to `.panelLayersLight` (only applied to the Layers tab's own
+   `.panel`, above, when `activeKey === 'layers'`) so the Explore/GPS
+   panels' existing dark-glass treatment is untouched. The rail and its
+   own logo/footer stay on the dark navy rail per the Figma reference —
+   only this drawer's surface goes light. */
+.panelLayersLight {
+  background: var(--v2-surface);
+  border-right: 1px solid var(--v2-divider);
+}
+.panelLayersLight .panelHeader {
+  background: rgba(255, 255, 255, 0.6);
+  border-bottom-color: var(--v2-divider);
+}
+.panelLayersLight .panelTitle {
+  color: var(--v2-neutral);
+}
+.panelLayersLight .panelSubtitle {
+  color: var(--v2-text-variant);
+}
+.panelLayersLight .panelBody {
+  scrollbar-color: var(--v2-divider) transparent;
+}
+
+.panelHeaderTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.activePill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-glow);
+  border: 1px solid var(--v2-primary-outline);
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+}
+
 /* Generic `.panel-header`/`.panel-title` shell (style.css ~296–309) —
    distinct from `.panelHeader` above, which is the Layers-only override.
    Used by the GPS Signal + Navigate panels (Slice 9), which use legacy's
@@ -256,8 +302,8 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  background: rgba(183, 109, 255, 0.08);
-  border: 1px solid rgba(183, 109, 255, 0.25);
+  background: var(--v2-primary-glow, rgba(183, 109, 255, 0.08));
+  border: 1px solid var(--v2-primary-outline, rgba(183, 109, 255, 0.25));
   color: var(--text);
   cursor: pointer;
   transition: background 0.18s, border-color 0.18s, transform var(--v2-duration-quick) var(--v2-ease-standard);
@@ -293,7 +339,7 @@
   height: 15px;
   padding: 0 3px;
   border-radius: 999px;
-  background: var(--primary, #a05aff);
+  background: var(--v2-primary, #a05aff);
   color: #fff;
   font-size: 9px;
   font-weight: 700;
@@ -303,8 +349,8 @@
 }
 .authBtn:hover,
 .adminBtn:hover {
-  background: rgba(183, 109, 255, 0.18);
-  border-color: rgba(183, 109, 255, 0.5);
+  background: var(--v2-primary-outline, rgba(183, 109, 255, 0.18));
+  border-color: var(--v2-primary, rgba(183, 109, 255, 0.5));
 }
 .authBtn span,
 .adminBtn span {
@@ -319,12 +365,12 @@
   height: 26px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1.5px solid var(--primary);
+  border: 1.5px solid var(--v2-primary);
 }
 .displayName {
   font-size: 6.5px;
   letter-spacing: 0.04em;
-  color: var(--primary);
+  color: var(--v2-primary);
   font-weight: 600;
   max-width: 48px;
   overflow: hidden;

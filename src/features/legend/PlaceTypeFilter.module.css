@@ -219,3 +219,82 @@
 .switch input:focus-visible ~ .switchTrack {
   box-shadow: 0 0 0 2px var(--primary);
 }
+
+/* ── Desktop light redesign (Sept 2026, Figma node 96:1227) ───────────────
+   Scoped entirely under `.desktopRoot`, only ever applied by `Sidebar.jsx`
+   (desktop-only, via `LayersPanel.jsx`'s own `desktop` passthrough). Every
+   rule above this point is untouched — the mobile bottom-sheet's render of
+   this same component stays byte-for-byte the same. Palette pulled from
+   tokens-v2.css. Category swatches (`--group-color`, `GROUP_ROWS`' pin
+   colors) are deliberately NOT touched here — those are shared with the
+   map's own pin colors (wpTypeMeta.js) and legend elsewhere, so recoloring
+   them would be a cross-app palette change, not a panel-scoped redesign. */
+.desktopRoot .sectionLabel {
+  color: var(--v2-text-variant);
+}
+.desktopRoot .resetBtn {
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+.desktopRoot .resetBtn:hover {
+  background: var(--v2-primary-outline);
+}
+
+.desktopRoot .group {
+  background: var(--v2-surface);
+  border-color: var(--v2-divider);
+}
+
+.desktopRoot .groupHeader {
+  background: transparent;
+  border-bottom-color: var(--v2-divider);
+}
+.desktopRoot .groupName {
+  color: var(--v2-neutral);
+}
+.desktopRoot .groupCount {
+  color: var(--v2-text-variant);
+  background: #fff;
+  border: 1px solid var(--v2-divider);
+}
+
+.desktopRoot .typeRow {
+  border-bottom-color: var(--v2-divider);
+}
+.desktopRoot .typeRow:hover {
+  background: rgba(15, 23, 42, 0.03);
+}
+.desktopRoot .typeOff .typeName {
+  text-decoration-color: var(--v2-muted);
+}
+.desktopRoot .typeName {
+  color: var(--v2-text);
+}
+.desktopRoot .typeCount {
+  color: var(--v2-text-variant);
+  background: #f1f5f9;
+}
+
+/* Track/knob switch — same shapes as the dark version, recolored. The
+   Figma frame's own "on" green (#14b8a6) is a hair off --v2-secondary
+   (#0d9488); reusing the token rather than forking a near-duplicate,
+   same call as tokens-v2.css's own precedent for close-but-not-exact
+   hexes elsewhere in this redesign pass. */
+.desktopRoot .switchTrack {
+  background: var(--v2-divider);
+  border-color: var(--v2-divider);
+}
+.desktopRoot .switchKnob {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
+}
+.desktopRoot .switch input:checked ~ .switchTrack {
+  background: var(--v2-secondary);
+  border-color: var(--v2-secondary);
+}
+.desktopRoot .switch input:checked ~ .switchTrack .switchKnob {
+  background: #fff;
+}
+.desktopRoot .switch input:focus-visible ~ .switchTrack {
+  box-shadow: 0 0 0 2px var(--v2-primary);
+}

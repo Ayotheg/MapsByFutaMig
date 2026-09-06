@@ -318,3 +318,125 @@
   transform: scale(1.28);
   box-shadow: 0 0 20px rgba(221, 183, 255, 0.85);
 }
+
+/* ── Desktop light redesign (Sept 2026, Figma node 96:1227) ───────────────
+   Scoped entirely under `.desktopRoot`, only ever applied by `Sidebar.jsx`
+   (desktop-only). Every rule above this point is untouched and still
+   governs the mobile bottom-sheet render byte-for-byte — these rules only
+   fire when the extra wrapping class is present. Palette pulled from
+   tokens-v2.css (the same v2 palette already used by AuthModal/GpsPanel/
+   LoadingScreen), not new one-off hexes, except where the Figma frame's
+   own value didn't map to an existing token within a hair (flagged
+   per-rule below, same convention as tokens-v2.css's own header notes). */
+.desktopRoot .sectionLabel {
+  color: var(--v2-text-variant);
+}
+.desktopRoot .layerRow {
+  border-bottom-color: var(--v2-divider);
+}
+.desktopRoot .layerRow:hover {
+  background: var(--v2-primary-glow);
+}
+.desktopRoot .layerIconWrap {
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-divider);
+}
+.desktopRoot .layerRow:hover .layerIconWrap {
+  background: #fff;
+}
+.desktopRoot .layerName {
+  color: var(--v2-neutral);
+}
+.desktopRoot .layerSub {
+  background: transparent;
+  border-top-color: var(--v2-divider);
+}
+.desktopRoot .layerSubDesc {
+  color: var(--v2-text-variant);
+}
+.desktopRoot .layerAction {
+  color: var(--v2-text-variant);
+  background: #fff;
+  border-color: var(--v2-divider);
+}
+.desktopRoot .layerAction:hover {
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+  border-color: var(--v2-primary-outline);
+}
+.desktopRoot .statusPill {
+  color: var(--v2-secondary);
+  background: rgba(13, 148, 136, 0.1);
+  border-color: rgba(13, 148, 136, 0.25);
+}
+.desktopRoot .statusGps {
+  color: var(--v2-primary);
+  background: var(--v2-primary-glow);
+  border-color: var(--v2-primary-outline);
+}
+.desktopRoot .statusStatic {
+  color: var(--v2-text-variant);
+  background: #fff;
+  border-color: var(--v2-divider);
+}
+
+/* Track/knob switch — reused verbatim as a shape, recolored for light. */
+.desktopRoot .lswitchTrack {
+  background: var(--v2-divider);
+  border-color: var(--v2-divider);
+}
+.desktopRoot .lswitchKnob {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.15);
+}
+.desktopRoot .lswitch input:checked ~ .lswitchTrack {
+  background: var(--v2-secondary);
+  border-color: var(--v2-secondary);
+}
+.desktopRoot .lswitch input:checked ~ .lswitchTrack .lswitchKnob {
+  background: #fff;
+}
+
+.desktopRoot .basemapThumb {
+  background: #fff;
+  border-color: var(--v2-divider);
+  color: var(--v2-text-variant);
+}
+.desktopRoot .basemapThumb:hover {
+  background: var(--v2-primary-glow);
+  border-color: var(--v2-primary-outline);
+  color: var(--v2-primary);
+}
+.desktopRoot .basemapThumb.active {
+  background: var(--v2-primary-glow);
+  border-color: var(--v2-primary);
+  color: var(--v2-primary);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.12);
+}
+
+.desktopRoot .opacitySection {
+  background: #fff;
+  border-color: var(--v2-divider);
+}
+.desktopRoot .opacityLabel {
+  color: var(--v2-text-variant);
+}
+.desktopRoot .opacityVal {
+  color: var(--v2-primary);
+}
+.desktopRoot .opacitySlider {
+  background: linear-gradient(
+    to right,
+    var(--v2-primary) 0%,
+    var(--v2-primary) var(--pct, 100%),
+    var(--v2-divider) var(--pct, 100%)
+  );
+}
+.desktopRoot .opacitySlider::-webkit-slider-thumb {
+  background: var(--v2-primary);
+  border: 2.5px solid #fff;
+  box-shadow: 0 0 10px var(--v2-primary-glow-strong);
+}
+.desktopRoot .opacitySlider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 16px var(--v2-primary-glow-strong);
+}

@@ -1,8 +1,9 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Compass, Rss, Navigation, CirclePlus, CircleUser, Shield, Sparkles } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
 import ExplorePanel from '../explore/ExplorePanel';
+import { GROUP_META } from './placeTypeGroups';
 import { displayName } from '../auth/useAuth';
 import { track } from '../../lib/analytics';
 import { readPersistentState, writePersistentState } from '../../lib/persistentState';
@@ -77,6 +78,18 @@ export default function Sidebar({
 
   useEffect(() => writePersistentState('sidebar-active-panel', activeKey), [activeKey]);
 
+  // Desktop Layers-panel light redesign (Sept 2026, Figma node 96:1227):
+  // the header's "N Active" pill counts how many of the real category
+  // groups (placeTypeGroups.js — already the 24-type consolidation) are
+  // currently fully toggled on, derived from the same `isGroupFullyVisible`
+  // PlaceTypeFilter itself already uses. Not a new piece of state — just a
+  // read of what's already tracked by `useTypeVisibility`.
+  const isGroupFullyVisible = typeVisibilityProps?.isGroupFullyVisible;
+  const activeGroupCount = useMemo(
+    () => (isGroupFullyVisible ? GROUP_META.filter((g) => isGroupFullyVisible(g.key)).length : GROUP_META.length),
+    [isGroupFullyVisible]
+  );
+
   // Slice 4: reflect collapsed state onto document.body, same
   // classList.toggle('sidebar-collapsed') approach legacy uses
   // (app.js ~3309/3320), so MapShell.module.css can react to it via a
@@ -123,16 +136,12 @@ export default function Sidebar({
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
       <div className={styles.logo}>
+        {/* Desktop redesign (Sept 2026, Figma node 96:1227): swapped from
+            the hand-drawn placeholder pin SVG to the real app icon, same
+            asset AuthModal.jsx already uses (`public/android-chrome-
+            512x512.png`), per explicit instruction. */}
         <div className={styles.logoIcon}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="10" r="4" stroke="var(--primary)" strokeWidth="1.8" />
-            <path
-              d="M12 2C7.03 2 3 6.03 3 11c0 5.25 7.5 11 9 11s9-5.75 9-11c0-4.97-4.03-9-9-9z"
-              stroke="var(--primary)"
-              strokeWidth="1.8"
-              fill="none"
-            />
-          </svg>
+          <img src="/android-chrome-512x512.png" alt="Maps By FUTA" width={24} height={24} />
         </div>
       </div>
 
@@ -156,15 +165,18 @@ export default function Sidebar({
       </nav>
 
       {!collapsed && activeKey === 'layers' && (
-        <div className={styles.panel}>
+        <div className={`${styles.panel} ${styles.panelLayersLight}`}>
           <div className={styles.panelHeader}>
             <div className={styles.panelHeaderTitles}>
-              <span className={styles.panelTitle}>Map Layers</span>
+              <div className={styles.panelHeaderTitleRow}>
+                <span className={styles.panelTitle}>Map Layers</span>
+                <span className={styles.activePill}>{activeGroupCount} Active</span>
+              </div>
               <span className={styles.panelSubtitle}>Map legend and data reference</span>
             </div>
           </div>
           <div className={styles.panelBody}>
-            <LayersPanel map={map} typeVisibilityProps={typeVisibilityProps} />
+            <LayersPanel map={map} typeVisibilityProps={typeVisibilityProps} desktop />
           </div>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import styles from './PlaceTypeFilter.module.css';
 import { GROUP_META, GROUP_ROWS } from './placeTypeGroups';
 
@@ -31,6 +32,14 @@ import { GROUP_META, GROUP_ROWS } from './placeTypeGroups';
  * one-off circular checkbox just in this section. All props/behavior
  * unchanged — `typeVisible`, `setTypeVisible`, counts, and group
  * visibility logic are untouched.
+ *
+ * `desktop` (Sept 2026, desktop Layers-panel light redesign — Figma node
+ * 96:1227): opt-in only, defaults to false so this component's existing
+ * consumer (`MobileSheet.jsx`, which never passes it) renders byte-for-
+ * byte the same dark-theme markup as before — mobile is untouched. When
+ * `Sidebar.jsx` (desktop-only) passes `desktop`, the root becomes a real
+ * element carrying `styles.desktopRoot` so the new light-theme rules
+ * below can scope to it; every other prop/handler/count is unchanged.
  */
 export default function PlaceTypeFilter({
   typeVisible,
@@ -39,9 +48,12 @@ export default function PlaceTypeFilter({
   typeCounts,
   groupCounts,
   isGroupFullyVisible,
+  desktop = false,
 }) {
+  const Root = desktop ? 'div' : Fragment;
+  const rootProps = desktop ? { className: styles.desktopRoot } : {};
   return (
-    <>
+    <Root {...rootProps}>
       <div className={styles.sectionLabel}>
         Place Types
         <button
@@ -103,6 +115,6 @@ export default function PlaceTypeFilter({
           );
         })}
       </div>
-    </>
+    </Root>
   );
 }
