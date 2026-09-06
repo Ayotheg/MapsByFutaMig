@@ -50,7 +50,7 @@ export default function DatabaseTab() {
       <div className={styles.card}>
         <div className={styles.cardTitle}>Row counts</div>
         {countsError && <div className={styles.errorNote}>{countsError}</div>}
-        {!counts && !countsError && <div style={{ fontSize: 11, color: 'var(--muted)' }}>Loading…</div>}
+        {!counts && !countsError && <div style={{ fontSize: 11, color: '#94a3b8' }}>Loading…</div>}
         {counts && (
           <div className={styles.statGrid}>
             {counts.map((row) => (
@@ -74,9 +74,9 @@ export default function DatabaseTab() {
       <div className={styles.card}>
         <div className={styles.cardTitle}>Recent signups</div>
         {signupsError && <div className={styles.errorNote}>{signupsError}</div>}
-        {!signups && !signupsError && <div style={{ fontSize: 11, color: 'var(--muted)' }}>Loading…</div>}
+        {!signups && !signupsError && <div style={{ fontSize: 11, color: '#94a3b8' }}>Loading…</div>}
         {signups && signups.length === 0 && (
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>No signups yet.</div>
+          <div style={{ fontSize: 11, color: '#94a3b8' }}>No signups yet.</div>
         )}
         {signups && signups.length > 0 && (
           <div className={styles.rankedList}>

@@ -31,7 +31,7 @@ import { track } from '../../lib/analytics';
  * submitted name currently needs an outright reject-and-resubmit rather
  * than a quick inline fix.
  */
-export default function PendingTab({ onRefreshWaypoints }) {
+export default function PendingTab({ onRefreshWaypoints, onCountChange }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -85,6 +85,13 @@ export default function PendingTab({ onRefreshWaypoints }) {
           submitterName: names[w.submitted_by] || (w.submitted_by ? `Student (${w.submitted_by.slice(0, 8)}…)` : 'Unknown'),
         }))
       );
+      // Slice 15: report the live count up to AdminPanel so the "Pending"
+      // tab button itself can show a badge (Figma: MAPSBYFUTA / ADMIN
+      // PANEL, node 96:1641) without AdminPanel needing its own separate
+      // query — this component already fetches these rows every time it
+      // loads or mutates one, so piggybacking here keeps the count exact
+      // and avoids a second, redundant Supabase call.
+      onCountChange?.((wpRows || []).length);
     } catch (e) {
       setError(e.message || 'Could not load pending submissions.');
     } finally {

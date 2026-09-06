@@ -1,51 +1,20 @@
 /*
- * Body-content styles for AdminEditModal, PLUS (as of this revert) its own
- * local copy of the overlay/modal/header/title/close/body/footer shell.
- *
- * Legacy source: style.css ~1781–1856 (`.admin-field-group`/`.admin-form-*`)
- * + ~2019–2082 (`.admin-coord-display`/`.admin-save-status`/
- * `.admin-img-*`).
- *
- * ── Reverted off the shared Modal shell (this session) ─────────────────
- * This used to just be body-content styles, with the shell coming from
- * `src/components/ui/Modal.module.css` (Slice 5's precedent). The
- * Waypoint-suggestion session redesigned *that shared file* to its v2
- * contract (light `--v2-surface` theme, Bricolage title, `1fr 2fr`
- * two-button footer grid) for `SuggestWaypointModal` — see
- * UI_REDESIGN_GUIDE.md's "Waypoint suggestion" entry, which explicitly
- * flags that every other consumer of the shared shell (this component
- * included) would inherit that v2 chrome immediately, before its own
- * session ever ran. Admin panel is still "Not started" in that guide's
- * own tracking table, so this component inheriting v2 styling (and a
- * 2-column footer grid that clips the 3rd button on `type: 'waypoint'`/
- * `'segment'`, which render Delete+Cancel+Save) was an unintended
- * side-effect, not a deliberate redesign of this screen.
- *
- * Per the same guide's note on `ReviewModal` ("Adding a variant prop to
- * `Modal.jsx` ... out of scope per Rule 1 [no premature shared
- * abstraction]. Instead, `ReviewModal` stopped using `Modal`/
- * `Modal.module.css` at all") this component follows the same
- * precedent: `AdminEditModal.jsx` no longer imports the shared `Modal`
- * component or its stylesheet at all, and instead renders its own
- * overlay/header/close/footer markup below, styled with the *exact*
- * pre-v2 CSS the shared file had (byte-for-byte, restored from the
- * pre-redesign build) rather than a fresh approximation. `.footer` also
- * goes back to `display:flex` (equal-width flex children) instead of
- * v2's `1fr 2fr` grid, since this modal's footer needs to support 2
- * buttons (Cancel/Save, `type: 'kml'`) *or* 3 (Delete/Cancel/Save,
- * `type: 'waypoint'`/`'segment'`) depending on `showDelete` — a fixed
- * 2-column grid can only ever fit one of those correctly.
- *
- * `SuggestWaypointModal` (and anything else intentionally redesigned)
- * keeps consuming the shared `Modal.module.css` as-is — this only
- * un-inherits the v2 shell for this one still-"Not started" screen.
+ * Body-content + shell styles for AdminEditModal — recolored Sept 2026 to
+ * match the admin panel's new light "console" look (Figma: MAPSBYFUTA /
+ * ADMIN PANEL, node 96:1641; this modal itself isn't in that frame, but
+ * shares its palette so opening it from a restyled list doesn't dump the
+ * admin into a jarring dark modal mid-flow). No structural change from the
+ * previous version — same overlay/header/close/body/footer shell, same
+ * reasons for owning that shell directly rather than the shared
+ * `components/ui/Modal.jsx` (see git history / prior header comment here
+ * for the full "why", still accurate); only color values changed.
  */
 
 .overlay {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: flex;
@@ -55,14 +24,14 @@
 }
 
 .modal {
-  background: #0e1628;
-  border: 1px solid var(--outline-dim);
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: var(--r-xl);
   width: 100%;
   max-width: 480px;
   max-height: 88vh;
   overflow-y: auto;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(221, 183, 255, 0.08);
+  box-shadow: 0 24px 64px -12px rgba(15, 23, 42, 0.35), 0 0 0 1px rgba(124, 58, 237, 0.06);
 }
 
 .header {
@@ -70,10 +39,11 @@
   justify-content: space-between;
   align-items: center;
   padding: 18px 20px 14px;
-  border-bottom: 1px solid var(--outline-dim);
+  border-bottom: 1px solid #f1f5f9;
   position: sticky;
   top: 0;
-  background: #0e1628;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(6px);
   z-index: 1;
 }
 
@@ -82,15 +52,15 @@
   font-weight: 700;
   font-size: 12px;
   letter-spacing: 0.12em;
-  color: var(--primary);
+  color: #7c3aed;
   text-transform: uppercase;
 }
 
 .close {
-  background: rgba(255, 255, 255, 0.06);
+  background: #f1f5f9;
   border: none;
   border-radius: var(--r-sm);
-  color: var(--muted);
+  color: #64748b;
   font-size: 14px;
   width: 28px;
   height: 28px;
@@ -101,8 +71,8 @@
   transition: background 0.2s, color 0.2s;
 }
 .close:hover {
-  background: rgba(255, 180, 171, 0.2);
-  color: var(--error);
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .body {
@@ -116,8 +86,8 @@
   display: flex;
   gap: 8px;
   padding: 12px 16px 16px;
-  border-top: 1px solid rgba(183, 109, 255, 0.1);
-  background: rgba(183, 109, 255, 0.02);
+  border-top: 1px solid #f1f5f9;
+  background: #f8f9fc;
 }
 
 /* ── Footer button variants ──────────────────────────────────────────── */
@@ -146,34 +116,34 @@
   cursor: default;
 }
 .btnPrimary {
-  background: linear-gradient(135deg, var(--primary-container) 0%, #9040e0 100%);
+  background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
   color: #fff;
-  border: 1px solid rgba(221, 183, 255, 0.2);
-  box-shadow: 0 4px 16px rgba(183, 109, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 .btnPrimary:hover:not(:disabled) {
-  box-shadow: 0 6px 24px rgba(183, 109, 255, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 6px 24px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
 .btnSecondary {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--muted);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
 }
 .btnSecondary:hover:not(:disabled) {
-  border-color: rgba(183, 109, 255, 0.35);
-  color: var(--primary);
-  background: rgba(183, 109, 255, 0.07);
+  border-color: rgba(124, 58, 237, 0.35);
+  color: #7c3aed;
+  background: #f5f3ff;
 }
 .btnDanger {
-  background: rgba(255, 80, 60, 0.08);
-  border: 1px solid rgba(255, 180, 171, 0.2);
-  color: var(--error);
+  background: #fef2f2;
+  border: 1px solid rgba(254, 202, 202, 0.7);
+  color: #b91c1c;
 }
 .btnDanger:hover:not(:disabled) {
-  background: rgba(255, 80, 60, 0.18);
-  border-color: rgba(255, 180, 171, 0.45);
-  box-shadow: 0 2px 12px rgba(255, 60, 40, 0.2);
+  background: #fee2e2;
+  border-color: rgba(252, 165, 165, 0.9);
+  box-shadow: 0 2px 12px rgba(220, 38, 38, 0.15);
   transform: translateY(-1px);
 }
 
@@ -204,30 +174,35 @@
   font-family: var(--font-mono);
   font-size: 8px;
   letter-spacing: 0.14em;
-  color: var(--muted);
+  color: #94a3b8;
   text-transform: uppercase;
 }
 .fieldGroup input,
 .fieldGroup select,
 .fieldGroup textarea {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #fff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  color: var(--text);
+  color: #0f172a;
   font-family: var(--font-ui);
   font-size: 12px;
   padding: 7px 10px;
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
+.fieldGroup input::placeholder,
+.fieldGroup textarea::placeholder {
+  color: #94a3b8;
+}
 .fieldGroup input:focus,
 .fieldGroup select:focus,
 .fieldGroup textarea:focus {
-  border-color: rgba(183, 109, 255, 0.45);
-  box-shadow: 0 0 0 3px rgba(183, 109, 255, 0.08);
+  border-color: rgba(124, 58, 237, 0.4);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08);
 }
 .fieldGroup select option {
-  background: #080d1a;
+  background: #fff;
+  color: #0f172a;
 }
 .fieldGroup textarea {
   resize: vertical;
@@ -237,8 +212,9 @@
 .coordDisplay {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: rgba(218, 226, 253, 0.4);
-  background: rgba(255, 255, 255, 0.03);
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
   border-radius: 7px;
   padding: 8px 12px;
   margin-top: 2px;
@@ -246,8 +222,8 @@
 .sourceTag {
   font-family: var(--font-mono);
   font-size: 9px;
-  color: rgba(218, 226, 253, 0.35);
-  background: rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+  background: #f1f5f9;
   border-radius: 4px;
   padding: 1px 6px;
   margin-left: 6px;
@@ -264,18 +240,18 @@
   margin-top: 8px;
 }
 .saveStatusSuccess {
-  background: rgba(68, 226, 205, 0.08);
-  color: var(--secondary);
-  border: 1px solid rgba(68, 226, 205, 0.18);
+  background: #f0fdfa;
+  color: #0f766e;
+  border: 1px solid rgba(153, 246, 228, 0.6);
 }
 .saveStatusError {
-  background: rgba(255, 180, 171, 0.08);
-  color: var(--error);
-  border: 1px solid rgba(255, 180, 171, 0.18);
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid rgba(254, 202, 202, 0.6);
 }
 
 .imgZone {
-  border: 1.5px dashed var(--outline-dim);
+  border: 1.5px dashed #e2e8f0;
   border-radius: 10px;
   padding: 14px;
   text-align: center;
@@ -283,22 +259,23 @@
   transition: border-color 0.2s, background 0.2s;
 }
 .imgZone:hover {
-  border-color: var(--primary-container);
-  background: rgba(183, 109, 255, 0.04);
+  border-color: rgba(124, 58, 237, 0.4);
+  background: #f5f3ff;
 }
 .imgZoneLabel {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--muted);
+  color: #64748b;
   margin-bottom: 10px;
 }
 .loadingNote {
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--muted);
+  color: #94a3b8;
 }
 .imgThumbs {
   display: flex;
@@ -316,21 +293,21 @@
   width: 72px;
   height: 72px;
   object-fit: cover;
-  border-radius: 6px;
-  border: 1.5px solid var(--outline-dim);
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
   cursor: pointer;
   transition: border-color 0.15s;
 }
 .imgThumb:hover {
-  border-color: var(--primary-container);
+  border-color: rgba(124, 58, 237, 0.5);
 }
 .imgRemove {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  background: var(--error-container);
-  color: white;
-  border: none;
+  top: -6px;
+  right: -6px;
+  background: #dc2626;
+  color: #fff;
+  border: 2px solid #fff;
   border-radius: 50%;
   width: 18px;
   height: 18px;
@@ -343,26 +320,31 @@
   transition: background 0.15s;
 }
 .imgRemove:hover {
-  background: #c00;
+  background: #b91c1c;
 }
 
-/* Legacy: `aeKmlImportBtn`, inline-styled rather than classed
-   (app.js ~4010) — `background:#00c896;color:#000` reproduced as-is. */
+/* Legacy: `aeKmlImportBtn`, kept its own solid brand-teal styling
+   (distinct from the violet primary button) since it triggers a
+   different, heavier action (writes to Supabase, not just local state). */
 .importBtn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: #00c896;
-  color: #000;
+  background: #0d9488;
+  color: #fff;
   width: 100%;
   font-weight: bold;
   border: none;
-  border-radius: 6px;
-  padding: 8px;
+  border-radius: 8px;
+  padding: 9px;
   cursor: pointer;
   margin-top: 8px;
   font-family: var(--font-ui);
+  transition: background 0.15s;
+}
+.importBtn:hover:not(:disabled) {
+  background: #0f766e;
 }
 .importBtn:disabled {
   opacity: 0.5;
@@ -375,8 +357,8 @@
   margin-top: 4px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid #f1f5f9;
+  background: #f8f9fc;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -390,6 +372,6 @@
   font-size: 9px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text);
+  color: #334155;
   cursor: pointer;
 }

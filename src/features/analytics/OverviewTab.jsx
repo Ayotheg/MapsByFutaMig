@@ -26,9 +26,9 @@ export default function OverviewTab() {
   }, []);
 
   if (error) return <div className={styles.errorNote}>{error}</div>;
-  if (!rows) return <div style={{ fontSize: 11, color: 'var(--muted)' }}>Loading…</div>;
+  if (!rows) return <div style={{ fontSize: 11, color: '#94a3b8' }}>Loading…</div>;
   if (rows.length === 0) {
-    return <div style={{ fontSize: 11, color: 'var(--muted)' }}>No traffic recorded yet.</div>;
+    return <div style={{ fontSize: 11, color: '#94a3b8' }}>No traffic recorded yet.</div>;
   }
 
   const chartData = rows.map((r) => ({
@@ -69,11 +69,11 @@ export default function OverviewTab() {
         <div className={styles.chartWrap}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip contentStyle={{ background: '#171f33', border: '1px solid rgba(255,255,255,0.1)', fontSize: 11 }} />
-              <Line type="monotone" dataKey="unique" stroke="var(--primary)" strokeWidth={2} dot={false} name="Unique visitors" />
+              <CartesianGrid stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(15,23,42,0.08)', fontSize: 11 }} />
+              <Line type="monotone" dataKey="unique" stroke="#7c3aed" strokeWidth={2} dot={false} name="Unique visitors" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -84,12 +84,12 @@ export default function OverviewTab() {
         <div className={styles.chartWrap}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip contentStyle={{ background: '#171f33', border: '1px solid rgba(255,255,255,0.1)', fontSize: 11 }} />
-              <Bar dataKey="unique" stackId="a" fill="var(--primary-container)" name="Total unique" radius={[3, 3, 0, 0]} />
-              <Bar dataKey="loggedIn" stackId="b" fill="var(--secondary)" name="Signed-in" radius={[3, 3, 0, 0]} />
+              <CartesianGrid stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(15,23,42,0.08)', fontSize: 11 }} />
+              <Bar dataKey="unique" stackId="a" fill="#9333ea" name="Total unique" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="loggedIn" stackId="b" fill="#0d9488" name="Signed-in" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -100,11 +100,11 @@ export default function OverviewTab() {
         <div className={styles.chartWrap}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-              <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip contentStyle={{ background: '#171f33', border: '1px solid rgba(255,255,255,0.1)', fontSize: 11 }} />
-              <Bar dataKey="sessions" fill="var(--tertiary)" radius={[3, 3, 0, 0]} />
+              <CartesianGrid stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="day" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(15,23,42,0.08)', fontSize: 11 }} />
+              <Bar dataKey="sessions" fill="#d97706" radius={[3, 3, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

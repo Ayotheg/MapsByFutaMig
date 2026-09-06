@@ -41,9 +41,9 @@ export default function JourneysTab() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className={styles.card}>
         <div className={styles.cardTitle}>Recent sessions</div>
-        {!sessions && <div style={{ fontSize: 11, color: 'var(--muted)' }}>Loading…</div>}
+        {!sessions && <div style={{ fontSize: 11, color: '#94a3b8' }}>Loading…</div>}
         {sessions && sessions.length === 0 && (
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>No sessions recorded yet.</div>
+          <div style={{ fontSize: 11, color: '#94a3b8' }}>No sessions recorded yet.</div>
         )}
         <div className={adminStyles.list}>
           {(sessions || []).map((s) => (
@@ -69,9 +69,9 @@ export default function JourneysTab() {
         <div className={styles.card}>
           <div className={styles.cardTitle}>Timeline</div>
           {eventsError && <div className={styles.errorNote}>{eventsError}</div>}
-          {!events && !eventsError && <div style={{ fontSize: 11, color: 'var(--muted)' }}>Loading…</div>}
+          {!events && !eventsError && <div style={{ fontSize: 11, color: '#94a3b8' }}>Loading…</div>}
           {events && events.length === 0 && (
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>No events for this session.</div>
+            <div style={{ fontSize: 11, color: '#94a3b8' }}>No events for this session.</div>
           )}
           {events && events.length > 0 && (
             <div className={styles.timeline}>

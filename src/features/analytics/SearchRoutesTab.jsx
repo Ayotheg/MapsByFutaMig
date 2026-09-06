@@ -38,30 +38,30 @@ export default function SearchRoutesTab() {
   }, [rows]);
 
   if (error) return <div className={styles.errorNote}>{error}</div>;
-  if (!rows) return <div style={{ fontSize: 11, color: 'var(--muted)' }}>Loading…</div>;
+  if (!rows) return <div style={{ fontSize: 11, color: '#94a3b8' }}>Loading…</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className={styles.card}>
         <div className={styles.cardTitle}>Top searched places — last 30 days</div>
         {topSearches.length === 0 ? (
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>No searches recorded yet.</div>
+          <div style={{ fontSize: 11, color: '#94a3b8' }}>No searches recorded yet.</div>
         ) : (
           <div className={styles.chartWrap}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topSearches} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke="rgba(255,255,255,0.06)" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
+                <CartesianGrid stroke="#e2e8f0" horizontal={false} />
+                <XAxis type="number" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis
                   type="category"
                   dataKey="label"
-                  tick={{ fontSize: 9, fill: 'var(--text)' }}
+                  tick={{ fontSize: 9, fill: '#0f172a' }}
                   axisLine={false}
                   tickLine={false}
                   width={90}
                 />
-                <Tooltip contentStyle={{ background: '#171f33', border: '1px solid rgba(255,255,255,0.1)', fontSize: 11 }} />
-                <Bar dataKey="count" fill="var(--tertiary)" radius={[0, 3, 3, 0]} />
+                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(15,23,42,0.08)', fontSize: 11 }} />
+                <Bar dataKey="count" fill="#d97706" radius={[0, 3, 3, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -71,7 +71,7 @@ export default function SearchRoutesTab() {
       <div className={styles.card}>
         <div className={styles.cardTitle}>Top routes — last 30 days</div>
         {topRoutes.length === 0 ? (
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>No navigations recorded yet.</div>
+          <div style={{ fontSize: 11, color: '#94a3b8' }}>No navigations recorded yet.</div>
         ) : (
           <div className={styles.rankedList}>
             {topRoutes.map((r, i) => (

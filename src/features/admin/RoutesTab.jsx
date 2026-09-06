@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Route, Camera, ChevronRight } from 'lucide-react';
+import { Route, Camera, ChevronRight, Search } from 'lucide-react';
 import styles from './AdminPanel.module.css';
 import { badgeStyleFor } from './adminBadgeColors';
 
@@ -17,42 +17,52 @@ export default function RoutesTab({ segments, onEditSegment }) {
     <div className={styles.tabContent}>
       <div className={styles.toolbar}>
         <div className={styles.countBadge}>
-          {filtered.length} of {segments.length} routes
+          <span className={styles.countBadgeDot} />
+          {filtered.length} <span className={styles.countBadgeMuted}>of {segments.length} routes</span>
         </div>
-        <input
-          type="text"
-          className={styles.searchInput}
-          placeholder="Search routes…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className={styles.searchWrap}>
+          <span className={styles.searchIcon}>
+            <Search size={16} />
+          </span>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search routes…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
       <div className={styles.list}>
         {filtered.length === 0 && <div className={styles.empty}>No segments found.</div>}
         {filtered.map((seg) => {
           const photoCount = seg.imageUrls?.length || 0;
+          const badge = badgeStyleFor('road');
           return (
             <div key={seg.id} className={styles.item} onClick={() => onEditSegment(seg)}>
-              <div className={styles.itemIcon}>
+              <div className={styles.itemIcon} style={{ background: badge.background, borderColor: badge.borderColor, color: badge.color }}>
                 <Route size={16} />
               </div>
               <div className={styles.itemBody}>
-                <div className={styles.itemName}>{seg.name || '(unnamed)'}</div>
-                <div className={styles.itemMeta}>
-                  {seg.category || 'route'} · {((seg.distance || 0) / 1000).toFixed(2)} km · {(seg.waypoints || []).length}{' '}
-                  waypoints
+                <div className={styles.itemTopRow}>
+                  <div className={styles.itemNameGroup}>
+                    <div className={styles.itemName}>{seg.name || '(unnamed)'}</div>
+                    {photoCount > 0 && (
+                      <span className={styles.itemPhotoBadge}>
+                        <Camera size={10} /> {photoCount}
+                      </span>
+                    )}
+                  </div>
+                  <span className={styles.itemBadge} style={badge}>
+                    {seg.category || 'route'}
+                  </span>
+                </div>
+                <div className={styles.itemDesc}>
+                  {((seg.distance || 0) / 1000).toFixed(2)} km · {(seg.waypoints || []).length} waypoints
                 </div>
               </div>
-              {photoCount > 0 && (
-                <span className={styles.itemPhotoBadge}>
-                  <Camera size={11} /> {photoCount}
-                </span>
-              )}
-              <span className={styles.itemBadge} style={badgeStyleFor('road')}>
-                {seg.category || 'route'}
-              </span>
               <span className={styles.itemChevron}>
-                <ChevronRight size={14} />
+                <ChevronRight size={16} />
               </span>
             </div>
           );

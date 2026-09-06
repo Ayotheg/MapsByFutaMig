@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { CheckCircle2, CircleX, Folder, Waypoints, MapPin, Camera, ChevronRight } from 'lucide-react';
 import styles from './AdminPanel.module.css';
+import { badgeStyleFor } from './adminBadgeColors';
 
 /** Legacy: the KML-upload markup (index.html ~910–940) + `buildKmlAdminList`
  * (app.js ~3809–3850). `adminKml` is the `useAdminKml()` result, lifted to
@@ -43,7 +44,7 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
   return (
     <div className={styles.tabContent}>
       <div className={styles.kmlUploadArea}>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ color: 'var(--primary)', opacity: 0.7 }}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ color: '#7c3aed', opacity: 0.7 }}>
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
           <line x1="12" y1="18" x2="12" y2="12" />
@@ -96,8 +97,8 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
         {entries.length === 0 && <div className={styles.empty}>No KML loaded yet.</div>}
         {entries.map(([filePath, file]) => (
           <div key={filePath}>
-            <div className={styles.item} style={{ cursor: 'default', borderBottom: `2px solid ${file.color}44`, paddingBottom: 4, marginBottom: 4 }}>
-              <div className={styles.itemIcon}>
+            <div className={styles.item} style={{ cursor: 'default', borderBottom: `2px solid ${file.color}44`, marginBottom: 8 }}>
+              <div className={styles.itemIcon} style={{ background: '#fff', borderColor: `${file.color}55`, color: file.color }}>
                 <Folder size={16} />
               </div>
               <div className={styles.itemBody}>
@@ -105,7 +106,9 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
                   {file.label}
                 </div>
                 <div className={styles.itemMeta}>
-                  {filePath} · {file.features.length} feature{file.features.length !== 1 ? 's' : ''}
+                  <span className={styles.itemMetaValue}>
+                    {filePath} · {file.features.length} feature{file.features.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
               </div>
             </div>
@@ -113,35 +116,45 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
               const isAuto = f.name && /@ \d+\.\d+/.test(f.name);
               const TypeIcon = f.type === 'LineString' || f.type === 'MultiLineString' ? Waypoints : MapPin;
               const photoCount = f.imageFiles?.length || 0;
+              const badge = badgeStyleFor('kml');
               return (
                 <div
                   key={idx}
                   className={styles.item}
-                  style={{ paddingLeft: 20 }}
+                  style={{ marginLeft: 12 }}
                   onClick={() => onEditKmlFeature({ path: filePath, idx, data: f })}
                 >
-                  <div className={styles.itemIcon}>
+                  <div className={styles.itemIcon} style={{ background: badge.background, borderColor: badge.borderColor, color: badge.color }}>
                     <TypeIcon size={16} />
                   </div>
                   <div className={styles.itemBody}>
-                    <div className={styles.itemName} style={isAuto ? { opacity: 0.65, fontStyle: 'italic' } : undefined}>
-                      {f.name}
+                    <div className={styles.itemTopRow}>
+                      <div className={styles.itemNameGroup}>
+                        <div className={styles.itemName} style={isAuto ? { opacity: 0.65, fontStyle: 'italic' } : undefined}>
+                          {f.name}
+                        </div>
+                        {photoCount > 0 && (
+                          <span className={styles.itemPhotoBadge}>
+                            <Camera size={10} /> {photoCount}
+                          </span>
+                        )}
+                      </div>
+                      <span className={styles.itemBadge} style={badge}>
+                        {f.type || 'feature'}
+                      </span>
+                    </div>
+                    <div className={styles.itemDesc}>
+                      {f.description ? f.description.replace(/<[^>]+>/g, '').slice(0, 60) : 'No description'}
                     </div>
                     <div className={styles.itemMeta}>
-                      {Number(f.lat).toFixed(5)}, {Number(f.lng).toFixed(5)}
-                      {f.description ? ` · ${f.description.replace(/<[^>]+>/g, '').slice(0, 50)}` : ''}
+                      <span className={styles.itemMetaLabel}>Coord:</span>
+                      <span className={styles.itemMetaValue}>
+                        {Number(f.lat).toFixed(5)}, {Number(f.lng).toFixed(5)}
+                      </span>
                     </div>
                   </div>
-                  {photoCount > 0 && (
-                    <span className={styles.itemPhotoBadge}>
-                      <Camera size={11} /> {photoCount}
-                    </span>
-                  )}
-                  <span className={styles.itemBadge} style={{ background: 'rgba(255,185,95,0.1)', color: 'var(--tertiary)', borderColor: 'rgba(255,185,95,0.22)' }}>
-                    {f.type || 'feature'}
-                  </span>
                   <span className={styles.itemChevron}>
-                    <ChevronRight size={14} />
+                    <ChevronRight size={16} />
                   </span>
                 </div>
               );

@@ -8,6 +8,7 @@ import PendingTab from './PendingTab';
 import AdminEditModal from './AdminEditModal';
 import { useAdminKml } from './useAdminKml';
 import InsightsErrorBoundary from '../analytics/InsightsErrorBoundary';
+import { supabase } from '../../lib/supabase';
 
 // Slice 14: the Insights tab is lazy-loaded per CLAUDE.md's bundle-size
 // policy — this is explicitly the heaviest tab (recharts + presence +
@@ -66,9 +67,31 @@ export default function AdminPanel({
   const [editContext, setEditContext] = useState(null);
   const [pickingCoord, setPickingCoord] = useState(false);
   const [pickedCoord, setPickedCoord] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const clickHandlerRef = useRef(null);
 
   const adminKml = useAdminKml({ map, onSelect, searchRegister });
+
+  // Slice 15: a cheap head-only count (no rows fetched) so the "Pending"
+  // tab shows a live badge (Figma: MAPSBYFUTA / ADMIN PANEL, node
+  // 96:1641) as soon as the panel opens — before the admin has ever
+  // clicked into that tab. PendingTab.jsx itself keeps this in sync
+  // afterwards (via its own `onCountChange`) every time it loads or
+  // mutates a row, so this initial fetch only has to cover the gap
+  // between "panel opens" and "Pending tab has been visited once".
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('waypoints')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count, error }) => {
+        if (!cancelled && !error && typeof count === 'number') setPendingCount(count);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Legacy: `_startPickingCoord`/`_stopPickingCoord` (app.js ~3394–3416) —
   // hides the whole overlay (not just this tab) so the map is fully
@@ -115,19 +138,27 @@ export default function AdminPanel({
         <div className={styles.panel}>
           <div className={styles.header}>
             <div className={styles.headerLeft}>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                style={{ color: 'var(--primary)', flexShrink: 0 }}
-              >
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-              </svg>
-              <div className={styles.title}>Admin</div>
+              <div className={styles.adminIdentity}>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  style={{ color: '#7c3aed', flexShrink: 0 }}
+                >
+                  <circle cx="12" cy="8" r="4" />
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                </svg>
+              </div>
+              <div className={styles.headerText}>
+                <div className={styles.titleRow}>
+                  <div className={styles.title}>Admin Console</div>
+                  <span className={styles.livePill}>Live</span>
+                </div>
+                <div className={styles.subtitle}>Campus GeoDB Management</div>
+              </div>
             </div>
             <div className={styles.headerRight}>
               <button type="button" className={styles.iconBtn} title="Refresh" onClick={handleRefresh}>
@@ -146,16 +177,23 @@ export default function AdminPanel({
           </div>
 
           <div className={styles.tabbar}>
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                type="button"
-                className={`${styles.atab} ${activeTab === t.key ? styles.atabActive : ''}`}
-                onClick={() => setActiveTab(t.key)}
-              >
-                {t.label}
-              </button>
-            ))}
+            {TABS.map((t) => {
+              const active = activeTab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  className={`${styles.atab} ${active ? styles.atabActive : ''}`}
+                  onClick={() => setActiveTab(t.key)}
+                >
+                  {active && <span className={styles.atabDot} />}
+                  {t.label}
+                  {t.key === 'pending' && pendingCount > 0 && (
+                    <span className={styles.atabCount}>{pendingCount}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {activeTab === 'points' && (
@@ -187,10 +225,12 @@ export default function AdminPanel({
               onChipsChanged={onChipsChanged}
             />
           )}
-          {activeTab === 'pending' && <PendingTab onRefreshWaypoints={onWaypointsChanged} />}
+          {activeTab === 'pending' && (
+            <PendingTab onRefreshWaypoints={onWaypointsChanged} onCountChange={setPendingCount} />
+          )}
           {activeTab === 'insights' && (
             <InsightsErrorBoundary>
-              <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: 'var(--muted)', fontSize: 11 }}>Loading insights…</div>}>
+              <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: '#94a3b8', fontSize: 11 }}>Loading insights…</div>}>
                 <InsightsTab />
               </Suspense>
             </InsightsErrorBoundary>

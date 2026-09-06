@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Target, CheckCircle2, Camera, ChevronRight } from 'lucide-react';
+import { Target, CheckCircle2, Camera, ChevronRight, Search } from 'lucide-react';
 import styles from './AdminPanel.module.css';
 import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { WP_ALL_TYPES } from './adminTypeOptions';
@@ -79,26 +79,34 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
 
   return (
     <div className={styles.tabContent}>
-      <div className={styles.toolbar}>
+      <div className={styles.toolbar} style={{ flexWrap: 'wrap' }}>
         <div className={styles.countBadge}>
-          {filtered.length} of {waypoints.length} waypoints
+          <span className={styles.countBadgeDot} />
+          {filtered.length} <span className={styles.countBadgeMuted}>of {waypoints.length} waypoints</span>
         </div>
-        <input
-          type="text"
-          className={styles.searchInput}
-          placeholder="Search points…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
         <button
           type="button"
           className={styles.addBtn}
+          style={{ marginLeft: 'auto' }}
           onClick={() => {
             setFormOpen((v) => !v);
           }}
         >
           + Add Point
         </button>
+        <div className={styles.searchWrap} style={{ flexBasis: '100%' }}>
+          <span className={styles.searchIcon}>
+            <Search size={16} />
+          </span>
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search points, tags or coords…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <span className={styles.searchKbd}>⌘K</span>
+        </div>
       </div>
 
       {formOpen && (
@@ -168,32 +176,43 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
           // always agree (see wpTypeMeta.js's resolveWaypointType comment).
           const resolvedType = resolveWaypointType(wp);
           const wasRemapped = wp.type && wp.type.trim().toLowerCase() !== resolvedType;
+          const badge = badgeStyleFor(resolvedType);
           return (
             <div key={wp.id} className={styles.item} onClick={() => onEditWaypoint(wp)}>
-              <div className={styles.itemIcon}>
+              <div className={styles.itemIcon} style={{ background: badge.background, borderColor: badge.borderColor, color: badge.color }}>
                 {(() => { const Icon = getTypeIcon(resolvedType); return <Icon size={16} />; })()}
               </div>
               <div className={styles.itemBody}>
-                <div className={styles.itemName}>{wp.name || '(unnamed)'}</div>
+                <div className={styles.itemTopRow}>
+                  <div className={styles.itemNameGroup}>
+                    <div className={styles.itemName}>{wp.name || '(unnamed)'}</div>
+                    {photoCount > 0 && (
+                      <span className={styles.itemPhotoBadge}>
+                        <Camera size={10} /> {photoCount}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={styles.itemBadge}
+                    style={badge}
+                    title={wasRemapped ? `Stored as "${wp.type}" — will be saved as "${resolvedType}" once you edit & save this point` : undefined}
+                  >
+                    {resolvedType.replace(/_/g, ' ')}
+                    {wasRemapped ? ' •' : ''}
+                  </span>
+                </div>
+                <div className={`${styles.itemDesc} ${!wp.description ? styles.itemDescEmpty : ''}`}>
+                  {wp.description || 'No description added'}
+                </div>
                 <div className={styles.itemMeta}>
-                  {wp.description || 'No description'} · {Number(wp.lat || 0).toFixed(5)}, {Number(wp.lng || 0).toFixed(5)}
+                  <span className={styles.itemMetaLabel}>Coord:</span>
+                  <span className={styles.itemMetaValue}>
+                    {Number(wp.lat || 0).toFixed(5)}, {Number(wp.lng || 0).toFixed(5)}
+                  </span>
                 </div>
               </div>
-              {photoCount > 0 && (
-                <span className={styles.itemPhotoBadge}>
-                  <Camera size={11} /> {photoCount}
-                </span>
-              )}
-              <span
-                className={styles.itemBadge}
-                style={badgeStyleFor(resolvedType)}
-                title={wasRemapped ? `Stored as "${wp.type}" — will be saved as "${resolvedType}" once you edit & save this point` : undefined}
-              >
-                {resolvedType.replace(/_/g, ' ')}
-                {wasRemapped ? ' •' : ''}
-              </span>
               <span className={styles.itemChevron}>
-                <ChevronRight size={14} />
+                <ChevronRight size={16} />
               </span>
             </div>
           );

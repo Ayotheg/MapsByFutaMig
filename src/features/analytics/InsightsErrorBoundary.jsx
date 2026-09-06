@@ -30,8 +30,8 @@ export default class InsightsErrorBoundary extends Component {
   render() {
     if (this.state.error) {
       return (
-        <div style={{ padding: 16, fontSize: 12, color: 'var(--muted)' }}>
-          <div style={{ color: 'var(--error)', fontWeight: 700, marginBottom: 6 }}>
+        <div style={{ padding: 16, fontSize: 12, color: '#94a3b8' }}>
+          <div style={{ color: '#dc2626', fontWeight: 700, marginBottom: 6 }}>
             Insights tab hit an error.
           </div>
           <div style={{ marginBottom: 10 }}>

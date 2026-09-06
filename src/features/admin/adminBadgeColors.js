@@ -1,64 +1,72 @@
-// Ported verbatim from legacy style.css ~1911–1959 (`.admin-item-badge.*`).
-// Types not listed here (printing_shop, cafe, restaurant, pharmacy,
-// barber, laundry, fuel, security_post) never got a dedicated rule in
-// legacy either — they fall through to the plain default badge color
-// (rgba(183,109,255,...), same "primary" shown below as the fallback).
-// Same underlying inconsistency BRAND_GUIDELINES.md already flags for
-// legend swatches vs. map-pin colors on this exact set of types — not a
-// transcription gap here, a real pre-existing legacy one.
-// Sept 2026: updated for the 24-type consolidation (adminTypeOptions.js).
-// Pre-merge keys kept alongside the new ones so any lingering raw DB value
-// (or KML/OSM subtype) still gets a real badge color instead of falling
-// through to DEFAULT_BADGE.
+// Sept 2026 redesign (Figma: MAPSBYFUTA / ADMIN PANEL, node 96:1641) — admin
+// panel moved from the app's dark surface to its own light "console" look.
+// Same type → color *mapping* as before (every key below is unchanged, and
+// still resolves the same way `resolveWaypointType`/`badgeStyleFor` always
+// did); only the actual color *values* changed, from translucent-on-dark
+// tints to solid light-tint/border/text triples that read correctly on the
+// new white cards. Hue families were kept close to their previous
+// counterparts (e.g. hostel stays amber, toilet stays sky-blue, mosque
+// stays green) so the badge a given type got before is still recognizably
+// "the same color", just re-rendered for a light background.
+//
+// Each entry's `color` doubles as the tint for that type's icon-avatar
+// circle in the list (see PointsTab.jsx / RoutesTab.jsx / KmlTab.jsx —
+// `badgeStyleFor(type)`'s `background`/`borderColor` are reused there too),
+// matching the Figma spec's per-category icon-swatch treatment.
 export const ADMIN_BADGE_COLORS = {
-  seg: { bg: 'rgba(68,226,205,0.1)', color: 'var(--secondary)', border: 'rgba(68,226,205,0.22)' },
-  road: { bg: 'rgba(68,226,205,0.1)', color: 'var(--secondary)', border: 'rgba(68,226,205,0.22)' },
-  kml: { bg: 'rgba(255,185,95,0.1)', color: 'var(--tertiary)', border: 'rgba(255,185,95,0.22)' },
+  seg: { bg: '#f0fdfa', color: '#0f766e', border: 'rgba(153,246,228,0.6)' },
+  road: { bg: '#f0fdfa', color: '#0f766e', border: 'rgba(153,246,228,0.6)' },
+  kml: { bg: '#fffbeb', color: '#92400e', border: 'rgba(253,230,138,0.8)' },
 
-  lecture_hall: { bg: 'rgba(55,138,221,0.12)', color: '#378ADD', border: 'rgba(55,138,221,0.28)' },
-  faculty: { bg: 'rgba(24,95,165,0.12)', color: '#85B7EB', border: 'rgba(24,95,165,0.28)' },
-  laboratory: { bg: 'rgba(93,202,165,0.12)', color: '#5DCAA5', border: 'rgba(93,202,165,0.28)' },
-  workshop: { bg: 'rgba(29,158,117,0.12)', color: '#1D9E75', border: 'rgba(29,158,117,0.28)' },
-  library: { bg: 'rgba(159,225,203,0.12)', color: '#9FE1CB', border: 'rgba(159,225,203,0.28)' },
+  lecture_hall: { bg: '#eff6ff', color: '#1d4ed8', border: 'rgba(191,219,254,0.7)' },
+  faculty: { bg: '#eef2ff', color: '#4338ca', border: 'rgba(199,210,254,0.7)' },
+  laboratory: { bg: '#ecfdf5', color: '#047857', border: 'rgba(167,243,208,0.6)' },
+  workshop: { bg: '#f0fdf4', color: '#15803d', border: 'rgba(187,247,208,0.7)' },
+  library: { bg: '#ecfeff', color: '#0e7490', border: 'rgba(165,243,252,0.6)' },
 
-  admin: { bg: 'rgba(127,119,221,0.12)', color: '#7F77DD', border: 'rgba(127,119,221,0.28)' },
-  senate: { bg: 'rgba(127,119,221,0.12)', color: '#7F77DD', border: 'rgba(127,119,221,0.28)' },
-  bursary: { bg: 'rgba(206,203,246,0.12)', color: '#7F77DD', border: 'rgba(206,203,246,0.28)' },
-  student_affairs: { bg: 'rgba(83,74,183,0.12)', color: '#7F77DD', border: 'rgba(83,74,183,0.28)' },
+  admin: { bg: '#eef2ff', color: '#4338ca', border: 'rgba(199,210,254,0.7)' },
+  senate: { bg: '#eef2ff', color: '#4338ca', border: 'rgba(199,210,254,0.7)' },
+  bursary: { bg: '#eef2ff', color: '#4338ca', border: 'rgba(199,210,254,0.7)' },
+  student_affairs: { bg: '#eef2ff', color: '#4338ca', border: 'rgba(199,210,254,0.7)' },
 
-  hostel: { bg: 'rgba(239,159,39,0.12)', color: '#EF9F27', border: 'rgba(239,159,39,0.28)' },
-  staff_quarters: { bg: 'rgba(186,117,23,0.12)', color: '#FAC775', border: 'rgba(186,117,23,0.28)' },
+  hostel: { bg: '#fffbeb', color: '#92400e', border: 'rgba(253,230,138,0.8)' },
+  staff_quarters: { bg: '#fff7ed', color: '#9a3412', border: 'rgba(254,215,170,0.7)' },
 
-  food: { bg: 'rgba(249,115,22,0.12)', color: '#F97316', border: 'rgba(249,115,22,0.28)' },
-  shop: { bg: 'rgba(216,90,48,0.12)', color: '#D85A30', border: 'rgba(216,90,48,0.28)' },
-  shopping: { bg: 'rgba(216,90,48,0.12)', color: '#F0997B', border: 'rgba(216,90,48,0.28)' },
-  kiosk: { bg: 'rgba(240,153,123,0.12)', color: '#F0997B', border: 'rgba(240,153,123,0.28)' },
-  bank: { bg: 'rgba(153,60,29,0.12)', color: '#F0997B', border: 'rgba(153,60,29,0.28)' },
+  food: { bg: '#fff7ed', color: '#c2410c', border: 'rgba(254,215,170,0.7)' },
+  shop: { bg: '#fefce8', color: '#854d0e', border: 'rgba(254,240,138,0.6)' },
+  shopping: { bg: '#fff1f2', color: '#be123c', border: 'rgba(254,205,211,0.6)' },
+  kiosk: { bg: '#fff1f2', color: '#be123c', border: 'rgba(254,205,211,0.6)' },
+  bank: { bg: '#fafaf9', color: '#57534e', border: 'rgba(214,211,209,0.7)' },
 
-  sports: { bg: 'rgba(212,83,126,0.12)', color: '#D4537E', border: 'rgba(212,83,126,0.28)' },
-  hall: { bg: 'rgba(237,147,177,0.12)', color: '#ED93B1', border: 'rgba(237,147,177,0.28)' },
-  clinic: { bg: 'rgba(244,192,209,0.12)', color: '#ED93B1', border: 'rgba(244,192,209,0.28)' },
-  auditorium: { bg: 'rgba(153,53,86,0.12)', color: '#ED93B1', border: 'rgba(153,53,86,0.28)' },
-  toilet: { bg: 'rgba(56,189,248,0.12)', color: '#38BDF8', border: 'rgba(56,189,248,0.28)' },
+  sports: { bg: '#fdf2f8', color: '#be185d', border: 'rgba(251,207,232,0.6)' },
+  hall: { bg: '#fdf2f8', color: '#db2777', border: 'rgba(251,207,232,0.6)' },
+  clinic: { bg: '#fef2f2', color: '#b91c1c', border: 'rgba(254,202,202,0.6)' },
+  auditorium: { bg: '#fdf2f8', color: '#9d174d', border: 'rgba(251,207,232,0.6)' },
+  toilet: { bg: '#f0f9ff', color: '#0369a1', border: 'rgba(186,230,253,0.6)' },
 
-  garage: { bg: 'rgba(136,135,128,0.12)', color: '#B4B2A9', border: 'rgba(136,135,128,0.28)' },
-  bus_stop: { bg: 'rgba(95,94,90,0.12)', color: '#B4B2A9', border: 'rgba(95,94,90,0.28)' },
-  infrastructure: { bg: 'rgba(180,178,169,0.12)', color: '#B4B2A9', border: 'rgba(180,178,169,0.28)' },
-  utility: { bg: 'rgba(180,178,169,0.12)', color: '#B4B2A9', border: 'rgba(180,178,169,0.28)' },
+  garage: { bg: '#f8fafc', color: '#475569', border: 'rgba(226,232,240,0.7)' },
+  bus_stop: { bg: '#f8fafc', color: '#475569', border: 'rgba(226,232,240,0.7)' },
+  infrastructure: { bg: '#f8fafc', color: '#475569', border: 'rgba(226,232,240,0.7)' },
+  utility: { bg: '#f8fafc', color: '#475569', border: 'rgba(226,232,240,0.7)' },
 
-  mosque: { bg: 'rgba(250,199,117,0.12)', color: '#FAC775', border: 'rgba(250,199,117,0.28)' },
-  chapel: { bg: 'rgba(192,132,252,0.12)', color: '#C084FC', border: 'rgba(192,132,252,0.28)' },
+  mosque: { bg: '#ecfdf5', color: '#047857', border: 'rgba(167,243,208,0.6)' },
+  chapel: { bg: '#faf5ff', color: '#7e22ce', border: 'rgba(233,213,255,0.6)' },
 
-  gate: { bg: 'rgba(226,75,74,0.12)', color: '#E24B4A', border: 'rgba(226,75,74,0.28)' },
-  entrance: { bg: 'rgba(226,75,74,0.12)', color: '#E24B4A', border: 'rgba(226,75,74,0.28)' },
-  hazard: { bg: 'rgba(226,75,74,0.12)', color: '#E24B4A', border: 'rgba(226,75,74,0.28)' },
+  gate: { bg: '#fef2f2', color: '#dc2626', border: 'rgba(254,202,202,0.6)' },
+  entrance: { bg: '#fef2f2', color: '#dc2626', border: 'rgba(254,202,202,0.6)' },
+  hazard: { bg: '#fef2f2', color: '#b91c1c', border: 'rgba(254,202,202,0.6)' },
 
-  landmark: { bg: 'rgba(175,169,236,0.12)', color: '#AFA9EC', border: 'rgba(175,169,236,0.28)' },
-  poi: { bg: 'rgba(93,202,165,0.12)', color: '#5DCAA5', border: 'rgba(93,202,165,0.28)' },
-  junction: { bg: 'rgba(136,135,128,0.12)', color: '#B4B2A9', border: 'rgba(136,135,128,0.28)' },
+  landmark: { bg: '#f5f3ff', color: '#7c3aed', border: 'rgba(221,214,254,0.8)' },
+  poi: { bg: '#ecfdf5', color: '#059669', border: 'rgba(167,243,208,0.6)' },
+  junction: { bg: '#f8fafc', color: '#475569', border: 'rgba(226,232,240,0.7)' },
 };
 
-const DEFAULT_BADGE = { bg: 'rgba(183,109,255,0.1)', color: 'var(--primary)', border: 'rgba(183,109,255,0.2)' };
+// Types not listed above (printing_shop, cafe, restaurant, pharmacy,
+// barber, laundry, fuel, security_post) never got a dedicated rule in
+// legacy either — they fall through to this default, the same violet used
+// throughout the panel's own chrome (matches the Figma spec's "PRINTING
+// SHOP" badge exactly: #faf5ff / rgba(233,213,255,0.6) / #6d28d9).
+const DEFAULT_BADGE = { bg: '#faf5ff', color: '#6d28d9', border: 'rgba(233,213,255,0.6)' };
 
 export function badgeStyleFor(key) {
   const c = ADMIN_BADGE_COLORS[key] || DEFAULT_BADGE;

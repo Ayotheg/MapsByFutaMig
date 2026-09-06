@@ -36,9 +36,9 @@ export default function FeatureUsageTab() {
   }, [rows]);
 
   if (error) return <div className={styles.errorNote}>{error}</div>;
-  if (!rows) return <div style={{ fontSize: 11, color: 'var(--muted)' }}>Loading…</div>;
+  if (!rows) return <div style={{ fontSize: 11, color: '#94a3b8' }}>Loading…</div>;
   if (ranked.length === 0) {
-    return <div style={{ fontSize: 11, color: 'var(--muted)' }}>No feature-usage events recorded yet.</div>;
+    return <div style={{ fontSize: 11, color: '#94a3b8' }}>No feature-usage events recorded yet.</div>;
   }
 
   return (
@@ -51,18 +51,18 @@ export default function FeatureUsageTab() {
             layout="vertical"
             margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
           >
-            <CartesianGrid stroke="rgba(255,255,255,0.06)" horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 9, fill: 'var(--muted)' }} axisLine={false} tickLine={false} />
+            <CartesianGrid stroke="#e2e8f0" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <YAxis
               type="category"
               dataKey="event_name"
-              tick={{ fontSize: 9, fill: 'var(--text)' }}
+              tick={{ fontSize: 9, fill: '#0f172a' }}
               axisLine={false}
               tickLine={false}
               width={110}
             />
-            <Tooltip contentStyle={{ background: '#171f33', border: '1px solid rgba(255,255,255,0.1)', fontSize: 11 }} />
-            <Bar dataKey="count" fill="var(--secondary)" radius={[0, 3, 3, 0]} />
+            <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(15,23,42,0.08)', fontSize: 11 }} />
+            <Bar dataKey="count" fill="#0d9488" radius={[0, 3, 3, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

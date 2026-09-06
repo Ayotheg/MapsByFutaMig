@@ -64,7 +64,7 @@ export default function LiveTab() {
       <div className={styles.card} style={{ marginTop: 12 }}>
         <div className={styles.cardTitle}>Who</div>
         {people.length === 0 && (
-          <div style={{ fontSize: 11, color: 'var(--muted)' }}>Nobody's on the site right now.</div>
+          <div style={{ fontSize: 11, color: '#94a3b8' }}>Nobody's on the site right now.</div>
         )}
         <div className={styles.presenceList}>
           {people.map((p) => (
