@@ -182,13 +182,15 @@ export default function Sidebar({
       )}
 
       {!collapsed && activeKey === 'explore' && (
-        <div className={styles.panel}>
-          <div className={styles.panelBody}>
+        <div className={`${styles.panel} ${styles.panelExploreDesktop}`}>
+          <div className={`${styles.panelBody} ${styles.panelBodyExploreDesktop}`}>
             <ExplorePanel
               picks={explorePicks || []}
               loading={explorePicksLoading}
               variant="full"
+              desktop
               onSelect={onExploreSelect}
+              onSuggestPlace={onSuggestPlaceClick}
             />
           </div>
         </div>

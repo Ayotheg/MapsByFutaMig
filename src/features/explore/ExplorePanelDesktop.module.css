@@ -1,0 +1,497 @@
+/* Desktop-only "Explore Campus" redesign (Figma: MAPSBYFUTA, node
+   111:57). Deliberately its own file/class namespace, separate from
+   ExplorePanel.module.css — that file is still shared by the mobile
+   compact preview and mobile full sheet, and must stay pixel-identical
+   to before. Nothing here is imported by anything mobile-facing.
+
+   Retuned to sit at the shared `--sidebar-panel-w` (240px, see
+   Sidebar.module.css's `.panelExploreDesktop`) instead of its original
+   460px, and scaled down throughout to match the Layers panel's visual
+   weight — smaller type, tighter paddings, subtler radii — rather than
+   the oversized/bold treatment the first pass shipped with. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+  font-family: var(--font-ui);
+}
+
+.head {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 12px 9px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+}
+
+.headTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.headTitleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.headTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.headTitle {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+.livePill {
+  display: inline-flex;
+  align-items: center;
+  background: #f5f3ff;
+  border: 1px solid #ddd6fe;
+  border-radius: var(--r-full);
+  padding: 2px 7px;
+  font-weight: 700;
+  font-size: 9px;
+  color: #6d28d9;
+}
+.headSubtitle {
+  font-size: 10px;
+  color: #64748b;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.countBadge {
+  flex-shrink: 0;
+  background: #f1f5f9;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: var(--r-md);
+  padding: 3px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+.countBadgeNumber {
+  font-weight: 700;
+  font-size: 11px;
+  color: #334155;
+}
+.countBadgeLabel {
+  font-weight: 600;
+  font-size: 9px;
+  color: #64748b;
+}
+
+.chipRow {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.chipRow::-webkit-scrollbar {
+  display: none;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--r-full);
+  padding: 4px 9px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 10px;
+  color: #475569;
+  background: #f1f5f9;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.chip:hover {
+  background: #e2e8f0;
+}
+.chipActive {
+  background: #0f172a;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+}
+.chipActive:hover {
+  background: #0f172a;
+}
+.chipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.controlsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid #f1f5f9;
+}
+.sortWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sortLabel {
+  font-size: 10px;
+  color: #94a3b8;
+}
+.sortBtn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 10px;
+  color: #1e293b;
+  padding: 2px 0;
+}
+.sortMenu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--r-md);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  z-index: 5;
+  min-width: 120px;
+  max-width: calc(var(--sidebar-panel-w) - 24px);
+}
+.sortMenuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 7px 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: #334155;
+  cursor: pointer;
+}
+.sortMenuItem:hover {
+  background: #f8fafc;
+}
+.sortMenuItemActive {
+  color: #7c3aed;
+  font-weight: 700;
+}
+
+.featuredPill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #ecfdf5;
+  border: 1px solid rgba(167, 243, 208, 0.6);
+  border-radius: var(--r-md);
+  padding: 2px 7px;
+  font-weight: 700;
+  font-size: 9px;
+  color: #059669;
+  white-space: nowrap;
+}
+.featuredDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: rgba(248, 250, 252, 0.5);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #e2e8f0 transparent;
+}
+
+.noResults {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 11px;
+  padding: 24px 10px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: var(--r-lg);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cardIdentity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.avatar {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-md);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.avatar svg {
+  width: 15px;
+  height: 15px;
+}
+.verifiedBadge {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  background: #fff;
+  border-radius: 50%;
+  color: #2563eb;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.verifiedBadge svg {
+  width: 10px;
+  height: 10px;
+}
+.cardIdentityText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cardName {
+  font-weight: 700;
+  font-size: 12px;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cardMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.cardDistance {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+  font-size: 10px;
+  color: #7c3aed;
+  white-space: nowrap;
+}
+.cardDistance svg {
+  width: 9px;
+  height: 9px;
+}
+.cardCategory {
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.promoBadge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--r-full);
+  padding: 2px 7px;
+  font-weight: 700;
+  font-size: 9px;
+  color: #92400e;
+  white-space: nowrap;
+}
+.promoBadge svg {
+  width: 9px;
+  height: 9px;
+}
+
+.cardDescription {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: #475569;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.cardTags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.cardTag {
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+  font-size: 9px;
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 7px;
+  border-top: 1px solid #f1f5f9;
+}
+.cardFooterMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.cardRating {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 700;
+  font-size: 10px;
+  color: #d97706;
+  white-space: nowrap;
+}
+.cardRating svg {
+  width: 9px;
+  height: 9px;
+}
+.cardReviewCount {
+  font-weight: 400;
+  color: #94a3b8;
+  margin-left: 1px;
+}
+.cardCategoryChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: #64748b;
+  white-space: nowrap;
+}
+.cardAction {
+  flex-shrink: 0;
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: var(--r-md);
+  padding: 6px 11px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background 0.15s;
+  width: 100%;
+}
+.cardAction:hover {
+  background: #6d28d9;
+}
+
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 10px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+.footerLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: #475569;
+}
+.footerDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+}
+.footerAction {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 10.5px;
+  color: #7c3aed;
+}
+.footerAction:hover {
+  color: #6d28d9;
+}

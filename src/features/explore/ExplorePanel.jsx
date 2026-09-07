@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import ExploreCard from './ExploreCard';
+import ExplorePanelDesktop from './ExplorePanelDesktop';
 import { useOneShotLocation } from './useOneShotLocation';
 import styles from './ExplorePanel.module.css';
 
@@ -27,7 +28,7 @@ const COMPACT_SLOTS = 2;
  *    stable scrollable list — no rotation once someone's actually
  *    reading the whole thing.
  */
-export default function ExplorePanel({ picks, loading, variant = 'compact', onViewAll, onSelect }) {
+export default function ExplorePanel({ picks, loading, variant = 'compact', onViewAll, onSelect, desktop, onSuggestPlace }) {
   const userCoords = useOneShotLocation(true);
 
   const promoted = useMemo(() => picks.filter((p) => p.isPromoted).sort((a, b) => b.priority - a.priority), [picks]);
@@ -71,6 +72,15 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
         <div className={styles.empty}>Nothing to explore yet — check back soon.</div>
       </div>
     );
+  }
+
+  // Desktop-only redesign (Figma node 111:57) — a completely separate
+  // component/CSS file, so the mobile "full" sheet just below (and the
+  // "compact" preview above) render exactly as before. `desktop` is
+  // only ever passed `true` by Sidebar.jsx; MobileSheet.jsx never sets
+  // it, so this branch is unreachable from mobile.
+  if (variant === 'full' && desktop) {
+    return <ExplorePanelDesktop picks={fullItems} userCoords={userCoords} onSelect={onSelect} onSuggestPlace={onSuggestPlace} />;
   }
 
   if (variant === 'full') {

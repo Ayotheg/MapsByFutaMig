@@ -237,6 +237,28 @@
   font-weight: 600;
 }
 
+/* ── Explore panel desktop redesign (Figma node 111:57) ──────────────────
+   Scoped to `.panelExploreDesktop`/`.panelBodyExploreDesktop` (only
+   applied to the Explore tab's own `.panel`/`.panelBody`, above, when
+   `activeKey === 'explore'`). Width was previously hardcoded to 460px,
+   nearly double the Layers/GPS panels' `--sidebar-panel-w` (240px) —
+   that made this the only drawer that didn't line up with the rest of
+   the rail, and broke the assumption every other floating element
+   (PlaceCard, QuickChips, DesktopSearchBar — all positioned off
+   `--sidebar-total-w`) makes about how wide an open panel actually is.
+   Explicitly set to the shared token instead of just deleting the
+   override, so it's clear this is intentionally the same width as
+   every other panel, not an accidental fallback. */
+.panelExploreDesktop {
+  width: var(--sidebar-panel-w);
+}
+.panelBodyExploreDesktop {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Generic `.panel-header`/`.panel-title` shell (style.css ~296–309) —
    distinct from `.panelHeader` above, which is the Layers-only override.
    Used by the GPS Signal + Navigate panels (Slice 9), which use legacy's
