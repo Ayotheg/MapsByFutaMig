@@ -3,6 +3,7 @@ import L from 'leaflet';
 import { haversine } from '../../lib/geoUtils';
 import { SMOOTH_WALK, SMOOTH_VEHICLE, VEHICLE_SPEED_KMH, TRAIL_MAX, tier } from './gpsConstants';
 import { announceCurrentLocation } from './announceLocation';
+import { unlockSpeech } from '../../lib/speech';
 import './navMapLayers.css';
 
 // ── Divicon caches, module-scope like legacy's `_dotIconCache`/`_arrowIconCache` ──
@@ -405,6 +406,7 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         return;
       }
       if (tier(lastAccuracyRef.current) === 'poor') return;
+      unlockSpeech();
       if (warmupWatchIdRef.current !== null) {
         navigator.geolocation.clearWatch(warmupWatchIdRef.current);
         warmupWatchIdRef.current = null;
