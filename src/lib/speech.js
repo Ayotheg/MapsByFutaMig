@@ -10,11 +10,22 @@
  * re-tapping the locate button replaces the old announcement instead of
  * queueing it up behind a growing backlog of speech.
  */
+export function unlockSpeech() {
+  if (typeof window === 'undefined' || !window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') return;
+  try {
+    const primer = new window.SpeechSynthesisUtterance(' ');
+    primer.volume = 0;
+    window.speechSynthesis.speak(primer);
+  } catch {
+    // Speech remains optional when the browser blocks or lacks the API.
+  }
+}
+
 export function speak(text) {
-  if (!text || typeof window === 'undefined' || !window.speechSynthesis) return;
+  if (!text || typeof window === 'undefined' || !window.speechSynthesis || typeof window.SpeechSynthesisUtterance !== 'function') return;
   try {
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new window.SpeechSynthesisUtterance(text);
     utterance.rate = 0.95;
     window.speechSynthesis.speak(utterance);
   } catch {
