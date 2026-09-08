@@ -9,7 +9,7 @@ import {
   Flag,
 } from "lucide-react";
 import { useSeo } from "../lib/useSeo";
-import mapsLogo from "/favicon-96x96.png";
+import mapsLogo from "../assets/mapsLogo.png";
 import styles from "./NotFoundPage.module.css";
 
 const CONTACT_EMAIL = "gearlifycorporation@gmail.com";
