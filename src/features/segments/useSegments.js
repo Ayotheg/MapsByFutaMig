@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
+import { withTimeoutSignal, isTimeoutError } from '../../lib/networkTimeout';
+import { cacheGet, cacheSet } from '../../lib/localCache';
+
+const CACHE_KEY = 'segments';
 
 /**
  * Loads saved segments (+ their photos, + their linked waypoints) from
@@ -61,39 +65,82 @@ export function useSegments() {
   const [segments, setSegments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isOffline, setIsOffline] = useState(false);
+  const [cachedAt, setCachedAt] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const [
-      { data: segRows, error: segErr },
-      { data: imgRows, error: imgErr },
-      { data: wpRows, error: wpErr },
-      { data: ptRows, error: ptErr },
-    ] = await Promise.all([
-      supabase
-        .from('segments')
-        .select('id, name, description, category, distance_m, duration_ms'),
-      supabase
-        .from('segment_images')
-        .select('segment_id, storage_path, position')
-        .order('position', { ascending: true }),
-      supabase
-        .from('waypoints')
-        .select('id, name, description, lat, lng, segment_id')
-        .not('segment_id', 'is', null),
-      supabase
-        .from('segment_points')
-        .select('segment_id, seq, lat, lng')
-        .order('seq', { ascending: true }),
-    ]);
-
-    if (segErr || imgErr || wpErr || ptErr) {
-      setError(segErr || imgErr || wpErr || ptErr);
+    // Same fast-path as useWaypoints: don't wait on a request that has no
+    // chance of succeeding if the browser already knows there's no network.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      const cached = cacheGet(CACHE_KEY);
+      if (cached) {
+        setSegments(cached.value);
+        setIsOffline(true);
+        setCachedAt(cached.savedAt);
+      } else {
+        setSegments([]);
+        setError(new Error('offline'));
+      }
       setLoading(false);
       return;
     }
+
+    const { signal, done } = withTimeoutSignal();
+
+    let segRows, segErr, imgRows, imgErr, wpRows, wpErr, ptRows, ptErr;
+    try {
+      [
+        { data: segRows, error: segErr },
+        { data: imgRows, error: imgErr },
+        { data: wpRows, error: wpErr },
+        { data: ptRows, error: ptErr },
+      ] = await Promise.all([
+        supabase
+          .from('segments')
+          .select('id, name, description, category, distance_m, duration_ms')
+          .abortSignal(signal),
+        supabase
+          .from('segment_images')
+          .select('segment_id, storage_path, position')
+          .order('position', { ascending: true })
+          .abortSignal(signal),
+        supabase
+          .from('waypoints')
+          .select('id, name, description, lat, lng, segment_id')
+          .not('segment_id', 'is', null)
+          .abortSignal(signal),
+        supabase
+          .from('segment_points')
+          .select('segment_id, seq, lat, lng')
+          .order('seq', { ascending: true })
+          .abortSignal(signal),
+      ]);
+    } finally {
+      done();
+    }
+
+    if (segErr || imgErr || wpErr || ptErr) {
+      const timedOut = [segErr, imgErr, wpErr, ptErr].some(isTimeoutError);
+      const cached = cacheGet(CACHE_KEY);
+      if (cached) {
+        setSegments(cached.value);
+        setIsOffline(true);
+        setCachedAt(cached.savedAt);
+        setError(null);
+        console.warn(
+          `[segments] Live load failed${timedOut ? ' (timed out)' : ''}, showing cached data from ${new Date(cached.savedAt).toLocaleString()}.`
+        );
+      } else {
+        setError(segErr || imgErr || wpErr || ptErr);
+      }
+      setLoading(false);
+      return;
+    }
+
+    setIsOffline(false);
 
     const pointsBySegment = {};
     for (const row of ptRows || []) {
@@ -139,7 +186,9 @@ export function useSegments() {
     }));
 
     setSegments(shaped);
+    setCachedAt(null);
     setLoading(false);
+    cacheSet(CACHE_KEY, shaped);
   }, []);
 
   useEffect(() => {
@@ -150,8 +199,18 @@ export function useSegments() {
         setLoading(false);
       }
     });
+
+    // Same auto-recover behavior as useWaypoints.js — refetch live data
+    // the moment the browser regains connectivity, no manual refresh
+    // needed.
+    const handleOnline = () => {
+      if (!cancelled) load();
+    };
+    window.addEventListener('online', handleOnline);
+
     return () => {
       cancelled = true;
+      window.removeEventListener('online', handleOnline);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -160,5 +219,5 @@ export function useSegments() {
   // a new segment — the equivalent of legacy's `reloadAllWaypoints()` +
   // `drawSavedSegment(newSeg)` pair, just re-fetching instead of hand-
   // splicing the new row into local state.
-  return { segments, loading, error, refetch: load };
+  return { segments, loading, error, isOffline, cachedAt, refetch: load };
 }

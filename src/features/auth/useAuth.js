@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { DEFAULT_TIMEOUT_MS } from '../../lib/networkTimeout';
 
 // ── FUTA Auth — Supabase Auth port of legacy's `initFutaAuth()` ────────────
 //
@@ -27,11 +28,40 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // `settled` guards against the failsafe below firing after the real
+    // callback already has — whichever happens first wins, the other is
+    // a no-op.
+    let settled = false;
+
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      settled = true;
       setUser(session?.user ?? null);
       setLoading(false);
     });
-    return () => listener.subscription.unsubscribe();
+
+    // Failsafe, same family as useWaypoints.js/useSegments.js's own 8s
+    // per-request timeouts. `onAuthStateChange` fires immediately with a
+    // *cached* session in the normal case, but Supabase still needs a
+    // network round-trip to validate/refresh a stored token — on a
+    // degraded connection that request can hang with nothing here to time
+    // it out otherwise, which is exactly the "one thing still gets stuck"
+    // gap HomeRoute.jsx's BOOT_TIMEOUT_MS was covering for from the
+    // outside. Treating "no answer within a reasonable window" as
+    // signed-out is a fine default for boot purposes: the map itself
+    // doesn't require auth, and anyone who really is signed in can just
+    // retry once their connection is better — what matters here is that
+    // `authReady` can't stay false forever.
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        setLoading(false);
+      }
+    }, DEFAULT_TIMEOUT_MS);
+
+    return () => {
+      clearTimeout(timer);
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   // ── Google OAuth ──────────────────────────────────────────────────────

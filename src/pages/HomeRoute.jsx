@@ -1,6 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MapPage from './MapPage'
 import LoadingScreen from './LoadingScreen'
+
+// Hard ceiling on how long we'll wait for every readiness flag before
+// offering the user a way out. Not a substitute for the real flags above —
+// it only kicks in if one of them never resolves (a hung Supabase request
+// on a degraded connection, for example — see useWaypoints.js/
+// useSegments.js's own 8s per-request timeout for the first line of
+// defense; this is the second, in case something upstream of those still
+// stalls, e.g. session restore). Picked to sit comfortably above normal
+// boot time (map + two Supabase reads + font load usually finish in low
+// single-digit seconds) without making a genuinely stuck user wait long.
+const BOOT_TIMEOUT_MS = 10000;
 
 // One entry per real boot milestone tracked below — order matches roughly
 // how they resolve in practice (map init is near-instant; Supabase reads
@@ -50,9 +61,27 @@ function HomeRoute() {
     waypointsReady: false,
     segmentsReady: false,
     authReady: false,
+    isOffline: false,
+    cachedAt: null,
+    retry: null,
   });
   const fontsReady = useFontsReady();
   const [booted, setBooted] = useState(false);
+
+  // Failsafe timer for BOOT_TIMEOUT_MS — see its comment above. Restarts
+  // whenever the person hits Retry, so a second slow attempt gets its own
+  // full window instead of inheriting whatever was left of the first.
+  const [timedOut, setTimedOut] = useState(false);
+  const timerRef = useRef(null);
+  const startBootTimer = () => {
+    clearTimeout(timerRef.current);
+    setTimedOut(false);
+    timerRef.current = setTimeout(() => setTimedOut(true), BOOT_TIMEOUT_MS);
+  };
+  useEffect(() => {
+    startBootTimer();
+    return () => clearTimeout(timerRef.current);
+  }, []);
 
   // Bug fix (reported directly): "only the map should be able to be
   // zoomed in or out, sometimes when you try to zoom the map, the
@@ -101,6 +130,21 @@ function HomeRoute() {
     Number(fontsReady);
   const allReady = completed >= BOOT_STEPS.length;
 
+  // "Continue anyway" only makes sense once the map itself exists — with
+  // no map instance there's nothing underneath the loading screen to
+  // reveal. Waypoints/segments already can't hang past their own 8s
+  // per-request timeout (useWaypoints.js/useSegments.js), so by the time
+  // this failsafe's 10s fires they're realistically always resolved one
+  // way or another (live data, cached data, or empty) — it's auth/font
+  // loading that has no such ceiling of its own, which is the gap this
+  // covers.
+  const canContinueAnyway = readiness.mapReady;
+
+  const handleRetry = () => {
+    readiness.retry?.();
+    startBootTimer();
+  };
+
   return (
     <>
       <MapPage onReadinessChange={setReadiness} />
@@ -109,6 +153,10 @@ function HomeRoute() {
           steps={BOOT_STEPS}
           current={completed}
           onComplete={allReady ? () => setBooted(true) : undefined}
+          stuck={timedOut && !allReady}
+          isOffline={readiness.isOffline}
+          onRetry={readiness.retry ? handleRetry : undefined}
+          onContinue={canContinueAnyway ? () => setBooted(true) : undefined}
         />
       )}
     </>

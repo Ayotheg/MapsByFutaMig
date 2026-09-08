@@ -168,3 +168,51 @@
   text-align: center;
   margin: 0;
 }
+
+/* Boot-timeout failsafe (HomeRoute.jsx's BOOT_TIMEOUT_MS) */
+.stuckPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 28px;
+  max-width: min(80vw, 300px);
+}
+.stuckMessage {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--v2-text-variant);
+  text-align: center;
+  margin: 0 0 14px;
+}
+.stuckActions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+.stuckButtonPrimary,
+.stuckButtonSecondary {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--v2-primary-outline);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.stuckButtonPrimary {
+  background: var(--v2-primary);
+  color: #ffffff;
+  border-color: transparent;
+}
+.stuckButtonSecondary {
+  background: transparent;
+  color: var(--v2-text);
+}
+.stuckButtonPrimary:hover,
+.stuckButtonSecondary:hover {
+  opacity: 0.85;
+}

@@ -8,7 +8,6 @@ import Sidebar from '../features/legend/Sidebar';
 import MobileSheet from '../features/legend/MobileSheet';
 import SegmentsLayer from '../features/segments/SegmentsLayer';
 import { useSegments } from '../features/segments/useSegments';
-import StaticKmlLayer from '../features/kml/StaticKmlLayer';
 import { useOSMAnnotations } from '../features/osm-annotations/useOSMAnnotations';
 import { useViewMode } from '../features/osm-annotations/useViewMode';
 import OSMAnnotationLayer from '../features/osm-annotations/OSMAnnotationLayer';
@@ -28,9 +27,15 @@ import { useGuestUsage } from '../features/auth/useGuestUsage';
 import { useAdminPin } from '../features/auth/useAdminPin';
 import { useSeo } from '../lib/useSeo';
 import SubmissionToast from '../features/waypoint-submissions/SubmissionToast';
+import OfflineBanner from '../features/offline/OfflineBanner';
 import { usePresenceTracking } from '../features/analytics/usePresenceTracking';
 import { setAnalyticsUser } from '../lib/analytics';
 import { readPersistentState, writePersistentState } from '../lib/persistentState';
+
+// Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
+// data — see the comment where it's used below for why this stays a
+// constant instead of ripping the prop out everywhere at once.
+const EMPTY_KML_ANNOTATIONS = [];
 
 // Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
 // DetailModal isn't needed for first paint, only mounts on a click, so it's
@@ -115,9 +120,21 @@ export default function MapPage({ onReadinessChange }) {
   const [isMobile] = useState(() => window.innerWidth <= 768);
   const [selectedSegmentId, setSelectedSegmentId] = useState(() => readPersistentState('selected-segment', null));
 
-  const { waypoints, loading: waypointsLoading, refetch: refetchWaypoints } = useWaypoints();
+  const {
+    waypoints,
+    loading: waypointsLoading,
+    isOffline: waypointsOffline,
+    cachedAt: waypointsCachedAt,
+    refetch: refetchWaypoints,
+  } = useWaypoints();
   const typeVisibilityProps = useTypeVisibility(waypoints);
-  const { segments, loading: segmentsLoading, refetch: refetchSegments } = useSegments();
+  const {
+    segments,
+    loading: segmentsLoading,
+    isOffline: segmentsOffline,
+    cachedAt: segmentsCachedAt,
+    refetch: refetchSegments,
+  } = useSegments();
   const selectedSegment = segments.find((s) => s.id === selectedSegmentId) || null;
 
   // ── Slice 7: search ─────────────────────────────────────────────────
@@ -133,12 +150,19 @@ export default function MapPage({ onReadinessChange }) {
   const [mapView, setMapView] = useState(() => readPersistentState('map-view', null));
 
   // ── Slice 6: OSM annotations + dedup ──────────────────────────────────
-  // `kmlAnnotations` is reported up by StaticKmlLayer as it loads (named
-  // points only); combined with `waypoints` into the live dedup index
-  // `useOSMAnnotations` checks each fetched OSM POI against. See
-  // useOSMAnnotations.js's header comment for why this is reactive rather
-  // than a one-shot check like legacy's.
-  const [kmlAnnotations, setKmlAnnotations] = useState([]);
+  // `kmlAnnotations` used to come from StaticKmlLayer.jsx (the 12
+  // bundled `public/kml/test*.kml` files) — deleted along with those
+  // files once their re-annotated points were slated to move into the
+  // `waypoints` table directly instead. Kept as a stable empty constant
+  // rather than ripping the prop out of QuickChipsTab/ChipResultsPanel/
+  // useSearchIndex/chipConfig.js too: all four already treat it as
+  // optional (`(kmlAnnotations || [])`), so `[]` is behaviorally
+  // identical to "no KML layer" with no risk of a half-finished
+  // multi-file prop removal breaking search/admin in the meantime. Once
+  // the re-annotated points are confirmed live in `waypoints`, this
+  // constant (and the now-unused prop threading downstream) can come out
+  // for real.
+  const kmlAnnotations = EMPTY_KML_ANNOTATIONS;
   const dedupIndex = useMemo(
     () => [
       ...waypoints.map((wp) => ({ id: wp.id, lat: wp.lat, lng: wp.lng, name: wp.name, source: 'waypoint' })),
@@ -230,17 +254,40 @@ export default function MapPage({ onReadinessChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.user]);
 
-  // Real boot-readiness signal for App's loading screen — no fake timer,
-  // just the same loading flags this page already tracks for its own
-  // data hooks (map init, waypoints, segments, session restore).
+  const handleRetryData = useCallback(() => {
+    refetchWaypoints();
+    refetchSegments();
+  }, [refetchWaypoints, refetchSegments]);
+
+  // Real boot-readiness signal for App's loading screen — the loading
+  // flags this page already tracks for its own data hooks (map init,
+  // waypoints, segments, session restore), plus enough extra info
+  // (isOffline/cachedAt, and a manual retry hook) for HomeRoute's
+  // failsafe timer to offer a real "retry" / "continue with saved data"
+  // choice instead of just hanging if the network is bad. See
+  // HomeRoute.jsx's BOOT_TIMEOUT_MS comment for why that failsafe exists.
   useEffect(() => {
     onReadinessChange?.({
       mapReady: !!map,
       waypointsReady: !waypointsLoading,
       segmentsReady: !segmentsLoading,
       authReady: !auth.loading,
+      isOffline: waypointsOffline || segmentsOffline,
+      cachedAt: waypointsCachedAt || segmentsCachedAt || null,
+      retry: handleRetryData,
     });
-  }, [map, waypointsLoading, segmentsLoading, auth.loading, onReadinessChange]);
+  }, [
+    map,
+    waypointsLoading,
+    segmentsLoading,
+    auth.loading,
+    waypointsOffline,
+    segmentsOffline,
+    waypointsCachedAt,
+    segmentsCachedAt,
+    handleRetryData,
+    onReadinessChange,
+  ]);
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState('login');
@@ -491,6 +538,11 @@ export default function MapPage({ onReadinessChange }) {
   return (
     <>
       <MapShell onMapReady={setMap} initialView={mapView} onViewChange={persistMapView} />
+      <OfflineBanner
+        isOffline={waypointsOffline || segmentsOffline}
+        cachedAt={waypointsCachedAt || segmentsCachedAt || null}
+        onRetry={handleRetryData}
+      />
       {map && (
         <WaypointLayer
           map={map}
@@ -503,15 +555,6 @@ export default function MapPage({ onReadinessChange }) {
       )}
       {map && (
         <SegmentsLayer map={map} segments={segments} onViewDetails={handleViewSegment} />
-      )}
-      {map && (
-        <StaticKmlLayer
-          map={map}
-          onSelect={handleSelectPlace}
-          onAnnotationsChange={setKmlAnnotations}
-          dedupSnaps={osmSnaps}
-          dedupBadges={osmBadgeMerges}
-        />
       )}
       {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleSelectPlace} />}
       {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
