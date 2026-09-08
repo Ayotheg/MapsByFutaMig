@@ -9,10 +9,14 @@ import styles from './OfflineBanner.module.css';
 // person browsing on stale/cached data needs to keep knowing that until
 // it's no longer true, not just for four seconds.
 //
-// `isOffline`/`cachedAt` come from useWaypoints/useSegments by way of
-// MapPage — see their own header comments for how the cache fallback
-// gets populated. `onRetry` re-runs both loads (MapPage wires this to
-// refetchWaypoints + refetchSegments).
+// `isOffline`/`cachedAt` come from MapPage, which merges two signals: the
+// browser's own live connectivity state (useOnlineStatus.js — catches a
+// mid-session disconnect even with no fetch in flight) and the data
+// hooks' own fallback state (useWaypoints/useSegments — catches a fetch
+// that failed/timed out despite the browser still reporting "online",
+// e.g. a captive portal or a route to Supabase specifically being down).
+// `onRetry` re-runs both loads (MapPage wires this to refetchWaypoints +
+// refetchSegments).
 function formatAge(cachedAt) {
   if (!cachedAt) return null;
   const mins = Math.round((Date.now() - cachedAt) / 60000);
@@ -64,7 +68,11 @@ export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
   return (
     <div className={`${styles.banner} ${styles.offline}`} role="status">
       <WifiOff size={14} />
-      <span>{age ? `Showing saved data from ${age}` : 'Showing saved data'}</span>
+      <span>
+        {age
+          ? `Showing saved data from ${age}`
+          : "You're offline — showing already-loaded data"}
+      </span>
       <button
         type="button"
         className={styles.retryButton}

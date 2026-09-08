@@ -26,6 +26,7 @@ import { useAuth, friendlyError } from '../features/auth/useAuth';
 import { useGuestUsage } from '../features/auth/useGuestUsage';
 import { useAdminPin } from '../features/auth/useAdminPin';
 import { useSeo } from '../lib/useSeo';
+import { useOnlineStatus } from '../lib/useOnlineStatus';
 import SubmissionToast from '../features/waypoint-submissions/SubmissionToast';
 import OfflineBanner from '../features/offline/OfflineBanner';
 import { usePresenceTracking } from '../features/analytics/usePresenceTracking';
@@ -119,6 +120,15 @@ export default function MapPage({ onReadinessChange }) {
   const [selected, setSelected] = useState(() => readPersistentState('selected-place', null));
   const [isMobile] = useState(() => window.innerWidth <= 768);
   const [selectedSegmentId, setSelectedSegmentId] = useState(() => readPersistentState('selected-segment', null));
+
+  // Live connectivity signal, separate from waypointsOffline/segmentsOffline
+  // below — those only flip on a fetch outcome (a cache fallback or a
+  // timeout), so they never notice the browser going offline mid-session
+  // with nothing new being fetched. This mirrors the browser's own
+  // `online`/`offline` events instead, so OfflineBanner reacts the instant
+  // connectivity actually drops, not just the next time something tries
+  // to talk to Supabase.
+  const browserOnline = useOnlineStatus();
 
   const {
     waypoints,
@@ -259,6 +269,15 @@ export default function MapPage({ onReadinessChange }) {
     refetchSegments();
   }, [refetchWaypoints, refetchSegments]);
 
+  // Merges two different signals that both mean "this isn't live data
+  // right now": waypointsOffline/segmentsOffline (a fetch fell back to
+  // cache or timed out) and browserOnline (the browser's own connectivity
+  // state, which can flip mid-session with no fetch involved at all —
+  // e.g. turning off mobile data while already looking at a loaded map).
+  // Without browserOnline in the mix, that second case triggers nothing.
+  const isOffline = !browserOnline || waypointsOffline || segmentsOffline;
+  const cachedAt = waypointsCachedAt || segmentsCachedAt || null;
+
   // Real boot-readiness signal for App's loading screen — the loading
   // flags this page already tracks for its own data hooks (map init,
   // waypoints, segments, session restore), plus enough extra info
@@ -272,8 +291,8 @@ export default function MapPage({ onReadinessChange }) {
       waypointsReady: !waypointsLoading,
       segmentsReady: !segmentsLoading,
       authReady: !auth.loading,
-      isOffline: waypointsOffline || segmentsOffline,
-      cachedAt: waypointsCachedAt || segmentsCachedAt || null,
+      isOffline,
+      cachedAt,
       retry: handleRetryData,
     });
   }, [
@@ -281,10 +300,8 @@ export default function MapPage({ onReadinessChange }) {
     waypointsLoading,
     segmentsLoading,
     auth.loading,
-    waypointsOffline,
-    segmentsOffline,
-    waypointsCachedAt,
-    segmentsCachedAt,
+    isOffline,
+    cachedAt,
     handleRetryData,
     onReadinessChange,
   ]);
@@ -539,8 +556,8 @@ export default function MapPage({ onReadinessChange }) {
     <>
       <MapShell onMapReady={setMap} initialView={mapView} onViewChange={persistMapView} />
       <OfflineBanner
-        isOffline={waypointsOffline || segmentsOffline}
-        cachedAt={waypointsCachedAt || segmentsCachedAt || null}
+        isOffline={isOffline}
+        cachedAt={cachedAt}
         onRetry={handleRetryData}
       />
       {map && (
