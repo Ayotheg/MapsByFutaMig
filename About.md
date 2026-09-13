@@ -16,6 +16,19 @@ Tagline (from the page title): **"Your go-to guide on FUTA Campus."**
 
 ---
 
+## Who built it
+
+Maps By FUTA was co-founded by Ayoola Omoniyi and Gem Akinbo. It was built
+because existing students could find their way around the parts of campus
+they already knew, but couldn't easily explore the rest of FUTA, and new
+students had no reliable way to navigate at all beyond word-of-mouth
+directions. The platform covers the full campus plus off-campus lodges
+and streets around FUTA. Connect with them on X:
+- Ayoola Omoniyi — https://x.com/AyotheGrapher_
+- Gem Akinbo — https://x.com/Gem_Akinbo
+
+---
+
 ## Core functionality
 
 ### 🗺️ Interactive campus map

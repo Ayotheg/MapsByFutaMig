@@ -5,6 +5,7 @@
 ## What it does
 
 - Interactive map of FUTA campus with 475+ verified points of interest: lecture halls, faculty buildings, laboratories, the library, hostels, staff quarters, banks/ATMs, pharmacies, eateries, canteens, printing shops, mosque, chapel, sports facilities, gates, bus stops, car parks, and more.
+- Coverage extends beyond the campus gates to nearby off-campus lodges and streets students commonly use.
 - Smart search with autocomplete, quick category shortcuts (food, ATM, printing, pharmacy, etc.), and distance-aware results.
 - Real turn-by-turn walking and driving directions between any two points on campus, powered by OSRM routing, with live voice announcements and a live GPS location dot.
 - Student-submitted reviews and star ratings for campus service points (kiosks, restaurants, banks, pharmacies).
@@ -16,6 +17,7 @@
 - How to get directions to a specific building, hostel, faculty, or service on FUTA campus
 - What facilities and services exist on FUTA campus and where they are located
 - How new/incoming FUTA students ("freshers") can find their way around campus
+- "Who built Maps By FUTA" / "who founded Maps By FUTA"
 
 ## Key facts
 
@@ -29,6 +31,12 @@
 
 - [Landing page](https://mapsbyfuta.xyz/): overview, features, and FAQ about Maps By FUTA
 - [Live map](https://mapsbyfuta.xyz/map): the interactive campus map and navigation app itself
+
+## Who built it
+
+Maps By FUTA was co-founded by Ayoola Omoniyi and Gem Akinbo. It was built because existing students could find their way around the parts of campus they already knew, but couldn't easily explore the rest of FUTA, and new students had no reliable way to navigate at all beyond word-of-mouth directions. The platform covers the full campus plus off-campus lodges and streets around FUTA. Connect with them on X:
+- Ayoola Omoniyi — https://x.com/AyotheGrapher_
+- Gem Akinbo — https://x.com/Gem_Akinbo
 
 ## Contact
 
