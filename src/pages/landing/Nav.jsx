@@ -26,7 +26,7 @@ function Nav() {
     { label: 'See how it works', id: 'video' },
     { label: 'Explore', id: 'explore' },
     { label: 'FAQ', id: 'faq' },
-    { label: 'Behind the scenes', id: 'bts' },
+    { label: 'BTS', id: 'bts' },
   ]
 
   const scrollTo = (id) => {
