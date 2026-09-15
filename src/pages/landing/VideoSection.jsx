@@ -11,7 +11,7 @@ import { RouteMotif } from './shared'
  * below normalizes whichever you give it, so this is the one line to
  * change once the real commercial is uploaded.
  */
-const DEMO_VIDEO_INPUT = 'https://youtu.be/Lofi1jha6s8?si=ik4bBl8_avCwhSiO'
+const DEMO_VIDEO_INPUT = 'https://youtu.be/sU0PdDBjWVo?si=hEaOUtgISZbvwrtM'
 
 // YouTube's `videoId` player param wants the bare 11-char ID, not a URL —
 // pasting a full link in directly is a common, silent failure mode (the
