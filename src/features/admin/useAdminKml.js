@@ -68,6 +68,14 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
   const buildLayerFromGeo = useCallback(
     (path, geo, color, kmlLabel) => {
       let idx = -1;
+
+      // Seed the registry immediately so the file shows up in the list
+      // even if it contains 0 valid point features.
+      setRegistry((reg) => ({
+        ...reg,
+        [path]: reg[path] || { color, label: kmlLabel, features: [] }
+      }));
+
       const geoLayer = L.geoJSON(geo, {
         filter: (f) => f.geometry?.type === 'Point',
         pointToLayer(f, ll) {
@@ -143,7 +151,50 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
       if (loadedPathsRef.current.has(path)) {
         throw new Error('This file is already loaded.');
       }
-      const geo = toGeoJSONKml(new DOMParser().parseFromString(text, 'text/xml'));
+      
+      // Some GIS tools export KML with namespace prefixes on tags (e.g., <ns0:Placemark>).
+      // The @tmcw/togeojson library strictly expects unprefixed tags like <Placemark>.
+      // We strip these prefixes from all opening and closing tags before parsing.
+      const cleanText = text.replace(/(<\/?)[\w-]+:/g, '$1');
+      
+      const geo = toGeoJSONKml(new DOMParser().parseFromString(cleanText, 'text/xml'));
+
+      // -- Duplicate Resistance Logic --
+      // Handle duplicates in a "broad sense" by filtering the incoming features against themselves
+      // to ensure no bloated or messy KML exports crash or clutter the admin interface.
+      if (geo.features) {
+        const uniqueFeatures = [];
+        for (const feature of geo.features) {
+          if (feature.geometry?.type !== 'Point') {
+            uniqueFeatures.push(feature);
+            continue;
+          }
+          
+          const lng = feature.geometry.coordinates[0];
+          const lat = feature.geometry.coordinates[1];
+          const name = feature.properties?.name?.trim()?.toLowerCase() || '';
+
+          const isDuplicate = uniqueFeatures.some(existing => {
+            if (existing.geometry?.type !== 'Point') return false;
+            const exLng = existing.geometry.coordinates[0];
+            const exLat = existing.geometry.coordinates[1];
+            const exName = existing.properties?.name?.trim()?.toLowerCase() || '';
+            
+            const dist = haversine(lat, lng, exLat, exLng);
+            
+            // Broad Duplicate Definition:
+            // 1. Same exact spot (within 2 meters) regardless of name (e.g., accidental GIS double-click).
+            // 2. Very close (within 25 meters) AND has the exact same name (e.g., same place exported twice).
+            return dist < 2 || (dist < 25 && name && name === exName);
+          });
+
+          if (!isDuplicate) {
+            uniqueFeatures.push(feature);
+          }
+        }
+        geo.features = uniqueFeatures;
+      }
+
       const label = kmlLabel || extractKmlLabel(geo) || path.split('/').pop();
       buildLayerFromGeo(path, geo, color, label);
       loadedPathsRef.current.add(path);

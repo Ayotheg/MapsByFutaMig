@@ -42,7 +42,7 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
   const entries = Object.entries(adminKml.registry);
 
   return (
-    <div className={styles.tabContent}>
+    <div className={styles.tabContent} style={{ overflowY: 'auto', display: 'block' }}>
       <div className={styles.kmlUploadArea}>
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" style={{ color: '#7c3aed', opacity: 0.7 }}>
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -93,7 +93,7 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
       )}
 
       <div className={styles.sectionLabel}>Loaded KML Files</div>
-      <div className={styles.list}>
+      <div className={styles.list} style={{ overflowY: 'visible', flex: 'none' }}>
         {entries.length === 0 && <div className={styles.empty}>No KML loaded yet.</div>}
         {entries.map(([filePath, file]) => (
           <div key={filePath}>
