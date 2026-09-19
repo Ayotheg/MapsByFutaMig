@@ -3,7 +3,7 @@ import { useSeo } from '../lib/useSeo'
 import Nav from './landing/Nav'
 import Hero from './landing/Hero'
 import TrustBar from './landing/TrustBar'
-import LaunchCountdown from './landing/LaunchCountdown'
+// import LaunchCountdown from './landing/LaunchCountdown'
 import CampusTransformSection from './landing/CampusTransformSection'
 import ProductFeatures from './landing/ProductFeatures'
 import VideoSection from './landing/VideoSection'
@@ -49,14 +49,14 @@ function LandingPage() {
           the preview card room to fully clear before this section
           starts, so nothing collides. See launchConfig.js for the
           LAUNCH_DATE constant if the date needs tweaking later. */}
-      <LaunchCountdown />
+      {/* <LaunchCountdown /> */}
       <CampusTransformSection />
       <ProductFeatures />
       <VideoSection />
       <ExploreSection />
       <PopularPlacesSection />
       <FinalCTA />
-      <BTSSection />
+      {/* <BTSSection /> */}
         <FAQ />
       <Footer />
     </>

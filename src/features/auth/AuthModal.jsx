@@ -230,7 +230,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
             <Divider />
             <Field label="Email Address" trailing={<button type="button" className={styles.forgotLink} onClick={handleForgot}>Forgot?</button>}>
               <div className={styles.inputIcon}><Mail size={16} /></div>
-              <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Enter your student or staff email" autoComplete="email" onKeyDown={enterSubmits(handleLogin)} />
+              <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="Enter your email address" autoComplete="email" onKeyDown={enterSubmits(handleLogin)} />
             </Field>
             <Field label="Password">
               <PasswordInput value={loginPw} onChange={setLoginPw} show={loginShowPw} onToggleShow={() => setLoginShowPw((s) => !s)} placeholder="Enter your password" autoComplete="current-password" onKeyDown={enterSubmits(handleLogin)} />
@@ -248,11 +248,11 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
             <Divider />
             <Field label="Full Name">
               <div className={styles.inputIcon}><User size={16} /></div>
-              <input type="text" value={signupName} onChange={(e) => setSignupName(e.target.value)} placeholder="John Doe" autoComplete="name" onKeyDown={enterSubmits(handleSignup)} />
+              <input type="text" value={signupName} onChange={(e) => setSignupName(e.target.value)} placeholder="Kayode Johnson" autoComplete="name" onKeyDown={enterSubmits(handleSignup)} />
             </Field>
             <Field label="Email Address">
               <div className={styles.inputIcon}><Mail size={16} /></div>
-              <input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="student@futa.edu.ng" autoComplete="email" onKeyDown={enterSubmits(handleSignup)} />
+              <input type="email" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} placeholder="kayode.johnson@example.com" autoComplete="email" onKeyDown={enterSubmits(handleSignup)} />
             </Field>
             <Field label="Password" hint="Min. 6 characters.">
               <PasswordInput value={signupPw} onChange={setSignupPw} show={signupShowPw} onToggleShow={() => setSignupShowPw((s) => !s)} placeholder="••••••••" autoComplete="new-password" onKeyDown={enterSubmits(handleSignup)} />
