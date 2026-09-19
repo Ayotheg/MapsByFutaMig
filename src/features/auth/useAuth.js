@@ -162,7 +162,7 @@ export function initials(user) {
 // mapped fresh from Supabase's own codes rather than reusing legacy's
 // Firebase-specific map verbatim.
 const ERROR_MESSAGES = {
-  invalid_credentials: 'Email or password is incorrect.',
+  invalid_credentials: 'Email or password is incorrect. If you signed up with Google, please use the Google button.',
   user_already_exists: 'This email is already registered. Sign in instead.',
   weak_password: 'Password must be at least 6 characters.',
   email_not_confirmed: 'Please confirm your email before signing in (Check your email for the confirmation link).',
