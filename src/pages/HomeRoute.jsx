@@ -51,10 +51,8 @@ function useFontsReady() {
 // mapReady/waypointsReady/segmentsReady/authReady flags plus fontsReady
 // here — no artificial timer standing in for real progress.
 //
-// Lives in its own file (rather than inline in App.jsx) so both the
-// real /map route (behind RequireLaunch) and the /gearlify dev route
-// (unguarded — see GearlifyGate.jsx) can mount the exact same map
-// experience without duplicating this component.
+// Lives in its own file rather than inline in App.jsx so the map route
+// can mount the complete experience without duplicating this component.
 function HomeRoute() {
   const [readiness, setReadiness] = useState({
     mapReady: false,

@@ -4,29 +4,12 @@ import './index.css'
 import HomeRoute from './pages/HomeRoute'
 import LoadingScreen from './pages/LoadingScreen'
 import NotFoundPage from './pages/NotFoundPage'
-import GearlifyGate from './pages/GearlifyGate'
 import ResetPasswordPage from './pages/ResetPasswordPage'
-import { useLaunchGate } from './pages/landing/landingHooks'
 
 import LandingPage from './pages/LandingPage'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import TermsOfService from './pages/legal/TermsOfService'
 import CookiePolicy from './pages/legal/CookiePolicy'
-
-// Guards the real /map route itself — not just the on-page buttons.
-// Renders NotFoundPage (rather than redirecting to "/") when the map
-// isn't open yet, so hitting /map pre-launch looks exactly like
-// hitting any other dead URL — it doesn't tip anyone off that a real
-// route lives there. Same launch check as every MapLink
-// (useLaunchGate → LAUNCH_DATE / hasDevAccess in launchConfig.js), so
-// the two can never disagree. /gearlify (GearlifyGate.jsx) is the one
-// deliberate way around this, and it renders the map directly rather
-// than going through this route at all.
-function RequireLaunch({ children }) {
-  const { launched } = useLaunchGate();
-  if (!launched) return <NotFoundPage />;
-  return children;
-}
 
 // React Router doesn't reset scroll position on navigation by default —
 // without this, clicking e.g. the footer's "Privacy Policy" link (or any
@@ -48,11 +31,9 @@ function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/map" element={<RequireLaunch><HomeRoute /></RequireLaunch>} />
-        <Route path="/gearlify" element={<GearlifyGate />} />
-        {/* Landing spot for the "Forgot password?" email link — not
-            behind RequireLaunch, since setting a password is an account
-            action, not access to the map itself. See useAuth.js's
+        <Route path="/map" element={<HomeRoute />} />
+        {/* Landing spot for the "Forgot password?" email link. See
+          useAuth.js's
             resetPassword() + ResetPasswordPage.jsx's header comment for
             why this route needs to exist at all (Supabase's recovery
             link auto-logs the browser in; this page is what turns that
