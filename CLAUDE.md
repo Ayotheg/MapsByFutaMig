@@ -4,7 +4,7 @@ Read this in full before writing any code. This file is handed to every new LLM
 session working on this project, regardless of which feature slice they're
 assigned. Fill in the "Session Context" block at the bottom with the specific
 slice you're working on before starting.
-
+yy
 ## Project summary
 Maps By FUTA is a Leaflet.js campus navigation web app for Federal University
 of Technology Akure. It is being migrated in two parallel tracks:
