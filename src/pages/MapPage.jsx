@@ -21,7 +21,6 @@ import MobileSearchOverlay from '../features/search/MobileSearchOverlay';
 import QuickChips from '../features/search/QuickChips';
 import ChipResultsPanel from '../features/search/ChipResultsPanel';
 import { useGpsTracking } from '../features/navigation/useGpsTracking';
-import MobFabCluster from '../features/navigation/MobFabCluster';
 import { useAuth, friendlyError } from '../features/auth/useAuth';
 import { useGuestUsage } from '../features/auth/useGuestUsage';
 import { useAdminPin } from '../features/auth/useAdminPin';
@@ -675,17 +674,10 @@ export default function MapPage({ onReadinessChange }) {
       />
 
       {/* ── Slice 9: GPS + Navigation ────────────────────────────────── */}
-      {isMobile && (
-        <MobFabCluster
-          sheetState={sheetState}
-          tracking={gps.isTracking}
-          onLocateClick={gps.toggleTracking}
-          onViewToggleClick={toggleViewMode}
-          onAuthClick={() => openAuthModal('login')}
-          user={auth.user}
-          guestNavRemaining={auth.user ? null : guestUsage.remaining}
-        />
-      )}
+      {/* MobFabCluster (floating profile / view-mode / locate buttons) is
+          intentionally not rendered — the Layers panel / bottom-sheet tabs
+          (Signal, Profile) cover the same actions. Component file is kept
+          in features/navigation/ in case it needs to be restored. */}
       {map && navOpen && (
         <Suspense fallback={null}>
           <NavigationController
