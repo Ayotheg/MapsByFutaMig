@@ -20,6 +20,7 @@
   cursor: pointer;
   pointer-events: auto;
   isolation: isolate;
+  max-width: min(190px, 42vw);
 }
 
 .gm-pin-label {
@@ -29,6 +30,11 @@
   color: #1a1a2e;
   max-width: 120px;
   line-height: 1.2;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-shadow:
     0 0 3px rgba(255, 255, 255, 1),
     0 0 6px rgba(255, 255, 255, 0.9),
