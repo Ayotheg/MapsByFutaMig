@@ -31,7 +31,7 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
     <div className={styles.row} style={style} onClick={handleRowClick}>
       <div className={styles.thumb}>
         {result.imageUrls && result.imageUrls.length > 0 ? (
-          <img src={result.imageUrls[0]} alt={result.name} loading="lazy" />
+          <img src={result.imageUrls[0]} alt={result.name} />
         ) : (
           <div className={styles.thumbPh}>
             <ThumbIcon size={22} />

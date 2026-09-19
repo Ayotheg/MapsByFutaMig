@@ -34,7 +34,7 @@ export default function ExploreCard({ pick, userCoords, onSelect }) {
       onClick={() => onSelect?.(pick.waypoint)}
     >
       <div className={styles.avatar} style={!image ? { background: color } : undefined}>
-        {image ? <img src={image} alt="" loading="lazy" /> : <Icon size={18} color="#fff" strokeWidth={2} />}
+        {image ? <img src={image} alt="" /> : <Icon size={18} color="#fff" strokeWidth={2} />}
       </div>
       <div className={styles.cardBody}>
         <div className={styles.cardName}>{pick.name}</div>
