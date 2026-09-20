@@ -11,8 +11,8 @@ import FootballIcon from './lib/FootballIcon'
 import MosqueIcon from './lib/MosqueIcon'
 // Moved to src/assets/ during Task 1 (asset migration) — path is relative
 // to src/pages/landing/, where Task 2 plans to place the split-up files.
-import mapsFlyerImg from '../../assets/MAPSBYFUTA.jpg'
-import logoImg from '../../assets/MapssByFuta.jpg'
+import mapsFlyerImg from './assets/MAPSBYFUTA.jpg'
+import logoImg from './assets/MapssByFuta.jpg'
 
 /* ─── Scroll reveal hook ─── */
 function useReveal(threshold = 0.15) {

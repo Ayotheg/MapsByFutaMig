@@ -58,7 +58,7 @@ export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
     return (
       <div className={`${styles.banner} ${styles.reconnected}`} role="status">
         <Wifi size={14} />
-        <span>Back online — showing the latest data</span>
+        <span>Online </span>
       </div>
     );
   }
@@ -71,7 +71,7 @@ export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
       <span>
         {age
           ? `Showing saved data from ${age}`
-          : "You're offline — showing already-loaded data"}
+          : "Offline -- Turn on your cellular/WIFI"}
       </span>
       <button
         type="button"

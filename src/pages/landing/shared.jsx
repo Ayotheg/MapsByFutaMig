@@ -1,56 +1,13 @@
 import { Link } from 'react-router-dom'
 import mapsLogo from "../../assets/mapsLogo.png"
-import { useDrawRoute, useLaunchGate } from './landingHooks'
+import { useDrawRoute } from './landingHooks'
 
-/**
- * Drop-in replacement for `<Link to="/map">` used by every "Open the
- * map" / "Start Navigating" button across the landing page (Nav, Hero,
- * CampusTransformSection, ExploreSection, PopularPlacesSection,
- * FinalCTA, Footer). Before LAUNCH_DATE (launchConfig.js) it renders
- * the exact same look but as an inert, non-clickable element —
- * dimmed, `cursor: not-allowed`, no navigation — instead of an actual
- * link to /map. Once the date passes it renders as a normal Link, no
- * code changes needed anywhere that uses it.
- */
-export const MapLink = ({ children, style, onMouseEnter, onMouseLeave, ...rest }) => {
-  const { launched } = useLaunchGate()
-
-  if (launched) {
-    return (
-      <Link to="/map" style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave} {...rest}>
-        {children}
-      </Link>
-    )
-  }
-
-  return (
-    <span
-      aria-disabled="true"
-      title="The map isn't open yet — check back at launch"
-      style={{ ...style, opacity: 0.45, cursor: 'not-allowed', pointerEvents: 'none' }}
-      {...rest}
-    >
-      {children}
-    </span>
-  )
-}
-
-/* ─── Map pin SVG ─── */
-export const Pin = ({ color = '#44e2cd', size = 10 }) => (
-  <svg width={size} height={size * 1.3} viewBox="0 0 10 13" fill="none">
-    <path d="M5 0C2.24 0 0 2.24 0 5c0 3.75 5 8 5 8s5-4.25 5-8c0-2.76-2.24-5-5-5z" fill={color} />
-    <circle cx="5" cy="5" r="2" fill="white" fillOpacity={0.9} />
-  </svg>
+export const MapLink = ({ children, ...rest }) => (
+  <Link to="/map" {...rest}>
+    {children}
+  </Link>
 )
 
-/**
- * Logo mark. Was previously `MapssByFuta.jpg` — a flattened JPG, so it
- * carried a baked-in background square (JPGs have no alpha channel) and
- * needed an `invert()` filter hack to read on a dark navbar. Swapped for
- * `logo-mark.svg` (the same mark, sourced from `public/favicon.svg`,
- * which is already a proper transparent vector in the real brand colors
- * per About.md) — no background, no filter hack needed.
- */
 export const Logo = ({ size = 44 }) => (
   <div className="flex items-center gap-2">
     <img src={mapsLogo} alt="MapsByFuta logo" style={{ height: size, width: 'auto', display: 'block' }} />

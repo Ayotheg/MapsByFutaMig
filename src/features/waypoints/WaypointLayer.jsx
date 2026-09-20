@@ -4,6 +4,75 @@ import './waypointMarkers.css';
 import { buildWaypointMarker } from './waypointMarkers';
 import { WP_TYPE_LABELS } from './wpTypeMeta';
 
+const MARKER_GAP = 8;
+const OFFSET_CANDIDATES = [
+  [0, 0],
+  [0, 24],
+  [0, -24],
+  [28, 0],
+  [-28, 0],
+  [0, 48],
+  [0, -48],
+  [52, 0],
+  [-52, 0],
+];
+
+function boxesOverlap(first, second) {
+  return (
+    first.left < second.right + MARKER_GAP &&
+    first.right + MARKER_GAP > second.left &&
+    first.top < second.bottom + MARKER_GAP &&
+    first.bottom + MARKER_GAP > second.top
+  );
+}
+
+// Leaflet owns the marker transform, so margins are used for a visual offset
+// instead of changing the marker's geographic position or click data.
+function layoutWaypointMarkers(map, entries) {
+  const placed = [];
+  const visibleEntries = entries
+    .filter(({ marker }) => marker._rendered && map.hasLayer(marker) && marker.getElement())
+    .sort((first, second) => first.marker.getLatLng().lat - second.marker.getLatLng().lat);
+
+  for (const { marker } of visibleEntries) {
+    const element = marker.getElement();
+    element.style.marginLeft = '0px';
+    element.style.marginTop = '0px';
+  }
+
+  for (const { marker } of visibleEntries) {
+    const element = marker.getElement();
+    const point = map.latLngToLayerPoint(marker.getLatLng());
+    const label = element.querySelector('.gm-pin-label');
+    const labelVisible = label && getComputedStyle(label).display !== 'none' && getComputedStyle(label).opacity !== '0';
+    const width = labelVisible ? element.offsetWidth : 14;
+    const height = labelVisible ? element.offsetHeight : 14;
+    let chosen = OFFSET_CANDIDATES[OFFSET_CANDIDATES.length - 1];
+
+    for (const candidate of OFFSET_CANDIDATES) {
+      const left = point.x - 7 + candidate[0];
+      const top = point.y - 7 + candidate[1];
+      const box = { left, top, right: left + width, bottom: top + height };
+      if (!placed.some((other) => boxesOverlap(box, other))) {
+        chosen = candidate;
+        placed.push(box);
+        break;
+      }
+    }
+
+    element.style.marginLeft = `${chosen[0]}px`;
+    element.style.marginTop = `${chosen[1]}px`;
+    if (!placed.some((box) => box.left === point.x - 7 + chosen[0] && box.top === point.y - 7 + chosen[1])) {
+      placed.push({
+        left: point.x - 7 + chosen[0],
+        top: point.y - 7 + chosen[1],
+        right: point.x - 7 + chosen[0] + width,
+        bottom: point.y - 7 + chosen[1] + height,
+      });
+    }
+  }
+}
+
 /**
  * Renders every non-OSM waypoint as a marker on `map` and opens the place
  * card on click. Mirrors legacy `loadSavedWaypoints` + the lazy
@@ -97,11 +166,16 @@ export default function WaypointLayer({ map, waypoints, isTypeVisible, onSelect,
         }
       }
       toAdd.forEach((m) => m.addTo(map));
+      requestAnimationFrame(() => layoutWaypointMarkers(map, markersRef.current));
     }
+    const relayout = () => requestAnimationFrame(() => layoutWaypointMarkers(map, markersRef.current));
     map.on('moveend zoomend', renderViewportMarkers);
+    map.on('moveend zoomend', relayout);
+    requestAnimationFrame(() => layoutWaypointMarkers(map, entries));
 
     return () => {
       map.off('moveend zoomend', renderViewportMarkers);
+      map.off('moveend zoomend', relayout);
       for (const { marker } of entries) {
         if (map.hasLayer(marker)) map.removeLayer(marker);
       }
