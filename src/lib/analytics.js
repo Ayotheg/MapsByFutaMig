@@ -111,6 +111,11 @@ function ensureFlushTimer() {
  * Keep `props` small and structured — analytics_events is queried a lot,
  * don't dump entire objects/HTML/large free text into it. */
 export function track(eventName, props = {}) {
+  try {
+    window.sabilytics?.track?.(eventName, props);
+  } catch (e) {
+    console.info('[analytics] Sabilytics tracking failed:', e?.message || e);
+  }
   ensureFlushTimer();
   queue.push({
     event_name: eventName,
