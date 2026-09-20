@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { track } from '../../lib/analytics';
+import { normalizeWaypointType } from '../waypoints/wpTypeMeta';
 
 // ── Admin panel — Supabase mutation helpers ─────────────────────────────
 //
@@ -30,6 +31,47 @@ import { track } from '../../lib/analytics';
 // confirmed live.
 
 const PLACE_IMAGES_BUCKET = 'place-images';
+
+
+// ── Silent-failure guard ─────────────────────────────────────────────────
+// Postgres Row-Level Security does NOT raise an error when an UPDATE or
+// DELETE is filtered out by policy — PostgREST answers "204 OK, 0 rows
+// changed". supabase-js therefore reports `error: null` and the old code
+// happily showed "Waypoint updated!" / "Approved" while nothing had been
+// written (and, since nothing changed, the map never refreshed). Every
+// admin write below now asks for the affected rows back (`.select('id')`)
+// and calls this when none came back, so a blocked write is a loud,
+// explained failure instead of a silent no-op.
+async function blockedWriteError(action) {
+  let reason =
+    'The database accepted the request but changed nothing — a Row-Level Security policy blocked it.';
+  try {
+    const { data: userRes } = await supabase.auth.getUser();
+    const user = userRes?.user;
+    if (!user) {
+      reason = 'You are not signed in to Maps By FUTA. Sign in first, then open the admin panel again.';
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!profile?.is_admin) {
+        reason =
+          `Your account (${user.email || user.id}) is not marked as an admin in the database, ` +
+          'so it is not allowed to change waypoints. The PIN only unlocks the panel — the database checks ' +
+          "profiles.is_admin. Run: update profiles set is_admin = true where id = '" + user.id + "';";
+      } else {
+        reason =
+          'Your account is an admin, but the waypoints table has no policy allowing this action. ' +
+          'Run supabase/admin_waypoint_policies.sql in the Supabase SQL editor.';
+      }
+    }
+  } catch {
+    // Diagnosis is best-effort; fall through with the generic message.
+  }
+  return new Error(`Could not ${action}. ${reason}`);
+}
 
 // ── Images ───────────────────────────────────────────────────────────────
 
@@ -90,7 +132,8 @@ export async function deleteImageRows(table, ids) {
 // now, but this stays backward-compatible with any other caller passing
 // only name/description/type.
 export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel }) {
-  const patch = { name, description, type };
+  // Never write a type the map/legend can't render (see wpTypeMeta.js).
+  const patch = { name, description, type: normalizeWaypointType(type) };
   const explorePatch = {};
   if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
   if (exploreTags !== undefined) explorePatch.explore_tags = exploreTags;
@@ -100,21 +143,38 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
   if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
 
   const hasExploreFields = Object.keys(explorePatch).length > 0;
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('waypoints')
     .update(hasExploreFields ? { ...patch, ...explorePatch } : patch)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
 
-  if (error && hasExploreFields && /column .* does not exist/i.test(error.message || '')) {
+  // PostgREST's missing-column message is "Could not find the 'x' column of
+  // 'waypoints' in the schema cache" (code PGRST204); Postgres' own is
+  // "column ... does not exist" (42703). The old check only matched the
+  // second form, so a not-yet-migrated Explore column blocked the whole save.
+  const missingColumn =
+    error &&
+    (error.code === 'PGRST204' ||
+      error.code === '42703' ||
+      /column .* does not exist|could not find the .* column/i.test(error.message || ''));
+
+  if (missingColumn && hasExploreFields) {
     // supabase/explore_fields.sql hasn't been run yet — don't let that
     // block saving the ordinary name/description/type edit too.
-    const { error: baseError } = await supabase.from('waypoints').update(patch).eq('id', id);
+    const { data: baseData, error: baseError } = await supabase
+      .from('waypoints')
+      .update(patch)
+      .eq('id', id)
+      .select('id');
     if (baseError) throw baseError;
+    if (!baseData?.length) throw await blockedWriteError('save this waypoint');
     throw new Error(
       'Saved name/description/type, but Explore fields need supabase/explore_fields.sql run first — the Explore toggle/tags/priority above were not saved.'
     );
   }
   if (error) throw error;
+  if (!data?.length) throw await blockedWriteError('save this waypoint');
   // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
   track('admin_action', { action: 'update', entity: 'waypoint' });
 }
@@ -128,8 +188,9 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
 // skipped: legacy never had this problem (base64-in-doc, nothing external
 // to orphan).
 export async function deleteWaypoint(id) {
-  const { error } = await supabase.from('waypoints').delete().eq('id', id);
+  const { data, error } = await supabase.from('waypoints').delete().eq('id', id).select('id');
   if (error) throw error;
+  if (!data?.length) throw await blockedWriteError('delete this waypoint');
   track('admin_action', { action: 'delete', entity: 'waypoint' });
 }
 
@@ -143,10 +204,14 @@ export async function insertWaypoint({ name, description, type, lat, lng }) {
       id: crypto.randomUUID(),
       name,
       description,
-      type,
+      type: normalizeWaypointType(type),
       lat,
       lng,
       source_type: 'gps_annotation',
+      // Explicit, not left to the column default: the map only ever loads
+      // `status = 'approved'` rows (useWaypoints.js), so an admin-added
+      // point must be approved on insert or it never shows up.
+      status: 'approved',
       saved_at: new Date().toISOString(),
     })
     .select('id')
@@ -164,17 +229,24 @@ export async function insertWaypoint({ name, description, type, lat, lng }) {
 // admins can call these successfully — this client uses the anon key,
 // same as every other call in this file.
 export async function approveWaypoint(id) {
-  const { error } = await supabase.from('waypoints').update({ status: 'approved' }).eq('id', id);
+  const { data, error } = await supabase
+    .from('waypoints')
+    .update({ status: 'approved', rejection_reason: null })
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  if (!data?.length) throw await blockedWriteError('approve this submission');
   track('admin_action', { action: 'approve', entity: 'waypoint_submission' });
 }
 
 export async function rejectWaypoint(id, reason) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('waypoints')
     .update({ status: 'rejected', rejection_reason: reason })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id');
   if (error) throw error;
+  if (!data?.length) throw await blockedWriteError('reject this submission');
   track('admin_action', { action: 'reject', entity: 'waypoint_submission' });
 }
 

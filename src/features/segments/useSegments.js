@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
-import { withTimeoutSignal, isTimeoutError } from '../../lib/networkTimeout';
+import { isTimeoutError } from '../../lib/networkTimeout';
+import { fetchAllRows } from '../../lib/fetchAllRows';
 import { cacheGet, cacheSet } from '../../lib/localCache';
 
 const CACHE_KEY = 'segments';
@@ -88,39 +89,45 @@ export function useSegments() {
       return;
     }
 
-    const { signal, done } = withTimeoutSignal();
-
+    // Every query is paged (lib/fetchAllRows.js) — `segment_points` in
+    // particular easily exceeds PostgREST's silent 1000-row response cap,
+    // which would truncate routes mid-line.
     let segRows, segErr, imgRows, imgErr, wpRows, wpErr, ptRows, ptErr;
-    try {
-      [
-        { data: segRows, error: segErr },
-        { data: imgRows, error: imgErr },
-        { data: wpRows, error: wpErr },
-        { data: ptRows, error: ptErr },
-      ] = await Promise.all([
+    [
+      { data: segRows, error: segErr },
+      { data: imgRows, error: imgErr },
+      { data: wpRows, error: wpErr },
+      { data: ptRows, error: ptErr },
+    ] = await Promise.all([
+      fetchAllRows(() =>
         supabase
           .from('segments')
           .select('id, name, description, category, distance_m, duration_ms')
-          .abortSignal(signal),
+          .order('id', { ascending: true })
+      ),
+      fetchAllRows(() =>
         supabase
           .from('segment_images')
           .select('segment_id, storage_path, position')
+          .order('segment_id', { ascending: true })
           .order('position', { ascending: true })
-          .abortSignal(signal),
+          .order('id', { ascending: true })
+      ),
+      fetchAllRows(() =>
         supabase
           .from('waypoints')
           .select('id, name, description, lat, lng, segment_id')
           .not('segment_id', 'is', null)
-          .abortSignal(signal),
+          .order('id', { ascending: true })
+      ),
+      fetchAllRows(() =>
         supabase
           .from('segment_points')
           .select('segment_id, seq, lat, lng')
+          .order('segment_id', { ascending: true })
           .order('seq', { ascending: true })
-          .abortSignal(signal),
-      ]);
-    } finally {
-      done();
-    }
+      ),
+    ]);
 
     if (segErr || imgErr || wpErr || ptErr) {
       const timedOut = [segErr, imgErr, wpErr, ptErr].some(isTimeoutError);

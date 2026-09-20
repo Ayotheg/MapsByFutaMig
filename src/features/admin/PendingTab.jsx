@@ -43,16 +43,26 @@ export default function PendingTab({ onRefreshWaypoints, onCountChange }) {
     setLoading(true);
     setError(null);
     try {
-      const [{ data: wpRows, error: wpErr }, { data: imgRows, error: imgErr }] = await Promise.all([
-        supabase
-          .from('waypoints')
-          .select('id, name, description, type, lat, lng, submitted_by, saved_at')
-          .eq('status', 'pending')
-          .order('saved_at', { ascending: true }),
-        supabase.from('waypoint_images').select('waypoint_id, storage_path, position').order('position', { ascending: true }),
-      ]);
+      const { data: wpRows, error: wpErr } = await supabase
+        .from('waypoints')
+        .select('id, name, description, type, lat, lng, submitted_by, saved_at')
+        .eq('status', 'pending')
+        .order('saved_at', { ascending: true });
       if (wpErr) throw wpErr;
-      if (imgErr) throw imgErr;
+
+      // Only the pending rows' photos (was: every photo in the table, which
+      // PostgREST silently truncates at 1000 rows).
+      let imgRows = [];
+      const pendingIds = (wpRows || []).map((w) => w.id);
+      if (pendingIds.length) {
+        const { data, error: imgErr } = await supabase
+          .from('waypoint_images')
+          .select('waypoint_id, storage_path, position')
+          .in('waypoint_id', pendingIds)
+          .order('position', { ascending: true });
+        if (imgErr) throw imgErr;
+        imgRows = data || [];
+      }
 
       const imagesByWaypoint = {};
       for (const row of imgRows || []) {

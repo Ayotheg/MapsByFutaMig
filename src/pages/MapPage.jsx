@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MapShell from '../features/map/MapShell';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
@@ -31,52 +31,19 @@ import OfflineBanner from '../features/offline/OfflineBanner';
 import { usePresenceTracking } from '../features/analytics/usePresenceTracking';
 import { setAnalyticsUser } from '../lib/analytics';
 import { readPersistentState, writePersistentState } from '../lib/persistentState';
+import DetailModal from '../features/segments/DetailModal';
+import NavigationController from '../features/navigation/NavigationController';
+import ReviewModal from '../features/reviews/ReviewModal';
+import AuthModal from '../features/auth/AuthModal';
+import AdminPinGate from '../features/auth/AdminPinGate';
+import AdminPanel from '../features/admin/AdminPanel';
+import SuggestWaypointModal from '../features/waypoint-submissions/SuggestWaypointModal';
+import MyWaypointSubmissionsPanel from '../features/waypoint-submissions/MyWaypointSubmissionsPanel';
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
 // data — see the comment where it's used below for why this stays a
 // constant instead of ripping the prop out everywhere at once.
 const EMPTY_KML_ANNOTATIONS = [];
-
-// Slice 4: bundle-size policy (CLAUDE.md, effective starting this slice) —
-// DetailModal isn't needed for first paint, only mounts on a click, so it's
-// lazy-loaded per the exact pattern the policy specifies.
-const DetailModal = lazy(() => import('../features/segments/DetailModal'));
-
-// Slice 9: the actual reason this slice is a lazy-load candidate — OSRM
-// routing, the "Where to?" panel, turn-by-turn HUD, and voice only mount
-// once the user actually opens/starts navigation, matching CLAUDE.md's own
-// bundle-size note for this slice. `useGpsTracking` (imported directly
-// above, NOT lazy) is a deliberately different call — see its own header
-// comment for why the accuracy-gauge/tracking logic has to warm up
-// unconditionally on first paint, matching legacy exactly, while the much
-// heavier Navigation feature behind it does not.
-const NavigationController = lazy(() => import('../features/navigation/NavigationController'));
-
-// Slice 9: ReviewModal was built in Slice 8 with nothing to trigger it —
-// this is that trigger landing. Same lazy tier as DetailModal/SaveModal
-// per ReviewModal.jsx's own wiring instructions.
-const ReviewModal = lazy(() => import('../features/reviews/ReviewModal'));
-
-// Slice 10: explicit "known candidate" in CLAUDE.md's bundle-size policy
-// — the auth modal only mounts once opened, same lazy tier as the other
-// modals above.
-const AuthModal = lazy(() => import('../features/auth/AuthModal'));
-
-// AdminPinGate was previously built (Slice 10) but never rendered anywhere
-// — the Sidebar's Admin button had no onClick at all. Wired up here: same
-// lazy tier as the other on-demand modals, only mounted once the Admin
-// button is actually clicked.
-const AdminPinGate = lazy(() => import('../features/auth/AdminPinGate'));
-
-// Slice 11: the real admin panel (waypoint/segment/KML CRUD). Same lazy
-// tier as the rest — a large, admin-only surface with no reason to be in
-// the first-paint bundle.
-const AdminPanel = lazy(() => import('../features/admin/AdminPanel'));
-
-// Slice 13: same lazy tier as the other on-demand modals above — only
-// mounts once a signed-in student actually opens "Suggest a place".
-const SuggestWaypointModal = lazy(() => import('../features/waypoint-submissions/SuggestWaypointModal'));
-const MyWaypointSubmissionsPanel = lazy(() => import('../features/waypoint-submissions/MyWaypointSubmissionsPanel'));
 
 /**
  * First page-level composition of the map with feature chrome around it.
@@ -582,9 +549,7 @@ export default function MapPage({ onReadinessChange }) {
         isMobile={isMobile}
       />
       {selectedSegment && (
-        <Suspense fallback={null}>
-          <DetailModal segment={selectedSegment} onClose={() => setSelectedSegmentId(null)} />
-        </Suspense>
+        <DetailModal segment={selectedSegment} onClose={() => setSelectedSegmentId(null)} />
       )}
       {isMobile ? (
         <MobileSheet
@@ -679,103 +644,89 @@ export default function MapPage({ onReadinessChange }) {
           (Signal, Profile) cover the same actions. Component file is kept
           in features/navigation/ in case it needs to be restored. */}
       {map && navOpen && (
-        <Suspense fallback={null}>
-          <NavigationController
-            ref={navControllerRef}
-            map={map}
-            gps={gps}
-            searchIndex={searchIndex}
-            initialDest={navSeedDest}
-            explorePicks={explorePicksState.picks}
-            onRequestClose={() => {
-              setNavOpen(false);
-              setNavSeedDest(null);
-            }}
-            onActiveChange={setNavActive}
-            onArrival={(dest) => {
-              closeOtherOverlays('review');
-              setReviewTarget(dest);
-              presence.updatePresence(`reviewing ${dest?.name || 'a place'}`);
-            }}
-            guestNavBlocked={guestNavBlocked}
-            onGuestBlocked={handleGuestNavBlocked}
-            onNavigationSuccess={() => {
-              if (!auth.user) guestUsage.recordUse();
-            }}
-          />
-        </Suspense>
+        <NavigationController
+          ref={navControllerRef}
+          map={map}
+          gps={gps}
+          searchIndex={searchIndex}
+          initialDest={navSeedDest}
+          explorePicks={explorePicksState.picks}
+          onRequestClose={() => {
+            setNavOpen(false);
+            setNavSeedDest(null);
+          }}
+          onActiveChange={setNavActive}
+          onArrival={(dest) => {
+            closeOtherOverlays('review');
+            setReviewTarget(dest);
+            presence.updatePresence(`reviewing ${dest?.name || 'a place'}`);
+          }}
+          guestNavBlocked={guestNavBlocked}
+          onGuestBlocked={handleGuestNavBlocked}
+          onNavigationSuccess={() => {
+            if (!auth.user) guestUsage.recordUse();
+          }}
+        />
       )}
       {reviewTarget && (
-        <Suspense fallback={null}>
-          <ReviewModal dest={reviewTarget} onClose={() => setReviewTarget(null)} onSubmitted={refetchWaypoints} user={auth.user} />
-        </Suspense>
+        <ReviewModal dest={reviewTarget} onClose={() => setReviewTarget(null)} onSubmitted={refetchWaypoints} user={auth.user} />
       )}
       {authModalOpen && (
-        <Suspense fallback={null}>
-          <AuthModal
-            initialTab={authModalTab}
-            user={auth.user}
-            onClose={() => setAuthModalOpen(false)}
-            signInWithGoogle={auth.signInWithGoogle}
-            signInWithEmail={auth.signInWithEmail}
-            signUpWithEmail={auth.signUpWithEmail}
-            resetPassword={auth.resetPassword}
-            signOut={auth.signOut}
-            friendlyError={friendlyError}
-            message={authModalMessage}
-          />
-        </Suspense>
+        <AuthModal
+          initialTab={authModalTab}
+          user={auth.user}
+          onClose={() => setAuthModalOpen(false)}
+          signInWithGoogle={auth.signInWithGoogle}
+          signInWithEmail={auth.signInWithEmail}
+          signUpWithEmail={auth.signUpWithEmail}
+          resetPassword={auth.resetPassword}
+          signOut={auth.signOut}
+          friendlyError={friendlyError}
+          message={authModalMessage}
+        />
       )}
       {adminPin.pinOpen && (
-        <Suspense fallback={null}>
-          <AdminPinGate
-            open={adminPin.pinOpen}
-            onSuccess={adminPin.handleSuccess}
-            onClose={adminPin.closePinGate}
-          />
-        </Suspense>
+        <AdminPinGate
+          open={adminPin.pinOpen}
+          onSuccess={adminPin.handleSuccess}
+          onClose={adminPin.closePinGate}
+        />
       )}
       {map && adminPanelOpen && (
-        <Suspense fallback={null}>
-          <AdminPanel
-            map={map}
-            user={auth.user}
-            waypoints={waypoints}
-            segments={segments}
-            kmlAnnotations={kmlAnnotations}
-            chips={quickChips.chips}
-            onChipsChanged={quickChips.refetch}
-            onClose={() => setAdminPanelOpen(false)}
-            onWaypointsChanged={refetchWaypoints}
-            onSegmentsChanged={refetchSegments}
-            onSelect={handleSelectPlace}
-            searchRegister={searchIndex.register}
-          />
-        </Suspense>
+        <AdminPanel
+          map={map}
+          user={auth.user}
+          waypoints={waypoints}
+          segments={segments}
+          kmlAnnotations={kmlAnnotations}
+          chips={quickChips.chips}
+          onChipsChanged={quickChips.refetch}
+          onClose={() => setAdminPanelOpen(false)}
+          onWaypointsChanged={refetchWaypoints}
+          onSegmentsChanged={refetchSegments}
+          onSelect={handleSelectPlace}
+          searchRegister={searchIndex.register}
+        />
       )}
 
       {/* ── Slice 13: student waypoint submissions ─────────────────── */}
       {suggestModalOpen && (
-        <Suspense fallback={null}>
-          <SuggestWaypointModal
-            user={auth.user}
-            waypoints={waypoints}
-            pickedCoord={suggestPickedCoord}
-            onCoordConsumed={() => setSuggestPickedCoord(null)}
-            onRequestMapPick={handleRequestMapPick}
-            onClose={() => setSuggestModalOpen(false)}
-            onSubmitted={(message) => setSubmissionToast(message)}
-            onViewSubmissions={() => {
-              closeOtherOverlays('submissions');
-              setMySubmissionsOpen(true);
-            }}
-          />
-        </Suspense>
+        <SuggestWaypointModal
+          user={auth.user}
+          waypoints={waypoints}
+          pickedCoord={suggestPickedCoord}
+          onCoordConsumed={() => setSuggestPickedCoord(null)}
+          onRequestMapPick={handleRequestMapPick}
+          onClose={() => setSuggestModalOpen(false)}
+          onSubmitted={(message) => setSubmissionToast(message)}
+          onViewSubmissions={() => {
+            closeOtherOverlays('submissions');
+            setMySubmissionsOpen(true);
+          }}
+        />
       )}
       {mySubmissionsOpen && (
-        <Suspense fallback={null}>
-          <MyWaypointSubmissionsPanel user={auth.user} onClose={() => setMySubmissionsOpen(false)} />
-        </Suspense>
+        <MyWaypointSubmissionsPanel user={auth.user} onClose={() => setMySubmissionsOpen(false)} />
       )}
       <SubmissionToast message={submissionToast} onDismiss={dismissSubmissionToast} />
     </>

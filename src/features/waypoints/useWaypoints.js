@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
 
 import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
 import L from 'leaflet';
-import { withTimeoutSignal, isTimeoutError } from '../../lib/networkTimeout';
+import { isTimeoutError } from '../../lib/networkTimeout';
+import { fetchAllRows } from '../../lib/fetchAllRows';
 import { cacheGet, cacheSet } from '../../lib/localCache';
 
 const CACHE_KEY = 'waypoints';
@@ -42,7 +43,15 @@ export function useWaypoints() {
   const [isOffline, setIsOffline] = useState(false);
   const [cachedAt, setCachedAt] = useState(null);
 
+  // Bumped on every load() so a slow background phase-2 from an older load
+  // can't overwrite the results of a newer one (e.g. admin edit → refetch).
+  const loadIdRef = useRef(0);
+  // Last full set of off-campus rows, kept so a refetch doesn't make them
+  // vanish from the map/search while phase 2 re-downloads them.
+  const bulkRef = useRef([]);
+
   const load = useCallback(async () => {
+    const loadId = ++loadIdRef.current;
     setLoading(true);
     setError(null);
 
@@ -68,48 +77,61 @@ export function useWaypoints() {
       'is_explore, explore_tags, explore_priority, is_promoted, sponsor_name, promo_label';
     const BASE_COLS = 'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count';
 
-    const { signal, done } = withTimeoutSignal();
+    // ── Two-phase load ────────────────────────────────────────────────────
+    // The table holds ~6,000 approved rows, but ~90% are `osm_import` rows
+    // from the Lagos/Ogun state-wide extraction (scripts/osm-annotations) —
+    // hundreds of km from the campus a first-time user is looking at.
+    //   Phase 1 (blocks the loading screen): everything else — the real
+    //     campus content (admin-annotated, GPS, student-submitted) + photos.
+    //   Phase 2 (background, never blocks): the bulk osm_import rows,
+    //     appended when they arrive. Search/legend counts update then.
+    // Both phases are paged (lib/fetchAllRows.js) because PostgREST silently
+    // caps one response at 1000 rows.
+    const CORE_FILTER = 'source_type.is.null,source_type.neq.osm_import'; // `neq` alone would drop NULLs
+    const coreQuery = (cols) => () =>
+      supabase
+        .from('waypoints')
+        .select(cols)
+        .eq('status', 'approved')
+        .or(CORE_FILTER)
+        .order('id', { ascending: true });
+    const bulkQuery = (cols) => () =>
+      supabase
+        .from('waypoints')
+        .select(cols)
+        .eq('status', 'approved')
+        .eq('source_type', 'osm_import')
+        .order('id', { ascending: true });
 
-    let wpRows, wpErr, imgRows, imgErr;
-    try {
-      {
-        const res = await supabase
-          .from('waypoints')
-          .select(`${BASE_COLS}, ${EXPLORE_COLS}`)
-          .eq('status', 'approved')
-          .abortSignal(signal);
-        if (res.error) {
-          // Explore fields (supabase/explore_fields.sql) not migrated yet —
-          // don't let that break waypoint loading for the whole map. Retry
-          // without them; useExplorePicks.js already treats a waypoint
-          // with none of these fields as simply "not featured".
-          const fallback = await supabase
-            .from('waypoints')
-            .select(BASE_COLS)
-            .eq('status', 'approved')
-            .abortSignal(signal);
-          wpRows = fallback.data;
-          wpErr = fallback.error;
-          if (!fallback.error) {
-            console.info(
-              '[waypoints] Explore fields not found — run supabase/explore_fields.sql to enable featuring places in Explore.'
-            );
-          }
-        } else {
-          wpRows = res.data;
-          wpErr = res.error;
-        }
+    let cols = `${BASE_COLS}, ${EXPLORE_COLS}`;
+    let [wpRes, imgRes] = await Promise.all([
+      fetchAllRows(coreQuery(cols)),
+      fetchAllRows(() =>
+        supabase
+          .from('waypoint_images')
+          .select('waypoint_id, storage_path, position')
+          .order('waypoint_id', { ascending: true })
+          .order('position', { ascending: true })
+          .order('id', { ascending: true })
+      ),
+    ]);
+    if (wpRes.error && !isTimeoutError(wpRes.error)) {
+      // Explore fields (supabase/explore_fields.sql) not migrated yet —
+      // don't let that break waypoint loading for the whole map. Retry
+      // without them; useExplorePicks.js already treats a waypoint
+      // with none of these fields as simply "not featured".
+      cols = BASE_COLS;
+      wpRes = await fetchAllRows(coreQuery(cols));
+      if (!wpRes.error) {
+        console.info(
+          '[waypoints] Explore fields not found — run supabase/explore_fields.sql to enable featuring places in Explore.'
+        );
       }
-      const imgRes = await supabase
-        .from('waypoint_images')
-        .select('waypoint_id, storage_path, position')
-        .order('position', { ascending: true })
-        .abortSignal(signal);
-      imgRows = imgRes.data;
-      imgErr = imgRes.error;
-    } finally {
-      done();
     }
+    const { data: wpRows, error: wpErr } = wpRes;
+    const { data: imgRows, error: imgErr } = imgRes;
+
+    if (loadId !== loadIdRef.current) return; // a newer load() superseded this one
 
     if (wpErr || imgErr) {
       // Network genuinely failed or timed out (as opposed to a real
@@ -144,63 +166,84 @@ export function useWaypoints() {
       (imagesByWaypoint[row.waypoint_id] ??= []).push(url);
     }
 
+    // Shared across both phases so co-located pins fan out consistently.
     const posCount = {};
+    function shape(rows) {
+      const out = [];
+      for (const wp of rows || []) {
+        // numeric columns come back as strings over PostgREST — coerce
+        // before doing any math or handing to Leaflet.
+        const rawLat = Number(wp.lat);
+        const rawLng = Number(wp.lng);
 
-    const shaped = [];
-    for (const wp of wpRows || []) {
-            // numeric columns come back as strings over PostgREST — coerce
-      // before doing any math or handing to Leaflet.
-      const rawLat = Number(wp.lat);
-      const rawLng = Number(wp.lng);
+        // Skip OSM-bulk-imported waypoints that fall inside the FUTA campus
+        // box — those still risk duplicating the live campus-only Overpass
+        // layer. Outside campus (e.g. Lagos/Ogun data), render normally.
+        if (wp.source_type === 'osm_import' && CAMPUS_BOUNDS.contains(L.latLng(rawLat, rawLng))) continue;
 
-      // Skip OSM-bulk-imported waypoints that fall inside the FUTA campus
-      // box — those still risk duplicating the live campus-only Overpass
-      // layer. Outside campus (e.g. Lagos/Ogun data), render normally.
-      if (wp.source_type === 'osm_import' && CAMPUS_BOUNDS.contains(L.latLng(rawLat, rawLng))) continue;
+        const key = `${rawLat.toFixed(5)},${rawLng.toFixed(5)}`;
+        posCount[key] = (posCount[key] || 0) + 1;
+        const n = posCount[key] - 1;
+        const angle = (n * 137.5 * Math.PI) / 180;
+        const lat = rawLat + (n > 0 ? NUDGE * Math.cos(angle) : 0);
+        const lng =
+          rawLng + (n > 0 ? (NUDGE * Math.sin(angle)) / Math.cos((rawLat * Math.PI) / 180) : 0);
 
-      const key = `${rawLat.toFixed(5)},${rawLng.toFixed(5)}`;
-      posCount[key] = (posCount[key] || 0) + 1;
-      const n = posCount[key] - 1;
-      const angle = (n * 137.5 * Math.PI) / 180;
-      const lat = rawLat + (n > 0 ? NUDGE * Math.cos(angle) : 0);
-      const lng =
-        rawLng + (n > 0 ? (NUDGE * Math.sin(angle)) / Math.cos((rawLat * Math.PI) / 180) : 0);
-
-      shaped.push({
-        id: wp.id,
-        name: wp.name,
-        description: wp.description || '',
-        type: wp.type,
-        lat,
-        lng,
-        sourceType: wp.source_type,
-        segmentId: wp.segment_id,
-        imageUrls: imagesByWaypoint[wp.id] || [],
-        // Slice 8: `avg_rating` is a nullable `numeric` column — no reviews
-        // yet means `null`, not `0`, same as legacy's Firestore doc simply
-        // not having an `avgRating` field until the first review lands.
-        // PostgREST returns numeric columns as strings — coerce here, same
-        // rule as lat/lng above.
-        avgRating: wp.avg_rating != null ? Number(wp.avg_rating) : null,
-        reviewCount: Number(wp.review_count) || 0,
-        // Explore panel fields (supabase/explore_fields.sql) — plain
-        // columns on this same row, not a separate table/fetch. Falsy/
-        // empty defaults here matter: `useExplorePicks.js` treats
-        // `isExplore: false` waypoints as simply not in the rotation,
-        // same as if these columns didn't exist yet (pre-migration).
-        isExplore: !!wp.is_explore,
-        exploreTags: wp.explore_tags || [],
-        explorePriority: wp.explore_priority ?? 0,
-        isPromoted: !!wp.is_promoted,
-        sponsorName: wp.sponsor_name || '',
-        promoLabel: wp.promo_label || 'Promoted',
-      });
+        out.push({
+          id: wp.id,
+          name: wp.name,
+          description: wp.description || '',
+          type: wp.type,
+          lat,
+          lng,
+          sourceType: wp.source_type,
+          segmentId: wp.segment_id,
+          imageUrls: imagesByWaypoint[wp.id] || [],
+          // Slice 8: `avg_rating` is a nullable `numeric` column — no reviews
+          // yet means `null`, not `0`, same as legacy's Firestore doc simply
+          // not having an `avgRating` field until the first review lands.
+          // PostgREST returns numeric columns as strings — coerce here, same
+          // rule as lat/lng above.
+          avgRating: wp.avg_rating != null ? Number(wp.avg_rating) : null,
+          reviewCount: Number(wp.review_count) || 0,
+          // Explore panel fields (supabase/explore_fields.sql) — plain
+          // columns on this same row, not a separate table/fetch. Falsy/
+          // empty defaults here matter: `useExplorePicks.js` treats
+          // `isExplore: false` waypoints as simply not in the rotation,
+          // same as if these columns didn't exist yet (pre-migration).
+          isExplore: !!wp.is_explore,
+          exploreTags: wp.explore_tags || [],
+          explorePriority: wp.explore_priority ?? 0,
+          isPromoted: !!wp.is_promoted,
+          sponsorName: wp.sponsor_name || '',
+          promoLabel: wp.promo_label || 'Promoted',
+        });
+      }
+      return out;
     }
 
-    setWaypoints(shaped);
+    const core = shape(wpRows);
+    // Keep whatever bulk rows we already had (from an earlier load) visible
+    // while phase 2 re-downloads them, so a refetch never blanks them out.
+    // Re-shaping them would double-count `posCount`, so they're appended as-is.
+    setWaypoints([...core, ...bulkRef.current]);
     setCachedAt(null);
-    setLoading(false);
-    cacheSet(CACHE_KEY, shaped); // last-known-good, for next time the network's bad
+    setLoading(false); // ← loading screen ends here; phase 2 continues silently
+
+    // ── Phase 2: bulk off-campus rows, in the background ─────────────────
+    const bulkRes = await fetchAllRows(bulkQuery(cols));
+    if (loadId !== loadIdRef.current) return; // superseded while downloading
+    if (bulkRes.error) {
+      // Not fatal: campus data is already on screen. Leave any earlier bulk
+      // rows in place and don't overwrite the cache with a partial list.
+      console.warn('[waypoints] Background load of off-campus places failed:', bulkRes.error?.message || bulkRes.error);
+      return;
+    }
+    const bulk = shape(bulkRes.data);
+    bulkRef.current = bulk;
+    const full = [...core, ...bulk];
+    setWaypoints(full);
+    cacheSet(CACHE_KEY, full); // last-known-good, for next time the network's bad
   }, []);
 
   useEffect(() => {

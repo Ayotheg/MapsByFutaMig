@@ -177,10 +177,18 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     // `onMapReady` rather than needing a second callback prop.
     map._campusBoundaryLayer = campusBoundaryRect;
 
-    onMapReady?.(map);
+    let mapReadyNotified = false;
+    const notifyMapReady = () => {
+      if (mapReadyNotified) return;
+      mapReadyNotified = true;
+      onMapReady?.(map);
+    };
+    baseMapLayer.once('load', notifyMapReady);
+    if (!baseMapLayer.isLoading()) notifyMapReady();
 
     return () => {
       clearTimeout(interactTimeout);
+      baseMapLayer.off('load', notifyMapReady);
       map.off('zoomend', updateZoomClass);
       map.off('moveend', saveView);
       map.off('dragstart mousedown touchstart', onInteractStart);

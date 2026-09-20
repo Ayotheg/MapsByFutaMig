@@ -94,6 +94,48 @@ export function isRateablePOI(type) {
   return POI_RATEABLE_TYPES.has(type);
 }
 
+// ── Quick-Chip category → real waypoint type ────────────────────────────
+// `classifyPlace()` (shared/placeCategories.js) answers "which SEARCH CHIP
+// does this belong to", and its 16+ keys are NOT the same set as the 24
+// pin types above — `kiosk`, `restaurant`, `shawarma`, `car_wash`,
+// `footwear`, `clothing`, `gas`, `furniture`, `barber` and `laundry` are
+// chip categories only. Before this map existed, `resolveWaypointType`
+// returned those keys straight through, so opening a waypoint like
+// "Shawarma Spot" in the admin panel and pressing Save wrote
+// `type: 'shawarma'` to the database. That value has no colour, no
+// legend row, no group and no <select> option, so the pin fell out of the
+// legend/type filter and the admin badge/dropdown disagreed again.
+//
+// Each chip key maps to the broad pin type it was merged into (see
+// adminTypeOptions.js's merge table): food ← kiosk/restaurant/shawarma,
+// shop ← car_wash/footwear/clothing/gas/furniture/barber/laundry.
+const CHIP_CATEGORY_TO_WP_TYPE = {
+  kiosk: 'food', // adminTypeOptions.js merge table: food ← cafe, restaurant, kiosk, fast_food
+  restaurant: 'food',
+  shawarma: 'food',
+  car_wash: 'shop',
+  footwear: 'shop',
+  clothing: 'shop',
+  gas: 'shop',
+  furniture: 'shop',
+  barber: 'shop',
+  laundry: 'shop',
+};
+
+export function isValidWaypointType(type) {
+  return typeof type === 'string' && Object.prototype.hasOwnProperty.call(WP_TYPE_LABELS, type);
+}
+
+// ── Guarantee a value safe to WRITE to `waypoints.type` ─────────────────
+// Every admin/KML/suggestion write goes through this, so no code path can
+// put an unknown type into the database again. A real type passes through
+// untouched; a chip key is mapped; anything else falls back to `landmark`.
+export function normalizeWaypointType(type) {
+  const raw = (type || '').trim().toLowerCase();
+  if (isValidWaypointType(raw)) return raw;
+  return CHIP_CATEGORY_TO_WP_TYPE[raw] || 'landmark';
+}
+
 // ── Resolve a waypoint's *displayed* type ────────────────────────────────
 // Bug this fixes: a chunk of imported waypoints carry a raw `type` that was
 // never a real option in this app's own Type dropdown (WP_ALL_TYPES) —
@@ -115,6 +157,8 @@ export function isRateablePOI(type) {
 // opening it in admin and picking the correct type.
 export function resolveWaypointType(wp) {
   const raw = (wp?.type || '').trim().toLowerCase();
-  if (raw && WP_TYPE_LABELS[raw]) return raw;
-  return classifyPlace(wp?.name, wp?.type) || 'landmark';
+  if (isValidWaypointType(raw)) return raw;
+  // classifyPlace() returns a *chip* key — map it onto a real pin type
+  // (and guard the result) instead of trusting it as one.
+  return normalizeWaypointType(classifyPlace(wp?.name, wp?.type));
 }
