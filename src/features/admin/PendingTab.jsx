@@ -103,16 +103,16 @@ export default function PendingTab({ onRefreshWaypoints, onCountChange }) {
     load();
   }, []);
 
-  function afterMutation() {
-    load();
-    onRefreshWaypoints?.();
+  async function afterMutation() {
+    await load();
+    await onRefreshWaypoints?.();
   }
 
   async function handleApprove(id) {
     setBusyId(id);
     try {
       await approveWaypoint(id);
-      afterMutation();
+      await afterMutation();
     } catch (e) {
       setError(e.message || 'Could not approve that submission.');
       // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
@@ -132,7 +132,7 @@ export default function PendingTab({ onRefreshWaypoints, onCountChange }) {
     try {
       await rejectWaypoint(id, rejectReason.trim() || null);
       setRejectingId(null);
-      afterMutation();
+      await afterMutation();
     } catch (e) {
       setError(e.message || 'Could not reject that submission.');
       track('error_occurred', { context: 'admin_reject', message: e?.message || String(e) });

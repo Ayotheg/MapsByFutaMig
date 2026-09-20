@@ -10,6 +10,7 @@ import {
 } from '../kml/kmlAnnotationUtils';
 import { haversine } from '../../lib/geoUtils';
 import { insertKmlPointAsWaypoint, insertKmlLineAsSegment, uploadImage, insertImageRows } from './adminSave';
+import { supabase } from '../../lib/supabase';
 
 /**
  * Admin "KML Upload" tab — ported from legacy's `_loadKMLFromGeoJSON`
@@ -43,6 +44,35 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
   const markersRef = useRef({}); // `${path}-${idx}` -> Leaflet layer
   const loadedPathsRef = useRef(new Set());
 
+  async function findExistingApprovedWaypoints() {
+    const { data, error } = await supabase
+      .from('waypoints')
+      .select('name, lat, lng, source_type')
+      .eq('status', 'approved');
+    if (error) throw error;
+    return (data || []).filter((row) => row.source_type !== 'osm_import');
+  }
+
+  function matchesExistingWaypoint(feature, existingRows, displayName) {
+    const [lng, lat] = feature.geometry.coordinates;
+    const normalizedName = normalizeWaypointName(displayName);
+    return existingRows.some(
+      (row) =>
+        normalizeWaypointName(row.name) === normalizedName &&
+        // KML coordinates may be rounded or shifted slightly by the source
+        // tool. Same-name points within the existing KML dedup radius are the
+        // same place for the admin work queue.
+        haversine(Number(row.lat), Number(row.lng), Number(lat), Number(lng)) <= 25
+    );
+  }
+
+  function normalizeWaypointName(name) {
+    return String(name || '')
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '');
+  }
+
   const setFeature = useCallback((path, idx, patch) => {
     setRegistry((reg) => {
       const file = reg[path];
@@ -73,7 +103,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
       // even if it contains 0 valid point features.
       setRegistry((reg) => ({
         ...reg,
-        [path]: reg[path] || { color, label: kmlLabel, features: [] }
+        [path]: { color, label: kmlLabel, features: [] }
       }));
 
       const geoLayer = L.geoJSON(geo, {
@@ -196,8 +226,20 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
       }
 
       const label = kmlLabel || extractKmlLabel(geo) || path.split('/').pop();
+      const existingRows = await findExistingApprovedWaypoints();
+      const beforeDatabaseFilter = geo.features.length;
+      geo.features = geo.features.filter((feature) => {
+        if (feature.geometry?.type !== 'Point') return true;
+        const [lng, lat] = feature.geometry.coordinates;
+        const rawName = feature.properties?.name || '';
+        const rawDesc = feature.properties?.description || '';
+        const displayName = sanitiseAnnotationName(rawName, lat, lng, label, rawDesc);
+        return !matchesExistingWaypoint(feature, existingRows, displayName);
+      });
+      const skippedExistingCount = beforeDatabaseFilter - geo.features.length;
       buildLayerFromGeo(path, geo, color, label);
       loadedPathsRef.current.add(path);
+      return { path, skippedExistingCount, remainingCount: geo.features.length };
     },
     [buildLayerFromGeo]
   );
@@ -208,8 +250,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
       const text = await file.text();
       const fakePath = 'uploaded/' + file.name;
       const kmlLabel = file.name.replace(/\.kml$/i, '');
-      await loadFromText(fakePath, text, color, kmlLabel);
-      return fakePath;
+      return loadFromText(fakePath, text, color, kmlLabel);
     },
     [loadFromText]
   );
@@ -221,8 +262,7 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
       const res = await fetch(path);
       if (!res.ok) throw new Error(`Failed: ${res.status} ${res.statusText}`);
       const text = await res.text();
-      await loadFromText(path, text, color, null);
-      return path;
+      return loadFromText(path, text, color, null);
     },
     [loadFromText]
   );
@@ -343,7 +383,9 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
     async (path, idx, { onImported, waypointType = 'landmark' } = {}) => {
       const file = registry[path];
       const feature = file?.features?.[idx];
-      if (!feature) return;
+      if (!feature) {
+        throw new Error('This KML feature is no longer available. Reload the file and try again.');
+      }
 
       const marker = markersRef.current[`${path}-${idx}`];
       let newId;
@@ -386,10 +428,16 @@ export function useAdminKml({ map, onSelect, searchRegister }) {
         await insertImageRows(table, idColumn, newId, paths, 0);
       }
 
-      onImported?.();
+      const importedMarker = markersRef.current[`${path}-${idx}`];
+      if (importedMarker) {
+        map.removeLayer(importedMarker);
+        delete markersRef.current[`${path}-${idx}`];
+      }
+      setFeature(path, idx, { imported: true });
+      await onImported?.();
       return newId;
     },
-    [registry]
+    [map, registry, setFeature]
   );
 
   return {

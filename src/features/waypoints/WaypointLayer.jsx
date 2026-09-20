@@ -144,6 +144,18 @@ export default function WaypointLayer({ map, waypoints, isTypeVisible, onSelect,
     });
     markersRef.current = entries;
 
+    if (import.meta.env.DEV) {
+      const simme = entries.find(({ wp }) => String(wp.name || '').trim().toLowerCase() === 'simme');
+      console.info('[FUTA debug] WaypointLayer SIMME', simme ? {
+        id: simme.wp.id,
+        lat: simme.wp.lat,
+        lng: simme.wp.lng,
+        type: simme.wp.type,
+        inViewport: map.getBounds().pad(0.2).contains(simme.marker.getLatLng()),
+        typeVisible: isTypeVisible(simme.wp.type),
+      } : { found: false });
+    }
+
     // ── Initial paint: only what's in view (+ 20% padding) AND type-visible,
     // same as legacy.
     const bounds = map.getBounds().pad(0.2);

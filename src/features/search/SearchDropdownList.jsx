@@ -19,7 +19,16 @@ export default function SearchDropdownList({
   activeIdx = -1,
   showBadge = true,
 }) {
-  const hasLocal = localResults && localResults.length > 0;
+  const normalizedQuery = String(query || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim();
+  const matchingLocalResults = (localResults || []).filter((entry) => {
+    const name = String(entry.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    const description = String(entry.desc || '').toLowerCase().replace(/[^a-z0-9\s]/g, '');
+    return name.includes(normalizedQuery) || description.includes(normalizedQuery);
+  });
+  const hasLocal = matchingLocalResults.length > 0;
   const hasOsm = osmResults && osmResults.length > 0;
   let idx = -1;
 
@@ -30,7 +39,7 @@ export default function SearchDropdownList({
           <div className={styles.sectionLabel}>
             <MapPin size={14} /> On This Map
           </div>
-          {localResults.map((r) => {
+          {matchingLocalResults.map((r) => {
             idx += 1;
             return (
               <SearchResultItem

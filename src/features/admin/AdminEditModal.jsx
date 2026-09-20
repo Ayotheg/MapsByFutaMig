@@ -197,7 +197,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
     setStatus(null);
     try {
       if (type === 'waypoint') {
-        await updateWaypoint(editContext.id, {
+        const result = await updateWaypoint(editContext.id, {
           name: name.trim(),
           description: description.trim(),
           type: wpType,
@@ -209,7 +209,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           promoLabel,
         });
         await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
-        setStatus({ text: 'Waypoint updated!', error: false, icon: true });
+        setStatus({ text: result?.warning || 'Waypoint updated!', error: false, icon: true });
         onWaypointChanged?.();
       } else if (type === 'segment') {
         await updateSegment(editContext.id, { name: name.trim(), description: description.trim(), category });
@@ -657,7 +657,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                   },
                 });
                 setStatus({ text: 'Imported to Supabase successfully!', error: false, icon: true });
-                onClose();
+                setTimeout(() => onClose(), 1500);
               } catch (e) {
                 setStatus({ text: `Import failed: ${e.message}`, error: true, icon: true });
               } finally {

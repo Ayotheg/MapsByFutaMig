@@ -20,16 +20,34 @@ import { track } from '../../lib/analytics';
 // useWaypoints.js/useSegments.js, which only expose resolved display URLs)
 // and reconciles added/removed images against these functions on save.
 //
-// ── Unverified — flag before relying on this live ───────────────────────
-// Same exposure segmentSave.js already flagged: this client uses the anon
-// key. Legacy's PIN gate is (by its own comment, adminPin.js) a UI
-// convenience only — these UPDATE/DELETE/INSERT calls need real RLS
-// policies (ideally scoped to `auth.uid()`, now that Slice 10 exists) on
-// `waypoints`/`segments`/`waypoint_images`/`segment_images`/
-// `segment_points` before they'll actually succeed for anyone. Not
-// confirmed live.
+// The browser still uses Supabase's publishable/anon key. The PIN gate is
+// only a UI convenience; the SQL in supabase/admin_rls.sql is the real
+// boundary and restricts writes to authenticated users whose profile is an
+// admin. The same policies must be applied to the live project.
 
 const PLACE_IMAGES_BUCKET = 'place-images';
+
+async function findExistingWaypoint({ name, lat, lng }) {
+  const { data, error } = await supabase
+    .from('waypoints')
+    .select('id, name')
+    .ilike('name', name.trim())
+    .eq('lat', lat)
+    .eq('lng', lng)
+    .eq('status', 'approved')
+    .or('source_type.is.null,source_type.neq.osm_import')
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function requireAuth() {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error || !session) {
+    throw new Error('Unauthorized: You must be signed in to perform admin actions.');
+  }
+}
 
 // ── Images ───────────────────────────────────────────────────────────────
 
@@ -47,6 +65,7 @@ export async function fetchImageRows(table, idColumn, entityId) {
 }
 
 export async function uploadImage(kind, entityId, file, position) {
+  await requireAuth();
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `${kind}/${entityId}/${position}-${Date.now()}.${ext}`;
   const { error } = await supabase.storage
@@ -58,12 +77,14 @@ export async function uploadImage(kind, entityId, file, position) {
 
 export async function removeStorageFiles(paths) {
   if (!paths.length) return;
+  await requireAuth();
   const { error } = await supabase.storage.from(PLACE_IMAGES_BUCKET).remove(paths);
   if (error) throw error;
 }
 
 export async function insertImageRows(table, idColumn, entityId, paths, startPosition = 0) {
   if (!paths.length) return;
+  await requireAuth();
   const rows = paths.map((p, i) => ({ [idColumn]: entityId, storage_path: p, position: startPosition + i }));
   const { error } = await supabase.from(table).insert(rows);
   if (error) throw error;
@@ -71,6 +92,7 @@ export async function insertImageRows(table, idColumn, entityId, paths, startPos
 
 export async function deleteImageRows(table, ids) {
   if (!ids.length) return;
+  await requireAuth();
   const { error } = await supabase.from(table).delete().in('id', ids);
   if (error) throw error;
 }
@@ -90,8 +112,13 @@ export async function deleteImageRows(table, ids) {
 // now, but this stays backward-compatible with any other caller passing
 // only name/description/type.
 export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel }) {
-  const patch = { name, description, type };
+  await requireAuth();
+  // Admin edits are only opened from the approved waypoint list. Writing the
+  // status explicitly repairs older rows whose status is still null and does
+  // not depend on a database default being present.
+  const patch = { name, description, type, status: 'approved' };
   const explorePatch = {};
+  let warning = null;
   if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
   if (exploreTags !== undefined) explorePatch.explore_tags = exploreTags;
   if (explorePriority !== undefined) explorePatch.explore_priority = explorePriority;
@@ -100,23 +127,31 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
   if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
 
   const hasExploreFields = Object.keys(explorePatch).length > 0;
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('waypoints')
     .update(hasExploreFields ? { ...patch, ...explorePatch } : patch)
-    .eq('id', id);
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
 
   if (error && hasExploreFields && /column .* does not exist/i.test(error.message || '')) {
     // supabase/explore_fields.sql hasn't been run yet — don't let that
     // block saving the ordinary name/description/type edit too.
-    const { error: baseError } = await supabase.from('waypoints').update(patch).eq('id', id);
+    const { data: baseData, error: baseError } = await supabase
+      .from('waypoints')
+      .update(patch)
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
     if (baseError) throw baseError;
-    throw new Error(
-      'Saved name/description/type, but Explore fields need supabase/explore_fields.sql run first — the Explore toggle/tags/priority above were not saved.'
-    );
+    if (!baseData) throw new Error('Waypoint was not updated. Check your admin access and try again.');
+    warning = 'Saved the waypoint, but Explore fields need supabase/explore_fields.sql before those options can be saved.';
   }
   if (error) throw error;
+  if (!data) throw new Error('Waypoint was not updated. Check your admin access and try again.');
   // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
   track('admin_action', { action: 'update', entity: 'waypoint' });
+  return { warning };
 }
 
 // Legacy: `adminDeleteBtn`'s waypoint branch (app.js ~4283–4300). Only
@@ -128,6 +163,7 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
 // skipped: legacy never had this problem (base64-in-doc, nothing external
 // to orphan).
 export async function deleteWaypoint(id) {
+  await requireAuth();
   const { error } = await supabase.from('waypoints').delete().eq('id', id);
   if (error) throw error;
   track('admin_action', { action: 'delete', entity: 'waypoint' });
@@ -137,21 +173,35 @@ export async function deleteWaypoint(id) {
 // 'gps_annotation'` matches legacy's literal value exactly (the type this
 // port's `useWaypoints.js` already filters `osm_import` rows out by).
 export async function insertWaypoint({ name, description, type, lat, lng }) {
+  await requireAuth();
+  const existing = await findExistingWaypoint({ name, lat, lng });
+  if (existing) {
+    throw new Error(`This waypoint already exists: "${existing.name}". Edit the existing point instead of importing it again.`);
+  }
+  // The migrated schema preserves Firestore IDs as text and older databases
+  // may not have the later default from waypoint_submissions.sql yet.
+  const id = crypto.randomUUID();
   const { data, error } = await supabase
     .from('waypoints')
     .insert({
-      id: crypto.randomUUID(),
+      id,
       name,
       description,
       type,
       lat,
       lng,
       source_type: 'gps_annotation',
+      status: 'approved',
       saved_at: new Date().toISOString(),
     })
     .select('id')
     .single();
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('This waypoint already exists. Refresh the map and edit the existing point instead.');
+    }
+    throw error;
+  }
   track('admin_action', { action: 'insert', entity: 'waypoint' });
   return data.id;
 }
@@ -164,17 +214,28 @@ export async function insertWaypoint({ name, description, type, lat, lng }) {
 // admins can call these successfully — this client uses the anon key,
 // same as every other call in this file.
 export async function approveWaypoint(id) {
-  const { error } = await supabase.from('waypoints').update({ status: 'approved' }).eq('id', id);
+  await requireAuth();
+  const { data, error } = await supabase
+    .from('waypoints')
+    .update({ status: 'approved' })
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error('Submission was not approved. Check your admin access and try again.');
   track('admin_action', { action: 'approve', entity: 'waypoint_submission' });
 }
 
 export async function rejectWaypoint(id, reason) {
-  const { error } = await supabase
+  await requireAuth();
+  const { data, error } = await supabase
     .from('waypoints')
     .update({ status: 'rejected', rejection_reason: reason })
-    .eq('id', id);
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error('Submission was not rejected. Check your admin access and try again.');
   track('admin_action', { action: 'reject', entity: 'waypoint_submission' });
 }
 
@@ -185,6 +246,7 @@ export async function rejectWaypoint(id, reason) {
 // (Slice 4/5's established deviation, confirmed against
 // FIREBASE_TO_SUPABASE_MIGRATION.md), so there's no copy to keep in sync.
 export async function updateSegment(id, { name, description, category }) {
+  await requireAuth();
   const { error } = await supabase.from('segments').update({ name, description, category }).eq('id', id);
   if (error) throw error;
   track('admin_action', { action: 'update', entity: 'segment' });
@@ -197,6 +259,7 @@ export async function updateSegment(id, { name, description, category }) {
 // deleted) — matches legacy's own behavior of only ever deleting the
 // segment doc itself, never its recorded waypoints.
 export async function deleteSegment(id) {
+  await requireAuth();
   const { error } = await supabase.from('segments').delete().eq('id', id);
   if (error) throw error;
   track('admin_action', { action: 'delete', entity: 'segment' });
@@ -213,9 +276,11 @@ export async function insertKmlPointAsWaypoint({ name, description, type = 'land
 }
 
 export async function insertKmlLineAsSegment({ name, description, points, distanceM }) {
+  await requireAuth();
   const { data, error } = await supabase
     .from('segments')
     .insert({
+      id: crypto.randomUUID(),
       name,
       description,
       category: 'other',

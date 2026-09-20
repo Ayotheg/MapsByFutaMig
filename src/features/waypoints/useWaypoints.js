@@ -198,6 +198,14 @@ export function useWaypoints() {
     }
 
     setWaypoints(shaped);
+    if (import.meta.env.DEV) {
+      const simme = shaped.find((waypoint) => String(waypoint.name || '').trim().toLowerCase() === 'simme');
+      console.info('[FUTA debug] useWaypoints result', {
+        total: shaped.length,
+        faculty: shaped.filter((waypoint) => waypoint.type === 'faculty').length,
+        simme,
+      });
+    }
     setCachedAt(null);
     setLoading(false);
     cacheSet(CACHE_KEY, shaped); // last-known-good, for next time the network's bad

@@ -12,7 +12,9 @@
 // do.
 
 const PREFIX = 'futamaps:cache:';
-const VERSION = 1; // bump if a cached shape ever becomes incompatible
+// Bump after admin/map data changes so an older snapshot cannot hide newly
+// approved or edited waypoints from the map and search index.
+const VERSION = 2;
 
 export function cacheSet(key, value) {
   try {

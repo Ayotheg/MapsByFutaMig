@@ -19,8 +19,13 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
     if (!file) return;
     setUploadStatus(null);
     try {
-      await adminKml.loadFromFile(file, color);
-      setUploadStatus({ text: `Loaded ${file.name}`, error: false, icon: true });
+      const result = await adminKml.loadFromFile(file, color);
+      const skipped = result?.skippedExistingCount || 0;
+      setUploadStatus({
+        text: `Loaded ${file.name}${skipped ? ` · skipped ${skipped} already-imported feature${skipped === 1 ? '' : 's'}` : ''}`,
+        error: false,
+        icon: true,
+      });
     } catch (err) {
       setUploadStatus({ text: err.message, error: true, icon: true });
     }
@@ -31,8 +36,13 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
     if (!p) return;
     setPathStatus(null);
     try {
-      await adminKml.loadFromPath(p, color);
-      setPathStatus({ text: `Loaded ${p}`, error: false, icon: true });
+      const result = await adminKml.loadFromPath(p, color);
+      const skipped = result?.skippedExistingCount || 0;
+      setPathStatus({
+        text: `Loaded ${p}${skipped ? ` · skipped ${skipped} already-imported feature${skipped === 1 ? '' : 's'}` : ''}`,
+        error: false,
+        icon: true,
+      });
       setPath('');
     } catch (err) {
       setPathStatus({ text: err.message, error: true, icon: true });
@@ -107,12 +117,13 @@ export default function KmlTab({ adminKml, onEditKmlFeature }) {
                 </div>
                 <div className={styles.itemMeta}>
                   <span className={styles.itemMetaValue}>
-                    {filePath} · {file.features.length} feature{file.features.length !== 1 ? 's' : ''}
+                    {filePath} · {file.features.filter((feature) => !feature.imported).length} remaining feature{file.features.filter((feature) => !feature.imported).length !== 1 ? 's' : ''}
                   </span>
                 </div>
               </div>
             </div>
             {file.features.map((f, idx) => {
+              if (f.imported) return null;
               const isAuto = f.name && /@ \d+\.\d+/.test(f.name);
               const TypeIcon = f.type === 'LineString' || f.type === 'MultiLineString' ? Waypoints : MapPin;
               const photoCount = f.imageFiles?.length || 0;

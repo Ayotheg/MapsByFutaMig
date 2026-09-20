@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { TYPE_ICON_KEYS } from '../../lib/typeIcons';
 
 /**
@@ -99,22 +99,14 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
     indexRef.current.push(entry);
   }, []);
 
-  // ── Resync the static (waypoint/segment/kml) portion on data change ──
-  useEffect(() => {
-    indexRef.current = indexRef.current.filter(
-      (e) => e.source !== 'waypoint' && e.source !== 'segment' && e.source !== 'kml'
-    );
-    idSetRef.current.clear();
-    nameCoordSetRef.current.clear();
-    indexRef.current.forEach((e) => {
-      if (e.id) idSetRef.current.add(e.id);
-      const normName = (e.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      nameCoordSetRef.current.add(normName + '|' + (e.lat || 0).toFixed(5) + '|' + (e.lng || 0).toFixed(5));
-    });
-
-    // waypoint entries — mirrors app.js ~3446's register() shape
+  // Rebuild static entries synchronously during render. This avoids a brief
+  // stale/empty search index between a Supabase refetch and the effect that
+  // used to populate it, which made freshly approved or edited waypoints
+  // appear in the map but not in search.
+  const staticEntries = useMemo(() => {
+    const entries = [];
     (waypoints || []).forEach((wp) => {
-      register({
+      entries.push({
         id: wp.id,
         lat: wp.lat,
         lng: wp.lng,
@@ -128,13 +120,10 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
         source: 'waypoint',
       });
     });
-
-    // segment entries — mirrors drawSavedSegment's register() (app.js
-    // ~2579–2588): midpoint of the route's points, name/desc/category.
     (segments || []).forEach((seg) => {
       if (!seg.points || seg.points.length === 0) return;
       const mid = seg.points[Math.floor(seg.points.length / 2)];
-      register({
+      entries.push({
         id: seg.id,
         lat: mid.lat,
         lng: mid.lng,
@@ -145,31 +134,34 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
         source: 'segment',
       });
     });
-
-    // KML annotation entries — mirrors app.js ~3537.
     (kmlAnnotations || []).forEach((a) => {
-      register({
-        id: a.id,
-        lat: a.lat,
-        lng: a.lng,
-        name: a.name,
-        desc: '',
-        type: 'waypoint',
-        subtype: 'kml',
-        source: 'kml',
-      });
+      entries.push({ ...a, desc: '', type: 'waypoint', subtype: 'kml', source: 'kml' });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return entries;
   }, [waypoints, segments, kmlAnnotations]);
+
+  indexRef.current = [...indexRef.current.filter((e) => e.source !== 'waypoint' && e.source !== 'segment' && e.source !== 'kml'), ...staticEntries];
 
   const query = useCallback((q, limit = 6) => {
     if (!q || q.trim().length < 1) return [];
-    return indexRef.current
+    const dynamicEntries = indexRef.current.filter(
+      (entry) => entry.source !== 'waypoint' && entry.source !== 'segment' && entry.source !== 'kml'
+    );
+    const results = [...staticEntries, ...dynamicEntries]
       .map((e) => ({ ...e, _score: score(e, q) }))
       .filter((e) => e._score > 0)
       .sort((a, b) => b._score - a._score)
       .slice(0, limit);
-  }, []);
+    if (import.meta.env.DEV && norm(q).includes('simm')) {
+      console.info('[FUTA debug] search query', {
+        query: q,
+        staticTotal: staticEntries.length,
+        localMatches: results.filter((entry) => entry.source !== 'osm').map((entry) => ({ name: entry.name, id: entry.id })),
+        simmeIndexed: staticEntries.some((entry) => norm(entry.name) === 'simme'),
+      });
+    }
+    return results;
+  }, [staticEntries]);
 
   const resolve = useCallback(
     (input) => {
