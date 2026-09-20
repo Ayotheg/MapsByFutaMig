@@ -118,13 +118,99 @@
   margin: 4px 16px 0;
   width: calc(100% - 32px);
 }
-.hero img {
+.hero > img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
   transition: opacity 0.25s;
 }
+/* Transparent full-hero button that opens the photo viewer. Sits under the
+   close / prev / next / count controls (z-index 2). */
+.heroTap {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+}
+.heroTap:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: -3px;
+  border-radius: var(--r-lg);
+}
+
+/* "Tap to view full photo" hint. Pulses for ~6s and shows its label for
+   ~5s each time a card opens, then settles into a quiet expand icon so it
+   stays discoverable without nagging. */
+.tapHint {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  color: #fff;
+  pointer-events: none;
+  animation: hintIn 0.45s var(--v2-ease-standard) 0.35s both;
+}
+.tapHintIcon {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tapHintIcon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  animation: hintPulse 1.5s ease-out 0.8s 4 both;
+}
+.tapHintIcon svg {
+  position: relative;
+}
+.tapHintText {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 170px;
+  padding: 0 8px 0 6px;
+  animation: hintCollapse 0.45s var(--v2-ease-standard) 5.2s forwards;
+}
+@keyframes hintIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes hintPulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+@keyframes hintCollapse {
+  to { max-width: 0; padding: 0; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tapHint { animation: none; }
+  .tapHintIcon::before { animation: none; opacity: 0; }
+}
+
 .heroOverlay {
   position: absolute;
   inset: 0;

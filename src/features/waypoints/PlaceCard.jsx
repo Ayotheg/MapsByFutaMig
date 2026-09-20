@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Star, X, Navigation } from 'lucide-react';
+import { Star, X, Navigation, Maximize2 } from 'lucide-react';
 import styles from './PlaceCard.module.css';
 import { isRateablePOI } from './wpTypeMeta';
+import PhotoLightbox from './PhotoLightbox';
 
 // ── Rating badge ─────────────────────────────────────────────────────────
 // Ported from legacy `_ratingBadgeHtml` (app.js ~2450–2456), now that
@@ -37,12 +38,13 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  * (from `useWaypoints.js`'s `avg_rating`/`review_count` columns) for the
  * rating badge. Pass `data={null}` to render closed.
  *
- * Photo full-view: legacy's thumbnail click called a segment-scoped
- * `openPhoto(idx, segmentId)` lightbox. This previously opened the
- * full-res image in a new tab on click (no in-app lightbox existed
- * yet); removed by direct instruction — the hero image is no longer
- * clickable, only the prev/next photo-nav buttons change `photoIdx`.
- * Revisit if a proper in-app lightbox is wanted later.
+ * Photo full-view: the hero image is a small, cropped (`object-fit:
+ * cover`) preview, so tapping/clicking it opens `PhotoLightbox` — the
+ * whole photo, full-screen, with a zoom tool (pinch / double-tap / wheel /
+ * slider). An animated "Tap to view full photo" pill on the hero tells
+ * users it's tappable; it collapses to just its icon after a few seconds
+ * (see `.tapHint` in PlaceCard.module.css). The viewer shares `photoIdx`
+ * with the card, so closing it leaves the hero on the last-viewed photo.
  *
  * UI_REDESIGN_GUIDE.md pass (this session): restyled to v2 light theme
  * per Figma node 7:943 ("Bottom Sheet Card") — see PlaceCard.module.css's
@@ -61,12 +63,17 @@ function RatingBadge({ type, avgRating, reviewCount }) {
 export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobile }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [dragY, setDragY] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  // Bumped whenever a (new) waypoint opens so the tap-hint animation replays.
+  const [hintRun, setHintRun] = useState(0);
   const dragging = useRef(false);
   const dragStartY = useRef(0);
 
   useEffect(() => {
     setPhotoIdx(0);
     setDragY(0);
+    setViewerOpen(false);
+    setHintRun((n) => n + 1);
   }, [data]);
 
   const isOpen = Boolean(data);
@@ -133,6 +140,20 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
               alt=""
             />
             <div className={styles.heroOverlay} />
+            {/* Whole hero is the tap target; controls below sit above it
+                (z-index 2) so close / prev / next still work. */}
+            <button
+              type="button"
+              className={styles.heroTap}
+              aria-label="View photo full screen"
+              onClick={() => setViewerOpen(true)}
+            />
+            <div className={styles.tapHint} key={hintRun} aria-hidden="true">
+              <span className={styles.tapHintIcon}>
+                <Maximize2 size={12} strokeWidth={2.5} />
+              </span>
+              <span className={styles.tapHintText}>Tap to view full photo</span>
+            </div>
             <button className={styles.closeOnHero} aria-label="Close" onClick={onClose}>
               <X size={14} strokeWidth={2.5} />
             </button>
@@ -227,6 +248,16 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
           </button>
         </div>
       </div>
+
+      {viewerOpen && hasPhotos && (
+        <PhotoLightbox
+          photos={photos}
+          index={Math.min(photoIdx, photos.length - 1)}
+          onIndexChange={setPhotoIdx}
+          onClose={() => setViewerOpen(false)}
+          title={data?.name}
+        />
+      )}
     </>
   );
 }
