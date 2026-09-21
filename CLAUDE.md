@@ -62,6 +62,23 @@ of Technology Akure. It is being migrated in two parallel tracks:
   suggestion: skipping it is how a feature-by-feature migration quietly
   turns into one giant JS payload by Slice 11.
 
+## Data scale (current) — don't assume a huge dataset
+
+As of Sept 2026 the live database holds only **~600+ waypoints** in total
+(owner-confirmed). Older comments in this repo once claimed ~6,000 rows
+(~90% bulk `osm_import`) — that figure was wrong/outdated and has been
+corrected; do not reintroduce it. Consequences for any session:
+
+- Do not add "large dataset" machinery (heavy pagination, IndexedDB,
+  virtualized lists, aggressive payload trimming) to solve a waypoint-count
+  problem. The existing paged/two-phase loading in `useWaypoints.js` and
+  `lib/fetchAllRows.js` is a harmless safeguard, not evidence of scale.
+- The localStorage fallback cache (`lib/localCache.js`) is small at this
+  size and is fine as-is; if a fact here matters to your task, run a `count`
+  on the table rather than trusting any number in a comment.
+- The bigger real-world data costs are photos (served at original size —
+  no resize on upload) and map tiles, not waypoint rows.
+
 ## Bundle-size & code-splitting policy
 
 *Effective starting Slice 4.* Slices 1–3 predate this policy and don't need

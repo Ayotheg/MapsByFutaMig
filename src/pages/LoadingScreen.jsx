@@ -33,6 +33,11 @@ function LoadingScreen({
   // e.g. cached data) dismisses the loading screen anyway.
   stuck = false,
   isOffline = false,
+  // True when this device already has a saved copy of the map data (a
+  // returning visitor). First-time visitors have none, so their message
+  // explains that the first load needs a connection instead of hinting
+  // at saved data that doesn't exist.
+  hasSavedData = true,
   onRetry,
   onContinue,
 }) {
@@ -108,8 +113,12 @@ function LoadingScreen({
           <div className={styles.stuckPanel} role="status">
             <p className={styles.stuckMessage}>
               {isOffline
-                ? "You seem to be offline. Check your connection and try again."
-                : "This is taking longer than usual — your connection may be slow."}
+                ? hasSavedData
+                  ? "You seem to be offline. Check your connection and try again."
+                  : "You seem to be offline. Check your connection and try again."
+                : hasSavedData
+                  ? "This is taking longer than usual — your connection may be slow."
+                  : "This is taking longer than usual — your connection may be slow. tap Retry."}
             </p>
             <div className={styles.stuckActions}>
               {onRetry && (

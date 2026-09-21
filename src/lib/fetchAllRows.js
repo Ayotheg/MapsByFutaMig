@@ -3,9 +3,12 @@ import { withTimeoutSignal } from './networkTimeout';
 // ── Fetch every row of a query, not just the first 1000 ─────────────────
 // Supabase's REST layer (PostgREST) caps every response at `max_rows`
 // (1000 by default) and does so SILENTLY — no error, no "truncated" flag,
-// just the first 1000 rows of an unordered result. For a table like
-// `waypoints` (thousands of bulk-imported rows) that meant anything past
-// the cut-off never reached the map, search or admin list. Because Postgres
+// just the first 1000 rows of an unordered result. This is a safeguard for
+// tables that can exceed 1000 rows (e.g. `waypoints` if the bulk OSM import
+// is ever loaded — it once did, and anything past the cut-off never reached
+// the map, search or admin list). NOTE: as of Sept 2026 `waypoints` holds
+// only ~600+ rows, so today this normally returns in a single request.
+// Because Postgres
 // stores an UPDATEd row as a new copy at the end of the table, an admin edit
 // or approval could push a waypoint *past* the cut-off — so it vanished from
 // the map right after being saved, and brand-new points never appeared.

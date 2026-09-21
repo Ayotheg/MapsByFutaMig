@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import MapPage from './MapPage'
 import LoadingScreen from './LoadingScreen'
+import { cacheGet } from '../lib/localCache'
 
 // Hard ceiling on how long we'll wait for every readiness flag before
 // offering the user a way out. Not a substitute for the real flags above —
@@ -65,6 +66,13 @@ function HomeRoute() {
   });
   const fontsReady = useFontsReady();
   const [booted, setBooted] = useState(false);
+
+  // Does this device already have a saved copy of the map data from an
+  // earlier successful visit? Checked once at mount (before this session
+  // can write one). First-time visitors have nothing saved, so the
+  // stuck-screen must not offer them "Continue with saved data" — see
+  // LoadingScreen's `hasSavedData`.
+  const [hasSavedData] = useState(() => !!cacheGet('waypoints'));
 
   // Failsafe timer for BOOT_TIMEOUT_MS — see its comment above. Restarts
   // whenever the person hits Retry, so a second slow attempt gets its own
@@ -136,7 +144,12 @@ function HomeRoute() {
   // way or another (live data, cached data, or empty) — it's auth/font
   // loading that has no such ceiling of its own, which is the gap this
   // covers.
-  const canContinueAnyway = readiness.mapReady;
+  //
+  // Also requires saved data on this device: "Continue" is labelled
+  // "Continue with saved data", which is only true for returning users.
+  // A first-time visitor would land on an empty map, so they only get
+  // Retry (and a message explaining the first load needs a connection).
+  const canContinueAnyway = readiness.mapReady && hasSavedData;
 
   const handleRetry = () => {
     readiness.retry?.();
@@ -153,6 +166,7 @@ function HomeRoute() {
           onComplete={allReady ? () => setBooted(true) : undefined}
           stuck={timedOut && !allReady}
           isOffline={readiness.isOffline}
+          hasSavedData={hasSavedData}
           onRetry={readiness.retry ? handleRetry : undefined}
           onContinue={canContinueAnyway ? () => setBooted(true) : undefined}
         />

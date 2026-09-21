@@ -78,9 +78,17 @@ export function useWaypoints() {
     const BASE_COLS = 'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count';
 
     // ── Two-phase load ────────────────────────────────────────────────────
-    // The table holds ~6,000 approved rows, but ~90% are `osm_import` rows
-    // from the Lagos/Ogun state-wide extraction (scripts/osm-annotations) —
-    // hundreds of km from the campus a first-time user is looking at.
+    // DATA SCALE — read before optimizing anything here: as of Sept 2026
+    // the DB holds only ~600+ waypoints in total (owner-confirmed). An
+    // earlier version of this comment claimed ~6,000 rows / ~90% osm_import
+    // — that was WRONG/outdated; do not size caches, payloads or "large
+    // dataset" optimizations off it. Run a `count` on the table if you
+    // need the current number.
+    //
+    // The two-phase split below is defensive, kept for if/when the bulk
+    // `osm_import` rows (scripts/osm-annotations, Lagos/Ogun state-wide
+    // extraction, hundreds of km from campus) are loaded. It is harmless
+    // at the current size.
     //   Phase 1 (blocks the loading screen): everything else — the real
     //     campus content (admin-annotated, GPS, student-submitted) + photos.
     //   Phase 2 (background, never blocks): the bulk osm_import rows,
