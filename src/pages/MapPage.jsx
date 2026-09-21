@@ -6,7 +6,6 @@ import { useWaypoints } from '../features/waypoints/useWaypoints';
 import { useTypeVisibility } from '../features/legend/useTypeVisibility';
 import Sidebar from '../features/legend/Sidebar';
 import MobileSheet from '../features/legend/MobileSheet';
-import SegmentsLayer from '../features/segments/SegmentsLayer';
 import { useSegments } from '../features/segments/useSegments';
 import { useOSMAnnotations } from '../features/osm-annotations/useOSMAnnotations';
 import { useViewMode } from '../features/osm-annotations/useViewMode';
@@ -434,14 +433,6 @@ export default function MapPage({ onReadinessChange }) {
     [closeOtherOverlays]
   );
 
-  const handleViewSegment = useCallback(
-    (id) => {
-      closeOtherOverlays('segment');
-      setSelectedSegmentId(id);
-    },
-    [closeOtherOverlays]
-  );
-
   function handleSuggestPlaceClick() {
     // A sign-in prompt instead of letting the form open and fail at the
     // RLS layer.
@@ -535,9 +526,6 @@ export default function MapPage({ onReadinessChange }) {
           snaps={osmSnaps}
           badgeMerges={osmBadgeMerges}
         />
-      )}
-      {map && (
-        <SegmentsLayer map={map} segments={segments} onViewDetails={handleViewSegment} />
       )}
       {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleSelectPlace} />}
       {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
