@@ -4,6 +4,9 @@ import { CheckCircle2, TriangleAlert, X, Mail, Lock, User, Eye, EyeOff, LogOut }
 import styles from './AuthModal.module.css';
 import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
+import WhatsAppIcon from '../../lib/WhatsAppIcon';
+import { CONTACT_EMAIL, WHATSAPP_CHAT_URL } from '../../lib/contactInfo';
+import { track } from '../../lib/analytics';
 
 /**
  * Login / Signup / Profile tabbed modal — ported from legacy
@@ -297,6 +300,37 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
               <LogOut size={14} />
               Sign Out
             </button>
+
+            {/* Support footer — sits below Sign Out, separated by a hairline,
+                so it reads as the card's footer and can't be mis-tapped as
+                part of the destructive action above it. Two direct-contact
+                pills (mail + WhatsApp chat), distinct from the WhatsApp
+                broadcast channel on the Explore tab. */}
+            <div className={styles.supportFooter}>
+              <p className={styles.supportText}>
+                Having any issues or suggestions? Reach us via mail or WhatsApp.
+              </p>
+              <div className={styles.supportActions}>
+                <a
+                  className={styles.supportBtn}
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  onClick={() => track('contact_click', { channel: 'email', source: 'profile_card' })}
+                >
+                  <Mail size={14} strokeWidth={2} aria-hidden="true" />
+                  Email
+                </a>
+                <a
+                  className={styles.supportBtn}
+                  href={WHATSAPP_CHAT_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => track('contact_click', { channel: 'whatsapp', source: 'profile_card' })}
+                >
+                  <WhatsAppIcon size={14} className={styles.supportWaIcon} />
+                  WhatsApp
+                </a>
+              </div>
+            </div>
           </div>
         )}
       </div>

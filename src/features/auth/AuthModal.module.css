@@ -451,6 +451,48 @@
 }
 .signoutBtn:hover { background: rgba(186, 26, 26, 0.18); }
 
+/* Support footer (Profile tab) — hairline-separated block under Sign Out. */
+.supportFooter {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--v2-track);
+  text-align: center;
+}
+.supportText {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--v2-text-variant);
+  margin: 0 0 12px;
+}
+.supportActions {
+  display: flex;
+  gap: 10px;
+}
+.supportBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 10px;
+  background: var(--v2-primary-glow);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-sm);
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+              border-color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.supportBtn:hover {
+  background: var(--v2-track);
+  border-color: var(--v2-primary);
+}
+.supportWaIcon { color: #25d366; }
+
 @media (max-width: 480px) {
   .modal { padding: 20px 18px; border-radius: var(--r-lg); }
 }
