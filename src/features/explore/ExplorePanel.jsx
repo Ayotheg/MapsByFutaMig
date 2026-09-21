@@ -91,15 +91,12 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
           <div className={styles.title}>Explore Campus</div>
           <div className={styles.subtitle}>Discover locations around you</div>
         </div>
-        {/* WhatsApp channel link — text line under the header rather than
-            at the end of the grid, where it'd be buried. Sits outside the
-            pick list on purpose, see ExploreChannelLink.jsx. */}
-        <ExploreChannelLink source="explore_mobile" />
         <div className={styles.grid}>
           {fullItems.map((pick) => (
             <ExploreCard key={pick.id} pick={pick} userCoords={userCoords} onSelect={onSelect} />
           ))}
         </div>
+        <ExploreChannelLink source="explore_mobile" />
       </div>
     );
   }
