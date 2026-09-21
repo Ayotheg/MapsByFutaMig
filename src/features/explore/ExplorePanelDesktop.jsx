@@ -4,6 +4,7 @@ import { getTypeIcon } from '../../lib/typeIcons';
 import { dotColor } from '../search/chipConfig';
 import { GROUP_META, groupOfType } from '../legend/placeTypeGroups';
 import { haversine } from '../../lib/geoUtils';
+import ExploreChannelLink from './ExploreChannelLink';
 import styles from './ExplorePanelDesktop.module.css';
 
 // Rough campus walking pace — same constant ExploreCard.jsx (the mobile
@@ -177,6 +178,11 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
           <ExploreCardDesktop key={pick.id} pick={pick} onSelect={onSelect} />
         ))}
       </div>
+
+      {/* WhatsApp channel link — pinned between the list and the footer so
+          it's visible without scrolling, and outside the list so it can't
+          be mistaken for a Featured Partner slot or counted as a vendor. */}
+      <ExploreChannelLink variant="row" source="explore_desktop" />
 
       <div className={styles.footer}>
         <div className={styles.footerLeft}>

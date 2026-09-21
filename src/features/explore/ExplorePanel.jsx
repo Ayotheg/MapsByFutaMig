@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import ExploreCard from './ExploreCard';
+import ExploreChannelLink from './ExploreChannelLink';
 import ExplorePanelDesktop from './ExplorePanelDesktop';
 import { useOneShotLocation } from './useOneShotLocation';
 import styles from './ExplorePanel.module.css';
@@ -90,6 +91,10 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
           <div className={styles.title}>Explore Campus</div>
           <div className={styles.subtitle}>Discover locations around you</div>
         </div>
+        {/* WhatsApp channel link — text line under the header rather than
+            at the end of the grid, where it'd be buried. Sits outside the
+            pick list on purpose, see ExploreChannelLink.jsx. */}
+        <ExploreChannelLink source="explore_mobile" />
         <div className={styles.grid}>
           {fullItems.map((pick) => (
             <ExploreCard key={pick.id} pick={pick} userCoords={userCoords} onSelect={onSelect} />
@@ -115,6 +120,11 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
           <ExploreCard key={pick.id} pick={pick} userCoords={userCoords} onSelect={onSelect} />
         ))}
       </div>
+      {/* Below the cards (not above) so that on a short phone, where the
+          half-height sheet has little spare room, the cards stay intact
+          and this line is what scrolls out of view — the sheet panel is
+          overflow-y: auto. */}
+      <ExploreChannelLink source="explore_mobile" />
     </div>
   );
 }

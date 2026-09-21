@@ -559,3 +559,23 @@ early "just in case."
     Vite-scaffold stubs, not yet built out.
   - **Folder structure was reorganized in Slice 2's session** — if an
     older commit's file paths don't match the section above, that's why.
+- **WhatsApp channel link (announcements + new features):** one URL constant
+  in `src/lib/whatsappChannel.js`, brand glyph in `src/lib/WhatsAppIcon.jsx`
+  (official mark inlined as SVG, like the Google "G" in `AuthModal.jsx`).
+  Three placements, each firing `whatsapp_channel_click` with a
+  `props.source` so they can be compared in Insights:
+  - `explore_mobile` — `features/explore/ExploreChannelLink.jsx`
+    (`variant="text"`), one muted line in `ExplorePanel.jsx`: under the
+    rotating cards in the compact/half sheet, under the header in the full
+    sheet.
+  - `explore_desktop` — same component (`variant="row"`), a pinned row in
+    `ExplorePanelDesktop.jsx` between the list and the footer.
+  - `landing_footer` — a pill next to the Crowdr pill in
+    `pages/landing/Footer.jsx`.
+  **Deliberately not a card inside the Explore list** (promoted "Featured
+  Partner" picks live there, and the desktop footer counts "verified
+  vendors"). **Footer.jsx loads `lib/analytics` lazily on click**, not via a
+  top-level import: the landing page is prerendered by `entry-server.jsx`,
+  and analytics pulls in the Supabase client. Vite prints an
+  `INEFFECTIVE_DYNAMIC_IMPORT` note for that import (analytics is also in
+  the main chunk) — expected, not an error. No timed popup was added.

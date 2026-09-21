@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import { Heart, ArrowRight, HeartHandshake, Mail, MapPin, MessageCircle } from 'lucide-react'
 import { MapLink } from './shared'
+import WhatsAppIcon from '../../lib/WhatsAppIcon'
+import { WHATSAPP_CHANNEL_URL } from '../../lib/whatsappChannel'
 
 const CROWDR_DONATE_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
 const CONTACT_EMAIL = 'gearlifycorporation@gmail.com'
@@ -118,8 +120,9 @@ function Footer() {
           </div>
         </div>
 
-        {/* Crowdr support pill — same content/link as before, re-skinned for light mode */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+        {/* Pill row: Crowdr support + WhatsApp channel. Wraps onto two lines
+            on narrow screens. */}
+        <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 10, padding: '24px 0' }}>
           <a
             href={CROWDR_DONATE_URL}
             target="_blank"
@@ -137,6 +140,34 @@ function Footer() {
             <HeartHandshake size={15} strokeWidth={2} color="var(--land-accent)" />
             <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-secondary)' }}>Support us on</span>
             <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 14, color: 'var(--land-text-primary)' }}>Crowdr</span>
+          </a>
+          {/* WhatsApp channel (announcements + new features). Distinct from
+              the mail/chat icons in "Get started" above, which reach a
+              person — this one is the broadcast channel. Click tracking
+              loads analytics lazily: importing it at module level would
+              pull the Supabase client into this prerendered page. */}
+          <a
+            href={WHATSAPP_CHANNEL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Get Maps By FUTA updates on WhatsApp"
+            onClick={() => {
+              import('../../lib/analytics')
+                .then(({ track }) => track('whatsapp_channel_click', { source: 'landing_footer' }))
+                .catch(() => {})
+            }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '8px 18px', borderRadius: 999,
+              background: 'var(--land-accent-tint-bg)', border: '1px solid var(--land-accent-tint-border)',
+              textDecoration: 'none', transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#e9d9ff' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--land-accent-tint-bg)' }}
+          >
+            <WhatsAppIcon size={15} style={{ color: '#25d366' }} />
+            <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-secondary)' }}>Get updates on</span>
+            <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 14, color: 'var(--land-text-primary)' }}>WhatsApp</span>
           </a>
         </div>
 

@@ -1,0 +1,92 @@
+/* WhatsApp channel link on the Explore tab. Two variants, see
+   ExploreChannelLink.jsx for why neither is card-shaped.
+   The glyph uses WhatsApp's own green as a brand mark (same treatment as
+   the Google "G" in AuthModal), everything else pulls from existing
+   tokens/literals of the surface it sits on. */
+
+/* ── Mobile: one line of text under the picks (compact) / under the
+   header (full) ─────────────────────────────────────────────────── */
+.text {
+  display: block;
+  padding: 8px 4px;
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--v2-text-variant);
+  text-align: center;
+  text-wrap: balance;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.text:active {
+  opacity: 0.7;
+}
+.text:focus-visible,
+.row:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* nowrap keeps "WhatsApp channel" from splitting across two lines when
+   the sentence wraps on very narrow phones */
+.textLink {
+  color: var(--v2-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.icon {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 4px;
+  color: #25d366;
+}
+.arrow {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-left: 1px;
+}
+
+/* ── Desktop: slim pinned row between the list and the panel footer.
+   Literals match ExplorePanelDesktop.module.css's own footer (this
+   panel doesn't use the v2 tokens). ──────────────────────────────── */
+.row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  line-height: 1.3;
+  color: #475569;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.row:hover {
+  background: #f8fafc;
+}
+.rowIcon {
+  flex-shrink: 0;
+  color: #25d366;
+}
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rowTitle {
+  color: #475569;
+}
+.rowCta {
+  font-weight: 700;
+  color: #7c3aed;
+}
+.rowArrow {
+  flex-shrink: 0;
+  color: #94a3b8;
+}
