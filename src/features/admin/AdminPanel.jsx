@@ -200,6 +200,14 @@ export default function AdminPanel({
             <PointsTab
               waypoints={waypoints}
               onEditWaypoint={(wp) => setEditContext({ type: 'waypoint', id: wp.id, data: wp })}
+              onAddPerson={() =>
+                setEditContext({
+                  type: 'waypoint',
+                  id: null,
+                  isNew: true,
+                  data: { name: '', description: '', isPerson: true },
+                })
+              }
               pickingCoord={pickingCoord}
               onStartPicking={startPicking}
               pickedCoord={pickedCoord}

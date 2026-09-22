@@ -15,7 +15,7 @@ import { track } from '../../lib/analytics';
  * level up in `AdminPanel.jsx` (it needs to hide the whole overlay and
  * touch the Leaflet `map` instance directly, not just this tab).
  */
-export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onStartPicking, pickedCoord, onCoordConsumed, onWaypointsChanged }) {
+export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pickingCoord, onStartPicking, pickedCoord, onCoordConsumed, onWaypointsChanged }) {
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   // PLACES / PEOPLE pill (supabase/people_entries.sql) — same waypoints
@@ -113,6 +113,10 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
           className={styles.addBtn}
           style={{ marginLeft: 'auto' }}
           onClick={() => {
+            if (isPeopleMode) {
+              onAddPerson?.();
+              return;
+            }
             setFormOpen((v) => !v);
           }}
         >

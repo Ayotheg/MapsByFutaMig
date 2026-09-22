@@ -133,7 +133,8 @@ export async function deleteImageRows(table, ids) {
 // only name/description/type.
 export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel }) {
   // Never write a type the map/legend can't render (see wpTypeMeta.js).
-  const patch = { name, description, type: normalizeWaypointType(type) };
+  const patch = { name, description };
+  if (type !== undefined) patch.type = normalizeWaypointType(type);
   const explorePatch = {};
   if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
   if (exploreTags !== undefined) explorePatch.explore_tags = exploreTags;
@@ -207,7 +208,6 @@ export async function insertWaypoint({ name, description, type, lat, lng, isPers
     id: crypto.randomUUID(),
     name,
     description,
-    type: normalizeWaypointType(type),
     lat: isPerson ? null : lat,
     lng: isPerson ? null : lng,
     source_type: 'gps_annotation',
@@ -217,6 +217,7 @@ export async function insertWaypoint({ name, description, type, lat, lng, isPers
     status: 'approved',
     saved_at: new Date().toISOString(),
   };
+  if (!isPerson) row.type = normalizeWaypointType(type);
   if (isPerson) row.is_person = true;
 
   const { data, error } = await supabase.from('waypoints').insert(row).select('id').single();

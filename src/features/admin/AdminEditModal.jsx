@@ -26,6 +26,7 @@ import {
   insertImageRows,
   removeStorageFiles,
   deleteImageRows,
+  insertWaypoint,
   updateWaypoint,
   deleteWaypoint,
   updateSegment,
@@ -81,7 +82,7 @@ function previewUrlFor(file) {
  * once "Import to Supabase" runs (`useAdminKml.importFeature`).
  */
 export default function AdminEditModal({ editContext, onClose, onWaypointChanged, onSegmentChanged, adminKml }) {
-  const { type } = editContext;
+  const { type, isNew } = editContext;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -136,12 +137,17 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       setIsPromoted(!!wp.isPromoted);
       setSponsorName(wp.sponsorName || '');
       setPromoLabel(wp.promoLabel || 'Promoted');
-      setImagesLoading(true);
-      fetchImageRows('waypoint_images', 'waypoint_id', editContext.id)
-        .then((rows) => {
-          setExistingImages(rows.map((r) => ({ id: r.id, storagePath: r.storage_path, url: resolveUrl(r.storage_path) })));
-        })
-        .finally(() => setImagesLoading(false));
+      if (editContext.id) {
+        setImagesLoading(true);
+        fetchImageRows('waypoint_images', 'waypoint_id', editContext.id)
+          .then((rows) => {
+            setExistingImages(rows.map((r) => ({ id: r.id, storagePath: r.storage_path, url: resolveUrl(r.storage_path) })));
+          })
+          .finally(() => setImagesLoading(false));
+      } else {
+        setExistingImages([]);
+        setImagesLoading(false);
+      }
     } else if (type === 'segment') {
       const seg = editContext.data;
       setName(seg.name || '');
@@ -204,19 +210,35 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
     setStatus(null);
     try {
       if (type === 'waypoint') {
-        await updateWaypoint(editContext.id, {
-          name: name.trim(),
-          description: description.trim(),
-          type: wpType,
+        const exploreFields = {
           isExplore,
           exploreTags: exploreTagsText.split(',').map((s) => s.trim()).filter(Boolean),
           explorePriority: Number(explorePriority) || 0,
           isPromoted,
           sponsorName,
           promoLabel,
-        });
-        await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
-        setStatus({ text: 'Waypoint updated!', error: false, icon: true });
+        };
+        if (isNew) {
+          const newId = await insertWaypoint({
+            name: name.trim(),
+            description: description.trim(),
+            lat: null,
+            lng: null,
+            isPerson,
+            ...(!isPerson && { type: wpType }),
+          });
+          await reconcileImages('waypoint_images', 'waypoint_id', newId, 'waypoints');
+          setStatus({ text: isPerson ? 'Person added!' : 'Waypoint added!', error: false, icon: true });
+        } else {
+          await updateWaypoint(editContext.id, {
+            name: name.trim(),
+            description: description.trim(),
+            ...(!isPerson && { type: wpType }),
+            ...exploreFields,
+          });
+          await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
+          setStatus({ text: 'Waypoint updated!', error: false, icon: true });
+        }
         onWaypointChanged?.();
       } else if (type === 'segment') {
         await updateSegment(editContext.id, { name: name.trim(), description: description.trim(), category });
@@ -363,25 +385,29 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             <div className={styles.wpRow}>
               <div className={styles.wpField}>
                 <div className={styles.wpFieldHead}>
-                  <span className={styles.wpLabel}>
-                    Category Type <span className={styles.wpLabelRequired}>*</span>
-                  </span>
+                  {!isPerson && (
+                    <span className={styles.wpLabel}>
+                      Category Type <span className={styles.wpLabelRequired}>*</span>
+                    </span>
+                  )}
                 </div>
-                <div className={styles.wpInputWrap}>
-                  <select className={styles.wpSelect} value={wpType} onChange={(e) => setWpType(e.target.value)}>
-                    {WP_ALL_TYPES.map(([t, label]) => (
-                      <option key={t} value={t}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
-                    <MapPin size={16} />
-                  </span>
-                  <span className={styles.wpSelectChevron}>
-                    <ChevronDown size={16} />
-                  </span>
-                </div>
+                {!isPerson && (
+                  <div className={styles.wpInputWrap}>
+                    <select className={styles.wpSelect} value={wpType} onChange={(e) => setWpType(e.target.value)}>
+                      {WP_ALL_TYPES.map(([t, label]) => (
+                        <option key={t} value={t}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                      <MapPin size={16} />
+                    </span>
+                    <span className={styles.wpSelectChevron}>
+                      <ChevronDown size={16} />
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* People entries (supabase/people_entries.sql) have no map
