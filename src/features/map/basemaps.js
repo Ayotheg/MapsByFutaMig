@@ -22,6 +22,20 @@ export const BASEMAP_STYLES = [
     subdomains: 'abc',
     maxZoom: 20,
     maxNativeZoom: 19,
+    // `tile.openstreetmap.org` is OSM's free public tile server, meant
+    // for light/testing traffic only — production apps with real
+    // traffic get throttled/blocked (see tile-caching-implementation-
+    // guide.md, Step 5). This is the swap target: a production-tier
+    // provider (MapTiler's free-tier raster XYZ endpoint) that
+    // `buildBaseLayer` in MapShell.jsx uses instead, once
+    // `VITE_MAPTILER_KEY` is set in `.env.local` — see `.env.example`.
+    // Kept as plain data with `{mapId}`/`{key}` placeholders (no
+    // `import.meta.env` read) so this file stays safe to import from
+    // vite.config.js for the Workbox `runtimeCaching` patterns.
+    // Until a key is added, MapShell keeps using `url` above and this
+    // field is simply unused.
+    prodUrl: 'https://api.maptiler.com/maps/{mapId}/{z}/{x}/{y}.png?key={key}',
+    prodMapIdDefault: 'streets-v4',
   },
   {
     id: 'dark',

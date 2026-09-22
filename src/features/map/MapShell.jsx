@@ -69,6 +69,25 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     // hardcoded Voyager layer shipped with (Slice 1) — retina/@2x
     // handling, Safari iOS buffer tuning — just parameterized per style
     // instead of only ever building the one CARTO Voyager URL.
+    // Step 5 of tile-caching-implementation-guide.md: move off
+    // `tile.openstreetmap.org` (public/testing server, not meant for
+    // production traffic) onto a real production tile provider once
+    // one is configured. `prodUrl` (basemaps.js) is only defined for
+    // the Light style today; falls straight back to the existing OSM
+    // `url` when no key is set, so nothing changes for anyone who
+    // hasn't added one yet.
+    const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY;
+    const MAPTILER_MAP_ID = import.meta.env.VITE_MAPTILER_MAP_ID;
+
+    const resolveTileUrl = (style) => {
+      if (style.prodUrl && MAPTILER_KEY) {
+        return style.prodUrl
+          .replace('{mapId}', MAPTILER_MAP_ID || style.prodMapIdDefault || 'streets-v4')
+          .replace('{key}', MAPTILER_KEY);
+      }
+      return style.url;
+    };
+
     const buildBaseLayer = (styleId) => {
       const style = getBasemapStyle(styleId);
       const useRetina = IS_RETINA && style.retina && style.urlRetina;
@@ -90,7 +109,11 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       // off `undefined` and crashing on the very first tile request. Only
       // set the key when a style actually defines one.
       if (style.subdomains) options.subdomains = style.subdomains;
-      return L.tileLayer(useRetina ? style.urlRetina : style.url, options);
+      // MapTiler's prodUrl has no {s} subdomain token, so only apply it
+      // when not using retina's separate `urlRetina` template.
+      const tileUrl = useRetina ? style.urlRetina : resolveTileUrl(style);
+      if (!useRetina && style.prodUrl && MAPTILER_KEY) delete options.subdomains;
+      return L.tileLayer(tileUrl, options);
     };
 
     let baseMapLayer = buildBaseLayer(DEFAULT_BASEMAP_ID).addTo(map);
