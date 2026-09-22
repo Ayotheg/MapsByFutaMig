@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import L from 'leaflet';
 import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
-import { osmBadge, findDuplicate, isGenericAnnotationName } from './osmAnnotationUtils';
+import { osmBadge, findDuplicate } from './osmAnnotationUtils';
 
 const OSM_CACHE_KEY = 'futa_osm_annotations_v1';
 const OSM_CACHE_TTL = 5 * 60 * 1000;
@@ -111,7 +111,6 @@ export function useOSMAnnotations(dedupIndex) {
         for (const el of elements) {
           const name = ((el.tags && el.tags.name) || '').trim();
           if (!name) continue;
-          if (isGenericAnnotationName(name)) continue;
           const lat = el.lat != null ? el.lat : el.center && el.center.lat;
           const lng = el.lon != null ? el.lon : el.center && el.center.lon;
           if (lat == null || lng == null) continue;

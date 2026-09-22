@@ -48,11 +48,6 @@ export function dedupNormName(s) {
   return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-export function isGenericAnnotationName(name) {
-  const value = (name || '').trim();
-  return /^(annotation|waypoint|placemark|point)(?:\s*\d*|\s*@.*)?$/i.test(value);
-}
-
 /**
  * Returns the first entry in `index` that matches the given OSM item, or
  * null if no duplicate is found. `index` entries: { id, lat, lng, name, source }.
@@ -65,11 +60,6 @@ export function findDuplicate(osmLat, osmLng, osmName, index) {
     if (e.lat == null || e.lng == null) continue;
     const dist = metersApart(osmLat, osmLng, e.lat, e.lng);
     if (dist > DEDUP_RADIUS_M) continue; // too far away — not the same building
-
-    // Imported KML/GPX points often use a generated label such as
-    // "ANNOTATION" or "Annotation @ 7.29810, 5.13820". The label cannot
-    // identify a real place, so proximity is the only useful duplicate test.
-    if (isGenericAnnotationName(e.name)) return e;
 
     const eNorm = dedupNormName(e.name);
 
