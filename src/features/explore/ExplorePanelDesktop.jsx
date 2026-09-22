@@ -34,7 +34,7 @@ const SORT_OPTIONS = [
  * "Verified" mark are all backed by fields already on the waypoint
  * (`avgRating`/`reviewCount`/`exploreTags`/`isExplore`/`type`).
  */
-export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSuggestPlace }) {
+export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSuggestPlace, category = 'places', onCategoryChange }) {
   const [activeGroup, setActiveGroup] = useState(null); // null = "All Spots"
   const [sortMode, setSortMode] = useState('featured');
   const [sortOpen, setSortOpen] = useState(false);
@@ -113,8 +113,28 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
           </div>
           <div className={styles.countBadge}>
             <span className={styles.countBadgeNumber}>{picks.length}</span>
-            <span className={styles.countBadgeLabel}>{picks.length === 1 ? 'Place' : 'Places'}</span>
+            <span className={styles.countBadgeLabel}>
+              {category === 'people' ? (picks.length === 1 ? 'Person' : 'People') : picks.length === 1 ? 'Place' : 'Places'}
+            </span>
           </div>
+        </div>
+
+        {/* PLACES / PEOPLE pill switcher (supabase/people_entries.sql). */}
+        <div className={styles.chipRow}>
+          <button
+            type="button"
+            className={`${styles.chip} ${category === 'places' ? styles.chipActive : ''}`}
+            onClick={() => onCategoryChange?.('places')}
+          >
+            Places
+          </button>
+          <button
+            type="button"
+            className={`${styles.chip} ${category === 'people' ? styles.chipActive : ''}`}
+            onClick={() => onCategoryChange?.('people')}
+          >
+            People
+          </button>
         </div>
 
         {availableGroups.length > 0 && (
@@ -140,39 +160,45 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
           </div>
         )}
 
-        <div className={styles.controlsRow}>
-          <div className={styles.sortWrap}>
-            <span className={styles.sortLabel}>Sort:</span>
-            <button type="button" className={styles.sortBtn} onClick={() => setSortOpen((v) => !v)}>
-              {currentSortLabel} <ChevronDown size={11} />
-            </button>
-            {sortOpen && (
-              <div className={styles.sortMenu}>
-                {availableSortOptions.map((o) => (
-                  <button
-                    key={o.key}
-                    type="button"
-                    className={`${styles.sortMenuItem} ${sortMode === o.key ? styles.sortMenuItemActive : ''}`}
-                    onClick={() => handleSortSelect(o.key)}
-                  >
-                    {o.label}
-                  </button>
-                ))}
+        {category === 'places' && (
+          <div className={styles.controlsRow}>
+            <div className={styles.sortWrap}>
+              <span className={styles.sortLabel}>Sort:</span>
+              <button type="button" className={styles.sortBtn} onClick={() => setSortOpen((v) => !v)}>
+                {currentSortLabel} <ChevronDown size={11} />
+              </button>
+              {sortOpen && (
+                <div className={styles.sortMenu}>
+                  {availableSortOptions.map((o) => (
+                    <button
+                      key={o.key}
+                      type="button"
+                      className={`${styles.sortMenuItem} ${sortMode === o.key ? styles.sortMenuItemActive : ''}`}
+                      onClick={() => handleSortSelect(o.key)}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {featuredPartnerCount > 0 && (
+              <div className={styles.featuredPill}>
+                <span className={styles.featuredDot} />
+                {featuredPartnerCount} Featured Partner{featuredPartnerCount === 1 ? '' : 's'}
               </div>
             )}
           </div>
-          {featuredPartnerCount > 0 && (
-            <div className={styles.featuredPill}>
-              <span className={styles.featuredDot} />
-              {featuredPartnerCount} Featured Partner{featuredPartnerCount === 1 ? '' : 's'}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       <div className={styles.list}>
         {sorted.length === 0 && (
-          <div className={styles.noResults}>No spots in this category yet — try "All Spots".</div>
+          <div className={styles.noResults}>
+            {category === 'people'
+              ? 'No people featured yet.'
+              : 'No spots in this category yet — try "All Spots".'}
+          </div>
         )}
         {sorted.map((pick) => (
           <ExploreCardDesktop key={pick.id} pick={pick} onSelect={onSelect} />
@@ -274,7 +300,7 @@ function ExploreCardDesktop({ pick, onSelect }) {
           )}
         </div>
         <button type="button" className={styles.cardAction} onClick={() => onSelect?.(pick.waypoint)}>
-          View on Map
+          {pick.isPerson ? 'View Details' : 'View on Map'}
         </button>
       </div>
     </article>

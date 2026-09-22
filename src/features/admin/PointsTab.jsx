@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Target, CheckCircle2, Camera, ChevronRight, Search } from 'lucide-react';
+import { Target, CheckCircle2, Camera, ChevronRight, Search, User } from 'lucide-react';
 import styles from './AdminPanel.module.css';
 import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { WP_ALL_TYPES } from './adminTypeOptions';
@@ -15,9 +15,13 @@ import { track } from '../../lib/analytics';
  * level up in `AdminPanel.jsx` (it needs to hide the whole overlay and
  * touch the Leaflet `map` instance directly, not just this tab).
  */
-export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onStartPicking, pickedCoord, onCoordConsumed, onWaypointsChanged }) {
+export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pickingCoord, onStartPicking, pickedCoord, onCoordConsumed, onWaypointsChanged }) {
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  // PLACES / PEOPLE pill (supabase/people_entries.sql) — same waypoints
+  // list, filtered by `isPerson`. "Add Point" becomes "Add Person" (no
+  // coordinates) while the People pill is active.
+  const [category, setCategory] = useState('places');
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [type, setType] = useState('lecture_hall');
@@ -25,6 +29,8 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
   const [lng, setLng] = useState('');
   const [status, setStatus] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const isPeopleMode = category === 'people';
 
   useEffect(() => {
     if (pickedCoord) {
@@ -35,28 +41,46 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
     }
   }, [pickedCoord, onCoordConsumed]);
 
+  const categorized = waypoints.filter((wp) => (isPeopleMode ? wp.isPerson : !wp.isPerson));
   const filter = search.toLowerCase();
-  const filtered = waypoints.filter(
+  const filtered = categorized.filter(
     (wp) => !filter || wp.name?.toLowerCase().includes(filter) || wp.description?.toLowerCase().includes(filter)
   );
 
+  function switchCategory(next) {
+    setCategory(next);
+    setFormOpen(false);
+    setStatus(null);
+  }
+
   async function handleSave() {
     const trimmedName = name.trim();
-    const latNum = parseFloat(lat);
-    const lngNum = parseFloat(lng);
     if (!trimmedName) {
       setStatus({ text: 'Name is required.', error: true });
       return;
     }
-    if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
-      setStatus({ text: 'Valid coordinates required.', error: true });
-      return;
+    let latNum = null;
+    let lngNum = null;
+    if (!isPeopleMode) {
+      latNum = parseFloat(lat);
+      lngNum = parseFloat(lng);
+      if (Number.isNaN(latNum) || Number.isNaN(lngNum)) {
+        setStatus({ text: 'Valid coordinates required.', error: true });
+        return;
+      }
     }
     setSaving(true);
     setStatus(null);
     try {
-      await insertWaypoint({ name: trimmedName, description: desc.trim(), type, lat: latNum, lng: lngNum });
-      setStatus({ text: 'Point added successfully!', error: false, icon: true });
+      await insertWaypoint({
+        name: trimmedName,
+        description: desc.trim(),
+        type,
+        lat: latNum,
+        lng: lngNum,
+        isPerson: isPeopleMode,
+      });
+      setStatus({ text: isPeopleMode ? 'Person added successfully!' : 'Point added successfully!', error: false, icon: true });
       setName('');
       setDesc('');
       setLat('');
@@ -66,7 +90,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
     } catch (e) {
       setStatus({ text: `Error: ${e.message}`, error: true });
       // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
-      track('error_occurred', { context: 'admin_insert_waypoint', message: e?.message || String(e) });
+      track('error_occurred', { context: isPeopleMode ? 'admin_insert_person' : 'admin_insert_waypoint', message: e?.message || String(e) });
     } finally {
       setSaving(false);
     }
@@ -82,18 +106,38 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
       <div className={styles.toolbar} style={{ flexWrap: 'wrap' }}>
         <div className={styles.countBadge}>
           <span className={styles.countBadgeDot} />
-          {filtered.length} <span className={styles.countBadgeMuted}>of {waypoints.length} waypoints</span>
+          {filtered.length} <span className={styles.countBadgeMuted}>of {categorized.length} {isPeopleMode ? 'people' : 'waypoints'}</span>
         </div>
         <button
           type="button"
           className={styles.addBtn}
           style={{ marginLeft: 'auto' }}
           onClick={() => {
+            if (isPeopleMode) {
+              onAddPerson?.();
+              return;
+            }
             setFormOpen((v) => !v);
           }}
         >
-          + Add Point
+          + {isPeopleMode ? 'Add Person' : 'Add Point'}
         </button>
+        <div className={styles.categoryPillRow} style={{ flexBasis: '100%' }}>
+          <button
+            type="button"
+            className={`${styles.categoryPill} ${!isPeopleMode ? styles.categoryPillActive : ''}`}
+            onClick={() => switchCategory('places')}
+          >
+            Places
+          </button>
+          <button
+            type="button"
+            className={`${styles.categoryPill} ${isPeopleMode ? styles.categoryPillActive : ''}`}
+            onClick={() => switchCategory('people')}
+          >
+            People
+          </button>
+        </div>
         <div className={styles.searchWrap} style={{ flexBasis: '100%' }}>
           <span className={styles.searchIcon}>
             <Search size={16} />
@@ -101,7 +145,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
           <input
             type="text"
             className={styles.searchInput}
-            placeholder="Search points, tags or coords…"
+            placeholder={isPeopleMode ? 'Search people…' : 'Search points, tags or coords…'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -111,10 +155,10 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
 
       {formOpen && (
         <div className={styles.inlineForm}>
-          <div className={styles.formTitle}>New Annotated Point</div>
+          <div className={styles.formTitle}>{isPeopleMode ? 'New Person' : 'New Annotated Point'}</div>
           <div className={styles.fieldGroup}>
             <label>Name *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Engineering Block A" />
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder={isPeopleMode ? 'e.g. Prof. Adebayo Ogundimu' : 'e.g. Engineering Block A'} />
           </div>
           <div className={styles.fieldGroup}>
             <label>Description</label>
@@ -130,33 +174,39 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
               ))}
             </select>
           </div>
-          <div className={styles.fieldRow}>
-            <div className={styles.fieldGroup}>
-              <label>Latitude *</label>
-              <input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="e.g. 7.30124" type="number" step="any" />
-            </div>
-            <div className={styles.fieldGroup}>
-              <label>Longitude *</label>
-              <input value={lng} onChange={(e) => setLng(e.target.value)} placeholder="e.g. 5.13441" type="number" step="any" />
-            </div>
-          </div>
-          <div className={styles.fieldGroup}>
-            <label>Or click map to pick coords</label>
-            <button
-              type="button"
-              className={`${styles.pickBtn} ${pickingCoord ? styles.pickBtnActive : ''}`}
-              onClick={onStartPicking}
-            >
-              <Target size={13} /> Pick from Map
-            </button>
-            {pickingCoord && <div className={styles.pickHint}>Click anywhere on the map…</div>}
-          </div>
+          {/* People entries (supabase/people_entries.sql) have no map
+              location — coordinates are Places-only. */}
+          {!isPeopleMode && (
+            <>
+              <div className={styles.fieldRow}>
+                <div className={styles.fieldGroup}>
+                  <label>Latitude *</label>
+                  <input value={lat} onChange={(e) => setLat(e.target.value)} placeholder="e.g. 7.30124" type="number" step="any" />
+                </div>
+                <div className={styles.fieldGroup}>
+                  <label>Longitude *</label>
+                  <input value={lng} onChange={(e) => setLng(e.target.value)} placeholder="e.g. 5.13441" type="number" step="any" />
+                </div>
+              </div>
+              <div className={styles.fieldGroup}>
+                <label>Or click map to pick coords</label>
+                <button
+                  type="button"
+                  className={`${styles.pickBtn} ${pickingCoord ? styles.pickBtnActive : ''}`}
+                  onClick={onStartPicking}
+                >
+                  <Target size={13} /> Pick from Map
+                </button>
+                {pickingCoord && <div className={styles.pickHint}>Click anywhere on the map…</div>}
+              </div>
+            </>
+          )}
           <div className={styles.formActions}>
             <button type="button" className={styles.formCancel} onClick={handleCancel}>
               Cancel
             </button>
             <button type="button" className={styles.formSave} onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save Point'}
+              {saving ? 'Saving…' : isPeopleMode ? 'Save Person' : 'Save Point'}
             </button>
           </div>
           {status && (
@@ -168,19 +218,20 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
       )}
 
       <div className={styles.list}>
-        {filtered.length === 0 && <div className={styles.empty}>No waypoints found.</div>}
+        {filtered.length === 0 && <div className={styles.empty}>{isPeopleMode ? 'No people found.' : 'No waypoints found.'}</div>}
         {filtered.map((wp) => {
           const photoCount = wp.imageUrls?.length || 0;
           // Resolved type — same value AdminEditModal will pre-select on
           // "Edit", so the badge shown here and the Type shown there
           // always agree (see wpTypeMeta.js's resolveWaypointType comment).
           const resolvedType = resolveWaypointType(wp);
-          const wasRemapped = wp.type && wp.type.trim().toLowerCase() !== resolvedType;
+          const wasRemapped = !wp.isPerson && wp.type && wp.type.trim().toLowerCase() !== resolvedType;
+          const displayType = wp.isPerson ? 'Person' : resolvedType.replace(/_/g, ' ');
           const badge = badgeStyleFor(resolvedType);
           return (
             <div key={wp.id} className={styles.item} onClick={() => onEditWaypoint(wp)}>
               <div className={styles.itemIcon} style={{ background: badge.background, borderColor: badge.borderColor, color: badge.color }}>
-                {(() => { const Icon = getTypeIcon(resolvedType); return <Icon size={16} />; })()}
+                {(() => { const Icon = wp.isPerson ? User : getTypeIcon(resolvedType); return <Icon size={16} />; })()}
               </div>
               <div className={styles.itemBody}>
                 <div className={styles.itemTopRow}>
@@ -197,19 +248,21 @@ export default function PointsTab({ waypoints, onEditWaypoint, pickingCoord, onS
                     style={badge}
                     title={wasRemapped ? `Stored as "${wp.type}" — will be saved as "${resolvedType}" once you edit & save this point` : undefined}
                   >
-                    {resolvedType.replace(/_/g, ' ')}
+                    {displayType}
                     {wasRemapped ? ' •' : ''}
                   </span>
                 </div>
                 <div className={`${styles.itemDesc} ${!wp.description ? styles.itemDescEmpty : ''}`}>
                   {wp.description || 'No description added'}
                 </div>
-                <div className={styles.itemMeta}>
-                  <span className={styles.itemMetaLabel}>Coord:</span>
-                  <span className={styles.itemMetaValue}>
-                    {Number(wp.lat || 0).toFixed(5)}, {Number(wp.lng || 0).toFixed(5)}
-                  </span>
-                </div>
+                {!wp.isPerson && (
+                  <div className={styles.itemMeta}>
+                    <span className={styles.itemMetaLabel}>Coord:</span>
+                    <span className={styles.itemMetaValue}>
+                      {Number(wp.lat || 0).toFixed(5)}, {Number(wp.lng || 0).toFixed(5)}
+                    </span>
+                  </div>
+                )}
               </div>
               <span className={styles.itemChevron}>
                 <ChevronRight size={16} />

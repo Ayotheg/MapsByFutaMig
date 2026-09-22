@@ -895,13 +895,16 @@ const NavigationController = forwardRef(function NavigationController(
   const userCoords = useOneShotLocation(destPanelOpen);
   const popularPlaces = useMemo(
     () =>
-      (explorePicks || []).slice(0, 2).map((pick) => ({
+      (explorePicks || [])
+        .filter((pick) => !pick.isPerson)
+        .slice(0, 2)
+        .map((pick) => ({
         ...pick,
         distanceLabel:
           userCoords && pick.lat != null && pick.lng != null
             ? fmtDistAway(haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng))
             : null,
-      })),
+        })),
     [explorePicks, userCoords]
   );
 

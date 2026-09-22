@@ -22,6 +22,10 @@ export default function ExploreCard({ pick, userCoords, onSelect }) {
   const color = dotColor(pick.type);
   const distanceLabel = formatDistanceLabel(pick, userCoords);
   const image = pick.images && pick.images[0];
+  const description = pick.waypoint?.description?.trim();
+  const metaLabel = description
+    ? description.slice(0, 64)
+    : distanceLabel || (pick.type || '').replace(/_/g, ' ') || 'Campus spot';
 
   return (
     <button
@@ -38,9 +42,7 @@ export default function ExploreCard({ pick, userCoords, onSelect }) {
       </div>
       <div className={styles.cardBody}>
         <div className={styles.cardName}>{pick.name}</div>
-        <div className={styles.cardMeta}>
-          {distanceLabel || (pick.type || '').replace(/_/g, ' ') || 'Campus spot'}
-        </div>
+        <div className={styles.cardMeta}>{metaLabel}</div>
         {!!(pick.tags && pick.tags.length) && (
           <div className={styles.cardTags}>{pick.tags.slice(0, 2).join(' · ')}</div>
         )}

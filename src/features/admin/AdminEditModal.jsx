@@ -14,6 +14,7 @@ import {
   Trash2,
   Check,
   ImagePlus,
+  User,
 } from 'lucide-react';
 import styles from './AdminEditModal.module.css';
 import { WP_ALL_TYPES } from './adminTypeOptions';
@@ -25,6 +26,7 @@ import {
   insertImageRows,
   removeStorageFiles,
   deleteImageRows,
+  insertWaypoint,
   updateWaypoint,
   deleteWaypoint,
   updateSegment,
@@ -80,12 +82,17 @@ function previewUrlFor(file) {
  * once "Import to Supabase" runs (`useAdminKml.importFeature`).
  */
 export default function AdminEditModal({ editContext, onClose, onWaypointChanged, onSegmentChanged, adminKml }) {
-  const { type } = editContext;
+  const { type, isNew } = editContext;
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [wpType, setWpType] = useState('landmark');
   const [category, setCategory] = useState('other');
+  // People entries (supabase/people_entries.sql) — same edit form as a
+  // Place, minus coordinates. Set once from `wp.isPerson` on open; never
+  // toggled from here (a row's Place/Person status is decided at creation
+  // in PointsTab, not editable after the fact).
+  const [isPerson, setIsPerson] = useState(false);
 
   // Explore panel fields (supabase/explore_fields.sql) — this IS the
   // "pick a name on the map and feature it" flow: no separate admin
@@ -123,18 +130,24 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       // from name+type so this always matches the badge. See its comment
       // in wpTypeMeta.js.
       setWpType(resolveWaypointType(wp));
+      setIsPerson(!!wp.isPerson);
       setIsExplore(!!wp.isExplore);
       setExploreTagsText((wp.exploreTags || []).join(', '));
       setExplorePriority(wp.explorePriority ?? 0);
       setIsPromoted(!!wp.isPromoted);
       setSponsorName(wp.sponsorName || '');
       setPromoLabel(wp.promoLabel || 'Promoted');
-      setImagesLoading(true);
-      fetchImageRows('waypoint_images', 'waypoint_id', editContext.id)
-        .then((rows) => {
-          setExistingImages(rows.map((r) => ({ id: r.id, storagePath: r.storage_path, url: resolveUrl(r.storage_path) })));
-        })
-        .finally(() => setImagesLoading(false));
+      if (editContext.id) {
+        setImagesLoading(true);
+        fetchImageRows('waypoint_images', 'waypoint_id', editContext.id)
+          .then((rows) => {
+            setExistingImages(rows.map((r) => ({ id: r.id, storagePath: r.storage_path, url: resolveUrl(r.storage_path) })));
+          })
+          .finally(() => setImagesLoading(false));
+      } else {
+        setExistingImages([]);
+        setImagesLoading(false);
+      }
     } else if (type === 'segment') {
       const seg = editContext.data;
       setName(seg.name || '');
@@ -197,19 +210,36 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
     setStatus(null);
     try {
       if (type === 'waypoint') {
-        await updateWaypoint(editContext.id, {
-          name: name.trim(),
-          description: description.trim(),
-          type: wpType,
+        const exploreFields = {
           isExplore,
           exploreTags: exploreTagsText.split(',').map((s) => s.trim()).filter(Boolean),
           explorePriority: Number(explorePriority) || 0,
           isPromoted,
           sponsorName,
           promoLabel,
-        });
-        await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
-        setStatus({ text: 'Waypoint updated!', error: false, icon: true });
+        };
+        if (isNew) {
+          const newId = await insertWaypoint({
+            name: name.trim(),
+            description: description.trim(),
+            lat: null,
+            lng: null,
+            isPerson,
+            ...exploreFields,
+            ...(!isPerson && { type: wpType }),
+          });
+          await reconcileImages('waypoint_images', 'waypoint_id', newId, 'waypoints');
+          setStatus({ text: isPerson ? 'Person added!' : 'Waypoint added!', error: false, icon: true });
+        } else {
+          await updateWaypoint(editContext.id, {
+            name: name.trim(),
+            description: description.trim(),
+            ...(!isPerson && { type: wpType }),
+            ...exploreFields,
+          });
+          await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
+          setStatus({ text: 'Waypoint updated!', error: false, icon: true });
+        }
         onWaypointChanged?.();
       } else if (type === 'segment') {
         await updateSegment(editContext.id, { name: name.trim(), description: description.trim(), category });
@@ -295,20 +325,22 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           <div className={styles.headerWaypoint}>
             <div className={styles.headerWpLeft}>
               <div className={styles.headerWpIcon}>
-                <MapPin size={20} />
+                {isPerson ? <User size={20} /> : <MapPin size={20} />}
               </div>
               <div>
                 <div className={styles.headerWpTitleRow}>
-                  <span className={styles.headerWpTitle}>Edit Waypoint</span>
+                  <span className={styles.headerWpTitle}>{isPerson ? 'Edit Person' : 'Edit Waypoint'}</span>
                   {shortId && (
                     <span className={styles.headerWpBadge}>
                       <span className={styles.headerWpBadgeDot} />
-                      Waypoint #{shortId}
+                      {isPerson ? 'Person' : 'Waypoint'} #{shortId}
                     </span>
                   )}
                 </div>
                 <div className={styles.headerWpSubtitle}>
-                  Manage details, coordinates, and public visibility for this campus spot
+                  {isPerson
+                    ? 'Manage details and public visibility for this person'
+                    : 'Manage details, coordinates, and public visibility for this campus spot'}
                 </div>
               </div>
             </div>
@@ -321,7 +353,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             <div className={styles.wpField}>
               <div className={styles.wpFieldHead}>
                 <span className={styles.wpLabel}>
-                  Place Name <span className={styles.wpLabelRequired}>*</span>
+                  {isPerson ? 'Name' : 'Place Name'} <span className={styles.wpLabelRequired}>*</span>
                 </span>
                 <span className={styles.wpHint}>Displayed to all users</span>
               </div>
@@ -330,7 +362,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                   className={styles.wpInput}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Waypoint name"
+                  placeholder={isPerson ? 'Person name' : 'Waypoint name'}
                 />
                 <span className={`${styles.wpInputIcon} ${styles.wpInputIconRight}`}>
                   <Pencil size={14} />
@@ -354,45 +386,53 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             <div className={styles.wpRow}>
               <div className={styles.wpField}>
                 <div className={styles.wpFieldHead}>
-                  <span className={styles.wpLabel}>
-                    Category Type <span className={styles.wpLabelRequired}>*</span>
-                  </span>
+                  {!isPerson && (
+                    <span className={styles.wpLabel}>
+                      Category Type <span className={styles.wpLabelRequired}>*</span>
+                    </span>
+                  )}
                 </div>
-                <div className={styles.wpInputWrap}>
-                  <select className={styles.wpSelect} value={wpType} onChange={(e) => setWpType(e.target.value)}>
-                    {WP_ALL_TYPES.map(([t, label]) => (
-                      <option key={t} value={t}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
-                    <MapPin size={16} />
-                  </span>
-                  <span className={styles.wpSelectChevron}>
-                    <ChevronDown size={16} />
-                  </span>
-                </div>
+                {!isPerson && (
+                  <div className={styles.wpInputWrap}>
+                    <select className={styles.wpSelect} value={wpType} onChange={(e) => setWpType(e.target.value)}>
+                      {WP_ALL_TYPES.map(([t, label]) => (
+                        <option key={t} value={t}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                      <MapPin size={16} />
+                    </span>
+                    <span className={styles.wpSelectChevron}>
+                      <ChevronDown size={16} />
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div className={styles.wpField}>
-                <div className={styles.wpFieldHead}>
-                  <span className={styles.wpLabel}>
-                    Coordinates <span className={styles.wpHintPill}>read-only</span>
-                  </span>
-                  <button type="button" className={styles.wpCopyBtn} onClick={handleCopyCoords}>
-                    <Copy size={12} /> Copy
-                  </button>
-                </div>
-                <div className={styles.wpInputWrap}>
-                  <div className={styles.wpCoordInput}>
-                    {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
+              {/* People entries (supabase/people_entries.sql) have no map
+                  location — coordinates are Places-only. */}
+              {!isPerson && (
+                <div className={styles.wpField}>
+                  <div className={styles.wpFieldHead}>
+                    <span className={styles.wpLabel}>
+                      Coordinates <span className={styles.wpHintPill}>read-only</span>
+                    </span>
+                    <button type="button" className={styles.wpCopyBtn} onClick={handleCopyCoords}>
+                      <Copy size={12} /> Copy
+                    </button>
                   </div>
-                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
-                    <Lock size={16} />
-                  </span>
+                  <div className={styles.wpInputWrap}>
+                    <div className={styles.wpCoordInput}>
+                      {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
+                    </div>
+                    <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                      <Lock size={16} />
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* "Feature in Explore" — the whole ask was "just me picking a
@@ -493,7 +533,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
             <div className={styles.wpField}>
               <div className={styles.wpFieldHead}>
-                <span className={styles.wpLabel}>Place Photos</span>
+                <span className={styles.wpLabel}>{isPerson ? 'Photos' : 'Place Photos'}</span>
                 <span className={styles.wpHint}>JPEG, PNG up to 10MB</span>
               </div>
               <div className={styles.wpPhotoGrid}>
@@ -527,7 +567,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
           <div className={styles.footerWaypoint}>
             <button type="button" className={styles.wpDeleteBtn} onClick={handleDelete} disabled={busy}>
-              <Trash2 size={16} /> Delete Waypoint
+              <Trash2 size={16} /> {isPerson ? 'Delete Person' : 'Delete Waypoint'}
             </button>
             <div className={styles.wpFooterActions}>
               <button type="button" className={styles.wpCancelBtn} onClick={onClose}>
