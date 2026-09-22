@@ -203,7 +203,20 @@ export async function deleteWaypoint(id) {
 // insert, minus a location — `lat`/`lng` are left null rather than
 // required, since a person has nowhere on the map to pin. Everything
 // else (status/source_type/admin write path) is identical to a Place.
-export async function insertWaypoint({ name, description, type, lat, lng, isPerson }) {
+export async function insertWaypoint({
+  name,
+  description,
+  type,
+  lat,
+  lng,
+  isPerson,
+  isExplore,
+  exploreTags,
+  explorePriority,
+  isPromoted,
+  sponsorName,
+  promoLabel,
+}) {
   const row = {
     id: crypto.randomUUID(),
     name,
@@ -219,6 +232,14 @@ export async function insertWaypoint({ name, description, type, lat, lng, isPers
   };
   if (!isPerson) row.type = normalizeWaypointType(type);
   if (isPerson) row.is_person = true;
+  const explorePatch = {};
+  if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
+  if (exploreTags !== undefined) explorePatch.explore_tags = exploreTags;
+  if (explorePriority !== undefined) explorePatch.explore_priority = explorePriority;
+  if (isPromoted !== undefined) explorePatch.is_promoted = !!isPromoted;
+  if (sponsorName !== undefined) explorePatch.sponsor_name = sponsorName || null;
+  if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
+  Object.assign(row, explorePatch);
 
   const { data, error } = await supabase.from('waypoints').insert(row).select('id').single();
 
@@ -231,8 +252,10 @@ export async function insertWaypoint({ name, description, type, lat, lng, isPers
     (error.code === 'PGRST204' ||
       error.code === '42703' ||
       /column .* does not exist|could not find the .* column/i.test(error.message || ''));
-  if (missingColumn && isPerson) {
-    const { is_person, ...withoutIsPerson } = row;
+  if (missingColumn && (isPerson || Object.keys(explorePatch).length > 0)) {
+    const withoutIsPerson = { ...row };
+    delete withoutIsPerson.is_person;
+    for (const field of Object.keys(explorePatch)) delete withoutIsPerson[field];
     const { data: retryData, error: retryError } = await supabase
       .from('waypoints')
       .insert(withoutIsPerson)

@@ -225,6 +225,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             lat: null,
             lng: null,
             isPerson,
+            ...exploreFields,
             ...(!isPerson && { type: wpType }),
           });
           await reconcileImages('waypoint_images', 'waypoint_id', newId, 'waypoints');

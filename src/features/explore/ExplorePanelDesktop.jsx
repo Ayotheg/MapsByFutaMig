@@ -160,34 +160,36 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
           </div>
         )}
 
-        <div className={styles.controlsRow}>
-          <div className={styles.sortWrap}>
-            <span className={styles.sortLabel}>Sort:</span>
-            <button type="button" className={styles.sortBtn} onClick={() => setSortOpen((v) => !v)}>
-              {currentSortLabel} <ChevronDown size={11} />
-            </button>
-            {sortOpen && (
-              <div className={styles.sortMenu}>
-                {availableSortOptions.map((o) => (
-                  <button
-                    key={o.key}
-                    type="button"
-                    className={`${styles.sortMenuItem} ${sortMode === o.key ? styles.sortMenuItemActive : ''}`}
-                    onClick={() => handleSortSelect(o.key)}
-                  >
-                    {o.label}
-                  </button>
-                ))}
+        {category === 'places' && (
+          <div className={styles.controlsRow}>
+            <div className={styles.sortWrap}>
+              <span className={styles.sortLabel}>Sort:</span>
+              <button type="button" className={styles.sortBtn} onClick={() => setSortOpen((v) => !v)}>
+                {currentSortLabel} <ChevronDown size={11} />
+              </button>
+              {sortOpen && (
+                <div className={styles.sortMenu}>
+                  {availableSortOptions.map((o) => (
+                    <button
+                      key={o.key}
+                      type="button"
+                      className={`${styles.sortMenuItem} ${sortMode === o.key ? styles.sortMenuItemActive : ''}`}
+                      onClick={() => handleSortSelect(o.key)}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {featuredPartnerCount > 0 && (
+              <div className={styles.featuredPill}>
+                <span className={styles.featuredDot} />
+                {featuredPartnerCount} Featured Partner{featuredPartnerCount === 1 ? '' : 's'}
               </div>
             )}
           </div>
-          {featuredPartnerCount > 0 && (
-            <div className={styles.featuredPill}>
-              <span className={styles.featuredDot} />
-              {featuredPartnerCount} Featured Partner{featuredPartnerCount === 1 ? '' : 's'}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       <div className={styles.list}>
