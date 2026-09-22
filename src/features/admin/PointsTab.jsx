@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Target, CheckCircle2, Camera, ChevronRight, Search } from 'lucide-react';
+import { Target, CheckCircle2, Camera, ChevronRight, Search, User } from 'lucide-react';
 import styles from './AdminPanel.module.css';
 import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { WP_ALL_TYPES } from './adminTypeOptions';
@@ -225,12 +225,13 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
           // "Edit", so the badge shown here and the Type shown there
           // always agree (see wpTypeMeta.js's resolveWaypointType comment).
           const resolvedType = resolveWaypointType(wp);
-          const wasRemapped = wp.type && wp.type.trim().toLowerCase() !== resolvedType;
+          const wasRemapped = !wp.isPerson && wp.type && wp.type.trim().toLowerCase() !== resolvedType;
+          const displayType = wp.isPerson ? 'Person' : resolvedType.replace(/_/g, ' ');
           const badge = badgeStyleFor(resolvedType);
           return (
             <div key={wp.id} className={styles.item} onClick={() => onEditWaypoint(wp)}>
               <div className={styles.itemIcon} style={{ background: badge.background, borderColor: badge.borderColor, color: badge.color }}>
-                {(() => { const Icon = getTypeIcon(resolvedType); return <Icon size={16} />; })()}
+                {(() => { const Icon = wp.isPerson ? User : getTypeIcon(resolvedType); return <Icon size={16} />; })()}
               </div>
               <div className={styles.itemBody}>
                 <div className={styles.itemTopRow}>
@@ -247,7 +248,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
                     style={badge}
                     title={wasRemapped ? `Stored as "${wp.type}" — will be saved as "${resolvedType}" once you edit & save this point` : undefined}
                   >
-                    {resolvedType.replace(/_/g, ' ')}
+                    {displayType}
                     {wasRemapped ? ' •' : ''}
                   </span>
                 </div>
