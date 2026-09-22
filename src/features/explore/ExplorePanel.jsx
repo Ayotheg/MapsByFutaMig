@@ -41,8 +41,6 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
     () => picks.filter((p) => (category === 'people' ? p.isPerson : !p.isPerson)),
     [picks, category]
   );
-  const peopleCount = useMemo(() => picks.filter((p) => p.isPerson).length, [picks]);
-
   const promoted = useMemo(
     () => categorizedPicks.filter((p) => p.isPromoted).sort((a, b) => b.priority - a.priority),
     [categorizedPicks]
@@ -106,7 +104,6 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
         onSuggestPlace={onSuggestPlace}
         category={category}
         onCategoryChange={setCategory}
-        peopleCount={peopleCount}
       />
     );
   }
@@ -118,7 +115,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
           <div className={styles.title}>Explore Campus</div>
           <div className={styles.subtitle}>Discover locations around you</div>
         </div>
-        <CategoryPills category={category} onChange={setCategory} peopleCount={peopleCount} />
+        <CategoryPills category={category} onChange={setCategory} />
         <div className={styles.grid}>
           {fullItems.length === 0 && (
             <div className={styles.empty}>
@@ -145,7 +142,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
           View All <ChevronRight size={13} />
         </button>
       </div>
-      <CategoryPills category={category} onChange={setCategory} peopleCount={peopleCount} />
+      <CategoryPills category={category} onChange={setCategory} />
       <div className={styles.grid}>
         {compactItems.length === 0 && (
           <div className={styles.empty}>{category === 'people' ? 'No people featured yet.' : 'No places featured yet.'}</div>
@@ -169,7 +166,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
  * pick, same restraint the rest of this panel already uses (empty
  * sections say so in words instead of showing a "0").
  */
-function CategoryPills({ category, onChange, peopleCount }) {
+function CategoryPills({ category, onChange }) {
   return (
     <div className={styles.categoryTabs}>
       <button
@@ -184,7 +181,7 @@ function CategoryPills({ category, onChange, peopleCount }) {
         className={`${styles.categoryTab} ${category === 'people' ? styles.categoryTabActive : ''}`}
         onClick={() => onChange('people')}
       >
-        People{peopleCount > 0 ? ` (${peopleCount})` : ''}
+        People
       </button>
     </div>
   );

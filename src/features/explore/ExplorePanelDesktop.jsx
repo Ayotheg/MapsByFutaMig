@@ -34,7 +34,7 @@ const SORT_OPTIONS = [
  * "Verified" mark are all backed by fields already on the waypoint
  * (`avgRating`/`reviewCount`/`exploreTags`/`isExplore`/`type`).
  */
-export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSuggestPlace, category = 'places', onCategoryChange, peopleCount = 0 }) {
+export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSuggestPlace, category = 'places', onCategoryChange }) {
   const [activeGroup, setActiveGroup] = useState(null); // null = "All Spots"
   const [sortMode, setSortMode] = useState('featured');
   const [sortOpen, setSortOpen] = useState(false);
@@ -133,7 +133,7 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
             className={`${styles.chip} ${category === 'people' ? styles.chipActive : ''}`}
             onClick={() => onCategoryChange?.('people')}
           >
-            People{peopleCount > 0 ? ` (${peopleCount})` : ''}
+            People
           </button>
         </div>
 
