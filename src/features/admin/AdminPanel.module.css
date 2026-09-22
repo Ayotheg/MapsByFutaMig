@@ -305,6 +305,33 @@
   filter: drop-shadow(0 6px 14px rgba(124, 58, 237, 0.4));
 }
 
+/* ── Places / People pill switcher (supabase/people_entries.sql) ──────── */
+.categoryPillRow {
+  display: flex;
+  gap: 6px;
+}
+.categoryPill {
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 9999px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.categoryPill:hover:not(.categoryPillActive) {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.categoryPillActive {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+}
+
 /* ── Inline "Add Point" form ───────────────────────────────── */
 .inlineForm {
   padding: 12px 16px 14px;

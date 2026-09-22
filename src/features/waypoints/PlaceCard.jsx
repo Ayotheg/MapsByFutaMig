@@ -229,24 +229,29 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
           </div>
         )}
 
-        <div className={styles.actions}>
-          {/* Ported from legacy's live place-card controller
-              (app.js ~5995–6140, `onNavigate` opt): `window.openPlaceCard({
-              ..., onNavigate: () => window.NAV.navigateTo({lat,lng,name,id,type}) })`.
-              MapPage wires this to NavigationController's seed-destination
-              path (the same one `window.NAV.navigateTo` fed in legacy). */}
-          <button
-            className={styles.navBtn}
-            title="Navigate here"
-            onClick={() => {
-              onNavigate?.({ lat: data.lat, lng: data.lng, name: data.name, id: data.id, type: data.type });
-              onClose();
-            }}
-          >
-            <Navigation size={16} />
-            Navigate Here
-          </button>
-        </div>
+        {/* People entries (supabase/people_entries.sql) have no lat/lng —
+            there's nowhere to navigate to, so the button is left out
+            entirely rather than firing with null coordinates. */}
+        {data?.lat != null && data?.lng != null && (
+          <div className={styles.actions}>
+            {/* Ported from legacy's live place-card controller
+                (app.js ~5995–6140, `onNavigate` opt): `window.openPlaceCard({
+                ..., onNavigate: () => window.NAV.navigateTo({lat,lng,name,id,type}) })`.
+                MapPage wires this to NavigationController's seed-destination
+                path (the same one `window.NAV.navigateTo` fed in legacy). */}
+            <button
+              className={styles.navBtn}
+              title="Navigate here"
+              onClick={() => {
+                onNavigate?.({ lat: data.lat, lng: data.lng, name: data.name, id: data.id, type: data.type });
+                onClose();
+              }}
+            >
+              <Navigation size={16} />
+              Navigate Here
+            </button>
+          </div>
+        )}
       </div>
 
       {viewerOpen && hasPhotos && (

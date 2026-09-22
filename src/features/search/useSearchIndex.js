@@ -112,8 +112,13 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
       nameCoordSetRef.current.add(normName + '|' + (e.lat || 0).toFixed(5) + '|' + (e.lng || 0).toFixed(5));
     });
 
-    // waypoint entries — mirrors app.js ~3446's register() shape
+    // waypoint entries — mirrors app.js ~3446's register() shape.
+    // People entries (supabase/people_entries.sql) have no lat/lng and
+    // aren't a navigable destination, so they're left out of location
+    // search/quick-chips entirely — they're only reachable via the
+    // Explore panel's "People" pill.
     (waypoints || []).forEach((wp) => {
+      if (wp.isPerson) return;
       register({
         id: wp.id,
         lat: wp.lat,

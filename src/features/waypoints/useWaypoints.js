@@ -73,8 +73,11 @@ export function useWaypoints() {
       return;
     }
 
+    // `is_person` (supabase/people_entries.sql) is optional independently of
+    // the Explore fields, so a missing people migration must not hide picks.
     const EXPLORE_COLS =
       'is_explore, explore_tags, explore_priority, is_promoted, sponsor_name, promo_label';
+    const PEOPLE_COLS = 'is_person';
     const BASE_COLS = 'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count';
 
     // ── Two-phase load ────────────────────────────────────────────────────
@@ -111,7 +114,7 @@ export function useWaypoints() {
         .eq('source_type', 'osm_import')
         .order('id', { ascending: true });
 
-    let cols = `${BASE_COLS}, ${EXPLORE_COLS}`;
+    let cols = `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}`;
     let [wpRes, imgRes] = await Promise.all([
       fetchAllRows(coreQuery(cols)),
       fetchAllRows(() =>
@@ -124,16 +127,25 @@ export function useWaypoints() {
       ),
     ]);
     if (wpRes.error && !isTimeoutError(wpRes.error)) {
-      // Explore fields (supabase/explore_fields.sql) not migrated yet —
-      // don't let that break waypoint loading for the whole map. Retry
-      // without them; useExplorePicks.js already treats a waypoint
-      // with none of these fields as simply "not featured".
-      cols = BASE_COLS;
+      // The people migration is newer than the Explore migration. Retry
+      // without only `is_person` first, preserving already-working Explore
+      // fields when supabase/people_entries.sql has not been run yet.
+      cols = `${BASE_COLS}, ${EXPLORE_COLS}`;
       wpRes = await fetchAllRows(coreQuery(cols));
       if (!wpRes.error) {
         console.info(
-          '[waypoints] Explore fields not found — run supabase/explore_fields.sql to enable featuring places in Explore.'
+          '[waypoints] People fields not found — run supabase/people_entries.sql to enable the People pill.'
         );
+      } else {
+        // Explore fields are optional too. Keep the map working when the
+        // older Explore migration has not been run either.
+        cols = BASE_COLS;
+        wpRes = await fetchAllRows(coreQuery(cols));
+        if (!wpRes.error) {
+          console.info(
+            '[waypoints] Explore fields not found — run supabase/explore_fields.sql to enable featuring places in Explore.'
+          );
+        }
       }
     }
     const { data: wpRows, error: wpErr } = wpRes;
@@ -179,6 +191,36 @@ export function useWaypoints() {
     function shape(rows) {
       const out = [];
       for (const wp of rows || []) {
+        const isPerson = !!wp.is_person;
+
+        // People entries (supabase/people_entries.sql) have no map
+        // location — they only ever show up under the Explore panel's
+        // "People" pill, never as a pin. Skip all the lat/lng math (which
+        // needs real numbers) and the nudge bookkeeping entirely for them.
+        if (isPerson) {
+          out.push({
+            id: wp.id,
+            name: wp.name,
+            description: wp.description || '',
+            type: wp.type,
+            lat: null,
+            lng: null,
+            sourceType: wp.source_type,
+            segmentId: wp.segment_id,
+            imageUrls: imagesByWaypoint[wp.id] || [],
+            avgRating: wp.avg_rating != null ? Number(wp.avg_rating) : null,
+            reviewCount: Number(wp.review_count) || 0,
+            isExplore: !!wp.is_explore,
+            exploreTags: wp.explore_tags || [],
+            explorePriority: wp.explore_priority ?? 0,
+            isPromoted: !!wp.is_promoted,
+            sponsorName: wp.sponsor_name || '',
+            promoLabel: wp.promo_label || 'Promoted',
+            isPerson: true,
+          });
+          continue;
+        }
+
         // numeric columns come back as strings over PostgREST — coerce
         // before doing any math or handing to Leaflet.
         const rawLat = Number(wp.lat);
@@ -225,6 +267,7 @@ export function useWaypoints() {
           isPromoted: !!wp.is_promoted,
           sponsorName: wp.sponsor_name || '',
           promoLabel: wp.promo_label || 'Promoted',
+          isPerson: false,
         });
       }
       return out;

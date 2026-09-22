@@ -197,25 +197,51 @@ export async function deleteWaypoint(id) {
 // Legacy: `adminAddPointSave` (app.js ~3418–3459). `source_type:
 // 'gps_annotation'` matches legacy's literal value exactly (the type this
 // port's `useWaypoints.js` already filters `osm_import` rows out by).
-export async function insertWaypoint({ name, description, type, lat, lng }) {
-  const { data, error } = await supabase
-    .from('waypoints')
-    .insert({
-      id: crypto.randomUUID(),
-      name,
-      description,
-      type: normalizeWaypointType(type),
-      lat,
-      lng,
-      source_type: 'gps_annotation',
-      // Explicit, not left to the column default: the map only ever loads
-      // `status = 'approved'` rows (useWaypoints.js), so an admin-added
-      // point must be approved on insert or it never shows up.
-      status: 'approved',
-      saved_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
+//
+// `isPerson` (supabase/people_entries.sql): a Person entry is the same
+// insert, minus a location — `lat`/`lng` are left null rather than
+// required, since a person has nowhere on the map to pin. Everything
+// else (status/source_type/admin write path) is identical to a Place.
+export async function insertWaypoint({ name, description, type, lat, lng, isPerson }) {
+  const row = {
+    id: crypto.randomUUID(),
+    name,
+    description,
+    type: normalizeWaypointType(type),
+    lat: isPerson ? null : lat,
+    lng: isPerson ? null : lng,
+    source_type: 'gps_annotation',
+    // Explicit, not left to the column default: the map only ever loads
+    // `status = 'approved'` rows (useWaypoints.js), so an admin-added
+    // point must be approved on insert or it never shows up.
+    status: 'approved',
+    saved_at: new Date().toISOString(),
+  };
+  if (isPerson) row.is_person = true;
+
+  const { data, error } = await supabase.from('waypoints').insert(row).select('id').single();
+
+  // supabase/people_entries.sql hasn't been run yet — `is_person` doesn't
+  // exist as a column. Don't let that block adding a Person entirely;
+  // retry without it (it'll just behave like an ordinary waypoint with no
+  // coordinates until the migration runs).
+  const missingColumn =
+    error &&
+    (error.code === 'PGRST204' ||
+      error.code === '42703' ||
+      /column .* does not exist|could not find the .* column/i.test(error.message || ''));
+  if (missingColumn && isPerson) {
+    const { is_person, ...withoutIsPerson } = row;
+    const { data: retryData, error: retryError } = await supabase
+      .from('waypoints')
+      .insert(withoutIsPerson)
+      .select('id')
+      .single();
+    if (retryError) throw retryError;
+    track('admin_action', { action: 'insert', entity: 'waypoint' });
+    return retryData.id;
+  }
+
   if (error) throw error;
   track('admin_action', { action: 'insert', entity: 'waypoint' });
   return data.id;
