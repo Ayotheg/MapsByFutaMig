@@ -189,6 +189,28 @@
       ]
     }
     </script>
+    <!-- Map-route preconnect: start the DNS + TLS handshakes for the two
+         hosts /map needs first (Supabase data + OSM tiles) before the JS
+         bundle has even parsed. Scoped to /map so the landing page doesn't
+         open connections it never uses. Supabase is fetched via CORS
+         (crossorigin); tiles are plain <img> loads (no crossorigin) — the
+         two modes use separate connection pools, so each is preconnected
+         in the mode it will actually be used. -->
+    <script>
+      (function () {
+        if (location.pathname.indexOf('/map') !== 0) return;
+        function pc(href, cors) {
+          var l = document.createElement('link');
+          l.rel = 'preconnect';
+          l.href = href;
+          if (cors) l.crossOrigin = '';
+          document.head.appendChild(l);
+        }
+        var sb = '%VITE_SUPABASE_URL%';
+        if (sb.indexOf('http') === 0) pc(sb, true); // stays literal if env unset
+        pc('https://tile.openstreetmap.org', false);
+      })();
+    </script>
     <!-- Google Tag Manager -->
     <script>
       (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':

@@ -17,6 +17,9 @@
   left: var(--sidebar-total-w);
   right: 0;
   bottom: 0;
+  /* Neutral land-coloured backdrop so the map never flashes white/blank
+     while tiles are still arriving on a slow connection. */
+  background: #e8e6e1;
   touch-action: none;
   -webkit-touch-callout: none;
   -webkit-user-select: none;

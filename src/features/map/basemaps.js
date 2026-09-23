@@ -17,9 +17,14 @@ export const BASEMAP_STYLES = [
     id: 'light',
     label: 'Light',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    // Single host, no {s} subdomains: OSM's tile policy now recommends
+    // plain tile.openstreetmap.org (all of a/b/c were the same servers
+    // anyway). With HTTP/2 one host means ONE DNS + TCP + TLS handshake
+    // instead of three — a real cost on a slow mobile connection.
+    // MapShell.jsx only sets `subdomains` on the layer when a style
+    // defines one, so simply omitting it here is safe.
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     retina: false,
-    subdomains: 'abc',
     maxZoom: 20,
     maxNativeZoom: 19,
   },

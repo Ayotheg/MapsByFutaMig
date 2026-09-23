@@ -81,7 +81,10 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
         keepBuffer: IS_SAFARI_IOS ? 2 : 4,
         updateWhenIdle: IS_SAFARI_IOS,
         updateWhenZooming: false,
-        crossOrigin: true,
+        // No `crossOrigin`: nothing here reads tile pixels back (no canvas
+        // export), so forcing CORS mode only adds a way for a tile request
+        // to fail (server without CORS headers) and puts tiles in a
+        // different connection pool than a plain <img> load.
       };
       // Leaflet's tileLayer defaults `subdomains` to 'abc' internally, but
       // only when the option is actually *absent* — passing an explicit
@@ -177,18 +180,26 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     // `onMapReady` rather than needing a second callback prop.
     map._campusBoundaryLayer = campusBoundaryRect;
 
-    let mapReadyNotified = false;
-    const notifyMapReady = () => {
-      if (mapReadyNotified) return;
-      mapReadyNotified = true;
-      onMapReady?.(map);
-    };
-    baseMapLayer.once('load', notifyMapReady);
-    if (!baseMapLayer.isLoading()) notifyMapReady();
+    // ── Map is "ready" as soon as the Leaflet instance exists — NOT when
+    // the first tiles finish. This used to wait for the base layer's
+    // 'load' event, which only fires once every visible tile has loaded
+    // or failed. On a slow/stalled connection to the tile server that
+    // could take a very long time, and since `map` state gates
+    // WaypointLayer, OSMAnnotationLayer, GPS, navigation and the loading
+    // screen's own "Continue with saved data" escape hatch (HomeRoute's
+    // `canContinueAnyway` needs mapReady), a slow tile server blocked the
+    // entire app. Tiles now stream in behind an already-usable map.
+    //
+    // Deferred one tick (and cancelled in cleanup) so React StrictMode's
+    // mount → cleanup → mount double-invoke never hands consumers a map
+    // instance that's about to be removed.
+    const readyTimer = setTimeout(() => {
+      if (mapRef.current === map) onMapReady?.(map);
+    }, 0);
 
     return () => {
+      clearTimeout(readyTimer);
       clearTimeout(interactTimeout);
-      baseMapLayer.off('load', notifyMapReady);
       map.off('zoomend', updateZoomClass);
       map.off('moveend', saveView);
       map.off('dragstart mousedown touchstart', onInteractStart);
