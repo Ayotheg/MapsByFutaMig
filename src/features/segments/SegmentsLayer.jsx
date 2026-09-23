@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import './segmentPopup.css';
+import { escapeHtml } from '../../lib/escapeHtml';
 
 // Raw Leaflet popup HTML can't hold a React icon — inline SVG matching
 // Lucide's own ChevronRight glyph, same approach as NavigationController's
@@ -55,8 +56,8 @@ export default function SegmentsLayer({ map, segments, onViewDetails }) {
           .setLatLng(line.getBounds().getCenter())
           .setContent(
             `<div class="seg-popup">
-              <div class="seg-popup-name">${seg.name}</div>
-              <div class="seg-popup-meta">${seg.category} · ${((seg.distance || 0) / 1000).toFixed(2)} km</div>
+              <div class="seg-popup-name">${escapeHtml(seg.name)}</div>
+              <div class="seg-popup-meta">${escapeHtml(seg.category)} · ${((seg.distance || 0) / 1000).toFixed(2)} km</div>
               <button type="button" class="seg-popup-btn">${SVG_CHEVRON} VIEW DETAILS</button>
             </div>`
           )

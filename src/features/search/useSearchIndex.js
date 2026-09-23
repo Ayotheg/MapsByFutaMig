@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { TYPE_ICON_KEYS } from '../../lib/typeIcons';
+import { highlight } from './highlight';
 
 /**
  * React port of legacy's `window.FUTA_SEARCH` (app.js ~547–648).
@@ -62,12 +63,6 @@ function score(entry, q) {
 
 function icon(entry) {
   return TYPE_ICON_KEYS[entry.subtype] || TYPE_ICONS[entry.subtype] || TYPE_ICONS[entry.type] || 'geo-alt-fill';
-}
-
-function highlight(text, q) {
-  if (!q) return text;
-  const re = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-  return text.replace(re, '<mark>$1</mark>');
 }
 
 export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {

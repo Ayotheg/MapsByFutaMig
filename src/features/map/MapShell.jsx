@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { RefreshCw, TriangleAlert, X } from 'lucide-react';
 import L from 'leaflet';
 import styles from './MapShell.module.css';
 
@@ -9,6 +10,7 @@ import styles from './MapShell.module.css';
 
 import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
 import { BASEMAP_STYLES, DEFAULT_BASEMAP_ID, getBasemapStyle } from './basemaps';
+import { watchTileLayer } from './tileHealth';
 
 const CAMPUS_CENTER = [7.2980, 5.1380];
 
@@ -32,6 +34,10 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
   const mapRef = useRef(null);
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
+  // Shown when the tile layer is clearly not loading (see tileHealth.js) —
+  // asks the person to refresh. Stays until dismissed, refreshed, or (if it
+  // was only a slow network) tiles start arriving.
+  const [tileAlert, setTileAlert] = useState(false);
 
   useEffect(() => {
     if (mapRef.current) return; // guard against StrictMode double-invoke
@@ -61,6 +67,17 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
 
     // ── Hide +/- zoom buttons on mobile (pinch-to-zoom is the native gesture)
     if (window.innerWidth <= 768) map.zoomControl.remove();
+
+    // Tile retry + "map isn't loading" alert — see tileHealth.js.
+    const tileDisposers = new Set();
+    const watchTiles = (layer) => {
+      const dispose = watchTileLayer(layer, {
+        onProblem: () => setTileAlert(true),
+        onRecovered: () => setTileAlert(false),
+      });
+      tileDisposers.add(dispose);
+      layer.once('remove', () => tileDisposers.delete(dispose));
+    };
 
     // ── Base tile: built from the style catalogue in `basemaps.js` so the
     // Layers panel (features/legend/LayersPanel.jsx) can switch between
@@ -93,7 +110,9 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       // off `undefined` and crashing on the very first tile request. Only
       // set the key when a style actually defines one.
       if (style.subdomains) options.subdomains = style.subdomains;
-      return L.tileLayer(useRetina ? style.urlRetina : style.url, options);
+      const layer = L.tileLayer(useRetina ? style.urlRetina : style.url, options);
+      watchTiles(layer);
+      return layer;
     };
 
     let baseMapLayer = buildBaseLayer(DEFAULT_BASEMAP_ID).addTo(map);
@@ -116,6 +135,7 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       // (removing a layer mid-render is exactly what throws Leaflet's
       // "this._map is null" in `_tileReady`), while the real old layer
       // was silently leaked underneath it.
+      setTileAlert(false); // fresh layer, fresh chance — its own watcher re-raises if needed
       const oldLayer = baseMapLayer;
       const nextLayer = buildBaseLayer(styleId).addTo(map);
       nextLayer.once('load', () => {
@@ -200,6 +220,7 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     return () => {
       clearTimeout(readyTimer);
       clearTimeout(interactTimeout);
+      [...tileDisposers].forEach((d) => d());
       map.off('zoomend', updateZoomClass);
       map.off('moveend', saveView);
       map.off('dragstart mousedown touchstart', onInteractStart);
@@ -212,5 +233,26 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <div ref={containerRef} className={styles.map} />;
+  return (
+    <>
+      <div ref={containerRef} className={styles.map} />
+      {tileAlert && (
+        <div className={styles.tileAlert} role="alert">
+          <TriangleAlert size={16} className={styles.tileAlertIcon} />
+          <span>The map isn't loading properly. Check your connection, then refresh the page.</span>
+          <button type="button" className={styles.tileAlertRefresh} onClick={() => window.location.reload()}>
+            <RefreshCw size={12} /> Refresh
+          </button>
+          <button
+            type="button"
+            className={styles.tileAlertClose}
+            aria-label="Dismiss"
+            onClick={() => setTileAlert(false)}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+    </>
+  );
 }

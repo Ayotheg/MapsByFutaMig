@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useState } from 'react';
 import styles from './LayersPanel.module.css';
 import PlaceTypeFilter from './PlaceTypeFilter';
-import { BASEMAP_STYLES, DEFAULT_BASEMAP_ID } from '../map/basemaps';
+import { SELECTABLE_BASEMAP_STYLES, DEFAULT_BASEMAP_ID } from '../map/basemaps';
 
 /**
  * Body content of the Layers panel — composed once, rendered by both the
@@ -163,7 +163,7 @@ export default function LayersPanel({
 
       <div className={styles.sectionLabel}>Base Map Style</div>
       <div className={styles.basemapGrid}>
-        {BASEMAP_STYLES.map((style) => (
+        {SELECTABLE_BASEMAP_STYLES.map((style) => (
           <button
             key={style.id}
             type="button"

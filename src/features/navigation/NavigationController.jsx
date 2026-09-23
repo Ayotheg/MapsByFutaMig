@@ -14,6 +14,7 @@ import NavArrivedBanner from './NavArrivedBanner';
 import './navMapLayers.css';
 import { track } from '../../lib/analytics';
 import { readPersistentState, removePersistentState, writePersistentState } from '../../lib/persistentState';
+import { escapeHtml } from '../../lib/escapeHtml';
 
 // Leaflet marker/popup content is raw HTML (not React), so the "arrived
 // destination" flag glyph below is a hand-built inline SVG matching
@@ -335,7 +336,7 @@ const NavigationController = forwardRef(function NavigationController(
       })
         .addTo(map)
         .bindPopup(
-          `<div class="wp-popup"><div class="wp-popup-title" style="color:#ff4d4d;display:flex;align-items:center;gap:5px">${SVG_FLAG(14)} ${name}</div><div class="wp-popup-type">Navigation Destination</div></div>`,
+          `<div class="wp-popup"><div class="wp-popup-title" style="color:#ff4d4d;display:flex;align-items:center;gap:5px">${SVG_FLAG(14)} ${escapeHtml(name)}</div><div class="wp-popup-type">Navigation Destination</div></div>`,
           { className: 'futa-popup' }
         );
     },

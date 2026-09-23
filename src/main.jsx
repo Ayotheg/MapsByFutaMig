@@ -27,3 +27,13 @@ if (window.location.pathname === '/' && rootEl.childElementCount > 0) {
     </StrictMode>,
   )
 }
+
+// Tile + photo cache (public/sw.js). Production only — a service worker
+// in `vite dev` caches stale modules and makes local changes look broken.
+// Registered after `load` so it never competes with the first paint, and a
+// failure is silently ignored: the app works exactly as before without it.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
