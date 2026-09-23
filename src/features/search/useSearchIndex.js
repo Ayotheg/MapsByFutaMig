@@ -113,12 +113,13 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
     });
 
     // waypoint entries — mirrors app.js ~3446's register() shape.
-    // People entries (supabase/people_entries.sql) have no lat/lng and
-    // aren't a navigable destination, so they're left out of location
-    // search/quick-chips entirely — they're only reachable via the
-    // Explore panel's "People" pill.
+    // People (supabase/people_entries.sql) and Channel (supabase/
+    // channel_entries.sql) entries have no lat/lng and aren't a
+    // navigable destination, so they're left out of location search/
+    // quick-chips entirely — they're only reachable via the Explore
+    // panel's People/Channels pills.
     (waypoints || []).forEach((wp) => {
-      if (wp.isPerson) return;
+      if (wp.isPerson || wp.isChannel) return;
       register({
         id: wp.id,
         lat: wp.lat,

@@ -892,11 +892,14 @@ const NavigationController = forwardRef(function NavigationController(
   }, [mode]);
 
   // ── Popular places on campus (new, this session — see header comment) ──
+  // Places only — People (supabase/people_entries.sql) and Channel
+  // (supabase/channel_entries.sql) picks have no map location, so they
+  // can't be a walkable "popular place to visit" here.
   const userCoords = useOneShotLocation(destPanelOpen);
   const popularPlaces = useMemo(
     () =>
       (explorePicks || [])
-        .filter((pick) => !pick.isPerson)
+        .filter((pick) => !pick.isPerson && !pick.isChannel)
         .slice(0, 2)
         .map((pick) => ({
         ...pick,
