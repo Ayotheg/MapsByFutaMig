@@ -125,7 +125,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
       <div className={styles.panel}>
         <div className={styles.headerFull}>
           <div className={styles.title}>Explore Campus</div>
-          <div className={styles.subtitle}>Discover locations around you</div>
+          <div className={styles.subtitle}>Discover places, connections, and updates across campus.</div>
         </div>
         <CategoryPills category={category} onChange={setCategory} />
         <div className={styles.grid}>
