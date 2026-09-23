@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Target, CheckCircle2, Camera, ChevronRight, Search, User } from 'lucide-react';
+import { Target, CheckCircle2, Camera, ChevronRight, Search, User, Rss } from 'lucide-react';
 import styles from './AdminPanel.module.css';
 import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { WP_ALL_TYPES } from './adminTypeOptions';
@@ -15,12 +15,15 @@ import { track } from '../../lib/analytics';
  * level up in `AdminPanel.jsx` (it needs to hide the whole overlay and
  * touch the Leaflet `map` instance directly, not just this tab).
  */
-export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pickingCoord, onStartPicking, pickedCoord, onCoordConsumed, onWaypointsChanged }) {
+export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, onAddChannel, pickingCoord, onStartPicking, pickedCoord, onCoordConsumed, onWaypointsChanged }) {
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
-  // PLACES / PEOPLE pill (supabase/people_entries.sql) — same waypoints
-  // list, filtered by `isPerson`. "Add Point" becomes "Add Person" (no
-  // coordinates) while the People pill is active.
+  // PLACES / PEOPLE / CHANNELS pill (supabase/people_entries.sql,
+  // supabase/channel_entries.sql) — same waypoints list, filtered by
+  // `isPerson`/`isChannel`. "Add Point" becomes "Add Person"/"Add
+  // Channel" (both skip coordinates) while that pill is active — both
+  // open the full AdminEditModal (via onAddPerson/onAddChannel) rather
+  // than this tab's own inline mini-form, same as People already does.
   const [category, setCategory] = useState('places');
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
@@ -31,6 +34,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
   const [saving, setSaving] = useState(false);
 
   const isPeopleMode = category === 'people';
+  const isChannelMode = category === 'channels';
 
   useEffect(() => {
     if (pickedCoord) {
@@ -41,7 +45,9 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
     }
   }, [pickedCoord, onCoordConsumed]);
 
-  const categorized = waypoints.filter((wp) => (isPeopleMode ? wp.isPerson : !wp.isPerson));
+  const categorized = waypoints.filter((wp) =>
+    isPeopleMode ? wp.isPerson : isChannelMode ? wp.isChannel : !wp.isPerson && !wp.isChannel
+  );
   const filter = search.toLowerCase();
   const filtered = categorized.filter(
     (wp) => !filter || wp.name?.toLowerCase().includes(filter) || wp.description?.toLowerCase().includes(filter)
@@ -106,7 +112,10 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
       <div className={styles.toolbar} style={{ flexWrap: 'wrap' }}>
         <div className={styles.countBadge}>
           <span className={styles.countBadgeDot} />
-          {filtered.length} <span className={styles.countBadgeMuted}>of {categorized.length} {isPeopleMode ? 'people' : 'waypoints'}</span>
+          {filtered.length}{' '}
+          <span className={styles.countBadgeMuted}>
+            of {categorized.length} {isPeopleMode ? 'people' : isChannelMode ? 'channels' : 'waypoints'}
+          </span>
         </div>
         <button
           type="button"
@@ -117,15 +126,19 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
               onAddPerson?.();
               return;
             }
+            if (isChannelMode) {
+              onAddChannel?.();
+              return;
+            }
             setFormOpen((v) => !v);
           }}
         >
-          + {isPeopleMode ? 'Add Person' : 'Add Point'}
+          + {isPeopleMode ? 'Add Person' : isChannelMode ? 'Add Channel' : 'Add Point'}
         </button>
         <div className={styles.categoryPillRow} style={{ flexBasis: '100%' }}>
           <button
             type="button"
-            className={`${styles.categoryPill} ${!isPeopleMode ? styles.categoryPillActive : ''}`}
+            className={`${styles.categoryPill} ${category === 'places' ? styles.categoryPillActive : ''}`}
             onClick={() => switchCategory('places')}
           >
             Places
@@ -137,6 +150,13 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
           >
             People
           </button>
+          <button
+            type="button"
+            className={`${styles.categoryPill} ${isChannelMode ? styles.categoryPillActive : ''}`}
+            onClick={() => switchCategory('channels')}
+          >
+            Channels
+          </button>
         </div>
         <div className={styles.searchWrap} style={{ flexBasis: '100%' }}>
           <span className={styles.searchIcon}>
@@ -145,7 +165,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
           <input
             type="text"
             className={styles.searchInput}
-            placeholder={isPeopleMode ? 'Search people…' : 'Search points, tags or coords…'}
+            placeholder={isPeopleMode ? 'Search people…' : isChannelMode ? 'Search channels…' : 'Search points, tags or coords…'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -218,20 +238,30 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
       )}
 
       <div className={styles.list}>
-        {filtered.length === 0 && <div className={styles.empty}>{isPeopleMode ? 'No people found.' : 'No waypoints found.'}</div>}
+        {filtered.length === 0 && (
+          <div className={styles.empty}>
+            {isPeopleMode ? 'No people found.' : isChannelMode ? 'No channels found.' : 'No waypoints found.'}
+          </div>
+        )}
         {filtered.map((wp) => {
           const photoCount = wp.imageUrls?.length || 0;
-          // Resolved type — same value AdminEditModal will pre-select on
-          // "Edit", so the badge shown here and the Type shown there
-          // always agree (see wpTypeMeta.js's resolveWaypointType comment).
-          const resolvedType = resolveWaypointType(wp);
-          const wasRemapped = !wp.isPerson && wp.type && wp.type.trim().toLowerCase() !== resolvedType;
-          const displayType = wp.isPerson ? 'Person' : resolvedType.replace(/_/g, ' ');
-          const badge = badgeStyleFor(resolvedType);
+          // Channel rows (supabase/channel_entries.sql) skip
+          // resolveWaypointType's name-guessing entirely — unlike a
+          // Person (which still gets a guessed color from its `type`),
+          // a Channel never has one, so it gets its own fixed badge/icon
+          // ('channel' key in adminBadgeColors.js) rather than a
+          // meaningless per-name guess.
+          const resolvedType = wp.isChannel ? null : resolveWaypointType(wp);
+          const wasRemapped = !wp.isPerson && !wp.isChannel && wp.type && wp.type.trim().toLowerCase() !== resolvedType;
+          const displayType = wp.isPerson ? 'Person' : wp.isChannel ? 'Channel' : resolvedType.replace(/_/g, ' ');
+          const badge = wp.isChannel ? badgeStyleFor('channel') : badgeStyleFor(resolvedType);
           return (
             <div key={wp.id} className={styles.item} onClick={() => onEditWaypoint(wp)}>
               <div className={styles.itemIcon} style={{ background: badge.background, borderColor: badge.borderColor, color: badge.color }}>
-                {(() => { const Icon = wp.isPerson ? User : getTypeIcon(resolvedType); return <Icon size={16} />; })()}
+                {(() => {
+                  const Icon = wp.isPerson ? User : wp.isChannel ? Rss : getTypeIcon(resolvedType);
+                  return <Icon size={16} />;
+                })()}
               </div>
               <div className={styles.itemBody}>
                 <div className={styles.itemTopRow}>
@@ -252,10 +282,16 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, pick
                     {wasRemapped ? ' •' : ''}
                   </span>
                 </div>
-                <div className={`${styles.itemDesc} ${!wp.description ? styles.itemDescEmpty : ''}`}>
-                  {wp.description || 'No description added'}
-                </div>
-                {!wp.isPerson && (
+                {wp.isChannel ? (
+                  <div className={`${styles.itemDesc} ${!wp.channelLink ? styles.itemDescEmpty : ''}`}>
+                    {wp.channelLink || 'No link added'}
+                  </div>
+                ) : (
+                  <div className={`${styles.itemDesc} ${!wp.description ? styles.itemDescEmpty : ''}`}>
+                    {wp.description || 'No description added'}
+                  </div>
+                )}
+                {!wp.isPerson && !wp.isChannel && (
                   <div className={styles.itemMeta}>
                     <span className={styles.itemMetaLabel}>Coord:</span>
                     <span className={styles.itemMetaValue}>

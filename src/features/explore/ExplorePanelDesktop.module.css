@@ -439,6 +439,10 @@
 }
 .cardAction {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   background: #7c3aed;
   color: #fff;
   border: none;

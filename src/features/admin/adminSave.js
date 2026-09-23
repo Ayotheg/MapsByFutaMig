@@ -131,7 +131,7 @@ export async function deleteImageRows(table, ids) {
 // patch fields, not required ones: AdminEditModal.jsx always passes them
 // now, but this stays backward-compatible with any other caller passing
 // only name/description/type.
-export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel }) {
+export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel, channelLink, channelPlatform }) {
   // Never write a type the map/legend can't render (see wpTypeMeta.js).
   const patch = { name, description };
   if (type !== undefined) patch.type = normalizeWaypointType(type);
@@ -142,6 +142,10 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
   if (isPromoted !== undefined) explorePatch.is_promoted = !!isPromoted;
   if (sponsorName !== undefined) explorePatch.sponsor_name = sponsorName || null;
   if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
+  // Channel entries (supabase/channel_entries.sql) — same "optional patch
+  // fields" shape as the Explore fields above.
+  if (channelLink !== undefined) explorePatch.channel_link = channelLink || null;
+  if (channelPlatform !== undefined) explorePatch.channel_platform = channelPlatform || null;
 
   const hasExploreFields = Object.keys(explorePatch).length > 0;
   const { data, error } = await supabase
@@ -171,7 +175,7 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
     if (baseError) throw baseError;
     if (!baseData?.length) throw await blockedWriteError('save this waypoint');
     throw new Error(
-      'Saved name/description/type, but Explore fields need supabase/explore_fields.sql run first — the Explore toggle/tags/priority above were not saved.'
+      'Saved name/description/type, but some fields need a migration run first — supabase/explore_fields.sql for the Explore toggle/tags/priority, and/or supabase/channel_entries.sql for the channel link — those were not saved.'
     );
   }
   if (error) throw error;
@@ -203,6 +207,9 @@ export async function deleteWaypoint(id) {
 // insert, minus a location — `lat`/`lng` are left null rather than
 // required, since a person has nowhere on the map to pin. Everything
 // else (status/source_type/admin write path) is identical to a Place.
+//
+// `isChannel` (supabase/channel_entries.sql): same "no location" shape
+// as a Person, plus `channelLink`/`channelPlatform` instead of a `type`.
 export async function insertWaypoint({
   name,
   description,
@@ -210,6 +217,9 @@ export async function insertWaypoint({
   lat,
   lng,
   isPerson,
+  isChannel,
+  channelLink,
+  channelPlatform,
   isExplore,
   exploreTags,
   explorePriority,
@@ -217,12 +227,13 @@ export async function insertWaypoint({
   sponsorName,
   promoLabel,
 }) {
+  const noLocation = isPerson || isChannel;
   const row = {
     id: crypto.randomUUID(),
     name,
     description,
-    lat: isPerson ? null : lat,
-    lng: isPerson ? null : lng,
+    lat: noLocation ? null : lat,
+    lng: noLocation ? null : lng,
     source_type: 'gps_annotation',
     // Explicit, not left to the column default: the map only ever loads
     // `status = 'approved'` rows (useWaypoints.js), so an admin-added
@@ -230,8 +241,13 @@ export async function insertWaypoint({
     status: 'approved',
     saved_at: new Date().toISOString(),
   };
-  if (!isPerson) row.type = normalizeWaypointType(type);
+  if (!noLocation) row.type = normalizeWaypointType(type);
   if (isPerson) row.is_person = true;
+  if (isChannel) {
+    row.is_channel = true;
+    row.channel_link = channelLink || null;
+    row.channel_platform = channelPlatform || null;
+  }
   const explorePatch = {};
   if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
   if (exploreTags !== undefined) explorePatch.explore_tags = exploreTags;
@@ -243,22 +259,26 @@ export async function insertWaypoint({
 
   const { data, error } = await supabase.from('waypoints').insert(row).select('id').single();
 
-  // supabase/people_entries.sql hasn't been run yet — `is_person` doesn't
-  // exist as a column. Don't let that block adding a Person entirely;
-  // retry without it (it'll just behave like an ordinary waypoint with no
-  // coordinates until the migration runs).
+  // supabase/people_entries.sql / channel_entries.sql haven't been run
+  // yet — `is_person`/`is_channel`/`channel_*` don't exist as columns.
+  // Don't let that block adding a Person or Channel entirely; retry
+  // without them (behaves like an ordinary waypoint with no coordinates
+  // until the relevant migration runs).
   const missingColumn =
     error &&
     (error.code === 'PGRST204' ||
       error.code === '42703' ||
       /column .* does not exist|could not find the .* column/i.test(error.message || ''));
-  if (missingColumn && (isPerson || Object.keys(explorePatch).length > 0)) {
-    const withoutIsPerson = { ...row };
-    delete withoutIsPerson.is_person;
-    for (const field of Object.keys(explorePatch)) delete withoutIsPerson[field];
+  if (missingColumn && (isPerson || isChannel || Object.keys(explorePatch).length > 0)) {
+    const withoutNewCols = { ...row };
+    delete withoutNewCols.is_person;
+    delete withoutNewCols.is_channel;
+    delete withoutNewCols.channel_link;
+    delete withoutNewCols.channel_platform;
+    for (const field of Object.keys(explorePatch)) delete withoutNewCols[field];
     const { data: retryData, error: retryError } = await supabase
       .from('waypoints')
-      .insert(withoutIsPerson)
+      .insert(withoutNewCols)
       .select('id')
       .single();
     if (retryError) throw retryError;

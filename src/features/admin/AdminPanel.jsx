@@ -208,6 +208,14 @@ export default function AdminPanel({
                   data: { name: '', description: '', isPerson: true },
                 })
               }
+              onAddChannel={() =>
+                setEditContext({
+                  type: 'waypoint',
+                  id: null,
+                  isNew: true,
+                  data: { name: '', description: '', isChannel: true },
+                })
+              }
               pickingCoord={pickingCoord}
               onStartPicking={startPicking}
               pickedCoord={pickedCoord}

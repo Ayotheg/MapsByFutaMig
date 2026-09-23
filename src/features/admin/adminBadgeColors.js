@@ -59,6 +59,12 @@ export const ADMIN_BADGE_COLORS = {
   landmark: { bg: '#f5f3ff', color: '#7c3aed', border: 'rgba(221,214,254,0.8)' },
   poi: { bg: '#ecfdf5', color: '#059669', border: 'rgba(167,243,208,0.6)' },
   junction: { bg: '#f8fafc', color: '#475569', border: 'rgba(226,232,240,0.7)' },
+
+  // Channel entries (supabase/channel_entries.sql) — reuses the same
+  // teal family as `seg`/`road` above (a fixed, dedicated color, not a
+  // name-guessed one — see PointsTab.jsx's comment on why Channel rows
+  // skip `resolveWaypointType` entirely).
+  channel: { bg: '#f0fdfa', color: '#0f766e', border: 'rgba(153,246,228,0.6)' },
 };
 
 // Types not listed above (printing_shop, cafe, restaurant, pharmacy,

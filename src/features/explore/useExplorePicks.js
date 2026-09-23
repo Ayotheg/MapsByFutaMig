@@ -32,11 +32,15 @@ function toPick(wp, overridePriority) {
     promoLabel: wp.promoLabel || 'Promoted',
     priority: overridePriority ?? wp.explorePriority ?? 0,
     isFallback: overridePriority !== undefined,
-    // Drives the Explore panel's PLACES/PEOPLE pill (supabase/
-    // people_entries.sql) — a Person pick renders/behaves the same as a
-    // Place one everywhere else (same card, same "feature in Explore"
-    // curation), it's just grouped under the other pill.
+    // Drives the Explore panel's PLACES/PEOPLE/CHANNELS pills (supabase/
+    // people_entries.sql, supabase/channel_entries.sql) — a Person or
+    // Channel pick renders/behaves the same as a Place one everywhere
+    // else (same "feature in Explore" curation), it's just grouped under
+    // its own pill and, for Channels, rendered by a dedicated card.
     isPerson: !!wp.isPerson,
+    isChannel: !!wp.isChannel,
+    channelLink: wp.channelLink || '',
+    channelPlatform: wp.channelPlatform || '',
   };
 }
 

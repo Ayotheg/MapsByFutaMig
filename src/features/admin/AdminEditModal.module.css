@@ -476,6 +476,40 @@
   left: 22px;
 }
 
+/* Channel entries (supabase/channel_entries.sql) — platform picker on the
+   Channel edit form. Reuses var(--v2-primary) (tokens-v2.css) for the
+   active state, same violet the Explore switch above uses as a literal
+   #7c3aed, so a picked platform reads as clearly "on" the same way. */
+.wpPlatformRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.wpPlatformBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--r-full);
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.wpPlatformBtn:hover {
+  border-color: rgba(124, 58, 237, 0.35);
+}
+.wpPlatformBtnActive,
+.wpPlatformBtnActive:hover {
+  background: var(--v2-primary);
+  border-color: var(--v2-primary);
+  color: #fff;
+}
+
 .wpExploreExtra {
   display: flex;
   flex-direction: column;

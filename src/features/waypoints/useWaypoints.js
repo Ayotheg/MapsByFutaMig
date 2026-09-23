@@ -73,11 +73,14 @@ export function useWaypoints() {
       return;
     }
 
-    // `is_person` (supabase/people_entries.sql) is optional independently of
-    // the Explore fields, so a missing people migration must not hide picks.
+    // `is_person` (supabase/people_entries.sql) and `is_channel`/
+    // `channel_link`/`channel_platform` (supabase/channel_entries.sql) are
+    // each optional independently of the Explore fields and of each other,
+    // so a missing migration for either must not hide the other's picks.
     const EXPLORE_COLS =
       'is_explore, explore_tags, explore_priority, is_promoted, sponsor_name, promo_label';
     const PEOPLE_COLS = 'is_person';
+    const CHANNEL_COLS = 'is_channel, channel_link, channel_platform';
     const BASE_COLS = 'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count';
 
     // ── Two-phase load ────────────────────────────────────────────────────
@@ -114,7 +117,28 @@ export function useWaypoints() {
         .eq('source_type', 'osm_import')
         .order('id', { ascending: true });
 
-    let cols = `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}`;
+    // Newest migration first, each tier dropping the newest-still-missing
+    // columns — the Channel migration (channel_entries.sql) is newer than
+    // People (people_entries.sql), which is newer than Explore
+    // (explore_fields.sql). Falls all the way back to BASE_COLS so the map
+    // still works on a project where none of these have been run yet.
+    const COL_TIERS = [
+      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}`, missingMsg: null },
+      {
+        cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}`,
+        missingMsg: '[waypoints] Channel fields not found — run supabase/channel_entries.sql to enable the Channels pill.',
+      },
+      {
+        cols: `${BASE_COLS}, ${EXPLORE_COLS}`,
+        missingMsg: '[waypoints] People fields not found — run supabase/people_entries.sql to enable the People pill.',
+      },
+      {
+        cols: BASE_COLS,
+        missingMsg: '[waypoints] Explore fields not found — run supabase/explore_fields.sql to enable featuring places in Explore.',
+      },
+    ];
+
+    let cols = COL_TIERS[0].cols;
     let [wpRes, imgRes] = await Promise.all([
       fetchAllRows(coreQuery(cols)),
       fetchAllRows(() =>
@@ -127,25 +151,10 @@ export function useWaypoints() {
       ),
     ]);
     if (wpRes.error && !isTimeoutError(wpRes.error)) {
-      // The people migration is newer than the Explore migration. Retry
-      // without only `is_person` first, preserving already-working Explore
-      // fields when supabase/people_entries.sql has not been run yet.
-      cols = `${BASE_COLS}, ${EXPLORE_COLS}`;
-      wpRes = await fetchAllRows(coreQuery(cols));
-      if (!wpRes.error) {
-        console.info(
-          '[waypoints] People fields not found — run supabase/people_entries.sql to enable the People pill.'
-        );
-      } else {
-        // Explore fields are optional too. Keep the map working when the
-        // older Explore migration has not been run either.
-        cols = BASE_COLS;
+      for (let i = 1; i < COL_TIERS.length && wpRes.error; i++) {
+        cols = COL_TIERS[i].cols;
         wpRes = await fetchAllRows(coreQuery(cols));
-        if (!wpRes.error) {
-          console.info(
-            '[waypoints] Explore fields not found — run supabase/explore_fields.sql to enable featuring places in Explore.'
-          );
-        }
+        if (!wpRes.error) console.info(COL_TIERS[i].missingMsg);
       }
     }
     const { data: wpRows, error: wpErr } = wpRes;
@@ -192,12 +201,15 @@ export function useWaypoints() {
       const out = [];
       for (const wp of rows || []) {
         const isPerson = !!wp.is_person;
+        const isChannel = !!wp.is_channel;
 
-        // People entries (supabase/people_entries.sql) have no map
-        // location — they only ever show up under the Explore panel's
-        // "People" pill, never as a pin. Skip all the lat/lng math (which
-        // needs real numbers) and the nudge bookkeeping entirely for them.
-        if (isPerson) {
+        // People entries (supabase/people_entries.sql) and Channel
+        // entries (supabase/channel_entries.sql) have no map location —
+        // they only ever show up under the Explore panel's People/
+        // Channels pills, never as a pin. Skip all the lat/lng math
+        // (which needs real numbers) and the nudge bookkeeping entirely
+        // for them.
+        if (isPerson || isChannel) {
           out.push({
             id: wp.id,
             name: wp.name,
@@ -216,7 +228,10 @@ export function useWaypoints() {
             isPromoted: !!wp.is_promoted,
             sponsorName: wp.sponsor_name || '',
             promoLabel: wp.promo_label || 'Promoted',
-            isPerson: true,
+            isPerson,
+            isChannel,
+            channelLink: wp.channel_link || '',
+            channelPlatform: wp.channel_platform || '',
           });
           continue;
         }
@@ -268,6 +283,7 @@ export function useWaypoints() {
           sponsorName: wp.sponsor_name || '',
           promoLabel: wp.promo_label || 'Promoted',
           isPerson: false,
+          isChannel: false,
         });
       }
       return out;

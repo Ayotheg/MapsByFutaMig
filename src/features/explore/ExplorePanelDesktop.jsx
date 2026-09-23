@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
-import { BadgeCheck, ChevronDown, Footprints, Plus, Star } from 'lucide-react';
+import { BadgeCheck, ChevronDown, Footprints, Plus, Star, ArrowUpRight } from 'lucide-react';
 import { getTypeIcon } from '../../lib/typeIcons';
 import { dotColor } from '../search/chipConfig';
 import { GROUP_META, groupOfType } from '../legend/placeTypeGroups';
 import { haversine } from '../../lib/geoUtils';
+import { channelPlatformMeta } from '../../lib/channelMeta';
+import { track } from '../../lib/analytics';
 import ExploreChannelLink from './ExploreChannelLink';
 import styles from './ExplorePanelDesktop.module.css';
 
@@ -114,12 +116,17 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
           <div className={styles.countBadge}>
             <span className={styles.countBadgeNumber}>{picks.length}</span>
             <span className={styles.countBadgeLabel}>
-              {category === 'people' ? (picks.length === 1 ? 'Person' : 'People') : picks.length === 1 ? 'Place' : 'Places'}
+              {category === 'people'
+                ? picks.length === 1 ? 'Person' : 'People'
+                : category === 'channels'
+                ? picks.length === 1 ? 'Channel' : 'Channels'
+                : picks.length === 1 ? 'Place' : 'Places'}
             </span>
           </div>
         </div>
 
-        {/* PLACES / PEOPLE pill switcher (supabase/people_entries.sql). */}
+        {/* PLACES / PEOPLE / CHANNELS pill switcher (supabase/
+            people_entries.sql, supabase/channel_entries.sql). */}
         <div className={styles.chipRow}>
           <button
             type="button"
@@ -134,6 +141,13 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
             onClick={() => onCategoryChange?.('people')}
           >
             People
+          </button>
+          <button
+            type="button"
+            className={`${styles.chip} ${category === 'channels' ? styles.chipActive : ''}`}
+            onClick={() => onCategoryChange?.('channels')}
+          >
+            Channels
           </button>
         </div>
 
@@ -197,12 +211,18 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
           <div className={styles.noResults}>
             {category === 'people'
               ? 'No people featured yet.'
+              : category === 'channels'
+              ? 'No channels featured yet.'
               : 'No spots in this category yet — try "All Spots".'}
           </div>
         )}
-        {sorted.map((pick) => (
-          <ExploreCardDesktop key={pick.id} pick={pick} onSelect={onSelect} />
-        ))}
+        {sorted.map((pick) =>
+          pick.isChannel ? (
+            <ChannelCardDesktop key={pick.id} pick={pick} />
+          ) : (
+            <ExploreCardDesktop key={pick.id} pick={pick} onSelect={onSelect} />
+          )
+        )}
       </div>
 
       {/* WhatsApp channel link — pinned between the list and the footer so
@@ -301,6 +321,53 @@ function ExploreCardDesktop({ pick, onSelect }) {
         </div>
         <button type="button" className={styles.cardAction} onClick={() => onSelect?.(pick.waypoint)}>
           {pick.isPerson ? 'View Details' : 'View on Map'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+/**
+ * Channel entries (supabase/channel_entries.sql) — a much simpler card
+ * than a Place/Person: no distance, rating, tags, or "View on Map" (a
+ * channel has nowhere on the map to show). The whole card links straight
+ * out to the invite link; the footer button re-states that as an
+ * explicit "Join the Channel" CTA per the card's own action-row pattern.
+ */
+function ChannelCardDesktop({ pick }) {
+  const platform = channelPlatformMeta(pick.channelPlatform);
+  const Icon = platform.icon;
+  const image = pick.images && pick.images[0];
+
+  function handleJoin() {
+    track('explore_channel_click', { source: 'explore_desktop_card', platform: pick.channelPlatform });
+    window.open(pick.channelLink, '_blank', 'noopener,noreferrer');
+  }
+
+  return (
+    <article className={styles.card}>
+      <div className={styles.cardTop}>
+        <div className={styles.cardIdentity}>
+          <div className={styles.avatar} style={!image ? { background: platform.color } : undefined}>
+            {image ? <img src={image} alt="" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
+          </div>
+          <div className={styles.cardIdentityText}>
+            <div className={styles.cardName}>{pick.name}</div>
+            <div className={styles.cardMetaRow}>
+              <span className={styles.cardCategory}>{platform.label}</span>
+            </div>
+          </div>
+        </div>
+        {pick.isPromoted && (
+          <span className={styles.promoBadge}>
+            <Star size={9} fill="currentColor" /> {pick.promoLabel || 'Promoted'}
+          </span>
+        )}
+      </div>
+
+      <div className={styles.cardFooter}>
+        <button type="button" className={styles.cardAction} onClick={handleJoin}>
+          Join the Channel <ArrowUpRight size={11} />
         </button>
       </div>
     </article>

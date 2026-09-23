@@ -15,11 +15,14 @@ import {
   Check,
   ImagePlus,
   User,
+  Rss,
+  Link as LinkIcon,
 } from 'lucide-react';
 import styles from './AdminEditModal.module.css';
 import { WP_ALL_TYPES } from './adminTypeOptions';
 import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { getPlaceImageUrl } from '../../lib/supabase';
+import { CHANNEL_PLATFORMS, channelPlatformMeta } from '../../lib/channelMeta';
 import {
   fetchImageRows,
   uploadImage,
@@ -94,6 +97,13 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
   // in PointsTab, not editable after the fact).
   const [isPerson, setIsPerson] = useState(false);
 
+  // Channel entries (supabase/channel_entries.sql) — same "no
+  // coordinates" shape as isPerson above, set once on open and never
+  // toggled from here for the same reason.
+  const [isChannel, setIsChannel] = useState(false);
+  const [channelLink, setChannelLink] = useState('');
+  const [channelPlatform, setChannelPlatform] = useState('');
+
   // Explore panel fields (supabase/explore_fields.sql) — this IS the
   // "pick a name on the map and feature it" flow: no separate admin
   // tab/table, just a few more fields on the same waypoint edit form
@@ -131,6 +141,9 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       // in wpTypeMeta.js.
       setWpType(resolveWaypointType(wp));
       setIsPerson(!!wp.isPerson);
+      setIsChannel(!!wp.isChannel);
+      setChannelLink(wp.channelLink || '');
+      setChannelPlatform(wp.channelPlatform || '');
       setIsExplore(!!wp.isExplore);
       setExploreTagsText((wp.exploreTags || []).join(', '));
       setExplorePriority(wp.explorePriority ?? 0);
@@ -206,6 +219,10 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       setStatus({ text: 'Name is required.', error: true });
       return;
     }
+    if (type === 'waypoint' && isChannel && !channelLink.trim()) {
+      setStatus({ text: 'Channel link is required.', error: true });
+      return;
+    }
     setBusy(true);
     setStatus(null);
     try {
@@ -218,6 +235,9 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           sponsorName,
           promoLabel,
         };
+        const channelFields = isChannel
+          ? { isChannel: true, channelLink: channelLink.trim(), channelPlatform }
+          : {};
         if (isNew) {
           const newId = await insertWaypoint({
             name: name.trim(),
@@ -225,20 +245,26 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             lat: null,
             lng: null,
             isPerson,
+            ...channelFields,
             ...exploreFields,
-            ...(!isPerson && { type: wpType }),
+            ...(!isPerson && !isChannel && { type: wpType }),
           });
           await reconcileImages('waypoint_images', 'waypoint_id', newId, 'waypoints');
-          setStatus({ text: isPerson ? 'Person added!' : 'Waypoint added!', error: false, icon: true });
+          setStatus({
+            text: isPerson ? 'Person added!' : isChannel ? 'Channel added!' : 'Waypoint added!',
+            error: false,
+            icon: true,
+          });
         } else {
           await updateWaypoint(editContext.id, {
             name: name.trim(),
             description: description.trim(),
-            ...(!isPerson && { type: wpType }),
+            ...(!isPerson && !isChannel && { type: wpType }),
+            ...channelFields,
             ...exploreFields,
           });
           await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
-          setStatus({ text: 'Waypoint updated!', error: false, icon: true });
+          setStatus({ text: isChannel ? 'Channel updated!' : 'Waypoint updated!', error: false, icon: true });
         }
         onWaypointChanged?.();
       } else if (type === 'segment') {
@@ -325,21 +351,25 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           <div className={styles.headerWaypoint}>
             <div className={styles.headerWpLeft}>
               <div className={styles.headerWpIcon}>
-                {isPerson ? <User size={20} /> : <MapPin size={20} />}
+                {isPerson ? <User size={20} /> : isChannel ? <Rss size={20} /> : <MapPin size={20} />}
               </div>
               <div>
                 <div className={styles.headerWpTitleRow}>
-                  <span className={styles.headerWpTitle}>{isPerson ? 'Edit Person' : 'Edit Waypoint'}</span>
+                  <span className={styles.headerWpTitle}>
+                    {isPerson ? 'Edit Person' : isChannel ? 'Edit Channel' : 'Edit Waypoint'}
+                  </span>
                   {shortId && (
                     <span className={styles.headerWpBadge}>
                       <span className={styles.headerWpBadgeDot} />
-                      {isPerson ? 'Person' : 'Waypoint'} #{shortId}
+                      {isPerson ? 'Person' : isChannel ? 'Channel' : 'Waypoint'} #{shortId}
                     </span>
                   )}
                 </div>
                 <div className={styles.headerWpSubtitle}>
                   {isPerson
                     ? 'Manage details and public visibility for this person'
+                    : isChannel
+                    ? 'Manage details and public visibility for this channel'
                     : 'Manage details, coordinates, and public visibility for this campus spot'}
                 </div>
               </div>
@@ -353,7 +383,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             <div className={styles.wpField}>
               <div className={styles.wpFieldHead}>
                 <span className={styles.wpLabel}>
-                  {isPerson ? 'Name' : 'Place Name'} <span className={styles.wpLabelRequired}>*</span>
+                  {isPerson ? 'Name' : isChannel ? 'Channel Name' : 'Place Name'} <span className={styles.wpLabelRequired}>*</span>
                 </span>
                 <span className={styles.wpHint}>Displayed to all users</span>
               </div>
@@ -362,7 +392,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                   className={styles.wpInput}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={isPerson ? 'Person name' : 'Waypoint name'}
+                  placeholder={isPerson ? 'Person name' : isChannel ? 'e.g. FUTA Announcements' : 'Waypoint name'}
                 />
                 <span className={`${styles.wpInputIcon} ${styles.wpInputIconRight}`}>
                   <Pencil size={14} />
@@ -370,70 +400,127 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
               </div>
             </div>
 
-            <div className={styles.wpField}>
-              <div className={styles.wpFieldHead}>
-                <span className={styles.wpLabel}>Description / Note</span>
-                <span className={styles.wpHint}>Optional</span>
-              </div>
-              <textarea
-                className={styles.wpTextarea}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional note"
-              />
-            </div>
-
-            <div className={styles.wpRow}>
+            {/* Channel entries (supabase/channel_entries.sql) keep the
+                edit form to exactly what the admin needs to fill in: name,
+                platform + link, photo, Feature toggle — no free-text
+                description field to leave blank. */}
+            {!isChannel && (
               <div className={styles.wpField}>
                 <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Description / Note</span>
+                  <span className={styles.wpHint}>Optional</span>
+                </div>
+                <textarea
+                  className={styles.wpTextarea}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional note"
+                />
+              </div>
+            )}
+
+            {isChannel ? (
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Platform</span>
+                  <span className={styles.wpHint}>Sets the link prefix &amp; icon</span>
+                </div>
+                <div className={styles.wpPlatformRow}>
+                  {CHANNEL_PLATFORMS.map((p) => {
+                    const PlatformIcon = p.icon;
+                    const active = channelPlatform === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        className={`${styles.wpPlatformBtn} ${active ? styles.wpPlatformBtnActive : ''}`}
+                        onClick={() => {
+                          setChannelPlatform(p.key);
+                          // Only prefill when the field is empty or still
+                          // holds another platform's un-edited prefix —
+                          // never stomp a link the admin already pasted.
+                          const stillAPrefill = CHANNEL_PLATFORMS.some((pp) => pp.prefill === channelLink);
+                          if (!channelLink.trim() || stillAPrefill) setChannelLink(p.prefill);
+                        }}
+                      >
+                        <PlatformIcon size={14} />
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className={styles.wpFieldHead} style={{ marginTop: 12 }}>
+                  <span className={styles.wpLabel}>
+                    Channel Link <span className={styles.wpLabelRequired}>*</span>
+                  </span>
+                  <span className={styles.wpHint}>Where "Join the Channel" opens</span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <input
+                    className={styles.wpInput}
+                    value={channelLink}
+                    onChange={(e) => setChannelLink(e.target.value)}
+                    placeholder={channelPlatformMeta(channelPlatform).prefill}
+                  />
+                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                    <LinkIcon size={16} />
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.wpRow}>
+                <div className={styles.wpField}>
+                  <div className={styles.wpFieldHead}>
+                    {!isPerson && (
+                      <span className={styles.wpLabel}>
+                        Category Type <span className={styles.wpLabelRequired}>*</span>
+                      </span>
+                    )}
+                  </div>
                   {!isPerson && (
-                    <span className={styles.wpLabel}>
-                      Category Type <span className={styles.wpLabelRequired}>*</span>
-                    </span>
+                    <div className={styles.wpInputWrap}>
+                      <select className={styles.wpSelect} value={wpType} onChange={(e) => setWpType(e.target.value)}>
+                        {WP_ALL_TYPES.map(([t, label]) => (
+                          <option key={t} value={t}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                        <MapPin size={16} />
+                      </span>
+                      <span className={styles.wpSelectChevron}>
+                        <ChevronDown size={16} />
+                      </span>
+                    </div>
                   )}
                 </div>
+
+                {/* People entries (supabase/people_entries.sql) have no map
+                    location — coordinates are Places-only. */}
                 {!isPerson && (
-                  <div className={styles.wpInputWrap}>
-                    <select className={styles.wpSelect} value={wpType} onChange={(e) => setWpType(e.target.value)}>
-                      {WP_ALL_TYPES.map(([t, label]) => (
-                        <option key={t} value={t}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
-                      <MapPin size={16} />
-                    </span>
-                    <span className={styles.wpSelectChevron}>
-                      <ChevronDown size={16} />
-                    </span>
+                  <div className={styles.wpField}>
+                    <div className={styles.wpFieldHead}>
+                      <span className={styles.wpLabel}>
+                        Coordinates <span className={styles.wpHintPill}>read-only</span>
+                      </span>
+                      <button type="button" className={styles.wpCopyBtn} onClick={handleCopyCoords}>
+                        <Copy size={12} /> Copy
+                      </button>
+                    </div>
+                    <div className={styles.wpInputWrap}>
+                      <div className={styles.wpCoordInput}>
+                        {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
+                      </div>
+                      <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                        <Lock size={16} />
+                      </span>
+                    </div>
                   </div>
                 )}
               </div>
-
-              {/* People entries (supabase/people_entries.sql) have no map
-                  location — coordinates are Places-only. */}
-              {!isPerson && (
-                <div className={styles.wpField}>
-                  <div className={styles.wpFieldHead}>
-                    <span className={styles.wpLabel}>
-                      Coordinates <span className={styles.wpHintPill}>read-only</span>
-                    </span>
-                    <button type="button" className={styles.wpCopyBtn} onClick={handleCopyCoords}>
-                      <Copy size={12} /> Copy
-                    </button>
-                  </div>
-                  <div className={styles.wpInputWrap}>
-                    <div className={styles.wpCoordInput}>
-                      {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
-                    </div>
-                    <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
-                      <Lock size={16} />
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
 
             {/* "Feature in Explore" — the whole ask was "just me picking a
                 name on the map and featuring it", so this lives right in
@@ -444,7 +531,9 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                   <Star size={16} />
                 </div>
                 <div>
-                  <div className={styles.wpExploreTitle}>Feature this place in Explore</div>
+                  <div className={styles.wpExploreTitle}>
+                    {isChannel ? 'Feature this channel in Explore' : 'Feature this place in Explore'}
+                  </div>
                   <div className={styles.wpExploreSubtitle}>
                     Spotlight this waypoint on the main campus discovery carousel
                   </div>
@@ -533,7 +622,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
             <div className={styles.wpField}>
               <div className={styles.wpFieldHead}>
-                <span className={styles.wpLabel}>{isPerson ? 'Photos' : 'Place Photos'}</span>
+                <span className={styles.wpLabel}>{isPerson || isChannel ? 'Photos' : 'Place Photos'}</span>
                 <span className={styles.wpHint}>JPEG, PNG up to 10MB</span>
               </div>
               <div className={styles.wpPhotoGrid}>
@@ -567,7 +656,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
           <div className={styles.footerWaypoint}>
             <button type="button" className={styles.wpDeleteBtn} onClick={handleDelete} disabled={busy}>
-              <Trash2 size={16} /> {isPerson ? 'Delete Person' : 'Delete Waypoint'}
+              <Trash2 size={16} /> {isPerson ? 'Delete Person' : isChannel ? 'Delete Channel' : 'Delete Waypoint'}
             </button>
             <div className={styles.wpFooterActions}>
               <button type="button" className={styles.wpCancelBtn} onClick={onClose}>

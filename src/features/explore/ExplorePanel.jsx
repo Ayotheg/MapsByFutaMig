@@ -13,6 +13,12 @@ import styles from './ExplorePanel.module.css';
 const ROTATE_MS = 7000;
 const COMPACT_SLOTS = 2;
 
+function emptyLabel(category) {
+  if (category === 'people') return 'No people featured yet.';
+  if (category === 'channels') return 'No channels featured yet.';
+  return 'No places featured yet.';
+}
+
 /**
  * Explore — admin-curated (or auto-generated) popular-places section.
  * Two variants, both fed by the same `picks` (from `useExplorePicks`):
@@ -32,13 +38,19 @@ const COMPACT_SLOTS = 2;
 export default function ExplorePanel({ picks, loading, variant = 'compact', onViewAll, onSelect, desktop, onSuggestPlace }) {
   const userCoords = useOneShotLocation(true);
 
-  // PLACES / PEOPLE pill (supabase/people_entries.sql) — same `picks`
-  // array, just split by `isPerson`. Defaults to Places so every existing
-  // flow (rotation, "View All", the desktop panel below) behaves exactly
-  // as before until someone actually taps the new pill.
+  // PLACES / PEOPLE / CHANNELS pill (supabase/people_entries.sql,
+  // supabase/channel_entries.sql) — same `picks` array, just split by
+  // `isPerson`/`isChannel`. Defaults to Places so every existing flow
+  // (rotation, "View All", the desktop panel below) behaves exactly as
+  // before until someone actually taps one of the new pills.
   const [category, setCategory] = useState('places');
   const categorizedPicks = useMemo(
-    () => picks.filter((p) => (category === 'people' ? p.isPerson : !p.isPerson)),
+    () =>
+      picks.filter((p) => {
+        if (category === 'people') return p.isPerson;
+        if (category === 'channels') return p.isChannel;
+        return !p.isPerson && !p.isChannel;
+      }),
     [picks, category]
   );
   const promoted = useMemo(
@@ -119,7 +131,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
         <div className={styles.grid}>
           {fullItems.length === 0 && (
             <div className={styles.empty}>
-              {category === 'people' ? 'No people featured yet.' : 'No places featured yet.'}
+              {emptyLabel(category)}
             </div>
           )}
           {fullItems.map((pick) => (
@@ -145,7 +157,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
       <CategoryPills category={category} onChange={setCategory} />
       <div className={styles.grid}>
         {compactItems.length === 0 && (
-          <div className={styles.empty}>{category === 'people' ? 'No people featured yet.' : 'No places featured yet.'}</div>
+          <div className={styles.empty}>{emptyLabel(category)}</div>
         )}
         {compactItems.map((pick) => (
           <ExploreCard key={pick.id} pick={pick} userCoords={userCoords} onSelect={onSelect} />
@@ -161,10 +173,11 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
 }
 
 /**
- * PLACES / PEOPLE pill switcher (supabase/people_entries.sql). People
- * only shows a count once there's at least one featured/fallback person
- * pick, same restraint the rest of this panel already uses (empty
- * sections say so in words instead of showing a "0").
+ * PLACES / PEOPLE / CHANNELS pill switcher (supabase/people_entries.sql,
+ * supabase/channel_entries.sql). People/Channels only show a count once
+ * there's at least one featured/fallback pick in that category, same
+ * restraint the rest of this panel already uses (empty sections say so
+ * in words instead of showing a "0").
  */
 function CategoryPills({ category, onChange }) {
   return (
@@ -182,6 +195,13 @@ function CategoryPills({ category, onChange }) {
         onClick={() => onChange('people')}
       >
         People
+      </button>
+      <button
+        type="button"
+        className={`${styles.categoryTab} ${category === 'channels' ? styles.categoryTabActive : ''}`}
+        onClick={() => onChange('channels')}
+      >
+        Channels
       </button>
     </div>
   );
