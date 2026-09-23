@@ -113,11 +113,10 @@ export default function WaypointLayer({ map, waypoints, isTypeVisible, onSelect,
 
   // Build markers once per waypoints load and attach them to the map.
   useEffect(() => {
-    // People and channel entries have no lat/lng — they only surface in
-    // Explore, never as pins here (buildWaypointMarker needs coordinates).
-    const placeWaypoints = waypoints.filter(
-      (wp) => !wp.isPerson && !wp.isChannel && wp.lat != null && wp.lng != null
-    );
+    // People entries (supabase/people_entries.sql) have no lat/lng — they
+    // only ever surface in the Explore panel's "People" pill, never as a
+    // pin here (buildWaypointMarker needs real coordinates).
+    const placeWaypoints = waypoints.filter((wp) => !wp.isPerson);
     if (!map || placeWaypoints.length === 0) return;
 
     const entries = placeWaypoints.map((wp) => {
