@@ -6,13 +6,15 @@ import { createClient } from '@supabase/supabase-js';
 // never sits in a source file that gets committed. Create a `.env.local`
 // (already gitignored by the Vite scaffold) with:
 //
-//   VITE_SUPABASE_URL=https://ownzoiipqcblyjwfset.supabase.co
+//   VITE_SUPABASE_URL=https://ownnzoiipqcblyjwfset.supabase.co
 //   VITE_SUPABASE_ANON_KEY=<your anon/publishable key>
 //
 // See .env.example for the template.
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Vite preserves whitespace from .env files. Trim both values so a copied
+// key cannot become a different websocket URL (for example, with `%0A`).
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
 
 if (!supabaseUrl || !supabaseAnonKey) {
   // Fail loudly at startup rather than letting every data call silently

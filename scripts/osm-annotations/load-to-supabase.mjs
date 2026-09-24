@@ -18,7 +18,7 @@
 //
 // REQUIRED ENV VARS (put in a .env.local at the repo root — already
 // gitignored by the Vite scaffold; Node 20+'s --env-file loads it):
-//   SUPABASE_URL=https://ownzoiipqcblyjwfset.supabase.co
+//   SUPABASE_URL=https://ownnzoiipqcblyjwfset.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY=<service role key, NOT the anon key>
 //
 // The service-role key is required (not the anon/publishable key) because
