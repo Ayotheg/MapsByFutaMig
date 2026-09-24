@@ -162,6 +162,15 @@
   --v2-primary-badge-fill:  rgba(237, 233, 254, 0.8);
   --v2-primary-border-soft: rgba(221, 214, 254, 0.8);
 
+  /* Promote screen (Figma node 127:2, "PROMOTE" — pulled via the Figma
+     MCP connection): the mandatory-location notice banner is the first
+     use of a tertiary/amber container tone, previously flagged below as
+     "not yet defined". Literal from the frame — rgba(255,220,198,0.4)
+     fill, #301400 text — neither is a clean tint step of --v2-tertiary
+     (#a15100), so both are new rather than derived: */
+  --v2-tertiary-container:    rgba(255, 220, 198, 0.4);
+  --v2-on-tertiary-container: #301400;
+
   /* Motion (Section 6) — first used by the Loading Screen's icon pulse */
   --v2-ease-standard:     cubic-bezier(0.4, 0, 0.2, 1);
   --v2-duration-quick:    150ms;
@@ -169,10 +178,9 @@
   --v2-duration-breathe:  2200ms;
 
   /* Not yet defined — add only when a screen actually needs it:
-     --v2-error (destructive/delete red seen in the style-guide icon
-     cluster, exact hex not given yet — confirm before using),
-     --v2-secondary-container / --v2-tertiary-container (lighter
-     tint variants, e.g. for the "Secondary" button's light fill). */
+     --v2-secondary-container (lighter tint variant, e.g. for the
+     "Secondary" button's light fill — --v2-tertiary-container was this
+     same kind of gap until the Promote screen above needed it). */
 
   /* Radii and spacing intentionally NOT duplicated here — reuse
      var(--r-sm) / var(--r-full) / var(--gap) / var(--pad) etc. from

@@ -7,6 +7,7 @@ import NotFoundPage from './pages/NotFoundPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
 import LandingPage from './pages/LandingPage'
+import PromotePage from './features/promote/PromotePage'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import TermsOfService from './pages/legal/TermsOfService'
 import CookiePolicy from './pages/legal/CookiePolicy'
@@ -41,6 +42,7 @@ function App() {
             flow instead of a silent auto-login). */}
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/loadingscreen" element={<LoadingScreen />} />
+        <Route path="/promote" element={<PromotePage />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookiePolicy />} />
