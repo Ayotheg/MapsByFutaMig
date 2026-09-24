@@ -1,9 +1,11 @@
-import { MoveUpRight } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import WhatsAppIcon from '../../lib/WhatsAppIcon';
+import { WHATSAPP_CHANNEL_URL } from '../../lib/whatsappChannel';
 import { track } from '../../lib/analytics';
 import styles from './ExploreChannelLink.module.css';
 
 /**
- * Feature submission link shown on the Explore tab.
+ * Link to the Maps By FUTA WhatsApp channel, shown on the Explore tab.
  *
  * Deliberately NOT an Explore card: the list it sits beside also carries
  * promoted "Featured Partner" picks and (on desktop) a "Showing N verified
@@ -20,31 +22,38 @@ import styles from './ExploreChannelLink.module.css';
  *    the scrolling list and the panel footer.
  *
  * `source` tags the click event so placements can be compared in the
- * Insights tab.
+ * Insights tab (`whatsapp_channel_click`, props.source).
  */
 export default function ExploreChannelLink({ variant = 'text', source }) {
+  const handleClick = () => track('whatsapp_channel_click', { source });
   const linkProps = {
-    href: '#',
+    href: WHATSAPP_CHANNEL_URL,
     target: '_blank',
     rel: 'noopener noreferrer',
-    onClick: () => track('whatsapp_channel_click', { source }),
+    onClick: handleClick,
   };
 
   if (variant === 'row') {
     return (
       <a className={styles.row} {...linkProps}>
-        <span>Want to be featured?</span>{' '}
-        <strong>Start here.</strong>
-        <MoveUpRight size={14} className={styles.rowArrow} aria-hidden="true" />
+        <WhatsAppIcon size={14} className={styles.rowIcon} />
+        <span className={styles.rowText}>
+          <span className={styles.rowTitle}>New places &amp; feature updates</span>
+          <strong className={styles.rowCta}>Join our WhatsApp channel</strong>
+        </span>
+        <ArrowUpRight size={12} className={styles.rowArrow} aria-hidden="true" />
       </a>
     );
   }
 
   return (
     <a className={styles.text} {...linkProps}>
-      Want to be featured? <strong>Start here.</strong>
-      <MoveUpRight size={13} className={styles.arrow} aria-hidden="true" />
+      New places &amp; feature updates on{' '}
+      <span className={styles.textLink}>
+        <WhatsAppIcon size={12} className={styles.icon} />
+        WhatsApp
+        <ArrowUpRight size={11} className={styles.arrow} aria-hidden="true" />
+      </span>
     </a>
   );
 }
-
