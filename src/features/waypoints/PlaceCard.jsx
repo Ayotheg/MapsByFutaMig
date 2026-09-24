@@ -3,6 +3,7 @@ import { Star, X, Navigation, Maximize2 } from 'lucide-react';
 import styles from './PlaceCard.module.css';
 import { isRateablePOI } from './wpTypeMeta';
 import PhotoLightbox from './PhotoLightbox';
+import { getTypeIcon } from '../../lib/typeIcons';
 
 // ── Rating badge ─────────────────────────────────────────────────────────
 // Ported from legacy `_ratingBadgeHtml` (app.js ~2450–2456), now that
@@ -66,6 +67,10 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
   const [viewerOpen, setViewerOpen] = useState(false);
   // Bumped whenever a (new) waypoint opens so the tap-hint animation replays.
   const [hintRun, setHintRun] = useState(0);
+  // Photo URLs that failed to load (Supabase unreachable, file gone…).
+  // Shared by the hero and the thumbnail strip so a dead photo shows the
+  // place's type icon in both, instead of a broken-image box.
+  const [failedUrls, setFailedUrls] = useState({});
   const dragging = useRef(false);
   const dragStartY = useRef(0);
 
@@ -74,11 +79,16 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
     setDragY(0);
     setViewerOpen(false);
     setHintRun((n) => n + 1);
+    setFailedUrls({});
   }, [data]);
 
   const isOpen = Boolean(data);
   const photos = data?.imageUrls || [];
   const hasPhotos = photos.length > 0;
+  const heroUrl = photos[photoIdx];
+  const heroFailed = Boolean(failedUrls[heroUrl]);
+  const TypeIcon = getTypeIcon(data?.type);
+  const markFailed = (url) => setFailedUrls((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
 
   function handleTouchStart(e) {
     dragging.current = true;
@@ -135,25 +145,41 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
 
         {hasPhotos && (
           <div className={styles.hero}>
-            <img
-              src={photos[photoIdx]}
-              alt=""
-            />
+            {/* The type icon is always underneath: it shows while the
+                (full-size) photo downloads and stays if the photo can't
+                be fetched. The <img> paints over it once bytes arrive. */}
+            <div className={styles.heroFallback} aria-hidden="true">
+              <TypeIcon size={44} strokeWidth={1.75} />
+            </div>
+            {!heroFailed && (
+              <img
+                src={heroUrl}
+                alt=""
+                decoding="async"
+                onError={() => markFailed(heroUrl)}
+              />
+            )}
             <div className={styles.heroOverlay} />
             {/* Whole hero is the tap target; controls below sit above it
-                (z-index 2) so close / prev / next still work. */}
-            <button
-              type="button"
-              className={styles.heroTap}
-              aria-label="View photo full screen"
-              onClick={() => setViewerOpen(true)}
-            />
-            <div className={styles.tapHint} key={hintRun} aria-hidden="true">
-              <span className={styles.tapHintIcon}>
-                <Maximize2 size={12} strokeWidth={2.5} />
-              </span>
-              <span className={styles.tapHintText}>Tap to view full photo</span>
-            </div>
+                (z-index 2) so close / prev / next still work. Not offered
+                when the photo failed — the viewer would have nothing to
+                show. */}
+            {!heroFailed && (
+              <>
+                <button
+                  type="button"
+                  className={styles.heroTap}
+                  aria-label="View photo full screen"
+                  onClick={() => setViewerOpen(true)}
+                />
+                <div className={styles.tapHint} key={hintRun} aria-hidden="true">
+                  <span className={styles.tapHintIcon}>
+                    <Maximize2 size={12} strokeWidth={2.5} />
+                  </span>
+                  <span className={styles.tapHintText}>Tap to view full photo</span>
+                </div>
+              </>
+            )}
             <button className={styles.closeOnHero} aria-label="Close" onClick={onClose}>
               <X size={14} strokeWidth={2.5} />
             </button>
@@ -216,15 +242,30 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
         {hasPhotos && photos.length > 1 && (
           <div className={styles.strip}>
             <div className={styles.stripInner}>
-              {photos.map((url, i) => (
-                <img
-                  key={url + i}
-                  src={url}
-                  alt={`Photo ${i + 1}`}
-                  className={i === photoIdx ? styles.active : ''}
-                  onClick={() => setPhotoIdx(i)}
-                />
-              ))}
+              {photos.map((url, i) =>
+                failedUrls[url] ? (
+                  <span
+                    key={url + i}
+                    className={`${styles.stripFallback} ${i === photoIdx ? styles.active : ''}`}
+                    role="button"
+                    aria-label={`Photo ${i + 1} (unavailable)`}
+                    onClick={() => setPhotoIdx(i)}
+                  >
+                    <TypeIcon size={20} />
+                  </span>
+                ) : (
+                  <img
+                    key={url + i}
+                    src={url}
+                    alt={`Photo ${i + 1}`}
+                    className={i === photoIdx ? styles.active : ''}
+                    loading="lazy"
+                    decoding="async"
+                    onClick={() => setPhotoIdx(i)}
+                    onError={() => markFailed(url)}
+                  />
+                )
+              )}
             </div>
           </div>
         )}

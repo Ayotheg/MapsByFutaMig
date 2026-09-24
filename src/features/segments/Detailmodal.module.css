@@ -84,3 +84,14 @@
 .images img:hover {
   border-color: var(--primary-container);
 }
+.imageFallback {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-md);
+  border: 1px solid var(--outline-dim);
+  background: var(--v2-thumb-bg, transparent);
+  color: var(--v2-primary, var(--muted));
+}

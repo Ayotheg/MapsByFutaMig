@@ -50,11 +50,19 @@
   position: relative;
   overflow: hidden;
 }
-.thumb img {
+/* Photo sits on top of .thumbPh (the type icon) and fades in once loaded. */
+.thumbImg {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.thumbImgLoaded {
+  opacity: 1;
 }
 .thumbPh {
   width: 100%;

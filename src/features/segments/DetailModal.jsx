@@ -1,6 +1,11 @@
 import { MapPin } from 'lucide-react';
 import Modal from '../../components/ui/Modal';
+import PlaceImage from '../../components/ui/PlaceImage';
+import { getTypeIcon } from '../../lib/typeIcons';
 import styles from './Detailmodal.module.css';
+
+// Route photos that can't be fetched fall back to the route icon.
+const RouteIcon = getTypeIcon('segment');
 
 /**
  * Ported from legacy `openDetailModal` (app.js ~2797–2852) + `#detailModal`
@@ -85,11 +90,16 @@ export default function DetailModal({ segment, onClose }) {
           <div className={styles.sectionLabel}>Photos</div>
           <div className={styles.images}>
             {imageUrls.map((url) => (
-              <img
+              <PlaceImage
                 key={url}
                 src={url}
                 alt=""
                 onClick={() => window.open(url, '_blank')}
+                fallback={
+                  <span className={styles.imageFallback}>
+                    <RouteIcon size={22} />
+                  </span>
+                }
               />
             ))}
           </div>

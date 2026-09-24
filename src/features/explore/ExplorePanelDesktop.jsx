@@ -7,6 +7,7 @@ import { haversine } from '../../lib/geoUtils';
 import { channelPlatformMeta } from '../../lib/channelMeta';
 import { track } from '../../lib/analytics';
 import ExploreChannelLink from './ExploreChannelLink';
+import AvatarBox from './AvatarBox';
 import styles from './ExplorePanelDesktop.module.css';
 
 // Rough campus walking pace — same constant ExploreCard.jsx (the mobile
@@ -262,14 +263,13 @@ function ExploreCardDesktop({ pick, onSelect }) {
     <article className={styles.card}>
       <div className={styles.cardTop}>
         <div className={styles.cardIdentity}>
-          <div className={styles.avatar} style={!image ? { background: color } : undefined}>
-            {image ? <img src={image} alt="" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
+          <AvatarBox className={styles.avatar} image={image} Icon={Icon} iconSize={15} color={color}>
             {isVerified && (
               <span className={styles.verifiedBadge} title="Verified campus spot">
                 <BadgeCheck size={10} />
               </span>
             )}
-          </div>
+          </AvatarBox>
           <div className={styles.cardIdentityText}>
             <div className={styles.cardName}>{pick.name}</div>
             <div className={styles.cardMetaRow}>
@@ -348,9 +348,7 @@ function ChannelCardDesktop({ pick }) {
     <article className={styles.card}>
       <div className={styles.cardTop}>
         <div className={styles.cardIdentity}>
-          <div className={styles.avatar} style={!image ? { background: platform.color } : undefined}>
-            {image ? <img src={image} alt="" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
-          </div>
+          <AvatarBox className={styles.avatar} image={image} Icon={Icon} iconSize={15} color={platform.color} />
           <div className={styles.cardIdentityText}>
             <div className={styles.cardName}>{pick.name}</div>
             <div className={styles.cardMetaRow}>

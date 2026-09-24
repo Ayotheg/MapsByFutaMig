@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { ImageOff } from 'lucide-react';
+import PlaceImage from '../../components/ui/PlaceImage';
 import styles from './AdminPanel.module.css';
 import ownStyles from './PendingTab.module.css';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
@@ -176,7 +178,18 @@ export default function PendingTab({ onRefreshWaypoints, onCountChange }) {
             {wp.imageUrls.length > 0 && (
               <div className={ownStyles.photoStrip}>
                 {wp.imageUrls.map((url) => (
-                  <img key={url} src={url} alt="" className={ownStyles.photoThumb} onClick={() => window.open(url, '_blank')} />
+                  <PlaceImage
+                    key={url}
+                    src={url}
+                    alt=""
+                    className={ownStyles.photoThumb}
+                    onClick={() => window.open(url, '_blank')}
+                    fallback={
+                      <span className={ownStyles.photoThumbFallback} title="Photo unavailable">
+                        <ImageOff size={18} />
+                      </span>
+                    }
+                  />
                 ))}
               </div>
             )}

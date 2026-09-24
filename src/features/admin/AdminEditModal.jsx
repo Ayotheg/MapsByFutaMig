@@ -14,11 +14,13 @@ import {
   Trash2,
   Check,
   ImagePlus,
+  ImageOff,
   User,
   Rss,
   Link as LinkIcon,
 } from 'lucide-react';
 import styles from './AdminEditModal.module.css';
+import PlaceImage from '../../components/ui/PlaceImage';
 import { WP_ALL_TYPES } from './adminTypeOptions';
 import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { getPlaceImageUrl } from '../../lib/supabase';
@@ -846,13 +848,18 @@ function Thumb({ url, onRemove, variant, cover }) {
   if (variant === 'grid') {
     return (
       <div className={styles.wpThumbGridItem}>
-        <img
+        <PlaceImage
           src={url}
           onClick={(e) => {
             e.stopPropagation();
             window.open(url, '_blank');
           }}
           alt=""
+          fallback={
+            <span className={styles.thumbFallbackGrid} title="Photo unavailable">
+              <ImageOff size={24} />
+            </span>
+          }
         />
         {cover && <span className={styles.wpThumbCoverTag}>Cover</span>}
         <button
@@ -872,7 +879,7 @@ function Thumb({ url, onRemove, variant, cover }) {
 
   return (
     <div className={styles.imgThumbWrap}>
-      <img
+      <PlaceImage
         className={styles.imgThumb}
         src={url}
         onClick={(e) => {
@@ -880,6 +887,11 @@ function Thumb({ url, onRemove, variant, cover }) {
           window.open(url, '_blank');
         }}
         alt=""
+        fallback={
+          <span className={styles.thumbFallbackSmall} title="Photo unavailable">
+            <ImageOff size={20} />
+          </span>
+        }
       />
       <button
         type="button"

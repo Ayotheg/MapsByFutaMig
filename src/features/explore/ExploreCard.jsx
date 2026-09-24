@@ -4,6 +4,7 @@ import { dotColor } from '../search/chipConfig';
 import { haversine } from '../../lib/geoUtils';
 import { channelPlatformMeta } from '../../lib/channelMeta';
 import { track } from '../../lib/analytics';
+import AvatarBox from './AvatarBox';
 import styles from './ExplorePanel.module.css';
 
 // Rough campus walking pace for the card's "X mins away" label — a
@@ -45,9 +46,7 @@ export default function ExploreCard({ pick, userCoords, onSelect }) {
       // which only exists for this panel's own display needs.
       onClick={() => onSelect?.(pick.waypoint)}
     >
-      <div className={styles.avatar} style={!image ? { background: color } : undefined}>
-        {image ? <img src={image} alt="" /> : <Icon size={18} color="#fff" strokeWidth={2} />}
-      </div>
+      <AvatarBox className={styles.avatar} image={image} Icon={Icon} iconSize={18} color={color} />
       <div className={styles.cardBody}>
         <div className={styles.cardName}>{pick.name}</div>
         <div className={styles.cardMeta}>{metaLabel}</div>
@@ -77,9 +76,7 @@ function ChannelExploreCard({ pick }) {
       rel="noopener noreferrer"
       onClick={() => track('explore_channel_click', { source: 'explore_card', platform: pick.channelPlatform })}
     >
-      <div className={styles.avatar} style={!image ? { background: platform.color } : undefined}>
-        {image ? <img src={image} alt="" /> : <Icon size={18} color="#fff" strokeWidth={2} />}
-      </div>
+      <AvatarBox className={styles.avatar} image={image} Icon={Icon} iconSize={18} color={platform.color} />
       <div className={styles.cardBody}>
         <div className={styles.cardName}>{pick.name}</div>
         <div className={styles.cardJoin}>Join the Channel</div>

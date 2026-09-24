@@ -116,3 +116,14 @@
   opacity: 0.6;
   cursor: default;
 }
+.photoThumbFallback {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  color: #94a3b8;
+}

@@ -1,6 +1,7 @@
 import { Navigation, Images } from 'lucide-react';
 import { dotColor, fmtDist } from './chipConfig';
 import { getTypeIcon } from '../../lib/typeIcons';
+import { useImageStatus } from '../../lib/useImageStatus';
 import styles from './ChipResultRow.module.css';
 
 /**
@@ -26,16 +27,29 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
   };
 
   const ThumbIcon = getTypeIcon(result.type, fallbackIconKey);
+  const firstImage = result.imageUrls && result.imageUrls[0];
+  const img = useImageStatus(firstImage);
 
   return (
     <div className={styles.row} style={style} onClick={handleRowClick}>
       <div className={styles.thumb}>
-        {result.imageUrls && result.imageUrls.length > 0 ? (
-          <img src={result.imageUrls[0]} alt={result.name} />
-        ) : (
-          <div className={styles.thumbPh}>
-            <ThumbIcon size={22} />
-          </div>
+        {/* The type icon is always underneath: it's what shows while the
+            (full-size) photo downloads, and what stays if it never loads.
+            The photo fades in on top once it has actually arrived, and is
+            lazy so a long list only fetches the rows near the viewport. */}
+        <div className={styles.thumbPh}>
+          <ThumbIcon size={22} />
+        </div>
+        {firstImage && !img.failed && (
+          <img
+            className={`${styles.thumbImg} ${img.loaded ? styles.thumbImgLoaded : ''}`}
+            src={firstImage}
+            alt={result.name}
+            loading="lazy"
+            decoding="async"
+            onLoad={img.onLoad}
+            onError={img.onError}
+          />
         )}
       </div>
 
