@@ -81,6 +81,8 @@ export const BASEMAP_STYLES = [
 
 export const DEFAULT_BASEMAP_ID = 'light';
 
+export const SELECTABLE_BASEMAP_STYLES = BASEMAP_STYLES;
+
 export function getBasemapStyle(id) {
   return BASEMAP_STYLES.find((style) => style.id === id) || BASEMAP_STYLES[0];
 }
