@@ -199,13 +199,16 @@ export default function PromotePage() {
           >
             <ArrowLeft size={16} strokeWidth={2.25} />
           </button>
+
+          <div className={styles.headerTitleWrap}>
+            <h1 className={styles.headerTitle}>PROMOTE YOUR BUSINESS</h1>
+          </div>
         </div>
       </header>
 
       <main className={styles.main}>
         <div className={styles.container}>
           <div className={styles.titleBlock}>
-            <h1 className={styles.title}>Promote Your Business</h1>
             <p className={styles.subtitle}>
               Reach thousands of FUTA students and campus explorers daily.
             </p>
@@ -254,7 +257,7 @@ export default function PromotePage() {
                   role="tab"
                   aria-selected={listingType === "physical"}
                   className={`${styles.typeBtn} ${listingType === "physical" ? styles.typeBtnActive : ""}`}
-                  onClick={() => setListingType("physical")}
+                  onClick={() => setListingType((current) => (current === "physical" ? null : "physical"))}
                 >
                   Physical Shop
                 </button>
@@ -263,7 +266,7 @@ export default function PromotePage() {
                   role="tab"
                   aria-selected={listingType === "online"}
                   className={`${styles.typeBtn} ${listingType === "online" ? styles.typeBtnActive : ""}`}
-                  onClick={() => setListingType("online")}
+                  onClick={() => setListingType((current) => (current === "online" ? null : "online"))}
                 >
                   Online Store
                 </button>
