@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
   AtSign,
   Camera,
+  CheckCircle2,
   Info,
   Link2,
   Map,
@@ -20,16 +21,31 @@ import styles from "./PromotePage.module.css";
 
 // ── Promote Your Business ───────────────────────────────────────────────
 //
-// Build-only pass from Figma (MAPSBYFUTA file, node 127:2, "PROMOTE") —
-// visual structure + light in-page interaction (type toggle, duration
-// slider, photo preview chips, location-mode highlight) only. Nothing
-// here talks to Supabase yet: no submission, no GPS read, no map-picker,
-// no photo upload, no checkout. That's the next pass, once this screen
-// is signed off.
+// Build pass from Figma (MAPSBYFUTA file, node 127:2, "PROMOTE"), now with
+// the Location section wired for real: GPS read + cross-route map-pick.
+// Everything else is still visual-only — no submission, no photo upload,
+// no checkout. That's the next pass, once this screen is signed off.
 //
 // Route: /promote. Standalone full page (not a modal/sheet like
 // SuggestWaypointModal), so it gets its own sticky header with a back
 // button instead of a shell-provided close affordance.
+//
+// Location wiring mirrors SuggestWaypointModal.jsx's own GPS/pick-on-map
+// pair, adapted for the fact that this page — unlike Suggest, which is a
+// modal already floating on top of the live map — has no map instance of
+// its own to hide anything on top of:
+//   - "Use Current GPS" is the exact same one-shot
+//     `navigator.geolocation.getCurrentPosition` call Suggest uses (not
+//     `useGpsTracking.js`'s continuous tracker — that's bound to the
+//     Leaflet map ref, not a reusable single-shot getter).
+//   - "Pick on Map" can't reuse Suggest's `onRequestMapPick` prop (that
+//     assumes a parent, MapPage.jsx, already has a `map` instance and a
+//     modal to hide in place). Instead this navigates to `/map` with
+//     `state: { pickCoordFor: '/promote' }`; MapPage.jsx recognizes that,
+//     waits for one map click, and navigates back here with
+//     `state: { pickedCoord }` — same "coordinates already exist ⇒ show
+//     the banner" endpoint Suggest's `pickedCoord`/`onCoordConsumed` pair
+//     reaches, just via a route round-trip instead of a prop.
 
 const MIN_DAYS = 1;
 const MAX_DAYS = 30;
@@ -93,6 +109,7 @@ export default function PromotePage() {
   });
 
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef(null);
 
   const [businessName, setBusinessName] = useState("");
@@ -100,11 +117,28 @@ export default function PromotePage() {
   // Neither pill is pre-selected — the Location / Contact sections below
   // only drop down once the person actually picks a type.
   const [listingType, setListingType] = useState(null); // null | 'physical' | 'online'
-  const [locationMode, setLocationMode] = useState(null); // 'gps' | 'map' | null
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
+  const [locStatus, setLocStatus] = useState(null); // { text, error } | null
   const [photos, setPhotos] = useState([]); // { id, file, previewUrl }[]
   const [days, setDays] = useState(DEFAULT_DAYS);
   const [contactPlatform, setContactPlatform] = useState("whatsapp");
   const [contactValue, setContactValue] = useState("");
+
+  // MapPage.jsx hands a picked coord back via router state once its own
+  // "Pick on Map" round-trip resolves — consumed once, then the nav
+  // state is cleared (replace, empty state) so a refresh or back-nav
+  // doesn't re-apply a stale pick. Same "consume it, then null it out"
+  // contract as Suggest's pickedCoord/onCoordConsumed prop pair.
+  useEffect(() => {
+    const picked = location.state?.pickedCoord;
+    if (!picked) return;
+    setLat(picked.lat.toFixed(6));
+    setLng(picked.lng.toFixed(6));
+    setLocStatus(null);
+    navigate(location.pathname, { replace: true, state: {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const activePlatform = useMemo(
     () => CONTACT_PLATFORMS.find((p) => p.id === contactPlatform) ?? CONTACT_PLATFORMS[0],
@@ -116,6 +150,29 @@ export default function PromotePage() {
     () => ((days - MIN_DAYS) / (MAX_DAYS - MIN_DAYS)) * 100,
     [days],
   );
+
+  function handleUseGps() {
+    if (!navigator.geolocation) {
+      setLocStatus({ text: "GPS is not available on this device.", error: true });
+      return;
+    }
+    setLocStatus({ text: "Getting your location…", error: false });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLat(pos.coords.latitude.toFixed(6));
+        setLng(pos.coords.longitude.toFixed(6));
+        setLocStatus(null);
+      },
+      (err) => {
+        setLocStatus({ text: `Couldn't get your location: ${err.message}`, error: true });
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }
+
+  function handlePickOnMap() {
+    navigate("/map", { state: { pickCoordFor: "/promote" } });
+  }
 
   function handleFilesSelected(e) {
     const incoming = Array.from(e.target.files || []);
@@ -245,21 +302,36 @@ export default function PromotePage() {
                 <div className={styles.locationRow}>
                   <button
                     type="button"
-                    className={`${styles.locBtn} ${locationMode === "gps" ? styles.locBtnActive : ""}`}
-                    onClick={() => setLocationMode("gps")}
+                    className={styles.locBtn}
+                    onClick={handleUseGps}
                   >
                     <Navigation size={18} strokeWidth={2} />
                     <span>Use Current GPS</span>
                   </button>
                   <button
                     type="button"
-                    className={`${styles.locBtn} ${locationMode === "map" ? styles.locBtnActive : ""}`}
-                    onClick={() => setLocationMode("map")}
+                    className={styles.locBtn}
+                    onClick={handlePickOnMap}
                   >
                     <Map size={18} strokeWidth={2} />
                     <span>Pick on Map</span>
                   </button>
                 </div>
+
+                {lat !== "" && lng !== "" && (
+                  <div className={styles.coordBanner}>
+                    <CheckCircle2 size={16} strokeWidth={2} />
+                    <span>
+                      Coordinates selected ({Number(lat).toFixed(5)}, {Number(lng).toFixed(5)})
+                    </span>
+                  </div>
+                )}
+
+                {locStatus && (
+                  <div className={`${styles.locStatus} ${locStatus.error ? styles.locStatusError : ""}`}>
+                    {locStatus.text}
+                  </div>
+                )}
               </div>
             )}
 

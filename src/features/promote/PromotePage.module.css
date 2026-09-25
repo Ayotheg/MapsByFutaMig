@@ -315,10 +315,41 @@
 .locBtn:active {
   transform: scale(0.98);
 }
-.locBtnActive {
-  border-color: var(--v2-primary);
-  background: var(--v2-primary-glow);
-  box-shadow: 0 0 0 3px var(--v2-primary-glow);
+
+.coordBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-md);
+  padding: 9px 12px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--v2-text);
+  animation: sectionReveal var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.coordBanner svg {
+  flex-shrink: 0;
+  color: var(--v2-chip-active-border);
+}
+@media (prefers-reduced-motion: reduce) {
+  .coordBanner {
+    animation: none;
+  }
+}
+
+.locStatus {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  background: var(--v2-hud-upnext-bg);
+  color: var(--v2-text-variant);
+}
+.locStatusError {
+  background: var(--v2-error-container);
+  color: var(--v2-error-text);
 }
 
 /* ── Online Store: platform + contact field ──────────────────────── */

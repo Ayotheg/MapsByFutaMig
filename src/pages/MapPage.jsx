@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import MapShell from '../features/map/MapShell';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
@@ -37,6 +38,7 @@ import AuthModal from '../features/auth/AuthModal';
 import AdminPinGate from '../features/auth/AdminPinGate';
 import AdminPanel from '../features/admin/AdminPanel';
 import SuggestWaypointModal from '../features/waypoint-submissions/SuggestWaypointModal';
+import MapPickBanner from '../features/map/MapPickBanner';
 import MyWaypointSubmissionsPanel from '../features/waypoint-submissions/MyWaypointSubmissionsPanel';
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
@@ -81,6 +83,8 @@ export default function MapPage({ onReadinessChange }) {
     robots: 'noindex, follow',
   });
 
+  const location = useLocation();
+  const navigate = useNavigate();
   const [map, setMap] = useState(null);
   const [selected, setSelected] = useState(() => readPersistentState('selected-place', null));
   const [isMobile] = useState(() => window.innerWidth <= 768);
@@ -381,6 +385,53 @@ export default function MapPage({ onReadinessChange }) {
     [map]
   );
 
+  // ── Cross-route map pick (e.g. PromotePage's "Pick on Map") ───────────
+  // A different shape from `handleRequestMapPick` below: that flow hides
+  // a modal that's already open on this same page and waits for a click.
+  // This one arrives via navigation — PromotePage sends the person here
+  // with `state: { pickCoordFor: '/promote' }` since it has no map of
+  // its own to hide anything on top of — waits for one click once the
+  // map is actually ready, then navigates back with the picked coord in
+  // `state.pickedCoord`, mirroring PromotePage's own
+  // `pickedCoord`/consume-on-mount half of the contract.
+  const [externalPick, setExternalPick] = useState(null); // { returnTo } | null
+  const externalPickHandlerRef = useRef(null);
+
+  useEffect(() => {
+    const returnTo = location.state?.pickCoordFor;
+    if (!returnTo || !map) return;
+    closeOtherOverlays('mapPick');
+    setExternalPick({ returnTo });
+    // Consume the nav state immediately so a back-navigation or refresh
+    // doesn't re-trigger picking mode.
+    navigate(location.pathname, { replace: true, state: {} });
+    const handler = (e) => {
+      externalPickHandlerRef.current = null;
+      setExternalPick(null);
+      navigate(returnTo, { replace: true, state: { pickedCoord: { lat: e.latlng.lat, lng: e.latlng.lng } } });
+    };
+    externalPickHandlerRef.current = handler;
+    map.once('click', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+
+  useEffect(
+    () => () => {
+      if (externalPickHandlerRef.current) map?.off('click', externalPickHandlerRef.current);
+    },
+    [map]
+  );
+
+  function cancelExternalPick() {
+    if (externalPickHandlerRef.current) {
+      map?.off('click', externalPickHandlerRef.current);
+      externalPickHandlerRef.current = null;
+    }
+    const returnTo = externalPick?.returnTo;
+    setExternalPick(null);
+    if (returnTo) navigate(returnTo, { replace: true });
+  }
+
   // Bug fix (reported directly): "I can open three different things at
   // once and they won't give room for each other, the whole screen now
   // looks clustered." Every surface below (`selected`'s `PlaceCard`,
@@ -517,6 +568,7 @@ export default function MapPage({ onReadinessChange }) {
         cachedAt={cachedAt}
         onRetry={handleRetryData}
       />
+      {externalPick && <MapPickBanner onCancel={cancelExternalPick} />}
       {map && (
         <WaypointLayer
           map={map}
