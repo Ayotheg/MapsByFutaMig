@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,21 +8,22 @@ import {
   CheckCircle2,
   Info,
   Link2,
-  Map,
   MapPin,
   MessageCircle,
   Navigation,
+  Search,
   Send,
   ShieldCheck,
   X,
 } from "lucide-react";
 import { useSeo } from "../../lib/useSeo";
+import WaypointSearchPanel from "./WaypointSearchPanel";
 import styles from "./PromotePage.module.css";
 
 // ── Promote Your Business ───────────────────────────────────────────────
 //
 // Build pass from Figma (MAPSBYFUTA file, node 127:2, "PROMOTE"), now with
-// the Location section wired for real: GPS read + cross-route map-pick.
+// the Location section wired for real: GPS read + waypoint search-pick.
 // Everything else is still visual-only — no submission, no photo upload,
 // no checkout. That's the next pass, once this screen is signed off.
 //
@@ -30,22 +31,18 @@ import styles from "./PromotePage.module.css";
 // SuggestWaypointModal), so it gets its own sticky header with a back
 // button instead of a shell-provided close affordance.
 //
-// Location wiring mirrors SuggestWaypointModal.jsx's own GPS/pick-on-map
-// pair, adapted for the fact that this page — unlike Suggest, which is a
-// modal already floating on top of the live map — has no map instance of
-// its own to hide anything on top of:
 //   - "Use Current GPS" is the exact same one-shot
 //     `navigator.geolocation.getCurrentPosition` call Suggest uses (not
 //     `useGpsTracking.js`'s continuous tracker — that's bound to the
 //     Leaflet map ref, not a reusable single-shot getter).
-//   - "Pick on Map" can't reuse Suggest's `onRequestMapPick` prop (that
-//     assumes a parent, MapPage.jsx, already has a `map` instance and a
-//     modal to hide in place). Instead this navigates to `/map` with
-//     `state: { pickCoordFor: '/promote' }`; MapPage.jsx recognizes that,
-//     waits for one map click, and navigates back here with
-//     `state: { pickedCoord }` — same "coordinates already exist ⇒ show
-//     the banner" endpoint Suggest's `pickedCoord`/`onCoordConsumed` pair
-//     reaches, just via a route round-trip instead of a prop.
+//   - "Search on Map" opens `WaypointSearchPanel` (same file's folder),
+//     which searches the existing `useWaypoints()` database in-place and
+//     lets the person pick one of their own already-pinned waypoints —
+//     no map instance needed here at all. This replaced an earlier
+//     cross-route "Pick on Map" (navigate to `/map`, wait for a click,
+//     navigate back — see MapPage.jsx history/git blame for the removed
+//     `externalPick` plumbing) now that promoting a listing is expected
+//     to almost always be for a place that's already on the map.
 
 const MIN_DAYS = 1;
 const MAX_DAYS = 30;
@@ -109,7 +106,6 @@ export default function PromotePage() {
   });
 
   const navigate = useNavigate();
-  const location = useLocation();
   const fileInputRef = useRef(null);
 
   const [businessName, setBusinessName] = useState("");
@@ -120,25 +116,11 @@ export default function PromotePage() {
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [locStatus, setLocStatus] = useState(null); // { text, error } | null
+  const [mapSearchOpen, setMapSearchOpen] = useState(false);
   const [photos, setPhotos] = useState([]); // { id, file, previewUrl }[]
   const [days, setDays] = useState(DEFAULT_DAYS);
   const [contactPlatform, setContactPlatform] = useState("whatsapp");
   const [contactValue, setContactValue] = useState("");
-
-  // MapPage.jsx hands a picked coord back via router state once its own
-  // "Pick on Map" round-trip resolves — consumed once, then the nav
-  // state is cleared (replace, empty state) so a refresh or back-nav
-  // doesn't re-apply a stale pick. Same "consume it, then null it out"
-  // contract as Suggest's pickedCoord/onCoordConsumed prop pair.
-  useEffect(() => {
-    const picked = location.state?.pickedCoord;
-    if (!picked) return;
-    setLat(picked.lat.toFixed(6));
-    setLng(picked.lng.toFixed(6));
-    setLocStatus(null);
-    navigate(location.pathname, { replace: true, state: {} });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state]);
 
   const activePlatform = useMemo(
     () => CONTACT_PLATFORMS.find((p) => p.id === contactPlatform) ?? CONTACT_PLATFORMS[0],
@@ -170,8 +152,14 @@ export default function PromotePage() {
     );
   }
 
-  function handlePickOnMap() {
-    navigate("/map", { state: { pickCoordFor: "/promote" } });
+  // Selecting a result in WaypointSearchPanel — same "coordinates already
+  // exist ⇒ show the banner" endpoint the old cross-route pick reached,
+  // just fed directly instead of via router state.
+  function handleWaypointPicked(entry) {
+    setLat(entry.lat.toFixed(6));
+    setLng(entry.lng.toFixed(6));
+    setLocStatus(null);
+    setMapSearchOpen(false);
   }
 
   function handleFilesSelected(e) {
@@ -311,12 +299,20 @@ export default function PromotePage() {
                   <button
                     type="button"
                     className={styles.locBtn}
-                    onClick={handlePickOnMap}
+                    onClick={() => setMapSearchOpen((v) => !v)}
+                    aria-expanded={mapSearchOpen}
                   >
-                    <Map size={18} strokeWidth={2} />
-                    <span>Pick on Map</span>
+                    <Search size={18} strokeWidth={2} />
+                    <span>Search on Map</span>
                   </button>
                 </div>
+
+                {mapSearchOpen && (
+                  <WaypointSearchPanel
+                    onSelect={handleWaypointPicked}
+                    onClose={() => setMapSearchOpen(false)}
+                  />
+                )}
 
                 {lat !== "" && lng !== "" && (
                   <div className={styles.coordBanner}>

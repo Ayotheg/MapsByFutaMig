@@ -1,0 +1,124 @@
+/* WaypointSearchPanel — "Search on Map" result panel, Promote page's
+   Location section. Same token/card language as PromotePage.module.css
+   (not merged into it, so this stays a self-contained, reusable panel). */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid rgba(204, 195, 216, 0.4);
+  border-radius: var(--r-xl);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+  padding: 12px;
+  animation: panelReveal var(--v2-duration-standard) var(--v2-ease-standard);
+}
+@keyframes panelReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid rgba(204, 195, 216, 0.3);
+  border-radius: var(--r-lg);
+  padding: 10px 12px;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
+    box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.searchRow:focus-within {
+  border-color: var(--v2-primary);
+  box-shadow: 0 0 0 3px var(--v2-primary-glow);
+}
+.searchIcon {
+  flex-shrink: 0;
+  color: var(--v2-text-variant);
+}
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--v2-neutral);
+}
+.searchInput::placeholder {
+  color: rgba(123, 116, 135, 0.7);
+}
+.clearBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  border: none;
+  background: rgba(204, 195, 216, 0.35);
+  color: var(--v2-text-variant);
+  cursor: pointer;
+}
+.closeBtn {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+
+.status,
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: var(--v2-text-variant);
+  padding: 6px 4px;
+}
+
+.spin {
+  animation: panelSpin 0.9s linear infinite;
+}
+@keyframes panelSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  max-height: 260px;
+  overflow-y: auto;
+  border-radius: var(--r-lg);
+  background: var(--v2-hud-upnext-bg);
+}
