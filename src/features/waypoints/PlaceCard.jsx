@@ -222,6 +222,8 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
                   src={url}
                   alt={`Photo ${i + 1}`}
                   className={i === photoIdx ? styles.active : ''}
+                  loading="lazy"
+                  decoding="async"
                   onClick={() => setPhotoIdx(i)}
                 />
               ))}

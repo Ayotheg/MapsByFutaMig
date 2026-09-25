@@ -263,7 +263,7 @@ function ExploreCardDesktop({ pick, onSelect }) {
       <div className={styles.cardTop}>
         <div className={styles.cardIdentity}>
           <div className={styles.avatar} style={!image ? { background: color } : undefined}>
-            {image ? <img src={image} alt="" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
+            {image ? <img src={image} alt="" loading="lazy" decoding="async" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
             {isVerified && (
               <span className={styles.verifiedBadge} title="Verified campus spot">
                 <BadgeCheck size={10} />
@@ -349,7 +349,7 @@ function ChannelCardDesktop({ pick }) {
       <div className={styles.cardTop}>
         <div className={styles.cardIdentity}>
           <div className={styles.avatar} style={!image ? { background: platform.color } : undefined}>
-            {image ? <img src={image} alt="" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
+           {image ? <img src={image} alt="" loading="lazy" decoding="async" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
           </div>
           <div className={styles.cardIdentityText}>
             <div className={styles.cardName}>{pick.name}</div>

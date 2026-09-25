@@ -176,7 +176,7 @@ export default function PendingTab({ onRefreshWaypoints, onCountChange }) {
             {wp.imageUrls.length > 0 && (
               <div className={ownStyles.photoStrip}>
                 {wp.imageUrls.map((url) => (
-                  <img key={url} src={url} alt="" className={ownStyles.photoThumb} onClick={() => window.open(url, '_blank')} />
+                  <img key={url} src={url} alt="" className={ownStyles.photoThumb} loading="lazy" decoding="async" onClick={() => window.open(url, '_blank')} />
                 ))}
               </div>
             )}

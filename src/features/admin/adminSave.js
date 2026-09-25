@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { track } from '../../lib/analytics';
 import { normalizeWaypointType } from '../waypoints/wpTypeMeta';
+import { compressImageFile } from '../../lib/imageCompress';
 
 // ── Admin panel — Supabase mutation helpers ─────────────────────────────
 //
@@ -89,11 +90,12 @@ export async function fetchImageRows(table, idColumn, entityId) {
 }
 
 export async function uploadImage(kind, entityId, file, position) {
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const compressed = await compressImageFile(file);
+  const ext = (compressed.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `${kind}/${entityId}/${position}-${Date.now()}.${ext}`;
   const { error } = await supabase.storage
     .from(PLACE_IMAGES_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
+    .upload(path, compressed, { contentType: compressed.type, upsert: true, cacheControl: '31536000' });
   if (error) throw error;
   return path;
 }

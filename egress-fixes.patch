@@ -1,0 +1,165 @@
+diff -ruN a/src/features/admin/PendingTab.jsx b/src/features/admin/PendingTab.jsx
+--- a/src/features/admin/PendingTab.jsx
++++ b/src/features/admin/PendingTab.jsx
+@@ -176,7 +176,7 @@
+             {wp.imageUrls.length > 0 && (
+               <div className={ownStyles.photoStrip}>
+                 {wp.imageUrls.map((url) => (
+-                  <img key={url} src={url} alt="" className={ownStyles.photoThumb} onClick={() => window.open(url, '_blank')} />
++                  <img key={url} src={url} alt="" className={ownStyles.photoThumb} loading="lazy" decoding="async" onClick={() => window.open(url, '_blank')} />
+                 ))}
+               </div>
+             )}
+diff -ruN a/src/features/admin/adminSave.js b/src/features/admin/adminSave.js
+--- a/src/features/admin/adminSave.js
++++ b/src/features/admin/adminSave.js
+@@ -1,6 +1,7 @@
+ import { supabase } from '../../lib/supabase';
+ import { track } from '../../lib/analytics';
+ import { normalizeWaypointType } from '../waypoints/wpTypeMeta';
++import { compressImageFile } from '../../lib/imageCompress';
+ 
+ // ── Admin panel — Supabase mutation helpers ─────────────────────────────
+ //
+@@ -89,11 +90,15 @@
+ }
+ 
+ export async function uploadImage(kind, entityId, file, position) {
+-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
++  const compressed = await compressImageFile(file);
++  const ext = (compressed.name.split('.').pop() || 'jpg').toLowerCase();
+   const path = `${kind}/${entityId}/${position}-${Date.now()}.${ext}`;
+   const { error } = await supabase.storage
+     .from(PLACE_IMAGES_BUCKET)
+-    .upload(path, file, { contentType: file.type, upsert: true });
++    .upload(path, compressed, { contentType: compressed.type, upsert: true, cacheControl: '31536000' });
+   if (error) throw error;
+   return path;
+ }
+diff -ruN a/src/features/explore/ExploreCard.jsx b/src/features/explore/ExploreCard.jsx
+--- a/src/features/explore/ExploreCard.jsx
++++ b/src/features/explore/ExploreCard.jsx
+@@ -46,7 +46,7 @@
+       onClick={() => onSelect?.(pick.waypoint)}
+     >
+       <div className={styles.avatar} style={!image ? { background: color } : undefined}>
+-        {image ? <img src={image} alt="" /> : <Icon size={18} color="#fff" strokeWidth={2} />}
++        {image ? <img src={image} alt="" loading="lazy" decoding="async" /> : <Icon size={18} color="#fff" strokeWidth={2} />}
+       </div>
+       <div className={styles.cardBody}>
+         <div className={styles.cardName}>{pick.name}</div>
+@@ -78,7 +78,7 @@
+       onClick={() => track('explore_channel_click', { source: 'explore_card', platform: pick.channelPlatform })}
+     >
+       <div className={styles.avatar} style={!image ? { background: platform.color } : undefined}>
+-        {image ? <img src={image} alt="" /> : <Icon size={18} color="#fff" strokeWidth={2} />}
++        {image ? <img src={image} alt="" loading="lazy" decoding="async" /> : <Icon size={18} color="#fff" strokeWidth={2} />}
+       </div>
+       <div className={styles.cardBody}>
+         <div className={styles.cardName}>{pick.name}</div>
+diff -ruN a/src/features/explore/ExplorePanelDesktop.jsx b/src/features/explore/ExplorePanelDesktop.jsx
+--- a/src/features/explore/ExplorePanelDesktop.jsx
++++ b/src/features/explore/ExplorePanelDesktop.jsx
+@@ -263,7 +263,7 @@
+       <div className={styles.cardTop}>
+         <div className={styles.cardIdentity}>
+           <div className={styles.avatar} style={!image ? { background: color } : undefined}>
+-            {image ? <img src={image} alt="" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
++            {image ? <img src={image} alt="" loading="lazy" decoding="async" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
+             {isVerified && (
+               <span className={styles.verifiedBadge} title="Verified campus spot">
+                 <BadgeCheck size={10} />
+@@ -349,7 +349,7 @@
+       <div className={styles.cardTop}>
+         <div className={styles.cardIdentity}>
+           <div className={styles.avatar} style={!image ? { background: platform.color } : undefined}>
+-            {image ? <img src={image} alt="" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
++            {image ? <img src={image} alt="" loading="lazy" decoding="async" /> : <Icon size={15} color="#fff" strokeWidth={2} />}
+           </div>
+           <div className={styles.cardIdentityText}>
+             <div className={styles.cardName}>{pick.name}</div>
+diff -ruN a/src/features/kml/segmentSave.js b/src/features/kml/segmentSave.js
+--- a/src/features/kml/segmentSave.js
++++ b/src/features/kml/segmentSave.js
+@@ -1,4 +1,5 @@
+ import { supabase } from '../../lib/supabase';
++import { compressImageFile } from '../../lib/imageCompress';
+ 
+ /**
+  * segmentSave.js — Supabase insert logic for the save flow.
+@@ -57,11 +58,15 @@
+  * resolved to a URL on read via getPlaceImageUrl).
+  */
+ async function uploadSegmentImage(segmentId, file, position) {
+-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
++  // See src/lib/imageCompress.js — resizes/re-encodes before upload so
++  // stored files (and every future download of them) stay small. This
++  // is what was blowing past the Free plan's Cached Egress quota.
++  const compressed = await compressImageFile(file);
++  const ext = (compressed.name.split('.').pop() || 'jpg').toLowerCase();
+   const path = `segments/${segmentId}/${position}.${ext}`;
+   const { error } = await supabase.storage
+     .from(PLACE_IMAGES_BUCKET)
+-    .upload(path, file, { contentType: file.type, upsert: true });
++    .upload(path, compressed, { contentType: compressed.type, upsert: true, cacheControl: '31536000' });
+   if (error) throw error;
+   return path;
+ }
+diff -ruN a/src/features/search/ChipResultRow.jsx b/src/features/search/ChipResultRow.jsx
+--- a/src/features/search/ChipResultRow.jsx
++++ b/src/features/search/ChipResultRow.jsx
+@@ -31,7 +31,7 @@
+     <div className={styles.row} style={style} onClick={handleRowClick}>
+       <div className={styles.thumb}>
+         {result.imageUrls && result.imageUrls.length > 0 ? (
+-          <img src={result.imageUrls[0]} alt={result.name} />
++          <img src={result.imageUrls[0]} alt={result.name} loading="lazy" decoding="async" />
+         ) : (
+           <div className={styles.thumbPh}>
+             <ThumbIcon size={22} />
+diff -ruN a/src/features/waypoints/PlaceCard.jsx b/src/features/waypoints/PlaceCard.jsx
+--- a/src/features/waypoints/PlaceCard.jsx
++++ b/src/features/waypoints/PlaceCard.jsx
+@@ -222,6 +222,8 @@
+                   src={url}
+                   alt={`Photo ${i + 1}`}
+                   className={i === photoIdx ? styles.active : ''}
++                  loading="lazy"
++                  decoding="async"
+                   onClick={() => setPhotoIdx(i)}
+                 />
+               ))}
+diff -ruN a/src/lib/imageCompress.js b/src/lib/imageCompress.js
+--- a/src/lib/imageCompress.js
++++ b/src/lib/imageCompress.js
+@@ -0,0 +1,43 @@
++// ── Egress fix (Oct 2026) ────────────────────────────────────────────────
++const MAX_DIMENSION = 1600;
++const JPEG_QUALITY = 0.82;
++
++export async function compressImageFile(file) {
++  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml' || file.type === 'image/gif') {
++    return file;
++  }
++
++  const bitmap = await createImageBitmap(file);
++  const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
++  const width = Math.round(bitmap.width * scale);
++  const height = Math.round(bitmap.height * scale);
++
++  const canvas = document.createElement('canvas');
++  canvas.width = width;
++  canvas.height = height;
++  const ctx = canvas.getContext('2d');
++  ctx.drawImage(bitmap, 0, 0, width, height);
++  bitmap.close?.();
++
++  const blob = await new Promise((resolve) =>
++    canvas.toBlob(resolve, 'image/jpeg', JPEG_QUALITY)
++  );
++
++  if (!blob || blob.size === 0 || blob.size >= file.size) return file;
++
++  const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
++  return new File([blob], newName, { type: 'image/jpeg' });
++}
