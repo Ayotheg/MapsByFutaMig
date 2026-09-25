@@ -3,11 +3,15 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
+  AtSign,
   Camera,
   Info,
+  Link2,
   Map,
   MapPin,
+  MessageCircle,
   Navigation,
+  Send,
   ShieldCheck,
   X,
 } from "lucide-react";
@@ -33,6 +37,51 @@ const DEFAULT_DAYS = 7;
 const NAIRA_PER_DAY = 500;
 const MAX_PHOTOS = 5;
 
+// Online Store's contact picker — these are businesses giving customers a
+// way to reach them, not a "join our channel" link. WhatsApp/Telegram/
+// Instagram each get their real-world short prefix (wa.me/, t.me/,
+// instagram.com/) so the business only has to type the number or handle;
+// "Other" stays a plain free-text field for anything else (a Facebook
+// page, a phone number, a different app). No brand glyphs for these in
+// lucide-react, so this reuses the app's existing fallback-icon approach
+// (MessageCircle for WhatsApp — same call already made for the WhatsApp
+// footer/Explore links; Send for Telegram's paper-plane mark; AtSign for
+// Instagram's @handle).
+const CONTACT_PLATFORMS = [
+  {
+    id: "whatsapp",
+    label: "WhatsApp",
+    Icon: MessageCircle,
+    prefix: "wa.me/",
+    fieldLabel: "WhatsApp Number",
+    placeholder: "2348012345678",
+  },
+  {
+    id: "telegram",
+    label: "Telegram",
+    Icon: Send,
+    prefix: "t.me/",
+    fieldLabel: "Telegram Username",
+    placeholder: "yourusername",
+  },
+  {
+    id: "instagram",
+    label: "Instagram",
+    Icon: AtSign,
+    prefix: "instagram.com/",
+    fieldLabel: "Instagram Handle",
+    placeholder: "yourhandle",
+  },
+  {
+    id: "other",
+    label: "Other",
+    Icon: Link2,
+    prefix: null,
+    fieldLabel: "Link or Phone Number",
+    placeholder: "Paste a link, or drop a phone number",
+  },
+];
+
 function formatNaira(amount) {
   return `₦${amount.toLocaleString("en-NG")}`;
 }
@@ -48,10 +97,19 @@ export default function PromotePage() {
 
   const [businessName, setBusinessName] = useState("");
   const [description, setDescription] = useState("");
-  const [listingType, setListingType] = useState("physical"); // 'physical' | 'online'
+  // Neither pill is pre-selected — the Location / Contact sections below
+  // only drop down once the person actually picks a type.
+  const [listingType, setListingType] = useState(null); // null | 'physical' | 'online'
   const [locationMode, setLocationMode] = useState(null); // 'gps' | 'map' | null
   const [photos, setPhotos] = useState([]); // { id, file, previewUrl }[]
   const [days, setDays] = useState(DEFAULT_DAYS);
+  const [contactPlatform, setContactPlatform] = useState("whatsapp");
+  const [contactValue, setContactValue] = useState("");
+
+  const activePlatform = useMemo(
+    () => CONTACT_PLATFORMS.find((p) => p.id === contactPlatform) ?? CONTACT_PLATFORMS[0],
+    [contactPlatform],
+  );
 
   const totalPrice = useMemo(() => days * NAIRA_PER_DAY, [days]);
   const sliderPct = useMemo(
@@ -167,9 +225,10 @@ export default function PromotePage() {
               </div>
             </div>
 
-            {/* Location (physical shop only) */}
+            {/* Location — Physical Shop only, hidden until that pill is
+                actually clicked (not just the default). */}
             {listingType === "physical" && (
-              <div className={styles.section}>
+              <div className={`${styles.section} ${styles.reveal}`}>
                 <div className={styles.noticeBanner}>
                   <Info size={15} strokeWidth={2} className={styles.noticeIcon} />
                   <p className={styles.noticeText}>
@@ -200,6 +259,59 @@ export default function PromotePage() {
                     <Map size={18} strokeWidth={2} />
                     <span>Pick on Map</span>
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Contact — Online Store only. Same drop-down-on-click
+                behavior as Location above. A prefixed field (wa.me/,
+                t.me/, instagram.com/) for the three named platforms, and
+                a plain free-text field for anything else. */}
+            {listingType === "online" && (
+              <div className={`${styles.section} ${styles.reveal}`}>
+                <div className={styles.rowHeadingWithHint}>
+                  <span className={styles.sectionLabel}>Platform</span>
+                  <span className={styles.hintText}>Sets the prefix &amp; icon</span>
+                </div>
+
+                <div className={styles.platformRow} role="tablist" aria-label="Contact platform">
+                  {CONTACT_PLATFORMS.map(({ id, label, Icon }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={contactPlatform === id}
+                      className={`${styles.platformBtn} ${contactPlatform === id ? styles.platformBtnActive : ""}`}
+                      onClick={() => setContactPlatform(id)}
+                    >
+                      <Icon size={15} strokeWidth={2} />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.rowHeadingWithHint}>
+                  <label htmlFor="promote-contact" className={styles.sectionLabel}>
+                    {activePlatform.fieldLabel} <span className={styles.required}>*</span>
+                  </label>
+                  <span className={styles.hintText}>How customers reach you</span>
+                </div>
+
+                <div className={styles.linkInputWrap}>
+                  {activePlatform.prefix ? (
+                    <span className={styles.linkPrefix}>{activePlatform.prefix}</span>
+                  ) : (
+                    <Link2 size={15} strokeWidth={2} className={styles.linkInputIcon} />
+                  )}
+                  <input
+                    id="promote-contact"
+                    type="text"
+                    inputMode={activePlatform.id === "whatsapp" ? "tel" : "text"}
+                    className={styles.linkInput}
+                    placeholder={activePlatform.placeholder}
+                    value={contactValue}
+                    onChange={(e) => setContactValue(e.target.value)}
+                  />
                 </div>
               </div>
             )}

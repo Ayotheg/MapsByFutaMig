@@ -130,6 +130,48 @@
   color: var(--v2-neutral);
 }
 
+/* Location / Contact sections drop down when their Type pill is
+   picked (Physical Shop / Online Store), rather than appearing already
+   open. Same easing/duration tokens as SuggestWaypointModal's
+   coordBanner reveal. */
+.reveal {
+  animation: sectionReveal var(--v2-duration-standard) var(--v2-ease-standard);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+}
+@keyframes sectionReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* A section heading paired with small right-aligned help copy — used by
+   both the Platform row and the Contact field below it. */
+.rowHeadingWithHint {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hintText {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--v2-text-variant);
+  text-align: right;
+}
+.required {
+  color: var(--v2-error-text);
+}
+
 /* ── Text fields ──────────────────────────────────────────────────── */
 .fieldCard {
   display: flex;
@@ -277,6 +319,83 @@
   border-color: var(--v2-primary);
   background: var(--v2-primary-glow);
   box-shadow: 0 0 0 3px var(--v2-primary-glow);
+}
+
+/* ── Online Store: platform + contact field ──────────────────────── */
+.platformRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.platformBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid rgba(204, 195, 216, 0.5);
+  border-radius: var(--r-full);
+  padding: 9px 16px;
+  color: var(--v2-neutral);
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    border-color var(--v2-duration-quick) var(--v2-ease-standard),
+    color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.platformBtn:hover {
+  border-color: var(--v2-primary-outline);
+  background: var(--v2-primary-glow);
+}
+.platformBtnActive,
+.platformBtnActive:hover {
+  background: var(--v2-primary);
+  border-color: var(--v2-primary);
+  color: var(--v2-on-primary);
+}
+
+.linkInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid rgba(204, 195, 216, 0.3);
+  border-radius: var(--r-xl);
+  padding: 13px 17px;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
+    box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.linkInputWrap:focus-within {
+  border-color: var(--v2-primary);
+  box-shadow: 0 0 0 3px var(--v2-primary-glow);
+}
+.linkInputIcon {
+  flex-shrink: 0;
+  color: var(--v2-text-variant);
+}
+.linkPrefix {
+  flex-shrink: 0;
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--v2-text-variant);
+  white-space: nowrap;
+}
+.linkInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--v2-neutral);
+  padding: 0;
+}
+.linkInput::placeholder {
+  color: rgba(123, 116, 135, 0.7);
 }
 
 /* ── Photos ───────────────────────────────────────────────────────── */
