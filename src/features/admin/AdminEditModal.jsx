@@ -25,7 +25,7 @@ import PlaceImage from '../../components/ui/PlaceImage';
 import { WP_ALL_TYPES } from './adminTypeOptions';
 import { resolveWaypointType } from '../waypoints/wpTypeMeta';
 import { getPlaceImageUrl } from '../../lib/supabase';
-import { CHANNEL_PLATFORMS, channelPlatformMeta } from '../../lib/channelMeta';
+import { CHANNEL_PLATFORMS, BUSINESS_PLATFORMS, channelPlatformMeta, businessPlatformMeta } from '../../lib/channelMeta';
 import {
   fetchImageRows,
   uploadImage,
@@ -509,7 +509,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                   <span className={styles.wpHint}>Sets the link prefix &amp; icon</span>
                 </div>
                 <div className={styles.wpPlatformRow}>
-                  {CHANNEL_PLATFORMS.map((p) => {
+                  {BUSINESS_PLATFORMS.map((p) => {
                     const PlatformIcon = p.icon;
                     const active = businessPlatform === p.key;
                     return (
@@ -519,7 +519,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                         className={`${styles.wpPlatformBtn} ${active ? styles.wpPlatformBtnActive : ''}`}
                         onClick={() => {
                           setBusinessPlatform(p.key);
-                          const stillAPrefill = CHANNEL_PLATFORMS.some((pp) => pp.prefill === businessLink);
+                          const stillAPrefill = BUSINESS_PLATFORMS.some((pp) => pp.prefill === businessLink);
                           if (!businessLink.trim() || stillAPrefill) setBusinessLink(p.prefill);
                         }}
                       >
@@ -533,18 +533,22 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                 <div className={styles.wpFieldHead} style={{ marginTop: 12 }}>
                   <span className={styles.wpLabel}>
                     {businessPlatform && businessPlatform !== 'other'
-                      ? `${channelPlatformMeta(businessPlatform).label} Link/Number`
+                      ? `${businessPlatformMeta(businessPlatform).label} Link/Number`
                       : 'Link'}{' '}
                     <span className={styles.wpLabelRequired}>*</span>
                   </span>
-                  <span className={styles.wpHint}>How customers reach you</span>
+                  <span className={styles.wpHint}>
+                    {businessPlatform === 'whatsapp'
+                      ? 'Customers message this number directly — got a WhatsApp Channel instead? Use "Other link" for that.'
+                      : 'How customers reach you'}
+                  </span>
                 </div>
                 <div className={styles.wpInputWrap}>
                   <input
                     className={styles.wpInput}
                     value={businessLink}
                     onChange={(e) => setBusinessLink(e.target.value)}
-                    placeholder={channelPlatformMeta(businessPlatform).prefill}
+                    placeholder={businessPlatformMeta(businessPlatform).prefill}
                   />
                   <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
                     <LinkIcon size={16} />

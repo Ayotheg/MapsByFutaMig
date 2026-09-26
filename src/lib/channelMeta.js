@@ -6,11 +6,13 @@ import WhatsAppIcon from './WhatsAppIcon';
 // "single source of truth" precedent typeIcons.js already established
 // for waypoint types. Used by:
 //   - AdminEditModal.jsx: the platform-picker pills on BOTH the Channel
-//     edit form (channelLink/channelPlatform) and the Business edit form
-//     (businessLink/businessPlatform) — picking one prefills the Link
-//     field with that platform's prefix so the admin only has to paste
-//     the rest. Same list, two independent field pairs — a row is only
-//     ever one or the other (never both).
+//     edit form (channelLink/channelPlatform, uses CHANNEL_PLATFORMS) and
+//     the Business edit form (businessLink/businessPlatform, uses
+//     BUSINESS_PLATFORMS below) — picking one prefills the Link field
+//     with that platform's prefix so the admin only has to paste the
+//     rest. Two separate lists, not one shared array, because WhatsApp
+//     means something different in each context (see below) — everything
+//     else about the two lists is identical.
 //   - PointsTab.jsx: the small platform icon in the admin points list.
 //   - ExploreCard.jsx / ExplorePanelDesktop.jsx: the channel card's
 //     avatar icon + brand color when no photo has been uploaded.
@@ -26,6 +28,10 @@ export const CHANNEL_PLATFORMS = [
     label: 'WhatsApp',
     icon: WhatsAppIcon,
     color: '#25d366',
+    // A Channel's whole point is "join this broadcast" (channel_entries.sql:
+    // ExploreCard's CTA literally reads "Join the Channel") — a
+    // whatsapp.com/channel/... invite link is the correct default here,
+    // unlike BUSINESS_PLATFORMS below.
     prefill: 'https://whatsapp.com/channel/',
   },
   {
@@ -51,8 +57,28 @@ export const CHANNEL_PLATFORMS = [
   },
 ];
 
-const DEFAULT_PLATFORM = CHANNEL_PLATFORMS.find((p) => p.key === 'other');
+// Business's WhatsApp default is a direct DM (wa.me/<number>), not a
+// broadcast Channel invite — a business wants a customer messaging them
+// personally, not joining a channel. Explicit request: if a business
+// genuinely wants to share a WhatsApp *Channel* link instead of a DM
+// number, "Other link" is where that goes — this list deliberately
+// doesn't try to guess which one a whatsapp.com/... paste means.
+// Same label/icon/color as CHANNEL_PLATFORMS' entries; only the
+// WhatsApp prefill differs, so this is built from that list rather than
+// duplicated by hand (one edit to color/icon/label still updates both).
+export const BUSINESS_PLATFORMS = CHANNEL_PLATFORMS.map((p) =>
+  p.key === 'whatsapp' ? { ...p, prefill: 'https://wa.me/' } : p
+);
+
+function findPlatform(list, platform) {
+  return list.find((p) => p.key === platform) || list.find((p) => p.key === 'other');
+}
 
 export function channelPlatformMeta(platform) {
-  return CHANNEL_PLATFORMS.find((p) => p.key === platform) || DEFAULT_PLATFORM;
+  return findPlatform(CHANNEL_PLATFORMS, platform);
 }
+
+export function businessPlatformMeta(platform) {
+  return findPlatform(BUSINESS_PLATFORMS, platform);
+}
+

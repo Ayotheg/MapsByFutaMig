@@ -4,7 +4,7 @@ import styles from './PlaceCard.module.css';
 import { isRateablePOI } from './wpTypeMeta';
 import PhotoLightbox from './PhotoLightbox';
 import { getTypeIcon } from '../../lib/typeIcons';
-import { channelPlatformMeta } from '../../lib/channelMeta';
+import { businessPlatformMeta } from '../../lib/channelMeta';
 import { track } from '../../lib/analytics';
 
 // ── Rating badge ─────────────────────────────────────────────────────────
@@ -308,7 +308,7 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
             <div className={styles.actions}>
               <button
                 className={styles.navBtn}
-                title={`Open ${channelPlatformMeta(data.businessPlatform).label} link`}
+                title={`Open ${businessPlatformMeta(data.businessPlatform).label} link`}
                 onClick={() => {
                   track('business_link_click', { source: 'place_card', platform: data.businessPlatform || null });
                   window.open(data.businessLink, '_blank', 'noopener,noreferrer');
@@ -316,7 +316,7 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
               >
                 <ExternalLink size={16} />
                 {data.businessPlatform && data.businessPlatform !== 'other'
-                  ? `Visit ${channelPlatformMeta(data.businessPlatform).label}`
+                  ? `Visit ${businessPlatformMeta(data.businessPlatform).label}`
                   : 'Visit Link'}
               </button>
             </div>
