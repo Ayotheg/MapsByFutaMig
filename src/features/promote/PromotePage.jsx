@@ -143,6 +143,7 @@ export default function PromotePage() {
   // Neither pill is pre-selected — the Location / Contact sections below
   // only drop down once the person actually picks a type.
   const [listingType, setListingType] = useState(null); // null | 'physical' | 'online'
+  const [detailsType, setDetailsType] = useState(null);
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [locStatus, setLocStatus] = useState(null); // { text, error } | null
@@ -165,6 +166,17 @@ export default function PromotePage() {
     () => ((days - MIN_DAYS) / (MAX_DAYS - MIN_DAYS)) * 100,
     [days],
   );
+
+  function handleListingTypeChange(type) {
+    if (listingType === type) {
+      setListingType(null);
+      if (type === "physical") setMapSearchOpen(false);
+      return;
+    }
+    setListingType(type);
+    setDetailsType(type);
+    if (type !== "physical") setMapSearchOpen(false);
+  }
 
   function handleUseGps() {
     if (!navigator.geolocation) {
@@ -343,7 +355,7 @@ export default function PromotePage() {
                   role="tab"
                   aria-selected={listingType === "physical"}
                   className={`${styles.typeBtn} ${listingType === "physical" ? styles.typeBtnActive : ""}`}
-                  onClick={() => setListingType("physical")}
+                  onClick={() => handleListingTypeChange("physical")}
                 >
                   Physical Shop
                 </button>
@@ -352,17 +364,30 @@ export default function PromotePage() {
                   role="tab"
                   aria-selected={listingType === "online"}
                   className={`${styles.typeBtn} ${listingType === "online" ? styles.typeBtnActive : ""}`}
-                  onClick={() => setListingType("online")}
+                  onClick={() => handleListingTypeChange("online")}
                 >
                   Online Store
                 </button>
               </div>
-            </div>
 
-            {/* Location — Physical Shop only, hidden until that pill is
-                actually clicked (not just the default). */}
-            {listingType === "physical" && (
-              <div className={`${styles.section} ${styles.reveal}`}>
+              <div
+                className={`${styles.typeDetailsRegion} ${listingType ? styles.typeDetailsRegionOpen : ""}`}
+                aria-hidden={listingType === null}
+                inert={listingType === null}
+                onTransitionEnd={(event) => {
+                  if (
+                    event.target === event.currentTarget &&
+                    event.propertyName === "grid-template-rows" &&
+                    listingType === null
+                  ) {
+                    setDetailsType(null);
+                  }
+                }}
+              >
+                <div className={styles.typeDetailsInner}>
+                  {/* Location — Physical Shop only. */}
+                  {detailsType === "physical" && (
+                    <div className={styles.section}>
                 <div className={styles.noticeBanner}>
                   <Info size={15} strokeWidth={2} className={styles.noticeIcon} />
                   <p className={styles.noticeText}>
@@ -417,15 +442,12 @@ export default function PromotePage() {
                     {locStatus.text}
                   </div>
                 )}
-              </div>
-            )}
+                    </div>
+                  )}
 
-            {/* Contact — Online Store only. Same drop-down-on-click
-                behavior as Location above. A prefixed field (wa.me/,
-                t.me/, instagram.com/) for the three named platforms, and
-                a plain free-text field for anything else. */}
-            {listingType === "online" && (
-              <div className={`${styles.section} ${styles.reveal}`}>
+                  {/* Contact — Online Store only. */}
+                  {detailsType === "online" && (
+                    <div className={styles.section}>
                 <div className={styles.rowHeadingWithHint}>
                   <span className={styles.sectionLabel}>Platform</span>
                   <span className={styles.hintText}>Sets the prefix &amp; icon</span>
@@ -470,8 +492,11 @@ export default function PromotePage() {
                     onChange={(e) => setContactValue(e.target.value)}
                   />
                 </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
 
             {/* Photos */}
             <div className={styles.section}>

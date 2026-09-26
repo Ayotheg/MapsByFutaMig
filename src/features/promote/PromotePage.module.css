@@ -130,16 +130,33 @@
   color: var(--v2-neutral);
 }
 
-/* Location / Contact sections drop down when their Type pill is
-   picked (Physical Shop / Online Store), rather than appearing already
-   open. Same easing/duration tokens as SuggestWaypointModal's
-   coordBanner reveal. */
-.reveal {
-  animation: sectionReveal var(--v2-duration-standard) var(--v2-ease-standard);
+/* Keep the detail panel mounted until its close transition finishes. */
+.typeDetailsRegion {
+  display: grid;
+  grid-template-rows: 0fr;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(-4px);
+  overflow: hidden;
+  pointer-events: none;
+  transition:
+    grid-template-rows var(--v2-duration-standard) var(--v2-ease-standard),
+    opacity var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.typeDetailsRegionOpen {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.typeDetailsInner {
+  min-height: 0;
+  overflow: hidden;
 }
 @media (prefers-reduced-motion: reduce) {
-  .reveal {
-    animation: none;
+  .typeDetailsRegion {
+    transition-duration: 0.01ms;
   }
 }
 @keyframes sectionReveal {
