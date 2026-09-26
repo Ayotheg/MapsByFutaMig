@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { track } from '../../lib/analytics';
 import { normalizeWaypointType } from '../waypoints/wpTypeMeta';
+import { compressImageFile } from '../../lib/imageCompression';
 
 // ── Admin panel — Supabase mutation helpers ─────────────────────────────
 //
@@ -89,11 +90,17 @@ export async function fetchImageRows(table, idColumn, entityId) {
 }
 
 export async function uploadImage(kind, entityId, file, position) {
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  // Every photo upload path in the app (admin edit, KML photo attach,
+  // student "suggest a place" submissions, business promotion photos)
+  // calls this one function — so compressing here covers all of them.
+  // See lib/imageCompression.js for why this also fixes the EXIF-orientation
+  // "flipped photo" bug rather than just shrinking file size.
+  const compressed = await compressImageFile(file);
+  const ext = (compressed.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `${kind}/${entityId}/${position}-${Date.now()}.${ext}`;
   const { error } = await supabase.storage
     .from(PLACE_IMAGES_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
+    .upload(path, compressed, { contentType: compressed.type, upsert: true });
   if (error) throw error;
   return path;
 }
