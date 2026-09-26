@@ -125,7 +125,13 @@ export function gatherResults(chip, { waypoints, searchIndex }) {
   const out = [];
 
   (waypoints || []).forEach((wp) => {
-    if (!wp.lat || !wp.lng) return;
+    // Business entries (supabase/business_entries.sql) have no lat/lng by
+    // design (useWaypoints.js) — the same case useSelectResult.js already
+    // carves out for plain search. Don't let the coordinate guard below
+    // drop them before their name even gets a chance to match a chip's
+    // keywords (e.g. "Debby's Fragrances" matching the `clothing` chip).
+    const isBusiness = !!wp.isBusiness;
+    if (!isBusiness && (!wp.lat || !wp.lng)) return;
     if (wp.id != null && excluded.has(wp.id)) return;
     const raw = (wp.name || '').trim();
     if (!raw) return;
@@ -135,16 +141,22 @@ export function gatherResults(chip, { waypoints, searchIndex }) {
     if (seen.has(nameLow)) return;
     seen.add(nameLow);
 
-    const dist = user ? distanceTo(user.lat, user.lng, wp.lat, wp.lng) : null;
+    const dist = !isBusiness && user ? distanceTo(user.lat, user.lng, wp.lat, wp.lng) : null;
     out.push({
       id: wp.id,
       name: raw,
-      type: normType(wp.type),
-      lat: wp.lat,
-      lng: wp.lng,
+      // Same synthetic 'shop' type useExplorePicks.js/PlaceCard.jsx use
+      // for a Business's icon/color (TYPE_COLORS.shop) — it has no real
+      // `type` of its own (no category picker on its edit form).
+      type: isBusiness ? 'shop' : normType(wp.type),
+      lat: isBusiness ? null : wp.lat,
+      lng: isBusiness ? null : wp.lng,
       desc: wp.description || '',
       imageUrls: wp.imageUrls || [],
       dist,
+      isBusiness,
+      businessLink: wp.businessLink || '',
+      businessPlatform: wp.businessPlatform || '',
     });
   });
 

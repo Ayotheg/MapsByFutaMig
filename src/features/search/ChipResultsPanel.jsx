@@ -67,6 +67,27 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
       : `Showing ${results.length} place${results.length !== 1 ? 's' : ''}${isMobile ? '' : ' · nearest first'}`;
 
   function handleOpen(r) {
+    // Business rows (see chipConfig.js) have nothing to fly to — open the
+    // place card directly, same short-circuit useSelectResult.js already
+    // does for search, and same badge/shape PlaceCard.jsx expects to
+    // swap Navigate for the "Visit Link" button.
+    if (r.isBusiness) {
+      onSelect?.({
+        name: r.name,
+        badge: 'ONLINE STORE',
+        description: r.desc || '',
+        lat: null,
+        lng: null,
+        imageUrls: r.imageUrls || [],
+        id: r.id,
+        type: r.type,
+        isBusiness: true,
+        businessLink: r.businessLink || '',
+        businessPlatform: r.businessPlatform || '',
+      });
+      return;
+    }
+
     map?.flyTo([r.lat, r.lng], 18, { duration: 1.0 });
     setTimeout(() => {
       onSelect?.({

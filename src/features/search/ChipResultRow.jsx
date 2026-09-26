@@ -71,16 +71,24 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
         </div>
       </div>
 
-      <button
-        className={styles.navBtn}
-        data-nav-btn
-        title={`Navigate to ${result.name}`}
-        aria-label={`Navigate to ${result.name}`}
-        onClick={handleNavClick}
-        type="button"
-      >
-        <Navigation size={14} />
-      </button>
+      {/* Business rows (chipConfig.js) have no lat/lng, so there's
+          nowhere for this button to navigate to — same reason
+          PlaceCard.jsx swaps its own Navigate button out for a
+          link-out one instead of showing a dead action here. Tapping
+          the row itself still opens the place card, which has the
+          real "Visit Link" button. */}
+      {!result.isBusiness && (
+        <button
+          className={styles.navBtn}
+          data-nav-btn
+          title={`Navigate to ${result.name}`}
+          aria-label={`Navigate to ${result.name}`}
+          onClick={handleNavClick}
+          type="button"
+        >
+          <Navigation size={14} />
+        </button>
+      )}
     </div>
   );
 }
