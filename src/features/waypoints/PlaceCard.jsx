@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Star, X, Navigation, Maximize2 } from 'lucide-react';
+import { Star, X, Navigation, Maximize2, ExternalLink } from 'lucide-react';
 import styles from './PlaceCard.module.css';
 import { isRateablePOI } from './wpTypeMeta';
 import PhotoLightbox from './PhotoLightbox';
 import { getTypeIcon } from '../../lib/typeIcons';
+import { channelPlatformMeta } from '../../lib/channelMeta';
+import { track } from '../../lib/analytics';
 
 // ── Rating badge ─────────────────────────────────────────────────────────
 // Ported from legacy `_ratingBadgeHtml` (app.js ~2450–2456), now that
@@ -87,7 +89,7 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
   const hasPhotos = photos.length > 0;
   const heroUrl = photos[photoIdx];
   const heroFailed = Boolean(failedUrls[heroUrl]);
-  const TypeIcon = getTypeIcon(data?.type);
+  const TypeIcon = getTypeIcon(data?.isBusiness ? 'shop' : data?.type);
   const markFailed = (url) => setFailedUrls((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
 
   function handleTouchStart(e) {
@@ -272,8 +274,16 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
 
         {/* People entries (supabase/people_entries.sql) have no lat/lng —
             there's nowhere to navigate to, so the button is left out
-            entirely rather than firing with null coordinates. */}
-        {data?.lat != null && data?.lng != null && (
+            entirely rather than firing with null coordinates. Business
+            entries (supabase/business_entries.sql) also have no lat/lng,
+            but DO have somewhere to send someone — their WhatsApp/
+            Telegram/Instagram/website link — so they get a different
+            button in the same slot instead of nothing. This is the one
+            place that distinction is drawn; everything else about this
+            card (photos, name, description, rating badge) renders
+            identically for a Business as for a normal waypoint, per the
+            person's own "card displays normally" instruction. */}
+        {data?.lat != null && data?.lng != null ? (
           <div className={styles.actions}>
             {/* Ported from legacy's live place-card controller
                 (app.js ~5995–6140, `onNavigate` opt): `window.openPlaceCard({
@@ -292,6 +302,25 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
               Navigate Here
             </button>
           </div>
+        ) : (
+          data?.isBusiness &&
+          data?.businessLink && (
+            <div className={styles.actions}>
+              <button
+                className={styles.navBtn}
+                title={`Open ${channelPlatformMeta(data.businessPlatform).label} link`}
+                onClick={() => {
+                  track('business_link_click', { source: 'place_card', platform: data.businessPlatform || null });
+                  window.open(data.businessLink, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                <ExternalLink size={16} />
+                {data.businessPlatform && data.businessPlatform !== 'other'
+                  ? `Visit ${channelPlatformMeta(data.businessPlatform).label}`
+                  : 'Visit Link'}
+              </button>
+            </div>
+          )
         )}
       </div>
 

@@ -57,6 +57,7 @@ function score(entry, q) {
   });
 
   if (entry.source === 'waypoint') s += 15;
+  if (entry.source === 'business') s += 15; // an Online Store is as much a "real named place" match as a waypoint
   if (entry.source === 'segment') s += 10;
   return s;
 }
@@ -97,7 +98,7 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
   // ── Resync the static (waypoint/segment/kml) portion on data change ──
   useEffect(() => {
     indexRef.current = indexRef.current.filter(
-      (e) => e.source !== 'waypoint' && e.source !== 'segment' && e.source !== 'kml'
+      (e) => e.source !== 'waypoint' && e.source !== 'business' && e.source !== 'segment' && e.source !== 'kml'
     );
     idSetRef.current.clear();
     nameCoordSetRef.current.clear();
@@ -113,6 +114,15 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
     // navigable destination, so they're left out of location search/
     // quick-chips entirely — they're only reachable via the Explore
     // panel's People/Channels pills.
+    //
+    // Business entries (supabase/business_entries.sql) are the one
+    // exception to that rule, by explicit request: also no lat/lng, but
+    // DOES need to be findable by typing its name in the search bar
+    // (that's the whole point of an Online Store listing someone can
+    // search for) — just not "navigable" in the fly-to-a-pin sense. See
+    // useSelectResult.js's own comment for how selecting a coordinate-
+    // less business result is handled differently from every other
+    // search source once picked.
     (waypoints || []).forEach((wp) => {
       if (wp.isPerson || wp.isChannel) return;
       register({
@@ -122,11 +132,14 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
         name: wp.name,
         desc: wp.description || '',
         type: wp.type,
-        subtype: wp.type,
+        subtype: wp.isBusiness ? 'shop' : wp.type, // generic storefront icon — a Business row has no `type` of its own
         imageUrls: wp.imageUrls || [],
         avgRating: wp.avgRating,
         reviewCount: wp.reviewCount,
-        source: 'waypoint',
+        source: wp.isBusiness ? 'business' : 'waypoint',
+        isBusiness: !!wp.isBusiness,
+        businessLink: wp.businessLink || '',
+        businessPlatform: wp.businessPlatform || '',
       });
     });
 

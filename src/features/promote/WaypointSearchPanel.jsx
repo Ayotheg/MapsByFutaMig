@@ -60,7 +60,7 @@ export default function WaypointSearchPanel({ onSelect, onClose }) {
   const entries = useMemo(
     () =>
       (waypoints || [])
-        .filter((wp) => !wp.isPerson && !wp.isChannel && wp.lat != null && wp.lng != null)
+        .filter((wp) => !wp.isPerson && !wp.isChannel && !wp.isBusiness && wp.lat != null && wp.lng != null)
         .map((wp) => ({
           id: wp.id,
           name: wp.name,

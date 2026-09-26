@@ -20,7 +20,12 @@ function toPick(wp, overridePriority) {
     waypointId: wp.id,
     waypoint: wp,
     name: wp.name,
-    type: wp.type,
+    // A Business row has no `type` of its own (no category picker on its
+    // edit form — see AdminEditModal.jsx's isBusiness branch) — 'shop'
+    // gives it a sensible storefront icon/color instead of the generic
+    // fallback, same synthetic-type trick PlaceCard.jsx and
+    // useSearchIndex.js each use for the same reason.
+    type: wp.isBusiness ? 'shop' : wp.type,
     images: wp.imageUrls || [],
     lat: wp.lat,
     lng: wp.lng,
@@ -41,6 +46,17 @@ function toPick(wp, overridePriority) {
     isChannel: !!wp.isChannel,
     channelLink: wp.channelLink || '',
     channelPlatform: wp.channelPlatform || '',
+    // Business (supabase/business_entries.sql) is deliberately NOT given
+    // its own dedicated card here the way Channel is — ExploreCard.jsx's
+    // `pick.isChannel` check is the only branch, so a Business pick falls
+    // through to the same normal place-card rendering a Person/Place
+    // gets, then opens the standard PlaceCard on click (`onSelect?.
+    // (pick.waypoint)`), which is exactly the "card displays normally"
+    // behavior asked for — PlaceCard.jsx's own isBusiness branch is what
+    // swaps the Navigate button for a link-out one there, not this file.
+    isBusiness: !!wp.isBusiness,
+    businessLink: wp.businessLink || '',
+    businessPlatform: wp.businessPlatform || '',
   };
 }
 

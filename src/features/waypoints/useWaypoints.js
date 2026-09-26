@@ -73,14 +73,17 @@ export function useWaypoints() {
       return;
     }
 
-    // `is_person` (supabase/people_entries.sql) and `is_channel`/
-    // `channel_link`/`channel_platform` (supabase/channel_entries.sql) are
-    // each optional independently of the Explore fields and of each other,
-    // so a missing migration for either must not hide the other's picks.
+    // `is_person` (supabase/people_entries.sql), `is_channel`/
+    // `channel_link`/`channel_platform` (supabase/channel_entries.sql), and
+    // `is_business`/`business_link`/`business_platform` (supabase/
+    // business_entries.sql) are each optional independently of the Explore
+    // fields and of each other, so a missing migration for any one must not
+    // hide the others' picks.
     const EXPLORE_COLS =
       'is_explore, explore_tags, explore_priority, is_promoted, sponsor_name, promo_label';
     const PEOPLE_COLS = 'is_person';
     const CHANNEL_COLS = 'is_channel, channel_link, channel_platform';
+    const BUSINESS_COLS = 'is_business, business_link, business_platform';
     const BASE_COLS = 'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count';
 
     // ── Two-phase load ────────────────────────────────────────────────────
@@ -118,12 +121,17 @@ export function useWaypoints() {
         .order('id', { ascending: true });
 
     // Newest migration first, each tier dropping the newest-still-missing
-    // columns — the Channel migration (channel_entries.sql) is newer than
-    // People (people_entries.sql), which is newer than Explore
+    // columns — the Business migration (business_entries.sql) is newer
+    // than Channel (channel_entries.sql), which is newer than People
+    // (people_entries.sql), which is newer than Explore
     // (explore_fields.sql). Falls all the way back to BASE_COLS so the map
     // still works on a project where none of these have been run yet.
     const COL_TIERS = [
-      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}`, missingMsg: null },
+      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}`, missingMsg: null },
+      {
+        cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}`,
+        missingMsg: '[waypoints] Business fields not found — run supabase/business_entries.sql to enable the Business pill.',
+      },
       {
         cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}`,
         missingMsg: '[waypoints] Channel fields not found — run supabase/channel_entries.sql to enable the Channels pill.',
@@ -202,14 +210,16 @@ export function useWaypoints() {
       for (const wp of rows || []) {
         const isPerson = !!wp.is_person;
         const isChannel = !!wp.is_channel;
+        const isBusiness = !!wp.is_business;
 
-        // People entries (supabase/people_entries.sql) and Channel
-        // entries (supabase/channel_entries.sql) have no map location —
-        // they only ever show up under the Explore panel's People/
-        // Channels pills, never as a pin. Skip all the lat/lng math
-        // (which needs real numbers) and the nudge bookkeeping entirely
-        // for them.
-        if (isPerson || isChannel) {
+        // People entries (supabase/people_entries.sql), Channel entries
+        // (supabase/channel_entries.sql), and Business entries (supabase/
+        // business_entries.sql) have no map location — they only ever
+        // show up under the Explore panel's People/Channels pills or (for
+        // Business) the search bar/an admin-featured Explore card, never
+        // as a pin. Skip all the lat/lng math (which needs real numbers)
+        // and the nudge bookkeeping entirely for them.
+        if (isPerson || isChannel || isBusiness) {
           out.push({
             id: wp.id,
             name: wp.name,
@@ -232,6 +242,9 @@ export function useWaypoints() {
             isChannel,
             channelLink: wp.channel_link || '',
             channelPlatform: wp.channel_platform || '',
+            isBusiness,
+            businessLink: wp.business_link || '',
+            businessPlatform: wp.business_platform || '',
           });
           continue;
         }
@@ -284,6 +297,7 @@ export function useWaypoints() {
           promoLabel: wp.promo_label || 'Promoted',
           isPerson: false,
           isChannel: false,
+          isBusiness: false,
         });
       }
       return out;

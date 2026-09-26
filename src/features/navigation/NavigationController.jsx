@@ -900,7 +900,7 @@ const NavigationController = forwardRef(function NavigationController(
   const popularPlaces = useMemo(
     () =>
       (explorePicks || [])
-        .filter((pick) => !pick.isPerson && !pick.isChannel)
+        .filter((pick) => !pick.isPerson && !pick.isChannel && !pick.isBusiness)
         .slice(0, 2)
         .map((pick) => ({
         ...pick,

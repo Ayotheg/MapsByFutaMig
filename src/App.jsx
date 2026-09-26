@@ -8,6 +8,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 
 import LandingPage from './pages/LandingPage'
 import PromotePage from './features/promote/PromotePage'
+import PromoteCallbackPage from './features/promote/PromoteCallbackPage'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import TermsOfService from './pages/legal/TermsOfService'
 import CookiePolicy from './pages/legal/CookiePolicy'
@@ -43,6 +44,13 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/loadingscreen" element={<LoadingScreen />} />
         <Route path="/promote" element={<PromotePage />} />
+        {/* BACHS's success_url lands here (see
+          features/promote/submitPromotion.js's create-promotion-checkout
+          call + PROMOTE_PAYMENT_INTEGRATION.md) — polls the promotions
+          row for a webhook-confirmed payment_status rather than trusting
+          the redirect itself. cancel_url points back at /promote?cancelled=1
+          instead, so a cancelled checkout never reaches this route. */}
+        <Route path="/promote/callback" element={<PromoteCallbackPage />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookiePolicy />} />

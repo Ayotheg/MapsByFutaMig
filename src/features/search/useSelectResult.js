@@ -25,7 +25,38 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
 
   const selectResult = useCallback(
     (entry) => {
-      if (!map || !entry.lat || !entry.lng) return;
+      if (!map) return;
+
+      // Business entries (supabase/business_entries.sql, registered by
+      // useSearchIndex.js with source:'business') are the one search
+      // result type with no lat/lng by design — there's nothing to fly
+      // to and no pin to drop. Every other branch below assumes real
+      // coordinates, so this short-circuits straight to opening the
+      // place card (in its normal, non-navigable form — see
+      // PlaceCard.jsx's isBusiness branch) instead of falling through to
+      // the `!entry.lat || !entry.lng` guard, which used to just
+      // silently do nothing for a coordinate-less result.
+      if (entry.source === 'business' || entry.isBusiness) {
+        track('search_result_selected', { query: entry.query || null, place_name: entry.name });
+        onSelect?.({
+          name: entry.name,
+          badge: 'ONLINE STORE',
+          description: entry.desc || '',
+          lat: null,
+          lng: null,
+          imageUrls: entry.imageUrls || [],
+          id: entry.id,
+          type: entry.subtype || entry.type,
+          avgRating: entry.avgRating,
+          reviewCount: entry.reviewCount,
+          isBusiness: true,
+          businessLink: entry.businessLink || '',
+          businessPlatform: entry.businessPlatform || '',
+        });
+        return;
+      }
+
+      if (!entry.lat || !entry.lng) return;
       const ll = [parseFloat(entry.lat), parseFloat(entry.lng)];
 
       // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — this one

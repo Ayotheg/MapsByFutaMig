@@ -65,6 +65,12 @@ export const ADMIN_BADGE_COLORS = {
   // name-guessed one — see PointsTab.jsx's comment on why Channel rows
   // skip `resolveWaypointType` entirely).
   channel: { bg: '#f0fdfa', color: '#0f766e', border: 'rgba(153,246,228,0.6)' },
+
+  // Business entries (supabase/business_entries.sql) — its own fixed
+  // color (not reused from `channel` or `shop`) so an admin scanning the
+  // list can tell a Business row apart from either at a glance. Same
+  // amber family as `hostel` above, just a distinct hue pairing.
+  business: { bg: '#fff7ed', color: '#c2410c', border: 'rgba(254,215,170,0.7)' },
 };
 
 // Types not listed above (printing_shop, cafe, restaurant, pharmacy,

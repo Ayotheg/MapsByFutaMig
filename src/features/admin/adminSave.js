@@ -131,7 +131,7 @@ export async function deleteImageRows(table, ids) {
 // patch fields, not required ones: AdminEditModal.jsx always passes them
 // now, but this stays backward-compatible with any other caller passing
 // only name/description/type.
-export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel, channelLink, channelPlatform }) {
+export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel, channelLink, channelPlatform, businessLink, businessPlatform }) {
   // Never write a type the map/legend can't render (see wpTypeMeta.js).
   const patch = { name, description };
   if (type !== undefined) patch.type = normalizeWaypointType(type);
@@ -146,6 +146,9 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
   // fields" shape as the Explore fields above.
   if (channelLink !== undefined) explorePatch.channel_link = channelLink || null;
   if (channelPlatform !== undefined) explorePatch.channel_platform = channelPlatform || null;
+  // Business entries (supabase/business_entries.sql) — same shape again.
+  if (businessLink !== undefined) explorePatch.business_link = businessLink || null;
+  if (businessPlatform !== undefined) explorePatch.business_platform = businessPlatform || null;
 
   const hasExploreFields = Object.keys(explorePatch).length > 0;
   const { data, error } = await supabase
@@ -175,7 +178,7 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
     if (baseError) throw baseError;
     if (!baseData?.length) throw await blockedWriteError('save this waypoint');
     throw new Error(
-      'Saved name/description/type, but some fields need a migration run first — supabase/explore_fields.sql for the Explore toggle/tags/priority, and/or supabase/channel_entries.sql for the channel link — those were not saved.'
+      'Saved name/description/type, but some fields need a migration run first — supabase/explore_fields.sql for the Explore toggle/tags/priority, supabase/channel_entries.sql for the channel link, and/or supabase/business_entries.sql for the business link — those were not saved.'
     );
   }
   if (error) throw error;
@@ -210,6 +213,12 @@ export async function deleteWaypoint(id) {
 //
 // `isChannel` (supabase/channel_entries.sql): same "no location" shape
 // as a Person, plus `channelLink`/`channelPlatform` instead of a `type`.
+//
+// `isBusiness` (supabase/business_entries.sql): same "no location" shape
+// again, plus `businessLink`/`businessPlatform` instead of a `type` — an
+// admin-added Online Store, deliberately its own boolean/columns rather
+// than reusing `isChannel`'s (see business_entries.sql's header comment
+// for why).
 export async function insertWaypoint({
   name,
   description,
@@ -220,6 +229,9 @@ export async function insertWaypoint({
   isChannel,
   channelLink,
   channelPlatform,
+  isBusiness,
+  businessLink,
+  businessPlatform,
   isExplore,
   exploreTags,
   explorePriority,
@@ -227,7 +239,7 @@ export async function insertWaypoint({
   sponsorName,
   promoLabel,
 }) {
-  const noLocation = isPerson || isChannel;
+  const noLocation = isPerson || isChannel || isBusiness;
   const row = {
     id: crypto.randomUUID(),
     name,
@@ -247,6 +259,11 @@ export async function insertWaypoint({
     row.is_channel = true;
     row.channel_link = channelLink || null;
     row.channel_platform = channelPlatform || null;
+  }
+  if (isBusiness) {
+    row.is_business = true;
+    row.business_link = businessLink || null;
+    row.business_platform = businessPlatform || null;
   }
   const explorePatch = {};
   if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
@@ -269,12 +286,15 @@ export async function insertWaypoint({
     (error.code === 'PGRST204' ||
       error.code === '42703' ||
       /column .* does not exist|could not find the .* column/i.test(error.message || ''));
-  if (missingColumn && (isPerson || isChannel || Object.keys(explorePatch).length > 0)) {
+  if (missingColumn && (isPerson || isChannel || isBusiness || Object.keys(explorePatch).length > 0)) {
     const withoutNewCols = { ...row };
     delete withoutNewCols.is_person;
     delete withoutNewCols.is_channel;
     delete withoutNewCols.channel_link;
     delete withoutNewCols.channel_platform;
+    delete withoutNewCols.is_business;
+    delete withoutNewCols.business_link;
+    delete withoutNewCols.business_platform;
     for (const field of Object.keys(explorePatch)) delete withoutNewCols[field];
     const { data: retryData, error: retryError } = await supabase
       .from('waypoints')

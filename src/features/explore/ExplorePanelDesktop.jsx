@@ -320,7 +320,7 @@ function ExploreCardDesktop({ pick, onSelect }) {
           )}
         </div>
         <button type="button" className={styles.cardAction} onClick={() => onSelect?.(pick.waypoint)}>
-          {pick.isPerson ? 'View Details' : 'View on Map'}
+          {pick.isPerson || pick.isBusiness ? 'View Details' : 'View on Map'}
         </button>
       </div>
     </article>

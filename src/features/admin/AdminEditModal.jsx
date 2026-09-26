@@ -17,6 +17,7 @@ import {
   ImageOff,
   User,
   Rss,
+  Store,
   Link as LinkIcon,
 } from 'lucide-react';
 import styles from './AdminEditModal.module.css';
@@ -106,6 +107,15 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
   const [channelLink, setChannelLink] = useState('');
   const [channelPlatform, setChannelPlatform] = useState('');
 
+  // Business entries (supabase/business_entries.sql) — same "no
+  // coordinates, set once on open, never toggled here" shape again. Kept
+  // as its own boolean/pair of fields rather than reusing isChannel's —
+  // see business_entries.sql's header comment for why a row is one or
+  // the other, never both.
+  const [isBusiness, setIsBusiness] = useState(false);
+  const [businessLink, setBusinessLink] = useState('');
+  const [businessPlatform, setBusinessPlatform] = useState('');
+
   // Explore panel fields (supabase/explore_fields.sql) — this IS the
   // "pick a name on the map and feature it" flow: no separate admin
   // tab/table, just a few more fields on the same waypoint edit form
@@ -146,6 +156,9 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       setIsChannel(!!wp.isChannel);
       setChannelLink(wp.channelLink || '');
       setChannelPlatform(wp.channelPlatform || '');
+      setIsBusiness(!!wp.isBusiness);
+      setBusinessLink(wp.businessLink || '');
+      setBusinessPlatform(wp.businessPlatform || '');
       setIsExplore(!!wp.isExplore);
       setExploreTagsText((wp.exploreTags || []).join(', '));
       setExplorePriority(wp.explorePriority ?? 0);
@@ -225,6 +238,10 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       setStatus({ text: 'Channel link is required.', error: true });
       return;
     }
+    if (type === 'waypoint' && isBusiness && !businessLink.trim()) {
+      setStatus({ text: 'Business link is required.', error: true });
+      return;
+    }
     setBusy(true);
     setStatus(null);
     try {
@@ -240,6 +257,9 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
         const channelFields = isChannel
           ? { isChannel: true, channelLink: channelLink.trim(), channelPlatform }
           : {};
+        const businessFields = isBusiness
+          ? { isBusiness: true, businessLink: businessLink.trim(), businessPlatform }
+          : {};
         if (isNew) {
           const newId = await insertWaypoint({
             name: name.trim(),
@@ -248,12 +268,13 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             lng: null,
             isPerson,
             ...channelFields,
+            ...businessFields,
             ...exploreFields,
-            ...(!isPerson && !isChannel && { type: wpType }),
+            ...(!isPerson && !isChannel && !isBusiness && { type: wpType }),
           });
           await reconcileImages('waypoint_images', 'waypoint_id', newId, 'waypoints');
           setStatus({
-            text: isPerson ? 'Person added!' : isChannel ? 'Channel added!' : 'Waypoint added!',
+            text: isPerson ? 'Person added!' : isChannel ? 'Channel added!' : isBusiness ? 'Business added!' : 'Waypoint added!',
             error: false,
             icon: true,
           });
@@ -261,12 +282,13 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           await updateWaypoint(editContext.id, {
             name: name.trim(),
             description: description.trim(),
-            ...(!isPerson && !isChannel && { type: wpType }),
+            ...(!isPerson && !isChannel && !isBusiness && { type: wpType }),
             ...channelFields,
+            ...businessFields,
             ...exploreFields,
           });
           await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
-          setStatus({ text: isChannel ? 'Channel updated!' : 'Waypoint updated!', error: false, icon: true });
+          setStatus({ text: isChannel ? 'Channel updated!' : isBusiness ? 'Business updated!' : 'Waypoint updated!', error: false, icon: true });
         }
         onWaypointChanged?.();
       } else if (type === 'segment') {
@@ -353,17 +375,17 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           <div className={styles.headerWaypoint}>
             <div className={styles.headerWpLeft}>
               <div className={styles.headerWpIcon}>
-                {isPerson ? <User size={20} /> : isChannel ? <Rss size={20} /> : <MapPin size={20} />}
+                {isPerson ? <User size={20} /> : isChannel ? <Rss size={20} /> : isBusiness ? <Store size={20} /> : <MapPin size={20} />}
               </div>
               <div>
                 <div className={styles.headerWpTitleRow}>
                   <span className={styles.headerWpTitle}>
-                    {isPerson ? 'Edit Person' : isChannel ? 'Edit Channel' : 'Edit Waypoint'}
+                    {isPerson ? 'Edit Person' : isChannel ? 'Edit Channel' : isBusiness ? 'Edit Business' : 'Edit Waypoint'}
                   </span>
                   {shortId && (
                     <span className={styles.headerWpBadge}>
                       <span className={styles.headerWpBadgeDot} />
-                      {isPerson ? 'Person' : isChannel ? 'Channel' : 'Waypoint'} #{shortId}
+                      {isPerson ? 'Person' : isChannel ? 'Channel' : isBusiness ? 'Business' : 'Waypoint'} #{shortId}
                     </span>
                   )}
                 </div>
@@ -372,6 +394,8 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                     ? 'Manage details and public visibility for this person'
                     : isChannel
                     ? 'Manage details and public visibility for this channel'
+                    : isBusiness
+                    ? 'Manage details and public visibility for this business — searchable, but never shown on the map'
                     : 'Manage details, coordinates, and public visibility for this campus spot'}
                 </div>
               </div>
@@ -385,7 +409,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             <div className={styles.wpField}>
               <div className={styles.wpFieldHead}>
                 <span className={styles.wpLabel}>
-                  {isPerson ? 'Name' : isChannel ? 'Channel Name' : 'Place Name'} <span className={styles.wpLabelRequired}>*</span>
+                  {isPerson ? 'Name' : isChannel ? 'Channel Name' : isBusiness ? 'Business Name' : 'Place Name'} <span className={styles.wpLabelRequired}>*</span>
                 </span>
                 <span className={styles.wpHint}>Displayed to all users</span>
               </div>
@@ -394,7 +418,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                   className={styles.wpInput}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder={isPerson ? 'Person name' : isChannel ? 'e.g. FUTA Announcements' : 'Waypoint name'}
+                  placeholder={isPerson ? 'Person name' : isChannel ? 'e.g. FUTA Announcements' : isBusiness ? 'e.g. Debby\'s Fragrances' : 'Waypoint name'}
                 />
                 <span className={`${styles.wpInputIcon} ${styles.wpInputIconRight}`}>
                   <Pencil size={14} />
@@ -405,7 +429,10 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             {/* Channel entries (supabase/channel_entries.sql) keep the
                 edit form to exactly what the admin needs to fill in: name,
                 platform + link, photo, Feature toggle — no free-text
-                description field to leave blank. */}
+                description field to leave blank. Business entries
+                (supabase/business_entries.sql) DO keep the description
+                field — an Online Store benefits from "what we sell" text
+                the way a channel doesn't. */}
             {!isChannel && (
               <div className={styles.wpField}>
                 <div className={styles.wpFieldHead}>
@@ -416,7 +443,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                   className={styles.wpTextarea}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional note"
+                  placeholder={isBusiness ? 'Brief details about your product' : 'Optional note'}
                 />
               </div>
             )}
@@ -464,6 +491,60 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                     value={channelLink}
                     onChange={(e) => setChannelLink(e.target.value)}
                     placeholder={channelPlatformMeta(channelPlatform).prefill}
+                  />
+                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                    <LinkIcon size={16} />
+                  </span>
+                </div>
+              </div>
+            ) : isBusiness ? (
+              // Same Platform-pills + Link shape as Channel above (shared
+              // CHANNEL_PLATFORMS list, see channelMeta.js) — this is the
+              // "COORDINATES replaced with LINK" swap: a Business gets
+              // this section in the exact slot a Place would otherwise
+              // have Category Type + Coordinates.
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Platform</span>
+                  <span className={styles.wpHint}>Sets the link prefix &amp; icon</span>
+                </div>
+                <div className={styles.wpPlatformRow}>
+                  {CHANNEL_PLATFORMS.map((p) => {
+                    const PlatformIcon = p.icon;
+                    const active = businessPlatform === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        className={`${styles.wpPlatformBtn} ${active ? styles.wpPlatformBtnActive : ''}`}
+                        onClick={() => {
+                          setBusinessPlatform(p.key);
+                          const stillAPrefill = CHANNEL_PLATFORMS.some((pp) => pp.prefill === businessLink);
+                          if (!businessLink.trim() || stillAPrefill) setBusinessLink(p.prefill);
+                        }}
+                      >
+                        <PlatformIcon size={14} />
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className={styles.wpFieldHead} style={{ marginTop: 12 }}>
+                  <span className={styles.wpLabel}>
+                    {businessPlatform && businessPlatform !== 'other'
+                      ? `${channelPlatformMeta(businessPlatform).label} Link/Number`
+                      : 'Link'}{' '}
+                    <span className={styles.wpLabelRequired}>*</span>
+                  </span>
+                  <span className={styles.wpHint}>How customers reach you</span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <input
+                    className={styles.wpInput}
+                    value={businessLink}
+                    onChange={(e) => setBusinessLink(e.target.value)}
+                    placeholder={channelPlatformMeta(businessPlatform).prefill}
                   />
                   <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
                     <LinkIcon size={16} />
@@ -534,7 +615,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                 </div>
                 <div>
                   <div className={styles.wpExploreTitle}>
-                    {isChannel ? 'Feature this channel in Explore' : 'Feature this place in Explore'}
+                    {isChannel ? 'Feature this channel in Explore' : isBusiness ? 'Feature this business in Explore' : 'Feature this place in Explore'}
                   </div>
                   <div className={styles.wpExploreSubtitle}>
                     Spotlight this waypoint on the main campus discovery carousel
@@ -624,7 +705,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
             <div className={styles.wpField}>
               <div className={styles.wpFieldHead}>
-                <span className={styles.wpLabel}>{isPerson || isChannel ? 'Photos' : 'Place Photos'}</span>
+                <span className={styles.wpLabel}>{isPerson || isChannel || isBusiness ? 'Photos' : 'Place Photos'}</span>
                 <span className={styles.wpHint}>JPEG, PNG up to 10MB</span>
               </div>
               <div className={styles.wpPhotoGrid}>
@@ -658,7 +739,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
           <div className={styles.footerWaypoint}>
             <button type="button" className={styles.wpDeleteBtn} onClick={handleDelete} disabled={busy}>
-              <Trash2 size={16} /> {isPerson ? 'Delete Person' : isChannel ? 'Delete Channel' : 'Delete Waypoint'}
+              <Trash2 size={16} /> {isPerson ? 'Delete Person' : isChannel ? 'Delete Channel' : isBusiness ? 'Delete Business' : 'Delete Waypoint'}
             </button>
             <div className={styles.wpFooterActions}>
               <button type="button" className={styles.wpCancelBtn} onClick={onClose}>

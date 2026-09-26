@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   AtSign,
@@ -8,6 +9,7 @@ import {
   CheckCircle2,
   Info,
   Link2,
+  Loader2,
   MapPin,
   MessageCircle,
   Navigation,
@@ -17,15 +19,46 @@ import {
   X,
 } from "lucide-react";
 import { useSeo } from "../../lib/useSeo";
+import { useAuth, friendlyError } from "../auth/useAuth";
 import WaypointSearchPanel from "./WaypointSearchPanel";
+import { submitPromotion } from "./submitPromotion";
+import { MIN_DAYS, MAX_DAYS, DEFAULT_DAYS, NAIRA_PER_DAY, MAX_PHOTOS, formatNaira } from "./pricing";
 import styles from "./PromotePage.module.css";
+
+// AuthModal is a full sign-in/sign-up surface, not needed for this page's
+// first paint — lazy-loaded per CLAUDE.md's bundle-size policy (a modal
+// that only mounts once the person tries to check out signed-out), the
+// exact pattern the policy's own header comment prescribes. **Real,
+// build-confirmed limitation, not silently ignored:** `npm run build`
+// reports `[INEFFECTIVE_DYNAMIC_IMPORT]` here — MapPage.jsx already
+// imports AuthModal statically (Slice 10 never made it lazy, despite
+// CLAUDE.md listing it as a candidate), so it's already sitting in the
+// main/shared chunk and this `lazy()` currently buys nothing on a visit
+// that also loads /map. It's the correct code for THIS page in
+// isolation (someone landing straight on /promote without ever visiting
+// /map would still get the split), and it costs nothing to leave in —
+// but the real fix is making MapPage.jsx's own AuthModal import lazy
+// too, which is out of this slice's scope (touches a different page).
+const AuthModal = lazy(() => import("../auth/AuthModal"));
 
 // ── Promote Your Business ───────────────────────────────────────────────
 //
-// Build pass from Figma (MAPSBYFUTA file, node 127:2, "PROMOTE"), now with
-// the Location section wired for real: GPS read + waypoint search-pick.
-// Everything else is still visual-only — no submission, no photo upload,
-// no checkout. That's the next pass, once this screen is signed off.
+// Build pass from Figma (MAPSBYFUTA file, node 127:2, "PROMOTE"). Location
+// (GPS read + waypoint search-pick) was wired first; this pass wires the
+// rest: photo upload, the duration slider actually driving the charged
+// amount (pricing.js), and "Proceed to checkout" submitting through
+// submitPromotion.js → the create-promotion-checkout Edge Function →
+// a real BACHS hosted-checkout redirect. See PROMOTE_PAYMENT_INTEGRATION.md
+// for the full payment architecture (Edge Functions, webhook, schema).
+//
+// Deliberately NOT this pass's job: what happens to a *paid* promotion —
+// the admin review/approve queue, and pushing an approved Physical Shop
+// into `waypoints`/onto the map vs. an approved Online Store rendering as
+// a link-out card on Explore. That's a separate, not-yet-written doc and
+// slice (the "admin issue"), same "payment first, admin after" split the
+// person asked for — `promotions.status` stays at 'awaiting_payment' →
+// 'pending_review' (set by the webhook) and goes no further from this
+// page's own code.
 //
 // Route: /promote. Standalone full page (not a modal/sheet like
 // SuggestWaypointModal), so it gets its own sticky header with a back
@@ -43,12 +76,6 @@ import styles from "./PromotePage.module.css";
 //     navigate back — see MapPage.jsx history/git blame for the removed
 //     `externalPick` plumbing) now that promoting a listing is expected
 //     to almost always be for a place that's already on the map.
-
-const MIN_DAYS = 1;
-const MAX_DAYS = 30;
-const DEFAULT_DAYS = 7;
-const NAIRA_PER_DAY = 500;
-const MAX_PHOTOS = 5;
 
 // Online Store's contact picker — these are businesses giving customers a
 // way to reach them, not a "join our channel" link. WhatsApp/Telegram/
@@ -95,10 +122,6 @@ const CONTACT_PLATFORMS = [
   },
 ];
 
-function formatNaira(amount) {
-  return `₦${amount.toLocaleString("en-NG")}`;
-}
-
 export default function PromotePage() {
   useSeo({
     title: "Promote Your Business – Maps By FUTA",
@@ -107,6 +130,13 @@ export default function PromotePage() {
 
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const auth = useAuth();
+  const [searchParams] = useSearchParams();
+  // BACHS's cancel_url (create-promotion-checkout Edge Function) points
+  // back here with `?cancelled=1` — the person's draft promotion row is
+  // left sitting at status:'awaiting_payment'/payment_status:'unpaid';
+  // nothing to clean up client-side, just let them know and retry.
+  const showCancelledNotice = searchParams.get("cancelled") === "1";
 
   const [businessName, setBusinessName] = useState("");
   const [description, setDescription] = useState("");
@@ -121,6 +151,9 @@ export default function PromotePage() {
   const [days, setDays] = useState(DEFAULT_DAYS);
   const [contactPlatform, setContactPlatform] = useState("whatsapp");
   const [contactValue, setContactValue] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const activePlatform = useMemo(
     () => CONTACT_PLATFORMS.find((p) => p.id === contactPlatform) ?? CONTACT_PLATFORMS[0],
@@ -187,6 +220,54 @@ export default function PromotePage() {
     });
   }
 
+  // "Proceed to checkout" — the payment half of this screen. Everything
+  // upstream of this point (name/description/type/location/contact/
+  // photos/duration) was already visual-only real state; this is the one
+  // new wire: package it, hand off to submitPromotion.js (validates,
+  // uploads photos, inserts the `promotions` row, calls the
+  // create-promotion-checkout Edge Function), then do a full-page
+  // redirect to whatever BACHS hosted-checkout URL comes back — same
+  // "hosted redirect, no card data touches this app" shape the
+  // `Secured by BACHS` badge below already promises.
+  async function handleCheckout() {
+    if (submitting) return;
+
+    if (!auth.user) {
+      // Same "open AuthModal with an explanatory message" pattern
+      // SuggestWaypointModal's entry points use for a signed-out click —
+      // a promotion has to be tied to an account (submitted_by, RLS-
+      // enforced) both so the person can see its status later and so
+      // BACHS's webhook has someone to notify.
+      setAuthModalOpen(true);
+      return;
+    }
+
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      const { checkoutUrl } = await submitPromotion({
+        userId: auth.user.id,
+        businessName,
+        description,
+        listingType,
+        lat,
+        lng,
+        contactPlatform,
+        contactValue,
+        days,
+        photos,
+      });
+      window.location.href = checkoutUrl; // full redirect — BACHS's hosted checkout, not an in-app modal
+    } catch (e) {
+      setSubmitError(e.message || "Could not start checkout. Please try again.");
+      setSubmitting(false);
+    }
+    // No `finally { setSubmitting(false) }` on the success path on purpose
+    // — the browser is about to navigate away to BACHS, so leaving the
+    // button disabled/spinning until that navigation actually happens
+    // is correct, not a bug.
+  }
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -199,20 +280,25 @@ export default function PromotePage() {
           >
             <ArrowLeft size={16} strokeWidth={2.25} />
           </button>
-
-          <div className={styles.headerTitleWrap}>
-            <h1 className={styles.headerTitle}>PROMOTE YOUR BUSINESS</h1>
-          </div>
         </div>
       </header>
 
       <main className={styles.main}>
         <div className={styles.container}>
           <div className={styles.titleBlock}>
+            <h1 className={styles.title}>Promote Your Business</h1>
             <p className={styles.subtitle}>
               Reach thousands of FUTA students and campus explorers daily.
             </p>
           </div>
+
+          {showCancelledNotice && (
+            <div className={`${styles.locStatus} ${styles.locStatusError}`} style={{ marginBottom: 16 }}>
+              <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+              Checkout was cancelled — nothing was charged. Your details below are still filled in,
+              so you can just try again.
+            </div>
+          )}
 
           <form
             className={styles.form}
@@ -257,7 +343,7 @@ export default function PromotePage() {
                   role="tab"
                   aria-selected={listingType === "physical"}
                   className={`${styles.typeBtn} ${listingType === "physical" ? styles.typeBtnActive : ""}`}
-                  onClick={() => setListingType((current) => (current === "physical" ? null : "physical"))}
+                  onClick={() => setListingType("physical")}
                 >
                   Physical Shop
                 </button>
@@ -266,7 +352,7 @@ export default function PromotePage() {
                   role="tab"
                   aria-selected={listingType === "online"}
                   className={`${styles.typeBtn} ${listingType === "online" ? styles.typeBtnActive : ""}`}
-                  onClick={() => setListingType((current) => (current === "online" ? null : "online"))}
+                  onClick={() => setListingType("online")}
                 >
                   Online Store
                 </button>
@@ -474,17 +560,35 @@ export default function PromotePage() {
 
             {/* Bottom actions */}
             <div className={styles.actions}>
+              {submitError && (
+                <div className={`${styles.locStatus} ${styles.locStatusError}`}>
+                  <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+                  {submitError}
+                </div>
+              )}
+
               <div className={styles.actionRow}>
                 <button
                   type="button"
                   className={styles.cancelBtn}
                   onClick={() => navigate(-1)}
+                  disabled={submitting}
                 >
                   Cancel
                 </button>
-                <button type="button" className={styles.checkoutBtn}>
-                  <span>Proceed to checkout</span>
-                  <ArrowRight size={14} strokeWidth={2.5} />
+                <button
+                  type="button"
+                  className={styles.checkoutBtn}
+                  onClick={handleCheckout}
+                  disabled={submitting}
+                  aria-busy={submitting}
+                >
+                  <span>{submitting ? "Starting checkout…" : "Proceed to checkout"}</span>
+                  {submitting ? (
+                    <Loader2 size={14} strokeWidth={2.5} className={styles.spinner} />
+                  ) : (
+                    <ArrowRight size={14} strokeWidth={2.5} />
+                  )}
                 </button>
               </div>
 
@@ -498,6 +602,23 @@ export default function PromotePage() {
           </form>
         </div>
       </main>
+
+      {authModalOpen && (
+        <Suspense fallback={null}>
+          <AuthModal
+            initialTab="signin"
+            user={auth.user}
+            onClose={() => setAuthModalOpen(false)}
+            signInWithGoogle={auth.signInWithGoogle}
+            signInWithEmail={auth.signInWithEmail}
+            signUpWithEmail={auth.signUpWithEmail}
+            resetPassword={auth.resetPassword}
+            signOut={auth.signOut}
+            friendlyError={friendlyError}
+            message="Sign in to promote your business — this ties your payment and listing to your account so you can track its status."
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

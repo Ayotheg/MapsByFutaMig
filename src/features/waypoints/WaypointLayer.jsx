@@ -116,7 +116,7 @@ export default function WaypointLayer({ map, waypoints, isTypeVisible, onSelect,
     // People and channel entries have no lat/lng — they only surface in
     // Explore, never as pins here (buildWaypointMarker needs coordinates).
     const placeWaypoints = waypoints.filter(
-      (wp) => !wp.isPerson && !wp.isChannel && wp.lat != null && wp.lng != null
+      (wp) => !wp.isPerson && !wp.isChannel && !wp.isBusiness && wp.lat != null && wp.lng != null
     );
     if (!map || placeWaypoints.length === 0) return;
 

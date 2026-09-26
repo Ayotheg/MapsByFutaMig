@@ -216,6 +216,14 @@ export default function AdminPanel({
                   data: { name: '', description: '', isChannel: true },
                 })
               }
+              onAddBusiness={() =>
+                setEditContext({
+                  type: 'waypoint',
+                  id: null,
+                  isNew: true,
+                  data: { name: '', description: '', isBusiness: true },
+                })
+              }
               pickingCoord={pickingCoord}
               onStartPicking={startPicking}
               pickedCoord={pickedCoord}
