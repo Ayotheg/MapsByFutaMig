@@ -1,0 +1,103 @@
+/*
+ * First-visit nudge: at the default entry zoom (MapShell's zoom-near
+ * tier — see waypointMarkers.css) waypoint markers are dot-only with no
+ * label, which reads as an empty map to someone who doesn't already know
+ * pinch/scroll zoom reveals place names. Bottom-center slot, same
+ * construction as SubmissionToast/OfflineBanner, but pushed up above
+ * that toast's bottom:28px/96px slot so the two never overlap on the
+ * rare chance a submission confirms in the first 5s of a first visit.
+ */
+.hint {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  z-index: 2300;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-track);
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.3;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--r-lg);
+  box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.12);
+  max-width: min(90vw, 360px);
+  text-align: left;
+  pointer-events: auto;
+  animation: hintIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+.hint.leaving {
+  animation: hintOut 280ms var(--v2-ease-standard) forwards;
+}
+
+.iconWrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(13, 148, 136, 0.12);
+  color: var(--v2-secondary);
+}
+
+.icon {
+  animation: iconPulse 1.6s ease-in-out infinite;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  margin: -4px -4px -4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--v2-neutral);
+  opacity: 0.6;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.close:hover {
+  opacity: 1;
+}
+
+@keyframes hintIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes hintOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to { opacity: 0; transform: translate(-50%, 8px); }
+}
+
+@keyframes iconPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint, .hint.leaving { animation: none; }
+  .icon { animation: none; }
+}
+
+@media (max-width: 768px) {
+  .hint {
+    bottom: 152px; /* clears the FAB cluster + mobile sheet peek */
+    font-size: 12.5px;
+    max-width: 92vw;
+  }
+}

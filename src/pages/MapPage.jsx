@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import MapShell from '../features/map/MapShell';
+import ZoomHint from '../features/map/ZoomHint';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
 import { useWaypoints } from '../features/waypoints/useWaypoints';
@@ -513,6 +514,7 @@ export default function MapPage({ onReadinessChange }) {
   return (
     <>
       <MapShell onMapReady={setMap} initialView={mapView} onViewChange={persistMapView} />
+      <ZoomHint map={map} />
       <OfflineBanner
         isOffline={isOffline}
         cachedAt={cachedAt}
