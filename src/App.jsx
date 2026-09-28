@@ -1,12 +1,12 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import './index.css'
-import HomeRoute from './pages/HomeRoute'
 import LoadingScreen from './pages/LoadingScreen'
 import NotFoundPage from './pages/NotFoundPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
 import LandingPage from './pages/LandingPage'
+import MaintenancePage from './pages/MaintenancePage'
 import PromotePage from './features/promote/PromotePage'
 import PromoteCallbackPage from './features/promote/PromoteCallbackPage'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
@@ -33,7 +33,7 @@ function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/map" element={<HomeRoute />} />
+        <Route path="/map" element={<MaintenancePage />} />
         {/* Landing spot for the "Forgot password?" email link. See
           useAuth.js's
             resetPassword() + ResetPasswordPage.jsx's header comment for

@@ -18,26 +18,26 @@ const ZOOM_CLOSE_THRESHOLD = 18;
  * small dots. This nudges them to zoom in without permanently cluttering
  * the UI for repeat visits.
  *
- * Dismisses itself three ways, whichever comes first: the 5s auto-timer,
- * the close button, or the person actually zooming in past the
- * zoom-close threshold (at which point they've already found the thing
- * being explained). Any of the three sets the localStorage flag so it
- * never shows again on this device.
+ * Dismisses itself after 5s, or immediately when closed or when the person
+ * zooms in past the zoom-close threshold. Only an intentional close or
+ * zoom-in sets the localStorage flag, so a missed toast can appear next visit.
  */
 export default function ZoomHint({ map }) {
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const timerRef = useRef(null);
 
-  const dismiss = useCallback(() => {
+  const dismiss = useCallback((remember = true) => {
     clearTimeout(timerRef.current);
     setLeaving(true);
     setTimeout(() => setVisible(false), FADE_MS);
-    try {
-      window.localStorage?.setItem(DISMISSED_KEY, '1');
-    } catch {
-      // Private-mode/storage-disabled browsers just see the hint again
-      // next visit -- not worth failing over for.
+    if (remember) {
+      try {
+        window.localStorage?.setItem(DISMISSED_KEY, '1');
+      } catch {
+        // Private-mode/storage-disabled browsers just see the hint again
+        // next visit -- not worth failing over for.
+      }
     }
   }, []);
 
@@ -54,7 +54,7 @@ export default function ZoomHint({ map }) {
 
     setVisible(true);
     setLeaving(false);
-    timerRef.current = setTimeout(dismiss, AUTO_DISMISS_MS);
+    timerRef.current = setTimeout(() => dismiss(false), AUTO_DISMISS_MS);
 
     const onZoomEnd = () => {
       if (map.getZoom() >= ZOOM_CLOSE_THRESHOLD) dismiss();
