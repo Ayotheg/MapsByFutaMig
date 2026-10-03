@@ -15,6 +15,7 @@ import './navMapLayers.css';
 import { track } from '../../lib/analytics';
 import { readPersistentState, removePersistentState, writePersistentState } from '../../lib/persistentState';
 import { escapeHtml } from '../../lib/escapeHtml';
+import { claimCompletion, createTripId, restoreTrip } from './navTrip';
 
 // Leaflet marker/popup content is raw HTML (not React), so the "arrived
 // destination" flag glyph below is a hand-built inline SVG matching
@@ -46,12 +47,18 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  *    unmounting is this port's equivalent "dormant" state, and is what
  *    makes this component a real lazy-load boundary instead of a
  *    permanently-resident one.
- *  - `onNavigationSuccess()` — new (no legacy equivalent): fired once per
- *    real arrival, for ANY destination — unlike `onArrival` above this is
- *    NOT gated on `isRateablePOI`. This is what MapPage uses to count a
- *    guest's free navigations (see `useGuestUsage.js`); a guest "using the
- *    map successfully" isn't about whether the place happens to support
- *    reviews.
+ *  - `onNavigationSuccess({ tripId })` — new (no legacy equivalent): fired
+ *    once per real arrival, for ANY destination — unlike `onArrival` above
+ *    this is NOT gated on `isRateablePOI`. MapPage uses it both to count a
+ *    guest's free navigations (see `useGuestUsage.js`) and to record a
+ *    signed-in user's completed navigation for their profile's
+ *    Navigations stat (navCompletion.js → `record_navigation_completion`).
+ *    "Once per trip" is enforced HERE, by `tripRef.completionReported`
+ *    (navTrip.js), which is persisted with the navigation session — so a
+ *    duplicate arrival tick, or a reload that restores an already-arrived
+ *    session and re-runs arrival detection, cannot fire it again. It is
+ *    NOT fired by opening navigation, cancelling, or closing the HUD. The
+ *    `tripId` lets the server make the count idempotent as well.
  *  - `guestNavBlocked` (bool) / `onGuestBlocked()` — the guest-limit gate
  *    itself. Checked at the top of `startNavigation()`, not just once at
  *    mount, so a guest who already has this controller open (e.g. picked a
@@ -134,6 +141,10 @@ const NavigationController = forwardRef(function NavigationController(
   const navArrivalCountRef = useRef(0);
   const navGpsTicksRef = useRef(0);
   const navArrivedRef = useRef(false);
+  // One id per navigation trip + whether its completion was already
+  // reported. Restored from the persisted session (so a reload can't
+  // re-report), replaced with a fresh trip in startNavigation().
+  const tripRef = useRef(restoreTrip(persistedNavigation));
   // Slice 14 instrumentation only — wall-clock start time for
   // nav_completed's duration_ms, not used by any navigation logic.
   const navStartTimeRef = useRef(null);
@@ -154,6 +165,8 @@ const NavigationController = forwardRef(function NavigationController(
       routeData: navRouteDataRef.current,
       stepIndex: navStepIndexRef.current,
       userPos: navUserPosRef.current,
+      tripId: tripRef.current.tripId,
+      completionReported: tripRef.current.completionReported,
     });
   }, []);
 
@@ -474,16 +487,26 @@ const NavigationController = forwardRef(function NavigationController(
     }));
     speak(`You have arrived at your destination, ${dest.name}!`);
     setArrivedBannerDest(dest.name);
+
+    // Completion side effects (analytics, guest free-nav tally, signed-in
+    // profile count) run at most once per trip. `navArrivedRef` above only
+    // guards one in-memory session; a reload mid-arrival restores the
+    // navigation with that ref reset, so the persisted `completionReported`
+    // flag is what actually prevents a double count. Persist it BEFORE
+    // calling out so even a crash/close right after can't re-report.
+    if (!claimCompletion(tripRef.current)) return;
+    persistNavigation();
     // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
     track('nav_completed', {
       from: 'My Location',
       to: dest.name,
       duration_ms: navStartTimeRef.current ? Date.now() - navStartTimeRef.current : null,
     });
-    // Counts towards the guest free-navigation limit regardless of
-    // destination type — see this file's header comment.
-    onNavigationSuccess?.();
-  }, [speak, onNavigationSuccess]);
+    // Counts towards the guest free-navigation limit / the signed-in
+    // user's Navigations stat regardless of destination type — see this
+    // file's header comment.
+    onNavigationSuccess?.({ tripId: tripRef.current.tripId });
+  }, [speak, onNavigationSuccess, persistNavigation]);
 
   const dismissArrivedBanner = useCallback(() => {
     const dest = navDestRef.current;
@@ -765,6 +788,8 @@ const NavigationController = forwardRef(function NavigationController(
     setNavActive(true);
     onActiveChange?.(true);
     navStartTimeRef.current = Date.now();
+    // New trip: fresh id, completion not yet reported.
+    tripRef.current = { tripId: createTripId(), completionReported: false };
     // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9). No named
     // origin exists for a live GPS fix, so "from" is a fixed label
     // rather than a guessed place name.

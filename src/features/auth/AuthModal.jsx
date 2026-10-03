@@ -4,6 +4,8 @@ import { CheckCircle2, TriangleAlert, X, Mail, Lock, User, Eye, EyeOff, LogOut }
 import styles from './AuthModal.module.css';
 import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
+import { fetchProfileStats, statTileValue } from './profileStats';
+import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
 import WhatsAppIcon from '../../lib/WhatsAppIcon';
 import { CONTACT_EMAIL, WHATSAPP_CHAT_URL } from '../../lib/contactInfo';
 import { track } from '../../lib/analytics';
@@ -93,35 +95,36 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
 
   // Profile stats — legacy's `loadProfileStats()` (app.js ~7379–7415),
   // fetched live each time the profile tab is shown.
-  const [stats, setStats] = useState({ reviews: '…', navs: '…' });
+  //
+  // Legacy reads `users/{uid}.reviewCount`/`.navCount` directly. This port
+  // reads the same two counters from `profiles` (supabase/profile_stats.sql):
+  // `review_count` is recomputed by triggers from the user's actual
+  // `reviews` rows, `nav_count` from recorded navigation completions
+  // (NavigationController → navCompletion.js → `record_navigation_completion`).
+  //
+  // Four explicit states (profileStats.js): loading, ready, missing (no
+  // profiles row), error (unreachable / timed out / schema not applied).
+  // Only `ready` shows numbers — a missing row or a failed query is shown
+  // as "—" plus a message and Retry, never as a valid-looking 0.
+  const [stats, setStats] = useState({ status: 'loading' });
+  const [statsAttempt, setStatsAttempt] = useState(0);
+  const userId = user?.id;
 
   useEffect(() => {
-    if (tab !== 'profile' || !user) return;
+    if (tab !== 'profile' || !userId) return;
     let cancelled = false;
-    (async () => {
-      // Legacy reads `users/{uid}.reviewCount`/`.navCount` directly.
-      // This port reads the same two counters from `profiles` (see
-      // FIREBASE_TO_SUPABASE_MIGRATION.md's "Step 7") — `review_count`
-      // is kept accurate by a trigger on every `reviews` insert (same
-      // "recompute, don't trust a client increment" pattern Step 6
-      // already used for waypoints' avg_rating). `nav_count` has no
-      // writer wired yet — see this file's own flag further down and
-      // Step 7's note — it will read back `0` until something increments
-      // it, which is accurate (zero tracked so far), not broken.
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('review_count, nav_count')
-        .eq('id', user.id)
-        .single();
-      if (cancelled) return;
-      if (error) {
-        setStats({ reviews: '—', navs: '—' });
-      } else {
-        setStats({ reviews: data.review_count ?? 0, navs: data.nav_count ?? 0 });
-      }
-    })();
+    setStats({ status: 'loading' });
+    fetchProfileStats(supabase, userId).then((result) => {
+      if (!cancelled) setStats(result);
+    });
     return () => { cancelled = true; };
-  }, [tab, user]);
+  }, [tab, userId, statsAttempt]);
+
+  // Sign-out: `signOut` rejects when Supabase returns an error (useAuth.js
+  // → signOut.js). Only a resolved call closes the modal; a failure keeps
+  // it open with the reason shown, since the user may still be signed in.
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const [signOutError, setSignOutError] = useState(null);
 
   function switchTab(next) {
     setTab(next);
@@ -185,8 +188,17 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
   }
 
   async function handleSignOut() {
-    await signOut();
-    onClose();
+    if (signOutBusy) return;
+    setSignOutError(null);
+    setSignOutBusy(true);
+    try {
+      await signOut();
+      onClose();
+    } catch (err) {
+      console.error('Sign out failed:', err);
+      setSignOutError(SIGN_OUT_FAILED_MESSAGE);
+      setSignOutBusy(false);
+    }
   }
 
   function enterSubmits(handler) {
@@ -287,18 +299,29 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
 
             <div className={styles.statsRow}>
               <div className={styles.stat}>
-                <div className={styles.statVal}>{stats.reviews}</div>
+                <div className={styles.statVal}>{statTileValue(stats, 'reviews')}</div>
                 <div className={styles.statLabel}>Reviews</div>
               </div>
               <div className={styles.stat}>
-                <div className={styles.statVal}>{stats.navs}</div>
+                <div className={styles.statVal}>{statTileValue(stats, 'navs')}</div>
                 <div className={styles.statLabel}>Navigations</div>
               </div>
             </div>
 
-            <button type="button" className={styles.signoutBtn} onClick={handleSignOut}>
+            {(stats.status === 'error' || stats.status === 'missing') && (
+              <div className={`${styles.status} ${styles.statusError}`} role="alert">
+                <TriangleAlert size={12} />
+                <span className={styles.statusText}>{stats.message}</span>
+                <button type="button" className={styles.statusAction} onClick={() => setStatsAttempt((n) => n + 1)}>
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {signOutError && <StatusMsg status={{ text: signOutError, error: true }} />}
+            <button type="button" className={styles.signoutBtn} onClick={handleSignOut} disabled={signOutBusy}>
               <LogOut size={14} />
-              Sign Out
+              {signOutBusy ? 'Signing out…' : 'Sign Out'}
             </button>
 
             {/* Support footer — sits below Sign Out, separated by a hairline,

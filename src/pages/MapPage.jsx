@@ -22,6 +22,7 @@ import ChipResultsPanel from '../features/search/ChipResultsPanel';
 import { useGpsTracking } from '../features/navigation/useGpsTracking';
 import { useAuth, friendlyError } from '../features/auth/useAuth';
 import { useGuestUsage } from '../features/auth/useGuestUsage';
+import { flushPendingNavCompletions, reportNavigationCompletion } from '../features/navigation/navCompletionClient';
 import { useAdminPin } from '../features/auth/useAdminPin';
 import { useSeo } from '../lib/useSeo';
 import { useOnlineStatus } from '../lib/useOnlineStatus';
@@ -228,6 +229,14 @@ export default function MapPage({ onReadinessChange }) {
     if (auth.user) guestUsage.reset();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.user]);
+
+  // Retry any completed navigations that couldn't be recorded earlier
+  // (offline / database unavailable). Safe to repeat: the server counts a
+  // given trip at most once. See navCompletion.js.
+  const signedInUserId = auth.user?.id ?? null;
+  useEffect(() => {
+    if (signedInUserId) flushPendingNavCompletions(signedInUserId);
+  }, [signedInUserId]);
 
   const handleRetryData = useCallback(() => {
     refetchWaypoints();
@@ -651,8 +660,12 @@ export default function MapPage({ onReadinessChange }) {
           }}
           guestNavBlocked={guestNavBlocked}
           onGuestBlocked={handleGuestNavBlocked}
-          onNavigationSuccess={() => {
+          onNavigationSuccess={({ tripId } = {}) => {
+            // Fired once per genuinely completed trip (see
+            // NavigationController's header). Guests feed the free-nav
+            // tally; signed-in users feed the profile's Navigations stat.
             if (!auth.user) guestUsage.recordUse();
+            else reportNavigationCompletion(auth.user.id, tripId);
           }}
         />
       )}
