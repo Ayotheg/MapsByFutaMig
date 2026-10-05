@@ -74,7 +74,7 @@ function toWaypointRow(record) {
     lat: record.lat,
     lng: record.lon,
     source_type: 'osm_import',
-    status: 'approved',
+    status: 'approved', 
   };
 }
 
