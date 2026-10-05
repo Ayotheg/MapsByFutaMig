@@ -2,7 +2,7 @@ import { useSeo } from '../../lib/useSeo'
 import LegalPageLayout from './LegalPageLayout'
 import './legal.css'
 
-const CONTACT_EMAIL = 'gearlifycorporation@gmail.com'
+const CONTACT_EMAIL = 'hello@mapsbyfuta.xyz'
 
 function PrivacyPolicy() {
   useSeo({ title: 'Privacy Policy – Maps By FUTA', robots: 'index, follow' })
@@ -62,7 +62,8 @@ function PrivacyPolicy() {
         Each of these may process technical data (like route coordinates)
         as part of delivering the feature — they don't receive your
         personal profile information.
-      </p>
+        </p>
+        <p>*Don't expect 100% performance, we rely on free and public services to power the map. </p>
 
       <h2>5. Data retention</h2>
       <p>

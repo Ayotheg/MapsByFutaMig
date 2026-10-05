@@ -2,7 +2,7 @@ import { useSeo } from '../../lib/useSeo'
 import LegalPageLayout from './LegalPageLayout'
 import './legal.css'
 
-const CONTACT_EMAIL = 'gearlifycorporation@gmail.com'
+const CONTACT_EMAIL = 'hello@mapsbyfuta.xyz'
 
 function TermsOfService() {
   useSeo({ title: 'Terms of Service – Maps By FUTA', robots: 'index, follow' })
