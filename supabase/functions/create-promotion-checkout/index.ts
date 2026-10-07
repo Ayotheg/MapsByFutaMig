@@ -22,9 +22,24 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { bachsRequest } from '../_shared/bachs.ts';
 
+// BUG FIX: this was missing entirely. The browser's supabase.functions.invoke()
+// sends an automatic OPTIONS preflight before the real POST (because it carries
+// an Authorization header) — without these headers and an explicit OPTIONS
+// handler, the browser blocks the actual request before it reaches this
+// function at all, and the client SDK reports it as a generic
+// "Failed to send a request to the Edge Function," which is what was happening.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   }
 
   let promotionId;
@@ -86,25 +101,19 @@ Deno.serve(async (req) => {
 
   let checkout;
   try {
-    // ⚠️ Product-based checkout, per _shared/bachs.ts's flag — Bachs's
-    // SDK examples check out against a pre-created Product rather than
-    // an ad-hoc amount. A fresh, single-use Product per promotion keeps
-    // this correct (never reuses/mutates a shared "Promotion" product
-    // that different campaigns' prices would fight over) at the cost of
-    // one extra API call per checkout. Replace this whole block with a
-    // direct ad-hoc-amount checkout call if/once step 2 of that flag's
-    // checklist finds one.
-    const product = await bachsRequest('/v1/products', {
+    // CONFIRMED (not a guess) by a real sandbox checkout + webhook
+    // round-trip run outside this repo: Bachs's checkout-sessions
+    // endpoint accepts an ad-hoc `pricing: { amount, currency }` body
+    // directly — no Product needs to exist first. The earlier version of
+    // this function created a one-off Product per checkout because the
+    // SDK examples only showed `product_cart`; that extra call (and the
+    // orphaned-Product cleanup it would've needed) is gone now that the
+    // ad-hoc path is proven to work. The endpoint path is also
+    // `/v1/checkout-sessions` (hyphen) — `/v1/checkout_sessions`
+    // (underscore) 404s.
+    checkout = await bachsRequest('/v1/checkout-sessions', {
       body: {
-        name: `Promotion (${promotion.days} day${promotion.days === 1 ? '' : 's'}) — ${promotion.business_name}`,
-        price: amount,
-        currency,
-      },
-    });
-
-    checkout = await bachsRequest('/v1/checkout_sessions', {
-      body: {
-        product_cart: [{ product_id: product.id, quantity: 1 }],
+        pricing: { amount, currency },
         success_url: successUrl,
         cancel_url: cancelUrl,
         // `reference` round-trips through BACHS and back onto the
@@ -112,7 +121,8 @@ Deno.serve(async (req) => {
         // metadata.promotion_id first and falls back to this if a given
         // event shape omits metadata, belt-and-suspenders since this is
         // the one link between "a payment happened" and "which row it's
-        // for."
+        // for." Both fields were confirmed present on real webhook
+        // payloads (event.data.reference, event.data.metadata).
         reference: promotion.id,
         metadata: { promotion_id: promotion.id },
       },
@@ -121,8 +131,14 @@ Deno.serve(async (req) => {
     return json({ error: `Could not start BACHS checkout: ${e.message}` }, 502);
   }
 
+  // Still genuinely unconfirmed: the earlier manual test proved the
+  // REDIRECT worked (browser reached Bachs's hosted page), but never
+  // printed this response body, so the exact field name carrying that
+  // URL wasn't logged. Keep both guesses until the first real deploy
+  // logs `checkout` and confirms which one it actually is.
   const checkoutUrl = checkout.url || checkout.checkout_url;
   if (!checkoutUrl) {
+    console.error('[create-promotion-checkout] no url/checkout_url on response:', JSON.stringify(checkout));
     return json({ error: 'BACHS did not return a checkout URL.' }, 502);
   }
 
@@ -145,6 +161,6 @@ Deno.serve(async (req) => {
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...corsHeaders },
   });
 }

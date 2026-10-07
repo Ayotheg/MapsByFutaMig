@@ -8,24 +8,16 @@
 // for whoever integrates this to diff against Bachs's real API reference
 // and fix any drift between what's guessed here and what's actually true).
 //
-// ⚠️ FLAGGED, NOT CONFIRMED — read before deploying:
-// The request/response shapes below (`/v1/products`, `/v1/checkout_sessions`,
-// field names like `product_cart`/`success_url`/`checkout_url`) are
-// reconstructed from Bachs's public SDK READMEs (bachs-io Python SDK,
-// zeevx/php-bachs) as of Sept 2026 — this session had no direct access to
-// Bachs's own REST API reference or an OpenAPI spec, only SDK usage
-// examples. Before this goes live:
-//   1. Sign up at https://bachs.io, get a sandbox key (sk_sandbox_...).
-//   2. Open the real API reference (linked from the dashboard) and confirm
-//      the exact paths/fields against what's used below — the SDKs
-//      strongly imply a *product-based* checkout (you create a Product,
-//      then check out against it) rather than an ad-hoc "just charge this
-//      amount" call. If Bachs's dashboard exposes a simpler ad-hoc-amount
-//      checkout endpoint, prefer it and delete the create-a-Product step
-//      entirely — it's only here because that's what the SDK examples
-//      show, not because it's confirmed to be the only way.
-//   3. Run one real sandbox checkout end-to-end and confirm the webhook
-//      fires with the shape bachs-webhook/index.ts expects.
+// CONFIRMED against a real sandbox account (not just SDK READMEs):
+// `/v1/checkout-sessions` (hyphen) accepts an ad-hoc
+// `{ pricing: { amount, currency }, success_url, cancel_url, reference,
+// metadata }` body directly — no `/v1/products` step needed, and no
+// `product_cart`. A real sandbox checkout + webhook round-trip confirmed
+// the whole flow end-to-end, including the webhook signature scheme (see
+// bachs-webhook/index.ts). Still genuinely unconfirmed: the exact field
+// name on the checkout-sessions response carrying the hosted page URL
+// (create-promotion-checkout/index.ts guesses `url` or `checkout_url` —
+// check its console.error output on first real deploy to settle this).
 
 const BACHS_BASE_URL = Deno.env.get('BACHS_BASE_URL') ?? 'https://sandbox-api.bachs.io';
 const BACHS_SECRET_KEY = Deno.env.get('BACHS_SECRET_KEY');

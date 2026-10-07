@@ -122,57 +122,62 @@ Don't add a client-side "mark as paid" path anywhere, ever, even as a
 fallback for a slow webhook — that defeats the entire reason this needs a
 webhook at all.
 
-## 3. BACHS API shape — what's assumed, what needs confirming
+## 3. BACHS API shape — what's confirmed, what's still open
 
-⚠️ **This section is the least certain part of this doc.** It's built from
-BACHS's public SDK READMEs (`bachs-io` Python SDK, `zeevx/php-bachs`), not
-a directly-read API reference — this session didn't have a BACHS account
-to check against. Treat every field name/path below as "probably right,
-verify before relying on it," which is also called out inline in
-`supabase/functions/_shared/bachs.ts` and `bachs-webhook/index.ts`.
+This section was originally written from SDK READMEs alone, flagged as
+"least certain." It's since been updated after a real sandbox account ran
+the actual flow end-to-end (checkout creation → hosted payment page →
+webhook delivery → signature verification), outside this specific repo
+checkout but against the same Bachs API this integration targets. Most of
+what was flagged is now resolved.
 
-**Confirmed with reasonable confidence** (consistent across multiple
-independent SDKs, so likely accurate):
+**Confirmed by an actual sandbox run (not SDK inference):**
 - Auth: `Authorization: Bearer sk_sandbox_...` / `sk_live_...`
-- Base URLs: `https://sandbox-api.bachs.io` and `https://api.bachs.io` —
-  environment is implied by which key prefix you use, not a separate flag
-- Amounts are **major units** (naira, not kobo) — do not multiply/divide
-  by 100 anywhere in this integration
-- IDs are prefixed and opaque: `cust_`, `prod_`, `chk_`, `evt_`, etc.
-- Webhook headers: `X-Bachs-Timestamp`, `X-Bachs-Signature`, HMAC-SHA256,
-  with a tolerance window (SDK default 300s) against replay
+- Base URLs: `https://sandbox-api.bachs.io` and `https://api.bachs.io`
+- Amounts are **major units** (naira, not kobo) in the *request* — e.g.
+  send `500` for ₦500. Note: amounts come back in *webhook payloads* as
+  strings like `"500.00"`, not numbers — parse before doing arithmetic on
+  them, though nothing in this integration currently needs to.
+- IDs are prefixed and opaque: `cust_`, `chk_`, `ch_`, `evt_`, `acct_`
+- **Checkout endpoint is `/v1/checkout-sessions` (hyphen)** —
+  `/v1/checkout_sessions` (underscore) 404s. Fixed in `bachs.ts`'s caller.
+- **No Product needed.** An ad-hoc `pricing: { amount, currency }` body on
+  the checkout-sessions call works directly — the Product-creation step
+  has been removed from `create-promotion-checkout/index.ts` entirely.
 - Checkout sessions take `success_url`, `cancel_url`, `reference`,
-  `metadata` — all threaded through in `create-promotion-checkout`
-- Common webhook event types: `checkout.completed`, `checkout.expired`,
-  `collection.succeeded`, `collection.failed`, `collection.underpaid`
+  `metadata` — confirmed present on both the request and round-tripped
+  onto the resulting webhook event (`event.data.reference`,
+  `event.data.metadata`).
+- Webhook signature: `X-Bachs-Timestamp` + `X-Bachs-Signature` headers
+  (and an equivalent combined `X-Bachs-Signature-V2: t=...,v1=...`),
+  HMAC-SHA256 over `${timestamp}.${rawBody}`, verified against a real
+  delivery and confirmed to pass with the correct secret and fail with a
+  wrong one.
+- Real webhook event shape, confirmed byte-for-byte:
+  `{ id, type, created_at, organization_id, data }`. Event types seen:
+  `checkout.completed` (data: `checkout_id`, `status`, `payment_status`,
+  `amount`, `currency`, `reference`, `customer`, `charge: { id, ... }`,
+  `metadata`) and `collection.succeeded` (data: `charge_id`,
+  `checkout_id`, `status: "SUCCEEDED"`, `amount`, `currency`, `reference`,
+  `metadata`).
 
-**Genuinely uncertain — confirm before going live:**
-- **Product-based vs. ad-hoc checkout.** Every SDK example builds a
-  checkout from a `product_cart: [{ product_id, quantity }]` — meaning you
-  create a Product first, then check out against it. There's no example
-  anywhere in what this session could find of "just charge ₦3,500, no
-  Product needed." `create-promotion-checkout/index.ts` currently creates
-  a fresh one-off Product per checkout as a workaround. **If BACHS's
-  dashboard has a simpler ad-hoc-amount checkout, use that instead** — it
-  removes an API call and a class of "orphaned Product" cleanup this
-  workaround otherwise accumulates.
-- **Exact REST paths.** `/v1/products` and `/v1/checkout_sessions` are
-  inferred from the SDKs' method names (`client.products.create`,
-  `client.checkouts.create_checkout_session`), not read directly off a
-  path table.
-- **Exact webhook payload shape.** `event.data.metadata.promotion_id` and
-  `event.data.reference` are both read as fallbacks for where the
-  promotion id round-trips — confirm which one (or something else
-  entirely) BACHS actually puts it on by triggering one real sandbox event
-  and logging the raw body.
-- **The signed string for the HMAC.** `bachs-webhook/index.ts` signs
-  `${timestamp}.${rawBody}` — this exact concatenation format (separator,
-  what's included) is inferred from the PHP SDK's description, not
-  independently verified byte-for-byte.
+**Fixed a real bug this uncovered:** the webhook handler read
+`event.data?.id` for `bachs_payment_id`, but neither real event type has
+a top-level `data.id` — it would have written `null` every time. Now
+reads `data.charge_id ?? data.charge?.id ?? data.checkout_id`.
 
-None of this blocks writing the code (done), but all of it should be
-checked against BACHS's own docs/dashboard, or by logging one real sandbox
-request/webhook delivery, before this handles real money.
+**Still genuinely unconfirmed:**
+- **The checkout-sessions response's URL field name.** The real test
+  proved the *redirect* worked (browser reached Bachs's hosted page) but
+  never logged the creation response body, so whether it's `.url`,
+  `.checkout_url`, or something else is still a guess (both are checked).
+  `create-promotion-checkout/index.ts` now logs the raw response if
+  neither is present — check Supabase function logs on first real deploy.
+- Whether live mode needs a *separate* webhook registration from sandbox
+  in Bachs's dashboard (observed to be the case via their UI's
+  "Switch to live" toggle, which appears to scope API keys AND webhook
+  endpoints separately) — register one under live mode too, don't assume
+  the sandbox one carries over.
 
 ## 4. Edge Functions reference
 

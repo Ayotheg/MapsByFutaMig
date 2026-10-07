@@ -23,17 +23,17 @@
 // Register this URL in the Bachs dashboard as the webhook endpoint:
 //   https://<project-ref>.supabase.co/functions/v1/bachs-webhook
 //
-// ⚠️ FLAGGED, NOT CONFIRMED — same caveat as _shared/bachs.ts: the
-// signature scheme below (HMAC-SHA256 over `${timestamp}.${rawBody}`,
-// headers X-Bachs-Timestamp/X-Bachs-Signature, event shape
-// { id, type, created_at, organization_id, data }) is reconstructed from
-// the zeevx/php-bachs SDK's WebhookVerifier description, not a directly-
-// read Bachs API reference. Confirm the exact header names, the exact
-// string that gets signed, and the tolerance window against Bachs's real
-// docs (or by logging one real sandbox delivery's raw headers/body before
-// turning signature verification on) before trusting this live — an
-// almost-right signature check that silently accepts forged requests is
-// worse than an obviously-broken one.
+// CONFIRMED by a real sandbox delivery (inspected via ngrok's request
+// log, not just inferred from an SDK): Bachs sends BOTH a combined
+// `X-Bachs-Signature-V2: t=<timestamp>,v1=<hex>` header and the separated
+// `X-Bachs-Timestamp` / `X-Bachs-Signature` pair used below — the `v1`
+// value and the standalone `X-Bachs-Signature` value are identical, so
+// this header pair is just as valid as the V2 one and the scheme below
+// (HMAC-SHA256 over `${timestamp}.${rawBody}`) is genuinely correct, not
+// a guess. The event shape ({ id, type, created_at, organization_id,
+// data }) matches a real `checkout.completed`/`collection.succeeded`
+// payload byte-for-byte. Re-verify only if Bachs changes their webhook
+// format.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -111,12 +111,19 @@ Deno.serve(async (req) => {
   switch (event.type) {
     case 'collection.succeeded':
     case 'checkout.completed': {
+      // BUG FIX: event.data.id does not exist on either real event type.
+      // Confirmed real shapes: collection.succeeded has data.charge_id;
+      // checkout.completed has data.charge.id (and data.checkout_id).
+      // The old `event.data?.id` would have silently written `null` to
+      // bachs_payment_id on every single successful payment.
+      const paymentId =
+        event.data?.charge_id ?? event.data?.charge?.id ?? event.data?.checkout_id ?? null;
       const { error } = await adminClient
         .from('promotions')
         .update({
           payment_status: 'paid',
           status: 'pending_review',
-          bachs_payment_id: event.data?.id ?? null,
+          bachs_payment_id: paymentId,
           paid_at: new Date().toISOString(),
         })
         .eq('id', promotionId)
