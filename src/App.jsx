@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import './index.css'
 import LoadingScreen from './pages/LoadingScreen'
+import HomeRoute from './pages/HomeRoute'
 import NotFoundPage from './pages/NotFoundPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
