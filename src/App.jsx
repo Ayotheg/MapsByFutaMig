@@ -6,7 +6,6 @@ import NotFoundPage from './pages/NotFoundPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 
 import LandingPage from './pages/LandingPage'
-import MaintenancePage from './pages/MaintenancePage'
 import PromotePage from './features/promote/PromotePage'
 import PromoteCallbackPage from './features/promote/PromoteCallbackPage'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
