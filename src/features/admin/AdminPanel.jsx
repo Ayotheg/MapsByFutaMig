@@ -5,6 +5,7 @@ import RoutesTab from './RoutesTab';
 import KmlTab from './KmlTab';
 import QuickChipsTab from './QuickChipsTab';
 import PendingTab from './PendingTab';
+import PromotionsTab from './PromotionsTab';
 import AdminEditModal from './AdminEditModal';
 import { useAdminKml } from './useAdminKml';
 import InsightsErrorBoundary from '../analytics/InsightsErrorBoundary';
@@ -33,6 +34,7 @@ const TABS = [
   { key: 'kml', label: 'KML Upload' },
   { key: 'chips', label: 'Chips' },
   { key: 'pending', label: 'Pending' },
+  { key: 'promotions', label: 'Promotions' },
   { key: 'insights', label: 'Insights' },
 ];
 
@@ -68,6 +70,7 @@ export default function AdminPanel({
   const [pickingCoord, setPickingCoord] = useState(false);
   const [pickedCoord, setPickedCoord] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [promoCount, setPromoCount] = useState(0);
   const clickHandlerRef = useRef(null);
 
   const adminKml = useAdminKml({ map, onSelect, searchRegister });
@@ -87,6 +90,15 @@ export default function AdminPanel({
       .eq('status', 'pending')
       .then(({ count, error }) => {
         if (!cancelled && !error && typeof count === 'number') setPendingCount(count);
+      });
+    // Paid promotions waiting on review — same cheap head-only count.
+    supabase
+      .from('promotions')
+      .select('id', { count: 'exact', head: true })
+      .eq('payment_status', 'paid')
+      .eq('status', 'pending_review')
+      .then(({ count, error }) => {
+        if (!cancelled && !error && typeof count === 'number') setPromoCount(count);
       });
     return () => {
       cancelled = true;
@@ -191,6 +203,9 @@ export default function AdminPanel({
                   {t.key === 'pending' && pendingCount > 0 && (
                     <span className={styles.atabCount}>{pendingCount}</span>
                   )}
+                  {t.key === 'promotions' && promoCount > 0 && (
+                    <span className={styles.atabCount}>{promoCount}</span>
+                  )}
                 </button>
               );
             })}
@@ -252,6 +267,7 @@ export default function AdminPanel({
           {activeTab === 'pending' && (
             <PendingTab onRefreshWaypoints={onWaypointsChanged} onCountChange={setPendingCount} />
           )}
+          {activeTab === 'promotions' && <PromotionsTab onCountChange={setPromoCount} onRefreshWaypoints={onWaypointsChanged} />}
           {activeTab === 'insights' && (
             <InsightsErrorBoundary>
               <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: '#94a3b8', fontSize: 11 }}>Loading insights…</div>}>

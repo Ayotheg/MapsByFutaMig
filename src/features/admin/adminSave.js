@@ -347,6 +347,50 @@ export async function rejectWaypoint(id, reason) {
   track('admin_action', { action: 'reject', entity: 'waypoint_submission' });
 }
 
+// ── Promotions (paid business listings) ──────────────────────────────────
+// Go through SECURITY DEFINER functions (supabase/promotions_admin.sql), not
+// a table UPDATE — promotions has no client UPDATE policy on purpose, since
+// payment columns share the row. The functions check is_admin() themselves
+// and only allow a paid, 'pending_review' row to change.
+export async function approvePromotion(id) {
+  // Publishes the listing in one database transaction: creates the approved
+  // waypoint (map pin for a Physical Shop, link-out business card for an
+  // Online Store), features it in Explore as Promoted, copies the photos,
+  // and starts the paid duration. Returns the new waypoint id.
+  const { data, error } = await supabase.rpc('admin_approve_promotion', { p_id: id });
+  if (error) throw promotionRpcError(error, 'approve');
+  track('admin_action', { action: 'approve', entity: 'promotion' });
+  return data;
+}
+
+/** Un-features promotions whose paid days have run out. Best-effort — a
+ * failure here must never block the review screen. */
+export async function expireEndedPromotions() {
+  try {
+    const { data } = await supabase.rpc('expire_promotions');
+    return typeof data === 'number' ? data : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function rejectPromotion(id, reason) {
+  const { error } = await supabase.rpc('admin_reject_promotion', { p_id: id, p_reason: reason || null });
+  if (error) throw promotionRpcError(error, 'reject');
+  track('admin_action', { action: 'reject', entity: 'promotion' });
+}
+
+function promotionRpcError(error, verb) {
+  const missing = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
+  if (missing) {
+    return new Error(
+      `Could not ${verb} this promotion — the database function is missing. ` +
+        'Run supabase/promotions_admin.sql in the Supabase SQL editor.'
+    );
+  }
+  return new Error(error.message || `Could not ${verb} this promotion.`);
+}
+
 // ── Segments ─────────────────────────────────────────────────────────────
 // Legacy: `adminSaveBtn`'s segment branch (app.js ~4156–4197) also
 // batch-writes a denormalized `segmentName` onto every child waypoint doc.

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
@@ -156,6 +156,30 @@ export default function PromotePage() {
   const [submitError, setSubmitError] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
+  // Returning from the payment provider with the browser's Back button.
+  //
+  // handleCheckout() leaves `submitting` true on purpose when it succeeds
+  // (the page is about to be replaced by BACHS's hosted checkout). But
+  // browsers keep this page in the back/forward cache (bfcache) when it's
+  // navigated away from, so pressing Back restores the page *frozen exactly
+  // as it was* — React state included — with no remount and no re-run of
+  // any effect. `submitting` is still true, so the button keeps showing
+  // "Starting checkout…" and spinning forever, whether the payment went
+  // through or was abandoned. `pageshow` with `event.persisted === true`
+  // is the one signal that fires in that case, so reset the in-flight
+  // state there. (A normal, non-cached load starts from fresh state and
+  // never hits this.)
+  useEffect(() => {
+    function handlePageShow(event) {
+      if (event.persisted) {
+        setSubmitting(false);
+        setSubmitError(null);
+      }
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
   const activePlatform = useMemo(
     () => CONTACT_PLATFORMS.find((p) => p.id === contactPlatform) ?? CONTACT_PLATFORMS[0],
     [contactPlatform],
@@ -277,7 +301,9 @@ export default function PromotePage() {
     // No `finally { setSubmitting(false) }` on the success path on purpose
     // — the browser is about to navigate away to BACHS, so leaving the
     // button disabled/spinning until that navigation actually happens
-    // is correct, not a bug.
+    // is correct, not a bug. If the person comes back via the browser's
+    // Back button (bfcache restore), the `pageshow` listener above resets
+    // `submitting` so the button doesn't stay stuck.
   }
 
   return (
