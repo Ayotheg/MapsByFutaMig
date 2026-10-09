@@ -33,7 +33,7 @@ function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/map" element={<MaintenancePage />} />
+        <Route path="/map" element={<HomeRoute />} />
         {/* Landing spot for the "Forgot password?" email link. See
           useAuth.js's
             resetPassword() + ResetPasswordPage.jsx's header comment for
