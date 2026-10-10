@@ -24,7 +24,7 @@ import styles from './ExploreChannelLink.module.css';
  */
 export default function ExploreChannelLink({ variant = 'text', source }) {
   const linkProps = {
-    href: '/',
+    href: '/promote',
     onClick: () => track('whatsapp_channel_click', { source }),
   };
 

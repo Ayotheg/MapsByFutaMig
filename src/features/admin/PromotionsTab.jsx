@@ -4,7 +4,7 @@ import PlaceImage from '../../components/ui/PlaceImage';
 import styles from './AdminPanel.module.css';
 import ownStyles from './PendingTab.module.css';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
-import { approvePromotion, rejectPromotion, expireEndedPromotions } from './adminSave';
+import { approvePromotion, rejectPromotion, removePromotion, expireEndedPromotions } from './adminSave';
 import { track } from '../../lib/analytics';
 import { formatNaira } from '../promote/pricing';
 
@@ -22,12 +22,15 @@ import { formatNaira } from '../promote/pricing';
  * supabase/promotions_admin.sql). Approving PUBLISHES: a Physical Shop
  * becomes an approved map waypoint, an Online Store becomes a link-out
  * business waypoint; both are featured in Explore as Promoted for the
- * paid number of days, then un-featured (expire_promotions).
+ * paid number of days, then un-featured (expire_promotions). An admin can
+ * also take a live one down early (Remove now) or erase it (Delete) from the
+ * Approved tab — admin_remove_promotion deletes the published waypoint too.
  */
 const FILTERS = [
   { key: 'review', label: 'Needs review', match: (q) => q.eq('payment_status', 'paid').eq('status', 'pending_review') },
   { key: 'approved', label: 'Approved', match: (q) => q.eq('status', 'approved') },
   { key: 'rejected', label: 'Rejected', match: (q) => q.eq('status', 'rejected') },
+  { key: 'removed', label: 'Removed', match: (q) => q.eq('status', 'removed') },
   { key: 'unpaid', label: 'Unpaid', match: (q) => q.in('payment_status', ['unpaid', 'failed', 'expired']) },
 ];
 
@@ -42,6 +45,7 @@ const REVIEW_LABEL = {
   pending_review: 'Pending review',
   approved: 'Approved',
   rejected: 'Rejected',
+  removed: 'Removed',
 };
 
 function Pill({ bg, fg, children }) {
@@ -77,6 +81,8 @@ export default function PromotionsTab({ onCountChange, onRefreshWaypoints }) {
   const [busyId, setBusyId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
+  // Two-step confirm for taking a live listing down: { id, erase }.
+  const [removing, setRemoving] = useState(null);
 
   async function load(activeFilter = filter) {
     setLoading(true);
@@ -158,6 +164,33 @@ export default function PromotionsTab({ onCountChange, onRefreshWaypoints }) {
     }
   }
 
+  async function submitRemove() {
+    if (!removing) return;
+    const { id, erase } = removing;
+    setBusyId(id);
+    setError(null);
+    try {
+      const { photoError } = await removePromotion(id, { erase });
+      setRemoving(null);
+      // The listing must disappear from the map / Explore straight away.
+      onRefreshWaypoints?.();
+      await load();
+      // load() clears the error line, so surface this after it. The listing
+      // IS gone; only the photo files in Storage are left to clear by hand.
+      if (photoError) {
+        setError(
+          `Removed, but its photo files couldn't be deleted from storage (${photoError}). ` +
+            'Delete them from the place-images bucket in Supabase (promotion/ folder).'
+        );
+      }
+    } catch (e) {
+      setError(e.message || 'Could not remove that promotion.');
+      track('error_occurred', { context: 'admin_remove_promotion', message: e?.message || String(e) });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function submitReject(id) {
     setBusyId(id);
     setError(null);
@@ -234,7 +267,12 @@ export default function PromotionsTab({ onCountChange, onRefreshWaypoints }) {
             <div className={ownStyles.submitter}>
               Submitted by {p.submitterName} · {when(p.created_at)}
             </div>
-            {p.status === 'approved' && p.promo_ends_at && (
+            {p.status === 'approved' && !p.waypoint_id && (
+              <div className={ownStyles.submitter}>
+                Its listing was deleted outside this panel — nothing is live. Use Delete to clear this record.
+              </div>
+            )}
+            {p.status === 'approved' && p.waypoint_id && p.promo_ends_at && (
               <div className={ownStyles.submitter}>
                 {new Date(p.promo_ends_at) > new Date()
                   ? `Live on ${p.listing_type === 'physical' ? 'the map + Explore' : 'Explore'} until ${when(p.promo_ends_at)}`
@@ -265,6 +303,46 @@ export default function PromotionsTab({ onCountChange, onRefreshWaypoints }) {
             ) : (
               <div className={ownStyles.noPhoto}>No photo attached</div>
             )}
+
+            {(filter === 'approved' || filter === 'removed') &&
+              (removing?.id === p.id ? (
+                <div className={ownStyles.rejectForm}>
+                  <div className={styles.itemMeta}>
+                    {removing.erase
+                      ? 'Delete this promotion permanently? The live listing and its photos are removed and the record (including payment details) is erased. This cannot be undone.'
+                      : 'Remove this listing now, before it expires? It leaves the map and Explore immediately. Its photos are deleted too. The record is kept under Removed.'}
+                  </div>
+                  <div className={ownStyles.cardActions}>
+                    <button type="button" className={styles.formCancel} onClick={() => setRemoving(null)}>
+                      Cancel
+                    </button>
+                    <button type="button" className={ownStyles.rejectBtn} onClick={submitRemove} disabled={busyId === p.id}>
+                      {busyId === p.id ? 'Working…' : removing.erase ? 'Yes, delete permanently' : 'Yes, remove now'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className={ownStyles.cardActions}>
+                  <button
+                    type="button"
+                    className={ownStyles.rejectBtn}
+                    onClick={() => setRemoving({ id: p.id, erase: true })}
+                    disabled={busyId === p.id}
+                  >
+                    Delete
+                  </button>
+                  {p.status === 'approved' && (
+                    <button
+                      type="button"
+                      className={styles.formSave}
+                      onClick={() => setRemoving({ id: p.id, erase: false })}
+                      disabled={busyId === p.id || !p.waypoint_id}
+                    >
+                      Remove now
+                    </button>
+                  )}
+                </div>
+              ))}
 
             {canReview &&
               (rejectingId === p.id ? (

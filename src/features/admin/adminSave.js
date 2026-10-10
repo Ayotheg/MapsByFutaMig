@@ -363,6 +363,53 @@ export async function approvePromotion(id) {
   return data;
 }
 
+/**
+ * Takes a live promotion down before its expiry date. `erase: false` removes
+ * the listing from the map/Explore but keeps the promotion record (status
+ * "removed"); `erase: true` also deletes the record. Both delete the
+ * published waypoint (what the app actually reads) AND the business's photo
+ * files from the `place-images` bucket — a DB cascade can't reach Storage,
+ * so the files are removed here, after the database step has succeeded.
+ *
+ * Order matters: paths are read first (they're gone from the DB afterwards),
+ * the database is cleaned next (the source of truth — if that fails nothing
+ * has been destroyed), and the files go last. A failure at that last step
+ * doesn't undo the removal; it's reported via `photoError` so the caller can
+ * tell the admin which files to clear by hand.
+ *
+ * @returns {Promise<{ photoCount: number, photoError: string|null }>}
+ */
+export async function removePromotion(id, { erase = false } = {}) {
+  // Every photo this business has: its promotion_images rows, plus any
+  // waypoint_images rows on the published listing (Approve copies the same
+  // paths across, but an admin may have added more via the edit form).
+  const paths = new Set();
+  const { data: promo } = await supabase.from('promotions').select('waypoint_id').eq('id', id).maybeSingle();
+  const { data: promoImgs } = await supabase.from('promotion_images').select('storage_path').eq('promotion_id', id);
+  for (const r of promoImgs || []) if (r.storage_path) paths.add(r.storage_path);
+  if (promo?.waypoint_id) {
+    const { data: wpImgs } = await supabase
+      .from('waypoint_images')
+      .select('storage_path')
+      .eq('waypoint_id', promo.waypoint_id);
+    for (const r of wpImgs || []) if (r.storage_path) paths.add(r.storage_path);
+  }
+
+  const { error } = await supabase.rpc('admin_remove_promotion', { p_id: id, p_erase: erase });
+  if (error) throw promotionRpcError(error, erase ? 'delete' : 'remove');
+  track('admin_action', { action: erase ? 'delete' : 'remove', entity: 'promotion' });
+
+  let photoError = null;
+  if (paths.size) {
+    try {
+      await removeStorageFiles([...paths]);
+    } catch (e) {
+      photoError = e?.message || 'unknown error';
+    }
+  }
+  return { photoCount: paths.size, photoError };
+}
+
 /** Un-features promotions whose paid days have run out. Best-effort — a
  * failure here must never block the review screen. */
 export async function expireEndedPromotions() {
