@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node scripts/escape.test.mjs && node scripts/sw.test.mjs && node scripts/tileHealth.test.mjs",
+    "test": "node scripts/escape.test.mjs && node scripts/sw.test.mjs && node scripts/tileHealth.test.mjs && node scripts/profileStats.test.mjs && node scripts/navCompletion.test.mjs",
     "build": "npm run test && vite build && vite build --ssr src/entry-server.jsx --outDir dist-ssr && node scripts/prerender.mjs",
     "build:client-only": "vite build",
     "lint": "oxlint",

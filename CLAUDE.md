@@ -347,10 +347,15 @@ early "just in case."
   but not called from anywhere that session — Slice 11 (above) is what
   wired them up. Schema: `FIREBASE_TO_SUPABASE_MIGRATION.md`'s new "Step
   7" (`reviews.user_id` + a `profiles` table for review/nav counts, not
-  yet applied to the live database). `nav_count` has no writer wired —
-  flagged deliberately, legacy's own signal for it is a dismissal
-  counter, not a completion counter, porting it faithfully means porting
-  a bug. Also created `.env.example` (referenced by
+  yet applied to the live database). `nav_count` was originally left
+  without a writer (legacy's own signal for it is a dismissal counter,
+  not a completion counter — porting it faithfully means porting a bug).
+  It now counts genuine arrivals only: `NavigationController`'s
+  `arrivedAtDestination` → `navCompletion.js` → the idempotent
+  `record_navigation_completion` RPC, defined with the rest of the
+  profile fixes in `supabase/profile_stats.sql` (must be run manually in
+  Supabase — see that file and `FIREBASE_TO_SUPABASE_MIGRATION.md`'s
+  "Step 7 follow-up"). Also created `.env.example` (referenced by
   `README.md`/`src/lib/supabase.js` since Slice 2, never actually
   committed — an unrelated pre-existing gap, fixed in passing since its
   contents were unambiguous). Full detail + every flagged decision (the
