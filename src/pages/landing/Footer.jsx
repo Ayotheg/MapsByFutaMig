@@ -5,7 +5,7 @@ import WhatsAppIcon from '../../lib/WhatsAppIcon'
 import { WHATSAPP_CHANNEL_URL } from '../../lib/whatsappChannel'
 
 const CROWDR_DONATE_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
-const CONTACT_EMAIL = 'gearlifycorporation@gmail.com'
+const CONTACT_EMAIL = 'hello@mapsbyfuta.xyz'
 // wa.me click-to-chat API — full international number, no "+" or leading zero.
 const WHATSAPP_NUMBER = '2348101734037'
 

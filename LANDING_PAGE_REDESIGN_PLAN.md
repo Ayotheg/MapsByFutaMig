@@ -756,7 +756,7 @@ Two small fixes:
    then `MessageCircle` for WhatsApp) in tinted violet circles
    (`--land-accent-tint-bg`, same hover-darken treatment as the Crowdr
    pill), `gap: 12` between all three. Email icon links to
-   `mailto:gearlifycorporation@gmail.com`; WhatsApp icon links to the
+   `mailto:hello@mapsbyfuta.xyz`; WhatsApp icon links to the
    standard `wa.me` click-to-chat API (`https://wa.me/2348101734037` —
    full international number, no `+` or leading zero) and opens in a
    new tab like the other external footer links. No brand-logo asset

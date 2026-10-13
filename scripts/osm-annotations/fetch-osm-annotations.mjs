@@ -213,7 +213,7 @@ async function runOverpassQuery(query, { endpoints, timeoutSec }) {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Accept: 'application/json',
-          'User-Agent': 'MapsByFutaMig-OSM-annotations-script/1.0 (contact: kemmiebabk@gmail.com)',
+          'User-Agent': 'MapsByFutaMig-OSM-annotations-script/1.0 (contact: hello@mapsbyfuta.xyz)',
         },
         body: 'data=' + encodeURIComponent(query),
         signal: controller.signal,
