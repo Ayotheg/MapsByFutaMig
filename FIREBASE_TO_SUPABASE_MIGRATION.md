@@ -565,8 +565,13 @@ create policy "profiles_select_own" on profiles
   for select using (auth.uid() = id);
 ```
 
-**`nav_count` has no writer wired this slice — flagged, not an
-oversight.** Legacy's own signal for it (`patchNavCountWithAuth`, app.js
+> **Superseded by "Step 7 follow-up" below.** The SQL block above is the
+> *original* Step 7 and has two defects (details below). Do not rely on it
+> alone — run `supabase/profile_stats.sql`, which is idempotent and
+> replaces/repairs it.
+
+**`nav_count` had no writer in the original Step 7 — flagged, not an
+oversight (now resolved: see "Step 7 follow-up").** Legacy's own signal for it (`patchNavCountWithAuth`, app.js
 ~7474–7488) increments on every `navHudClose` click, regardless of
 whether navigation actually reached the destination — it's a dismissal
 counter, not a completion counter, and would over-count relative to what
@@ -580,10 +585,11 @@ Flagged here for whichever future slice decides how navigations should
 actually be counted.
 
 **RLS on `profiles`:** only a `select`-own policy is added above —
-nothing needs to `insert`/`update` it directly from the client (the
-`handle_new_user`/`recompute_profile_review_count` triggers do both,
-running as the function owner via `security definer`/definer-context,
-not the requesting user's role).
+nothing needs to `insert`/`update` it directly from the client. *(The
+original text here said the triggers run "as the function owner via
+`security definer`/definer-context". That was true of `handle_new_user`
+but **not** of `recompute_profile_review_count()` above, which is a plain
+invoker-rights function — see defect 1 below.)*
 
 **Not yet confirmed against a live database** — same caveat as every
 other schema block in this doc (Steps 0/4/6): written from the legacy
@@ -594,6 +600,118 @@ OAuth client re-registration under Supabase Auth that Step 5 already
 flagged. `useAuth.js`'s `signInWithGoogle` assumes it's done; if it
 isn't, Google sign-in will fail at the redirect step (email/password
 sign-in and signup are unaffected either way).
+
+---
+
+## Step 7 follow-up — making Profile stats work end to end
+
+**Status: code is in the repo; the database change has NOT been applied
+and nothing here has been verified against a live Supabase project.** The
+Profile tab will show an explicit error/"not set up" state (not zeros)
+until the SQL below is run.
+
+### Manual action required — run this exactly once, in the Supabase SQL Editor
+
+> **File to run: [`supabase/profile_stats.sql`](supabase/profile_stats.sql)**
+> (paste the whole file; safe to re-run). It can be run before or after
+> `supabase/waypoint_submissions.sql` — both define the same `profiles`
+> superset and `handle_new_user`, so order doesn't matter.
+
+Then run the verification queries at the bottom of that file and read the
+results. Until they pass, treat the live database as unfixed.
+
+### Defects found in the original Step 7 (read from the SQL, not the live DB)
+
+1. **`review_count` could never increment.** `recompute_profile_review_count()`
+   is not `security definer`, so it runs as the reviewing user. That user
+   has (correctly) no UPDATE policy on `profiles`, so RLS filters the
+   `update` to zero rows with no error. The function was also insert-only,
+   so deleted reviews (or reviews removed by a waypoint's
+   `on delete cascade`) left a stale count.
+2. **`reviews.user_id` was client-controlled.** Any client could attribute a
+   review to another user and inflate their count.
+3. **`nav_count` had no writer.** (Intentional at the time; resolved here.)
+4. **Existing accounts have no `profiles` row** if they signed up before the
+   `on_auth_user_created` trigger existed, or if `handle_new_user` failed
+   (the `waypoint_submissions.sql` version only warns on failure, so a
+   sign-up never fails but the row can be missing).
+
+### What `supabase/profile_stats.sql` does
+
+| Area | Change |
+|---|---|
+| Schema | `reviews.user_id` (if absent); `profiles` + `is_admin`/timestamps (same superset as `waypoint_submissions.sql`); new `navigation_completions(user_id, trip_id, completed_at)` with PK `(user_id, trip_id)` |
+| New + existing users | `handle_new_user` re-declared (same body as `waypoint_submissions.sql`); **backfill** inserts a `profiles` row for every existing `auth.users` row |
+| `review_count` | Definer-rights trigger on `reviews` **insert / delete / `update of user_id`** that recomputes `count(*)` from the real rows (replaces the insert-only trigger); full recompute for all existing profiles |
+| Attribution | `BEFORE` trigger rejects a `user_id` that isn't the caller's own `auth.uid()` when called as `anon`/`authenticated` (anonymous reviews with `user_id = null` still work; SQL editor / service role unaffected) |
+| `nav_count` | Derived from `navigation_completions` by trigger; written **only** via `record_navigation_completion(p_trip_id uuid)` (signed-in only, idempotent per `(user, trip)`, 15 s throttle) |
+| Least privilege | RLS on; only `profiles_select_own` (`to authenticated`, `auth.uid() = id`); any pre-existing client INSERT/UPDATE/DELETE/ALL policy on `profiles` is dropped; `anon`/`authenticated` have **no** write privilege on `profiles` (so counters and `is_admin` can't be edited from the client) and no access to `navigation_completions` |
+
+### Metric definitions (unchanged in meaning)
+
+- **Reviews** = number of rows in `reviews` whose `user_id` is the user. An
+  anonymous review (`user_id = null`) never counts toward anyone.
+- **Navigations** = number of *completed* navigations. A navigation is
+  completed only when arrival detection confirms it
+  (`NavigationController.arrivedAtDestination`: within 15 m of the
+  destination on three consecutive GPS ticks). Opening navigation,
+  cancelling, and closing the HUD never count. It counts for **any**
+  destination (map-tap and Nominatim results included), not only
+  reviewable POIs. Since nothing wrote `nav_count` before, every existing
+  value is 0, so recomputing it from `navigation_completions` changes no
+  previously-meaningful number (the script warns if that assumption is
+  wrong). Trips completed before this change were never recorded and are not
+  backfilled.
+
+### How a completed trip is counted at most once
+
+1. `startNavigation()` creates a fresh `tripId` (UUID).
+2. `arrivedAtDestination()` claims the completion exactly once per trip
+   (`navTrip.js` → `claimCompletion`). The `tripId` and a
+   `completionReported` flag are stored in the persisted
+   `navigation-session`, so a page reload that restores an already-arrived
+   trip and re-runs arrival detection cannot report it again. (The old
+   in-memory `navArrivedRef` alone did not survive a reload.)
+3. `onNavigationSuccess({ tripId })` → `MapPage`: guests feed the free-nav
+   tally as before; signed-in users call `reportNavigationCompletion`.
+4. The trip is persisted to a small localStorage queue **before** the RPC,
+   and the RPC is idempotent on `(user, trip)`, so offline failures are
+   retried (on next sign-in/app load) without ever double counting.
+
+Side effect worth knowing: because the claim now gates the whole block,
+`track('nav_completed')` and the guest free-nav tally are also no longer
+double-fired by that reload path.
+
+### What the Profile tab shows now (`AuthModal.jsx` + `profileStats.js`)
+
+| State | Tiles | Message |
+|---|---|---|
+| loading | `…` | — |
+| ready | the real numbers (a genuine `0` is shown as `0`) | — |
+| no `profiles` row | `—` | "Your profile isn't set up yet…" + Retry |
+| database unavailable / timeout / table or policy missing / malformed data | `—` | "Couldn't load your stats…" + Retry |
+
+Sign-out: `useAuth.signOut` now rethrows the `{ error }` that
+`supabase.auth.signOut()` returns. On failure the modal stays open, shows
+"Couldn't sign you out. Check your connection and try again.", and the
+button re-enables for another attempt; it only closes after a successful
+sign-out.
+
+### Known limits (deliberate)
+
+- Arrival is detected on the client from GPS, so a determined user can
+  still call the RPC with fresh trip ids. The server only guarantees the
+  counter isn't directly settable, is idempotent per trip, and is
+  throttled — it cannot prove a trip physically happened.
+- A review is attributed to the *signed-in* user at insert time. If a
+  session silently expires so the request goes out as `anon` while the
+  client still sends `user_id`, the insert is now rejected (shown as
+  "Failed to save review. Try again.") instead of being silently
+  mis-attributed.
+- `reviews.user_id references auth.users(id)` has no `on delete` action, so
+  deleting an Auth user who has reviews is blocked by the FK. Pre-existing
+  and left unchanged here (changing it would convert their reviews to
+  anonymous); flagged for a separate decision.
 
 ---
 
@@ -608,6 +726,11 @@ sign-in and signup are unaffected either way).
 - [ ] Google OAuth client is actually re-registered under Supabase Auth (Step 5) — Google sign-in will silently fail at redirect otherwise
 - [ ] `profiles` row is created automatically on signup (check the table after a test signup) — confirms `handle_new_user` fired
 - [ ] Submitting a review while signed in increments that user's `profiles.review_count` (confirms `recompute_profile_review_count` fired) and does *not* error for an anonymous submission (`user_id` staying `null` is valid)
+- [ ] **`supabase/profile_stats.sql` has been run** and its closing verification queries (a–e) return the expected results — until then the Profile tab shows an error/"not set up" state
+- [ ] Every existing `auth.users` row has a `profiles` row (backfill) and `review_count`/`nav_count` equal the real row counts
+- [ ] A non-owner cannot read another user's profile, and a signed-in client gets *permission denied* on `update profiles set nav_count = 99`
+- [ ] Completing a real navigation while signed in increments Navigations by exactly 1 (also for a non-POI destination); cancelling, closing the HUD, and reloading mid-arrival do not
+- [ ] Sign-out with the network disabled shows the error and keeps the modal open
 
 ## Reference links
 

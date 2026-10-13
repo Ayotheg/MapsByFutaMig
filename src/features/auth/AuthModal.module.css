@@ -295,6 +295,19 @@
   margin-bottom: 12px;
   line-height: 1.4;
 }
+.statusText { flex: 1; }
+.statusAction {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  flex-shrink: 0;
+}
 .statusError { background: var(--v2-error-container); color: var(--v2-error-text); border: 1px solid rgba(186, 26, 26, 0.2); }
 .statusOk { background: rgba(13, 148, 136, 0.1); color: var(--v2-secondary); border: 1px solid rgba(13, 148, 136, 0.2); }
 
@@ -450,6 +463,7 @@
   transition: background var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .signoutBtn:hover { background: rgba(186, 26, 26, 0.18); }
+.signoutBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Support footer (Profile tab) — hairline-separated block under Sign Out. */
 .supportFooter {

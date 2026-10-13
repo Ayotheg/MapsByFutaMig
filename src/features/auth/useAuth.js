@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_TIMEOUT_MS } from '../../lib/networkTimeout';
+import { signOutOrThrow } from './signOut';
 
 // ── FUTA Auth — Supabase Auth port of legacy's `initFutaAuth()` ────────────
 //
@@ -127,9 +128,11 @@ export function useAuth() {
     if (error) throw error;
   }, []);
 
-  const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-  }, []);
+  // `supabase.auth.signOut()` resolves with `{ error }` rather than throwing,
+  // so it used to look successful even when it failed. `signOutOrThrow`
+  // rethrows that error; callers (AuthModal) must catch it and keep the
+  // user informed instead of assuming they're signed out. See signOut.js.
+  const signOut = useCallback(() => signOutOrThrow(supabase.auth), []);
 
   return { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword, signOut };
 }
