@@ -12,7 +12,7 @@ import { useSeo } from "../lib/useSeo";
 import mapsLogo from "/favicon-96x96.png";
 import styles from "./NotFoundPage.module.css";
 
-const CONTACT_EMAIL = "gearlifycorporation@gmail.com";
+const CONTACT_EMAIL = "hello@mapsbyfuta.xyz";
 
 // Static per Figma (node 117:68, "Popular Destination Chips") — these
 // four are the same campus landmarks used as placeholder/seed data

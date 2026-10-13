@@ -5,7 +5,7 @@
 // NOTE: pages/landing/Footer.jsx still carries its own copies of these two
 // values (landing page is out of scope for the in-app redesign). If either
 // changes, update both — or point Footer.jsx at this file.
-export const CONTACT_EMAIL = 'gearlifycorporation@gmail.com';
+export const CONTACT_EMAIL = 'hello@mapsbyfuta.xyz';
 
 // wa.me click-to-chat API — full international number, no "+" or leading zero.
 export const WHATSAPP_NUMBER = '2348101734037';
