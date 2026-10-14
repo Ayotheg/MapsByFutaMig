@@ -23,6 +23,7 @@ import { useSeo } from "../../lib/useSeo";
 import { useAuth, friendlyError } from "../auth/useAuth";
 import WaypointSearchPanel from "./WaypointSearchPanel";
 import { submitPromotion } from "./submitPromotion";
+import { fetchActivePromotion, activePromotionNotice } from "./activePromotion";
 import {
   MIN_DAYS,
   MAX_DAYS,
@@ -176,6 +177,26 @@ export default function PromotePage() {
   const [promoInput, setPromoInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [promoError, setPromoError] = useState(null);
+  // One ad per account at a time (activePromotion.js). While one is live or
+  // waiting for approval, checkout is blocked and a notice explains why.
+  const [activePromo, setActivePromo] = useState(null);
+  const userId = auth.user?.id;
+
+  useEffect(() => {
+    if (!userId) {
+      setActivePromo(null);
+      return undefined;
+    }
+    let cancelled = false;
+    fetchActivePromotion(userId).then((result) => {
+      if (!cancelled) setActivePromo(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const activePromoNotice = activePromotionNotice(activePromo);
 
   // Returning from the payment provider with the browser's Back button.
   //
@@ -325,6 +346,16 @@ export default function PromotePage() {
 
     setSubmitError(null);
     setSubmitting(true);
+
+    // Re-check right before paying: another tab or device may have started
+    // an ad since this page loaded.
+    const latest = await fetchActivePromotion(auth.user.id);
+    setActivePromo(latest);
+    if (activePromotionNotice(latest)) {
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const { checkoutUrl } = await submitPromotion({
         userId: auth.user.id,
@@ -382,6 +413,13 @@ export default function PromotePage() {
               <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
               Checkout was cancelled — nothing was charged. Your details below are still filled in,
               so you can just try again.
+            </div>
+          )}
+
+          {activePromoNotice && (
+            <div className={`${styles.locStatus} ${styles.locStatusError}`} style={{ marginBottom: 16 }}>
+              <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+              {activePromoNotice}
             </div>
           )}
 
@@ -721,10 +759,10 @@ export default function PromotePage() {
 
             {/* Bottom actions */}
             <div className={styles.actions}>
-              {submitError && (
+              {(submitError || activePromoNotice) && (
                 <div className={`${styles.locStatus} ${styles.locStatusError}`}>
                   <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                  {submitError}
+                  {submitError || activePromoNotice}
                 </div>
               )}
 
@@ -741,7 +779,7 @@ export default function PromotePage() {
                   type="button"
                   className={styles.checkoutBtn}
                   onClick={handleCheckout}
-                  disabled={submitting}
+                  disabled={submitting || !!activePromoNotice}
                   aria-busy={submitting}
                 >
                   <span>{submitting ? "Starting checkout…" : "Proceed to checkout"}</span>

@@ -183,8 +183,17 @@ export async function submitPromotion({
     body: { promotionId, promoCode: appliedPromo },
   });
   if (fnError) {
+    // A non-2xx reply's own message (e.g. "You already have an ad
+    // running…") is in the response body, not in fnError.message.
+    let serverMessage = null;
+    try {
+      serverMessage = (await fnError.context?.json?.())?.error || null;
+    } catch {
+      // body wasn't JSON; fall back below
+    }
     throw new Error(
-      fnError.message ||
+      serverMessage ||
+        fnError.message ||
         'Could not start payment. Your listing is saved as a draft — try checkout again in a moment.'
     );
   }

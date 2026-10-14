@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, TriangleAlert, X, Mail, Lock, User, Eye, EyeOff, LogOut } from 'lucide-react';
+import { CheckCircle2, TriangleAlert, X, Mail, Lock, User, Eye, EyeOff, LogOut, Megaphone } from 'lucide-react';
 import styles from './AuthModal.module.css';
 import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
 import { fetchProfileStats, statTileValue } from './profileStats';
+import { fetchActivePromotion } from '../promote/activePromotion';
 import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
 import WhatsAppIcon from '../../lib/WhatsAppIcon';
 import { CONTACT_EMAIL, WHATSAPP_CHAT_URL } from '../../lib/contactInfo';
@@ -119,6 +120,18 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
     });
     return () => { cancelled = true; };
   }, [tab, userId, statsAttempt]);
+
+  // The account's running ad, if any (activePromotion.js) — re-fetched each
+  // time the profile tab opens, so "days left" counts down day by day.
+  const [activeAd, setActiveAd] = useState(null);
+  useEffect(() => {
+    if (tab !== 'profile' || !userId) return;
+    let cancelled = false;
+    fetchActivePromotion(userId).then((result) => {
+      if (!cancelled) setActiveAd(result);
+    });
+    return () => { cancelled = true; };
+  }, [tab, userId]);
 
   // Sign-out: `signOut` rejects when Supabase returns an error (useAuth.js
   // → signOut.js). Only a resolved call closes the modal; a failure keeps
@@ -307,6 +320,30 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
                 <div className={styles.statLabel}>Navigations</div>
               </div>
             </div>
+
+            {activeAd?.status === 'live' && (
+              <div className={styles.adCard}>
+                <Megaphone size={16} className={styles.adIcon} />
+                <div className={styles.adText}>
+                  <div className={styles.adTitle}>Ad running · {activeAd.businessName}</div>
+                  <div className={styles.adMeta}>
+                    <strong>{activeAd.daysLeft} day{activeAd.daysLeft === 1 ? '' : 's'} left</strong>
+                    {' '}of {activeAd.days} · ends {new Date(activeAd.endsAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+            )}
+            {activeAd?.status === 'review' && (
+              <div className={styles.adCard}>
+                <Megaphone size={16} className={styles.adIcon} />
+                <div className={styles.adText}>
+                  <div className={styles.adTitle}>Ad waiting for approval · {activeAd.businessName}</div>
+                  <div className={styles.adMeta}>
+                    Paid for {activeAd.days} day{activeAd.days === 1 ? '' : 's'}. The countdown starts once it's approved.
+                  </div>
+                </div>
+              </div>
+            )}
 
             {(stats.status === 'error' || stats.status === 'missing') && (
               <div className={`${styles.status} ${styles.statusError}`} role="alert">

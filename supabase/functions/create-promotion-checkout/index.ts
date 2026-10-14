@@ -79,6 +79,34 @@ Deno.serve(async (req) => {
     return json({ error: `This promotion is already ${promotion.payment_status}.` }, 409);
   }
 
+  // One ad per account at a time (mirrors src/features/promote/
+  // activePromotion.js): no new checkout while another of this account's
+  // ads is live or paid and waiting for approval.
+  const { data: others, error: othersError } = await adminClient
+    .from('promotions')
+    .select('business_name, status, payment_status, waypoint_id, promo_ends_at')
+    .eq('submitted_by', promotion.submitted_by)
+    .neq('id', promotion.id)
+    .in('status', ['approved', 'pending_review']);
+  if (othersError) return json({ error: othersError.message }, 500);
+  const nowMs = Date.now();
+  const blocking = (others || []).find(
+    (p) =>
+      (p.status === 'approved' && p.waypoint_id && p.promo_ends_at && Date.parse(p.promo_ends_at) > nowMs) ||
+      (p.status === 'pending_review' && p.payment_status === 'paid')
+  );
+  if (blocking) {
+    return json(
+      {
+        error:
+          blocking.status === 'approved'
+            ? `You already have an ad running for "${blocking.business_name}". You can place a new ad once it ends.`
+            : `Your ad for "${blocking.business_name}" is paid and waiting for approval. You can place a new ad once it has finished running.`,
+      },
+      409
+    );
+  }
+
   // The amount charged is re-derived here from the stored `days` and the
   // optional promo code, NEVER taken from the client-inserted `amount` or
   // the request body. A tampered client could otherwise ask BACHS to
