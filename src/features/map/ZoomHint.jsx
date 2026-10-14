@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ZoomIn, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import styles from './ZoomHint.module.css';
 
 const DISMISSED_KEY = 'mbf_zoom_hint_dismissed';
-const AUTO_DISMISS_MS = 5000;
+// Long enough for the gesture animation below to loop ~4 times.
+const AUTO_DISMISS_MS = 7000;
 const FADE_MS = 280;
 // Matches MapShell's `zoom-close` tier (waypointMarkers.css) — once the
 // person is this zoomed in, dots already have inline labels and the
@@ -18,7 +19,11 @@ const ZOOM_CLOSE_THRESHOLD = 18;
  * small dots. This nudges them to zoom in without permanently cluttering
  * the UI for repeat visits.
  *
- * Dismisses itself after 5s, or immediately when closed or when the person
+ * Leads with a looping gesture animation rather than text alone: two
+ * fingertips spreading apart on touch screens, a scrolling mouse wheel
+ * on desktop (chosen by `pointer: coarse`, so tablets get the pinch).
+ *
+ * Dismisses itself after 7s, or immediately when closed or when the person
  * zooms in past the zoom-close threshold. Only an intentional close or
  * zoom-in sets the localStorage flag, so a missed toast can appear next visit.
  */
@@ -69,15 +74,49 @@ export default function ZoomHint({ map }) {
 
   if (!visible) return null;
 
+  const touch = isTouchScreen();
+
   return (
     <div className={`${styles.hint} ${leaving ? styles.leaving : ''}`} role="status">
-      <span className={styles.iconWrap}>
-        <ZoomIn size={16} className={styles.icon} />
+      <span className={styles.iconWrap} aria-hidden="true">
+        {touch ? <PinchGesture /> : <ScrollGesture />}
       </span>
-      <span className={styles.text}>Pinch or scroll to zoom in — place names appear as you get closer.</span>
+      <span className={styles.text}>
+        {touch ? 'Pinch outwards to zoom in' : 'Scroll to zoom in'} — place names appear as you get closer.
+      </span>
       <button type="button" className={styles.close} aria-label="Dismiss" onClick={dismiss}>
         <X size={14} />
       </button>
     </div>
+  );
+}
+
+function isTouchScreen() {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
+
+// Two fingertips pressing down near the centre, spreading apart along a
+// diagonal, then lifting off — the zoom-in pinch, looped.
+function PinchGesture() {
+  return (
+    <svg className={styles.gesture} viewBox="0 0 44 44" width="44" height="44">
+      <line className={styles.pinchTrack} x1="10" y1="34" x2="34" y2="10" />
+      <circle className={`${styles.finger} ${styles.fingerA}`} cx="22" cy="22" r="5" />
+      <circle className={`${styles.finger} ${styles.fingerB}`} cx="22" cy="22" r="5" />
+    </svg>
+  );
+}
+
+// A mouse with its wheel rolling forward.
+function ScrollGesture() {
+  return (
+    <svg className={styles.gesture} viewBox="0 0 44 44" width="44" height="44">
+      <rect className={styles.mouseBody} x="14" y="8" width="16" height="26" rx="8" />
+      <line className={styles.wheel} x1="22" y1="13" x2="22" y2="18" />
+    </svg>
   );
 }
