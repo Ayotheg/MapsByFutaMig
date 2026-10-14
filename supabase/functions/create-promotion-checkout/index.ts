@@ -155,7 +155,11 @@ Deno.serve(async (req) => {
     // products:write scope.)
     checkout = await bachsRequest('/v1/checkout-sessions', {
       body: {
-        pricing: { amount, currency },
+        // BACHS money fields are decimal STRINGS in major units ("100.00");
+        // a JS number is rejected ("pricing.amount: Input should be a valid
+        // string"). BachTest sent promotion.amount straight from the
+        // numeric column, which PostgREST already returns as that string.
+        pricing: { amount: amount.toFixed(2), currency },
         success_url: successUrl,
         cancel_url: cancelUrl,
         // `reference` round-trips through BACHS and back onto the
