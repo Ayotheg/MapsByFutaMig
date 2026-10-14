@@ -22,14 +22,35 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { bachsRequest } from '../_shared/bachs.ts';
 
+// Mirrors src/features/promote/pricing.js — keep the two in sync. These
+// copies are the ones that decide what BACHS actually collects.
+const NAIRA_PER_DAY = 200;
+const MIN_DAYS = 1;
+const MAX_DAYS = 30;
+const PROMO_CODE = 'IAMAFUTARIAN';
+const PROMO_DISCOUNT = 0.5;
+
+// The browser calls this cross-origin. Without these headers on EVERY
+// response, the browser hides an error reply's body and supabase-js can
+// only say "Failed to send a request to the Edge Function".
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS_HEADERS });
+  }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS });
   }
 
   let promotionId;
+  let promoCode;
   try {
-    ({ promotionId } = await req.json());
+    ({ promotionId, promoCode } = await req.json());
   } catch {
     return json({ error: 'Malformed request body — expected { promotionId }' }, 400);
   }
@@ -70,15 +91,55 @@ Deno.serve(async (req) => {
     return json({ error: `This promotion is already ${promotion.payment_status}.` }, 409);
   }
 
-  // The amount charged is re-derived from the stored row, NEVER taken
-  // from the request body — submitPromotion.js doesn't even send one.
-  // A tampered client could otherwise ask BACHS to collect ₦1 for a
-  // 30-day campaign; this function is the one place that can't be
-  // tricked into that, since `promotion.amount` was itself computed
-  // server-side-equivalent at insert time from `days` (pricing.js's
-  // computeAmount, mirrored — see submitPromotion.js).
-  const amount = promotion.amount;
+  // One ad per account at a time (mirrors src/features/promote/
+  // activePromotion.js): no new checkout while another of this account's
+  // ads is live or paid and waiting for approval.
+  const { data: others, error: othersError } = await adminClient
+    .from('promotions')
+    .select('business_name, status, payment_status, waypoint_id, promo_ends_at')
+    .eq('submitted_by', promotion.submitted_by)
+    .neq('id', promotion.id)
+    .in('status', ['approved', 'pending_review']);
+  if (othersError) return json({ error: othersError.message }, 500);
+  const nowMs = Date.now();
+  const blocking = (others || []).find(
+    (p) =>
+      (p.status === 'approved' && p.waypoint_id && p.promo_ends_at && Date.parse(p.promo_ends_at) > nowMs) ||
+      (p.status === 'pending_review' && p.payment_status === 'paid')
+  );
+  if (blocking) {
+    return json(
+      {
+        error:
+          blocking.status === 'approved'
+            ? `You already have an ad running for "${blocking.business_name}". You can place a new ad once it ends.`
+            : `Your ad for "${blocking.business_name}" is paid and waiting for approval. You can place a new ad once it has finished running.`,
+      },
+      409
+    );
+  }
+
+  // The amount charged is re-derived here from the stored `days` and the
+  // optional promo code, NEVER taken from the client-inserted `amount` or
+  // the request body. A tampered client could otherwise ask BACHS to
+  // collect ₦1 for a 30-day campaign; the promo discount only applies
+  // when the code matches PROMO_CODE above.
+  const days = Math.min(MAX_DAYS, Math.max(MIN_DAYS, Number(promotion.days) || MIN_DAYS));
+  const promoApplied =
+    typeof promoCode === 'string' && promoCode.trim().toUpperCase() === PROMO_CODE;
+  const fullAmount = days * NAIRA_PER_DAY;
+  const amount = promoApplied ? Math.round(fullAmount * (1 - PROMO_DISCOUNT)) : fullAmount;
   const currency = promotion.currency || 'NGN';
+
+  // Overwrite whatever amount the client inserted, so the row (and the
+  // admin Promotions tab) shows what is actually being charged.
+  if (Number(promotion.amount) !== amount) {
+    const { error: amountError } = await adminClient
+      .from('promotions')
+      .update({ amount })
+      .eq('id', promotion.id);
+    if (amountError) return json({ error: amountError.message }, 500);
+  }
 
   const siteUrl = Deno.env.get('SITE_URL') || req.headers.get('Origin') || '';
   const successUrl = `${siteUrl}/promote/callback?promotion=${promotion.id}`;
@@ -86,25 +147,19 @@ Deno.serve(async (req) => {
 
   let checkout;
   try {
-    // ⚠️ Product-based checkout, per _shared/bachs.ts's flag — Bachs's
-    // SDK examples check out against a pre-created Product rather than
-    // an ad-hoc amount. A fresh, single-use Product per promotion keeps
-    // this correct (never reuses/mutates a shared "Promotion" product
-    // that different campaigns' prices would fight over) at the cost of
-    // one extra API call per checkout. Replace this whole block with a
-    // direct ad-hoc-amount checkout call if/once step 2 of that flag's
-    // checklist finds one.
-    const product = await bachsRequest('/v1/products', {
+    // Ported from cefa161 (BachTest), CONFIRMED by a real sandbox checkout
+    // + webhook round-trip: `/v1/checkout-sessions` (hyphen; the underscore
+    // path 404s) takes an ad-hoc `pricing: { amount, currency }` directly,
+    // so no Product is created first. (The old two-step product flow sent
+    // `price` as a bare number, which BACHS rejects, and needed an extra
+    // products:write scope.)
+    checkout = await bachsRequest('/v1/checkout-sessions', {
       body: {
-        name: `Promotion (${promotion.days} day${promotion.days === 1 ? '' : 's'}) — ${promotion.business_name}`,
-        price: amount,
-        currency,
-      },
-    });
-
-    checkout = await bachsRequest('/v1/checkout_sessions', {
-      body: {
-        product_cart: [{ product_id: product.id, quantity: 1 }],
+        // BACHS money fields are decimal STRINGS in major units ("100.00");
+        // a JS number is rejected ("pricing.amount: Input should be a valid
+        // string"). BachTest sent promotion.amount straight from the
+        // numeric column, which PostgREST already returns as that string.
+        pricing: { amount: amount.toFixed(2), currency },
         success_url: successUrl,
         cancel_url: cancelUrl,
         // `reference` round-trips through BACHS and back onto the
@@ -118,11 +173,13 @@ Deno.serve(async (req) => {
       },
     });
   } catch (e) {
+    console.error('[create-promotion-checkout] BACHS checkout failed:', promotion.id, e.message);
     return json({ error: `Could not start BACHS checkout: ${e.message}` }, 502);
   }
 
   const checkoutUrl = checkout.url || checkout.checkout_url;
   if (!checkoutUrl) {
+    console.error('[create-promotion-checkout] no checkout URL in BACHS reply:', promotion.id, JSON.stringify(checkout).slice(0, 500));
     return json({ error: 'BACHS did not return a checkout URL.' }, 502);
   }
 
@@ -145,6 +202,6 @@ Deno.serve(async (req) => {
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
 }

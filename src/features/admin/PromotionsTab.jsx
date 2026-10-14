@@ -94,9 +94,9 @@ export default function PromotionsTab({ onCountChange, onRefreshWaypoints }) {
       const def = FILTERS.find((f) => f.key === activeFilter) || FILTERS[0];
       const base = supabase
         .from('promotions')
-        .select(
-          'id, submitted_by, business_name, description, listing_type, lat, lng, contact_platform, contact_link, days, amount, currency, status, payment_status, rejection_reason, paid_at, created_at, waypoint_id, promo_ends_at'
-        );
+        // '*' rather than a column list: existing_waypoint_id only exists
+        // once supabase/promotions_dedupe_ranking.sql has run.
+        .select('*');
       const { data, error: err } = await def
         .match(base)
         .order(activeFilter === 'review' ? 'paid_at' : 'created_at', { ascending: activeFilter === 'review' })
@@ -127,9 +127,19 @@ export default function PromotionsTab({ onCountChange, onRefreshWaypoints }) {
         if (!nameErr && nameRows) names = Object.fromEntries(nameRows.map((r) => [r.id, r.display_name]));
       }
 
+      // Name of the existing place a Physical Shop ad picked on the
+      // promote page — approving promotes that pin instead of adding one.
+      let placeNames = {};
+      const placeIds = [...new Set(list.map((r) => r.existing_waypoint_id).filter(Boolean))];
+      if (placeIds.length) {
+        const { data: places } = await supabase.from('waypoints').select('id, name').in('id', placeIds);
+        if (places) placeNames = Object.fromEntries(places.map((w) => [w.id, w.name]));
+      }
+
       setRows(
         list.map((r) => ({
           ...r,
+          existingPlaceName: r.existing_waypoint_id ? placeNames[r.existing_waypoint_id] || null : null,
           imageUrls: imagesById[r.id] || [],
           submitterName: names[r.submitted_by] || (r.submitted_by ? `Student (${r.submitted_by.slice(0, 8)}…)` : 'Unknown'),
         }))
@@ -260,6 +270,13 @@ export default function PromotionsTab({ onCountChange, onRefreshWaypoints }) {
                   )
                   : 'No contact link'}
             </div>
+            {p.listing_type === 'physical' && p.existing_waypoint_id && (
+              <div className={styles.itemMeta}>
+                Existing place: {p.existingPlaceName || 'no longer on the map'}
+                {p.status === 'pending_review' &&
+                  (p.existingPlaceName ? ' (Approve adds the ad to this pin, no new pin)' : ' (Approve adds a new pin)')}
+              </div>
+            )}
             <div className={styles.itemMeta}>
               {p.days} day{p.days === 1 ? '' : 's'} · {formatNaira(Number(p.amount))}
               {p.paid_at ? ` · paid ${when(p.paid_at)}` : ''}
@@ -281,6 +298,9 @@ export default function PromotionsTab({ onCountChange, onRefreshWaypoints }) {
             )}
             {p.status === 'rejected' && p.rejection_reason && (
               <div className={ownStyles.submitter}>Rejected: {p.rejection_reason}</div>
+            )}
+            {p.status === 'removed' && p.rejection_reason && (
+              <div className={ownStyles.submitter}>{p.rejection_reason}</div>
             )}
 
             {p.imageUrls.length > 0 ? (

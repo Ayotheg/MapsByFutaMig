@@ -123,8 +123,14 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations }) {
     // useSelectResult.js's own comment for how selecting a coordinate-
     // less business result is handled differently from every other
     // search source once picked.
+    //
+    // Paid Online Stores (a business that came from an approved promotion,
+    // marked by `promoPaidAt`, supabase/promotions_dedupe_ranking.sql) are
+    // left out too: they're ads and belong in Explore only. Businesses an
+    // admin adds by hand ("+ Add Business") stay searchable.
     (waypoints || []).forEach((wp) => {
       if (wp.isPerson || wp.isChannel) return;
+      if (wp.isBusiness && wp.promoPaidAt) return;
       register({
         id: wp.id,
         lat: wp.lat,

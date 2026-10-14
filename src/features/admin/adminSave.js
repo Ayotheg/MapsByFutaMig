@@ -100,7 +100,7 @@ export async function uploadImage(kind, entityId, file, position) {
   const path = `${kind}/${entityId}/${position}-${Date.now()}.${ext}`;
   const { error } = await supabase.storage
     .from(PLACE_IMAGES_BUCKET)
-    .upload(path, compressed, { contentType: compressed.type, upsert: true });
+    .upload(path, compressed, { contentType: compressed.type, upsert: false });
   if (error) throw error;
   return path;
 }
@@ -398,6 +398,22 @@ export async function removePromotion(id, { erase = false } = {}) {
   const { error } = await supabase.rpc('admin_remove_promotion', { p_id: id, p_erase: erase });
   if (error) throw promotionRpcError(error, erase ? 'delete' : 'remove');
   track('admin_action', { action: erase ? 'delete' : 'remove', entity: 'promotion' });
+
+  // If the listing's waypoint is still there, the ad was on an existing
+  // place (or one another live ad still uses) and only its badge came off
+  // (supabase/promotions_dedupe_ranking.sql). Its other photos belong to
+  // that place — only delete the files this promotion uploaded.
+  if (promo?.waypoint_id) {
+    const { data: still, error: stillErr } = await supabase
+      .from('waypoints')
+      .select('id')
+      .eq('id', promo.waypoint_id)
+      .maybeSingle();
+    if (still || stillErr) {
+      const own = `promotion/${id}/`;
+      for (const p of [...paths]) if (!p.startsWith(own)) paths.delete(p);
+    }
+  }
 
   let photoError = null;
   if (paths.size) {

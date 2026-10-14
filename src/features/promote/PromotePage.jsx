@@ -16,13 +16,26 @@ import {
   Search,
   Send,
   ShieldCheck,
+  Tag,
   X,
 } from "lucide-react";
 import { useSeo } from "../../lib/useSeo";
 import { useAuth, friendlyError } from "../auth/useAuth";
 import WaypointSearchPanel from "./WaypointSearchPanel";
 import { submitPromotion } from "./submitPromotion";
-import { MIN_DAYS, MAX_DAYS, DEFAULT_DAYS, NAIRA_PER_DAY, MAX_PHOTOS, formatNaira } from "./pricing";
+import { fetchActivePromotion, activePromotionNotice } from "./activePromotion";
+import {
+  MIN_DAYS,
+  MAX_DAYS,
+  DEFAULT_DAYS,
+  NAIRA_PER_DAY,
+  MAX_PHOTOS,
+  PROMO_DISCOUNT,
+  computeAmount,
+  formatNaira,
+  isValidPromoCode,
+  normalizePromoCode,
+} from "./pricing";
 import styles from "./PromotePage.module.css";
 
 // AuthModal is a full sign-in/sign-up surface, not needed for this page's
@@ -146,6 +159,10 @@ export default function PromotePage() {
   const [detailsType, setDetailsType] = useState(null);
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
+  // Set only while the coordinates came from picking an existing place in
+  // WaypointSearchPanel. Approving then promotes THAT pin instead of adding
+  // a duplicate one at the same spot (supabase/promotions_dedupe_ranking.sql).
+  const [pickedWaypointId, setPickedWaypointId] = useState(null);
   const [locStatus, setLocStatus] = useState(null); // { text, error } | null
   const [mapSearchOpen, setMapSearchOpen] = useState(false);
   const [photos, setPhotos] = useState([]); // { id, file, previewUrl }[]
@@ -155,6 +172,31 @@ export default function PromotePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  // Optional promo code. `promoInput` is what's typed; `appliedPromo` is only
+  // set once Apply accepts a valid code, and is what checkout actually sends.
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [promoError, setPromoError] = useState(null);
+  // One ad per account at a time (activePromotion.js). While one is live or
+  // waiting for approval, checkout is blocked and a notice explains why.
+  const [activePromo, setActivePromo] = useState(null);
+  const userId = auth.user?.id;
+
+  useEffect(() => {
+    if (!userId) {
+      setActivePromo(null);
+      return undefined;
+    }
+    let cancelled = false;
+    fetchActivePromotion(userId).then((result) => {
+      if (!cancelled) setActivePromo(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const activePromoNotice = activePromotionNotice(activePromo);
 
   // Returning from the payment provider with the browser's Back button.
   //
@@ -185,11 +227,33 @@ export default function PromotePage() {
     [contactPlatform],
   );
 
-  const totalPrice = useMemo(() => days * NAIRA_PER_DAY, [days]);
+  const fullPrice = useMemo(() => computeAmount(days), [days]);
+  const totalPrice = useMemo(() => computeAmount(days, appliedPromo), [days, appliedPromo]);
   const sliderPct = useMemo(
     () => ((days - MIN_DAYS) / (MAX_DAYS - MIN_DAYS)) * 100,
     [days],
   );
+
+  function handleApplyPromo() {
+    const code = normalizePromoCode(promoInput);
+    if (!code) {
+      setPromoError(null);
+      return;
+    }
+    if (isValidPromoCode(code)) {
+      setAppliedPromo(code);
+      setPromoError(null);
+    } else {
+      setAppliedPromo(null);
+      setPromoError("That promo code isn't valid.");
+    }
+  }
+
+  function handleRemovePromo() {
+    setAppliedPromo(null);
+    setPromoInput("");
+    setPromoError(null);
+  }
 
   function handleListingTypeChange(type) {
     if (listingType === type) {
@@ -212,6 +276,7 @@ export default function PromotePage() {
       (pos) => {
         setLat(pos.coords.latitude.toFixed(6));
         setLng(pos.coords.longitude.toFixed(6));
+        setPickedWaypointId(null);
         setLocStatus(null);
       },
       (err) => {
@@ -227,6 +292,7 @@ export default function PromotePage() {
   function handleWaypointPicked(entry) {
     setLat(entry.lat.toFixed(6));
     setLng(entry.lng.toFixed(6));
+    setPickedWaypointId(entry.id);
     setLocStatus(null);
     setMapSearchOpen(false);
   }
@@ -280,6 +346,16 @@ export default function PromotePage() {
 
     setSubmitError(null);
     setSubmitting(true);
+
+    // Re-check right before paying: another tab or device may have started
+    // an ad since this page loaded.
+    const latest = await fetchActivePromotion(auth.user.id);
+    setActivePromo(latest);
+    if (activePromotionNotice(latest)) {
+      setSubmitting(false);
+      return;
+    }
+
     try {
       const { checkoutUrl } = await submitPromotion({
         userId: auth.user.id,
@@ -288,10 +364,12 @@ export default function PromotePage() {
         listingType,
         lat,
         lng,
+        existingWaypointId: pickedWaypointId,
         contactPlatform,
         contactValue,
         days,
         photos,
+        promoCode: appliedPromo,
       });
       window.location.href = checkoutUrl; // full redirect — BACHS's hosted checkout, not an in-app modal
     } catch (e) {
@@ -335,6 +413,13 @@ export default function PromotePage() {
               <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
               Checkout was cancelled — nothing was charged. Your details below are still filled in,
               so you can just try again.
+            </div>
+          )}
+
+          {activePromoNotice && (
+            <div className={`${styles.locStatus} ${styles.locStatusError}`} style={{ marginBottom: 16 }}>
+              <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+              {activePromoNotice}
             </div>
           )}
 
@@ -584,6 +669,9 @@ export default function PromotePage() {
               <div className={styles.durationValueRow}>
                 <span className={styles.durationDays}>{days} Day{days === 1 ? "" : "s"}</span>
                 <span className={styles.durationPrice}>
+                  {appliedPromo && (
+                    <s className={styles.durationPriceOld}>{formatNaira(fullPrice)}</s>
+                  )}
                   {formatNaira(totalPrice)}{" "}
                   <span className={styles.durationPerDay}>
                     • ~{formatNaira(NAIRA_PER_DAY)}/day
@@ -607,14 +695,74 @@ export default function PromotePage() {
                 <span>15 Days</span>
                 <span>30 Days</span>
               </div>
+
+              {/* Promo code — optional */}
+              <div className={styles.promoBlock}>
+                <label htmlFor="promote-promo" className={styles.sectionLabel}>
+                  Promo Code (optional)
+                </label>
+                {appliedPromo ? (
+                  <div className={styles.coordBanner}>
+                    <CheckCircle2 size={16} strokeWidth={2} />
+                    <span className={styles.promoAppliedText}>
+                      <strong>{appliedPromo}</strong> applied — {Math.round(PROMO_DISCOUNT * 100)}% off
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.promoRemoveBtn}
+                      onClick={handleRemovePromo}
+                      aria-label="Remove promo code"
+                    >
+                      <X size={14} strokeWidth={2.25} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className={styles.promoRow}>
+                    <div className={styles.linkInputWrap}>
+                      <Tag size={15} strokeWidth={2} className={styles.linkInputIcon} />
+                      <input
+                        id="promote-promo"
+                        type="text"
+                        className={styles.linkInput}
+                        placeholder="Enter promo code"
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        spellCheck={false}
+                        value={promoInput}
+                        onChange={(e) => {
+                          setPromoInput(e.target.value);
+                          if (promoError) setPromoError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleApplyPromo();
+                          }
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.promoApplyBtn}
+                      onClick={handleApplyPromo}
+                      disabled={!promoInput.trim()}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+                {promoError && (
+                  <div className={`${styles.locStatus} ${styles.locStatusError}`}>{promoError}</div>
+                )}
+              </div>
             </div>
 
             {/* Bottom actions */}
             <div className={styles.actions}>
-              {submitError && (
+              {(submitError || activePromoNotice) && (
                 <div className={`${styles.locStatus} ${styles.locStatusError}`}>
                   <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                  {submitError}
+                  {submitError || activePromoNotice}
                 </div>
               )}
 
@@ -631,7 +779,7 @@ export default function PromotePage() {
                   type="button"
                   className={styles.checkoutBtn}
                   onClick={handleCheckout}
-                  disabled={submitting}
+                  disabled={submitting || !!activePromoNotice}
                   aria-busy={submitting}
                 >
                   <span>{submitting ? "Starting checkout…" : "Proceed to checkout"}</span>

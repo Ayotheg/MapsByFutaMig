@@ -445,6 +445,43 @@
   letter-spacing: 0.06em;
 }
 
+/* Running-ad countdown (profile tab) — same tile surface as .stat */
+.adCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: -8px 0 20px;
+  padding: 12px;
+  text-align: left;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-md);
+}
+.adIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--v2-primary);
+}
+.adText {
+  min-width: 0;
+}
+.adTitle {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v2-text);
+  overflow-wrap: anywhere;
+}
+.adMeta {
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--v2-text-variant);
+}
+.adMeta strong {
+  color: var(--v2-primary);
+}
+
 .signoutBtn {
   width: 100%;
   display: flex;

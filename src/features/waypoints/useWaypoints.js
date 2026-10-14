@@ -85,6 +85,8 @@ export function useWaypoints() {
     const CHANNEL_COLS = 'is_channel, channel_link, channel_platform';
     const BUSINESS_COLS = 'is_business, business_link, business_platform';
     const BASE_COLS = 'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count';
+    // Paid-ad ranking fields (supabase/promotions_dedupe_ranking.sql).
+    const PROMO_COLS = 'promo_days, promo_paid_at';
 
     // ── Two-phase load ────────────────────────────────────────────────────
     // DATA SCALE — read before optimizing anything here: as of Sept 2026
@@ -127,7 +129,11 @@ export function useWaypoints() {
     // (explore_fields.sql). Falls all the way back to BASE_COLS so the map
     // still works on a project where none of these have been run yet.
     const COL_TIERS = [
-      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}`, missingMsg: null },
+      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}, ${PROMO_COLS}`, missingMsg: null },
+      {
+        cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}`,
+        missingMsg: '[waypoints] Promotion ranking fields not found — run supabase/promotions_dedupe_ranking.sql to rank paid ads in Explore.',
+      },
       {
         cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}`,
         missingMsg: '[waypoints] Business fields not found — run supabase/business_entries.sql to enable the Business pill.',
@@ -238,6 +244,8 @@ export function useWaypoints() {
             isPromoted: !!wp.is_promoted,
             sponsorName: wp.sponsor_name || '',
             promoLabel: wp.promo_label || 'Promoted',
+            promoDays: wp.promo_days ?? null,
+            promoPaidAt: wp.promo_paid_at || null,
             isPerson,
             isChannel,
             channelLink: wp.channel_link || '',
@@ -295,6 +303,8 @@ export function useWaypoints() {
           isPromoted: !!wp.is_promoted,
           sponsorName: wp.sponsor_name || '',
           promoLabel: wp.promo_label || 'Promoted',
+          promoDays: wp.promo_days ?? null,
+          promoPaidAt: wp.promo_paid_at || null,
           isPerson: false,
           isChannel: false,
           isBusiness: false,

@@ -35,6 +35,8 @@ function toPick(wp, overridePriority) {
     isPromoted: !!wp.isPromoted,
     sponsorName: wp.sponsorName || '',
     promoLabel: wp.promoLabel || 'Promoted',
+    promoDays: wp.promoDays ?? null,
+    promoPaidAt: wp.promoPaidAt || null,
     priority: overridePriority ?? wp.explorePriority ?? 0,
     isFallback: overridePriority !== undefined,
     // Drives the Explore panel's PLACES/PEOPLE/CHANNELS pills (supabase/
@@ -60,6 +62,36 @@ function toPick(wp, overridePriority) {
   };
 }
 
+function paidTime(pick) {
+  const t = pick.promoPaidAt ? Date.parse(pick.promoPaidAt) : NaN;
+  return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * Explore order, shared by every Explore surface:
+ *   1. Promoted before organic.
+ *   2. Among promoted: paid ads (approved from the admin Promotions tab,
+ *      supabase/promotions_dedupe_ranking.sql) before ones an admin marked
+ *      Promoted by hand. Paid ads go by most days paid, then whoever PAID
+ *      first. Payment time, not approval time, so approving late never
+ *      changes anyone's place.
+ *   3. Everything else by the admin-set priority.
+ */
+export function comparePicks(a, b) {
+  if (!!a.isPromoted !== !!b.isPromoted) return a.isPromoted ? -1 : 1;
+  if (a.isPromoted) {
+    const ta = paidTime(a);
+    const tb = paidTime(b);
+    if ((ta != null) !== (tb != null)) return ta != null ? -1 : 1;
+    if (ta != null) {
+      const byDays = (Number(b.promoDays) || 0) - (Number(a.promoDays) || 0);
+      if (byDays) return byDays;
+      if (ta !== tb) return ta - tb;
+    }
+  }
+  return (b.priority ?? 0) - (a.priority ?? 0);
+}
+
 /**
  * Explore panel data — no separate fetch, no separate table. A place is
  * "featured" by ticking a checkbox in the same waypoint edit form
@@ -77,7 +109,7 @@ export function useExplorePicks(waypoints) {
     const featured = (waypoints || [])
       .filter((wp) => wp.isExplore)
       .map((wp) => toPick(wp))
-      .sort((a, b) => b.priority - a.priority);
+      .sort(comparePicks);
 
     if (featured.length) return featured;
 
