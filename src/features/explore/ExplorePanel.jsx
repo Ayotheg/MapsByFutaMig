@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import ExploreCard from './ExploreCard';
+import { comparePicks } from './useExplorePicks';
 import ExploreChannelLink from './ExploreChannelLink';
 import ExplorePanelDesktop from './ExplorePanelDesktop';
 import { useOneShotLocation } from './useOneShotLocation';
@@ -54,11 +55,11 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
     [picks, category]
   );
   const promoted = useMemo(
-    () => categorizedPicks.filter((p) => p.isPromoted).sort((a, b) => b.priority - a.priority),
+    () => categorizedPicks.filter((p) => p.isPromoted).sort(comparePicks),
     [categorizedPicks]
   );
   const organic = useMemo(
-    () => categorizedPicks.filter((p) => !p.isPromoted).sort((a, b) => b.priority - a.priority),
+    () => categorizedPicks.filter((p) => !p.isPromoted).sort(comparePicks),
     [categorizedPicks]
   );
 

@@ -399,6 +399,22 @@ export async function removePromotion(id, { erase = false } = {}) {
   if (error) throw promotionRpcError(error, erase ? 'delete' : 'remove');
   track('admin_action', { action: erase ? 'delete' : 'remove', entity: 'promotion' });
 
+  // If the listing's waypoint is still there, the ad was on an existing
+  // place (or one another live ad still uses) and only its badge came off
+  // (supabase/promotions_dedupe_ranking.sql). Its other photos belong to
+  // that place — only delete the files this promotion uploaded.
+  if (promo?.waypoint_id) {
+    const { data: still, error: stillErr } = await supabase
+      .from('waypoints')
+      .select('id')
+      .eq('id', promo.waypoint_id)
+      .maybeSingle();
+    if (still || stillErr) {
+      const own = `promotion/${id}/`;
+      for (const p of [...paths]) if (!p.startsWith(own)) paths.delete(p);
+    }
+  }
+
   let photoError = null;
   if (paths.size) {
     try {

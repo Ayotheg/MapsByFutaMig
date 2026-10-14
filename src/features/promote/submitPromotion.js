@@ -109,6 +109,7 @@ export async function submitPromotion({
   listingType,
   lat,
   lng,
+  existingWaypointId, // optional; the place picked via "Search on Map"
   contactPlatform,
   contactValue,
   days,
@@ -146,6 +147,9 @@ export async function submitPromotion({
     listing_type: listingType,
     lat: listingType === 'physical' ? Number(lat) : null,
     lng: listingType === 'physical' ? Number(lng) : null,
+    // Only sent when set, so an insert still works before
+    // supabase/promotions_dedupe_ranking.sql has added the column.
+    ...(listingType === 'physical' && existingWaypointId ? { existing_waypoint_id: existingWaypointId } : {}),
     contact_platform: listingType === 'online' ? contactPlatform : null,
     contact_link: contactLink,
     days: Number(days),

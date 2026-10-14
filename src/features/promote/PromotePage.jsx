@@ -158,6 +158,10 @@ export default function PromotePage() {
   const [detailsType, setDetailsType] = useState(null);
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
+  // Set only while the coordinates came from picking an existing place in
+  // WaypointSearchPanel. Approving then promotes THAT pin instead of adding
+  // a duplicate one at the same spot (supabase/promotions_dedupe_ranking.sql).
+  const [pickedWaypointId, setPickedWaypointId] = useState(null);
   const [locStatus, setLocStatus] = useState(null); // { text, error } | null
   const [mapSearchOpen, setMapSearchOpen] = useState(false);
   const [photos, setPhotos] = useState([]); // { id, file, previewUrl }[]
@@ -251,6 +255,7 @@ export default function PromotePage() {
       (pos) => {
         setLat(pos.coords.latitude.toFixed(6));
         setLng(pos.coords.longitude.toFixed(6));
+        setPickedWaypointId(null);
         setLocStatus(null);
       },
       (err) => {
@@ -266,6 +271,7 @@ export default function PromotePage() {
   function handleWaypointPicked(entry) {
     setLat(entry.lat.toFixed(6));
     setLng(entry.lng.toFixed(6));
+    setPickedWaypointId(entry.id);
     setLocStatus(null);
     setMapSearchOpen(false);
   }
@@ -327,6 +333,7 @@ export default function PromotePage() {
         listingType,
         lat,
         lng,
+        existingWaypointId: pickedWaypointId,
         contactPlatform,
         contactValue,
         days,

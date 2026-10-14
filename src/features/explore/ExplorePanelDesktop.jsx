@@ -8,6 +8,7 @@ import { channelPlatformMeta } from '../../lib/channelMeta';
 import { track } from '../../lib/analytics';
 import ExploreChannelLink from './ExploreChannelLink';
 import AvatarBox from './AvatarBox';
+import { comparePicks } from './useExplorePicks';
 import styles from './ExplorePanelDesktop.module.css';
 
 // Rough campus walking pace — same constant ExploreCard.jsx (the mobile
@@ -84,14 +85,9 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
     if (sortMode === 'rating') {
       return list.sort((a, b) => (b.avgRating ?? -1) - (a.avgRating ?? -1) || (b.reviewCount ?? 0) - (a.reviewCount ?? 0));
     }
-    // "featured" — same ordering ExplorePanel already builds for every
-    // other variant: promoted picks first (by priority), then organic
-    // picks (by priority). Kept identical on purpose, just relabeled as
-    // a selectable option alongside the two new ones.
-    return list.sort((a, b) => {
-      if (!!a.isPromoted !== !!b.isPromoted) return a.isPromoted ? -1 : 1;
-      return (b.priority ?? 0) - (a.priority ?? 0);
-    });
+    // "featured" — same ordering ExplorePanel uses (comparePicks): paid
+    // ads first by days paid, then whoever paid first; then organic picks.
+    return list.sort(comparePicks);
   }, [filtered, sortMode, userCoords]);
 
   const featuredPartnerCount = filtered.filter((p) => p.isPromoted).length;

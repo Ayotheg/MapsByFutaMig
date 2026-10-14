@@ -136,6 +136,9 @@ export function gatherResults(chip, { waypoints, searchIndex }) {
     const raw = (wp.name || '').trim();
     if (!raw) return;
     const isPinned = wp.id != null && pinned.has(wp.id);
+    // A paid Online Store lives in Explore only (same rule as
+    // useSearchIndex.js) unless an admin pinned it to this chip on purpose.
+    if (isBusiness && wp.promoPaidAt && !isPinned) return;
     if (!isPinned && !nameOrTypeMatches(wp.name, wp.type, keywords)) return;
     const nameLow = raw.toLowerCase();
     if (seen.has(nameLow)) return;
