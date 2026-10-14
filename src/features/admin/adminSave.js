@@ -100,7 +100,7 @@ export async function uploadImage(kind, entityId, file, position) {
   const path = `${kind}/${entityId}/${position}-${Date.now()}.${ext}`;
   const { error } = await supabase.storage
     .from(PLACE_IMAGES_BUCKET)
-    .upload(path, compressed, { contentType: compressed.type, upsert: true });
+    .upload(path, compressed, { contentType: compressed.type, upsert: false });
   if (error) throw error;
   return path;
 }

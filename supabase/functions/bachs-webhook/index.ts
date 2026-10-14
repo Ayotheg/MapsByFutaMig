@@ -111,6 +111,44 @@ Deno.serve(async (req) => {
   switch (event.type) {
     case 'collection.succeeded':
     case 'checkout.completed': {
+      // Amount check — a signature-verified "succeeded" event only proves
+      // BACHS collected *something*, not that it was the right amount.
+      // Compare what BACHS says it collected against the price we stored
+      // (create-promotion-checkout re-derives promotions.amount server-side
+      // before creating the checkout, so it is the trusted expected value).
+      const { data: promotion, error: lookupError } = await adminClient
+        .from('promotions')
+        .select('amount, currency, payment_status')
+        .eq('id', promotionId)
+        .maybeSingle();
+      if (lookupError) {
+        console.error('[bachs-webhook] promotion lookup failed:', lookupError.message);
+        // Release the dedupe row so BACHS's retry isn't swallowed as
+        // "already processed" — nothing was applied yet.
+        await adminClient.from('bachs_webhook_events').delete().eq('id', event.id);
+        return new Response('Lookup failed', { status: 500 });
+      }
+      if (!promotion) {
+        console.error('[bachs-webhook] no promotion row for', promotionId, 'event', event.id);
+        break;
+      }
+
+      const check = checkAmountPaid(event, promotion);
+      if (!check.ok) {
+        // Deliberately NOT marked paid, failed, or expired — same stance as
+        // collection.underpaid below: a mismatch needs a human decision.
+        console.error('[bachs-webhook] amount check failed, NOT marking paid:', {
+          eventId: event.id,
+          promotionId,
+          reason: check.reason,
+          expected: promotion.amount,
+          expectedCurrency: promotion.currency,
+          paid: check.paid,
+          paidCurrency: check.currency,
+        });
+        break;
+      }
+
       const { error } = await adminClient
         .from('promotions')
         .update({
@@ -153,6 +191,64 @@ Deno.serve(async (req) => {
 
   return new Response('OK', { status: 200 });
 });
+
+// BACHS money fields are decimal STRINGS in major units ("200.00"), never
+// minor units/floats (docs.bachs.io, event pages). `promotions.amount` is
+// numeric(12,2) in naira too, so no x100 conversion between the two — we
+// only go to integer kobo here to compare without float drift.
+//
+// Real field names (docs.bachs.io/guides/webhooks/events/*):
+//   collection.succeeded → data.amount, data.currency, data.status
+//                          (SUCCEEDED | ACCEPTED | OVERPAID; OVERPAID also
+//                          carries data.received_amount)
+//   checkout.completed   → data.charge.amount / data.charge.currency
+//                          (data.amount is the checkout total; data.charge
+//                          is null for free checkouts), data.payment_status
+// `settlement_amount` is NOT used: it is the net credited after fees/FX, so
+// it can legitimately be lower than the price.
+//
+// Comparison is paid >= expected, not ===: with fee_bearer = 'customer'
+// BACHS adds its fee on top of the price, so `amount` can exceed
+// promotions.amount. Short payments are what this guards against.
+function toMinorUnits(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n * 100) : null;
+}
+
+function checkAmountPaid(event, promotion) {
+  const d = event.data ?? {};
+  const isCollection = event.type === 'collection.succeeded';
+
+  if (isCollection) {
+    // ACCEPTED = "accepted on other terms" (not a full-price payment);
+    // only SUCCEEDED and OVERPAID are full-amount states.
+    if (d.status && d.status !== 'SUCCEEDED' && d.status !== 'OVERPAID') {
+      return { ok: false, reason: `collection status ${d.status} is not a full payment` };
+    }
+  } else if (d.payment_status !== 'paid') {
+    return { ok: false, reason: `checkout payment_status is ${d.payment_status}` };
+  }
+
+  const charge = d.charge ?? null;
+  const paidRaw = isCollection
+    ? (d.status === 'OVERPAID' ? d.received_amount ?? d.amount : d.amount)
+    : (charge?.amount ?? d.amount);
+  const currency = isCollection ? d.currency : (charge?.currency ?? d.currency);
+
+  const paid = toMinorUnits(paidRaw);
+  const expected = toMinorUnits(promotion.amount);
+  if (paid === null || expected === null) {
+    return { ok: false, reason: 'amount missing or not numeric', paid: paidRaw, currency };
+  }
+  if (!currency || String(currency).toUpperCase() !== String(promotion.currency).toUpperCase()) {
+    return { ok: false, reason: 'currency mismatch', paid: paidRaw, currency };
+  }
+  if (paid < expected) {
+    return { ok: false, reason: 'paid less than promotions.amount', paid: paidRaw, currency };
+  }
+  return { ok: true, paid: paidRaw, currency };
+}
 
 async function hmacSha256Hex(secret, message) {
   const key = await crypto.subtle.importKey(
