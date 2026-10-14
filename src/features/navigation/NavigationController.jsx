@@ -7,6 +7,7 @@ import { fetchRoute } from './osrmRoute';
 import { turnIcon, fmtDist } from './turnHelpers';
 import { fmtDist as fmtDistAway } from '../search/chipConfig';
 import { NAV_START_ZOOM } from './gpsConstants';
+import { subscribeGps } from './gpsWatch';
 import { useOneShotLocation } from '../explore/useOneShotLocation';
 import NavDestPanel from './NavDestPanel';
 import NavHud from './NavHud';
@@ -134,7 +135,9 @@ const NavigationController = forwardRef(function NavigationController(
   const navRouteDataRef = useRef(persistedNavigation?.routeData || null);
   const navStepIndexRef = useRef(persistedNavigation?.stepIndex || 0);
   const navUserPosRef = useRef(persistedNavigation?.userPos || null);
-  const navWatchIdRef = useRef(null);
+  // Unsubscribe fn for the shared watcher (gpsWatch.js) — navigation no
+  // longer owns a `watchPosition` of its own.
+  const navGpsUnsubRef = useRef(null);
   const navRouteLayersRef = useRef(null); // { done, ahead, pulse }
   const navDestMarkerRef = useRef(null);
   const navUserMarkerRef = useRef(null);
@@ -637,14 +640,8 @@ const NavigationController = forwardRef(function NavigationController(
   );
 
   const startWatch = useCallback(() => {
-    if (navWatchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(navWatchIdRef.current);
-    }
-    navWatchIdRef.current = navigator.geolocation.watchPosition(
-      handleGpsFix,
-      (err) => console.warn('Nav GPS err:', err.message),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
-    );
+    navGpsUnsubRef.current?.();
+    navGpsUnsubRef.current = subscribeGps(handleGpsFix, (err) => console.warn('Nav GPS err:', err.message));
   }, [handleGpsFix]);
 
   // Rebuild the live map layers and GPS watch after the browser recreates
@@ -669,8 +666,8 @@ const NavigationController = forwardRef(function NavigationController(
     startWatch();
 
     return () => {
-      if (navWatchIdRef.current !== null) navigator.geolocation?.clearWatch(navWatchIdRef.current);
-      navWatchIdRef.current = null;
+      navGpsUnsubRef.current?.();
+      navGpsUnsubRef.current = null;
     };
     // This restoration runs once for the snapshot captured at mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -838,10 +835,8 @@ const NavigationController = forwardRef(function NavigationController(
     spokenTurnNowRef.current = false;
     nearArrivalSpokenRef.current = false;
 
-    if (navWatchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(navWatchIdRef.current);
-      navWatchIdRef.current = null;
-    }
+    navGpsUnsubRef.current?.();
+    navGpsUnsubRef.current = null;
 
     clearRouteLayers();
     if (navDestMarkerRef.current) {
@@ -955,7 +950,8 @@ const NavigationController = forwardRef(function NavigationController(
   // the user-driven stop/close paths above).
   useEffect(
     () => () => {
-      if (navWatchIdRef.current !== null) navigator.geolocation.clearWatch(navWatchIdRef.current);
+      navGpsUnsubRef.current?.();
+      navGpsUnsubRef.current = null;
       clearTimeout(navGpsStaleTimerRef.current);
       clearTimeout(navDropDebounceRef.current);
       if (navClickAbortRef.current) navClickAbortRef.current.abort();

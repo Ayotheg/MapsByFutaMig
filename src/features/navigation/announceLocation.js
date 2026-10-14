@@ -1,5 +1,18 @@
 import { reverseGeocode } from '../search/nominatimSearch';
 import { speak } from '../../lib/speech';
+import { haversine } from '../../lib/geoUtils';
+
+// The last reverse-geocode result, kept WITH the coordinates and time it
+// was computed for. Reused only for a fix within GEOCODE_REUSE_M of those
+// coordinates and younger than GEOCODE_REUSE_MS — anything else re-geocodes.
+// In-memory only, on purpose: a place name must never survive a reload.
+const GEOCODE_REUSE_M = 150;
+const GEOCODE_REUSE_MS = 3 * 60 * 1000;
+let geocodeCache = null;
+
+// Bumped per call so a slow response for an older fix can't speak over
+// (or after) the announcement for a newer one.
+let announceSeq = 0;
 
 /**
  * "Find my location" → speak it out loud.
@@ -19,20 +32,37 @@ import { speak } from '../../lib/speech';
  * road + "within Obanla axis"), so no campus vs. off-campus
  * special-casing is needed; it's one code path either way.
  *
- * Fails silently on a network hiccup/unsupported browser — same "never
- * block the UI on a location lookup" posture as
- * `useOneShotLocation.js`.
+ * The caller must pass a fix it has just accepted as current (see
+ * `useGpsTracking.js`). If the lookup fails this says so rather than
+ * staying silent or reusing an earlier name. `approximate` (the weak-signal
+ * fallback fix) changes the wording so a ±300m guess isn't stated as fact.
  */
-export async function announceCurrentLocation(lat, lng) {
+export async function announceCurrentLocation(lat, lng, { approximate = false } = {}) {
   if (lat == null || lng == null) return;
+  const seq = ++announceSeq;
 
-  let result;
-  try {
-    result = await reverseGeocode(lat, lng);
-  } catch {
+  let result = null;
+  const cached = geocodeCache;
+  if (
+    cached &&
+    Date.now() - cached.at <= GEOCODE_REUSE_MS &&
+    haversine(cached.lat, cached.lng, lat, lng) <= GEOCODE_REUSE_M
+  ) {
+    result = cached.result;
+  } else {
+    try {
+      result = await reverseGeocode(lat, lng);
+    } catch {
+      result = null;
+    }
+    if (seq !== announceSeq) return;
+    if (result) geocodeCache = { lat, lng, at: Date.now(), result };
+  }
+
+  if (!result) {
+    speak('Location found, but the place name could not be loaded.');
     return;
   }
-  if (!result) return;
 
   const { address, displayName } = result;
 
@@ -55,7 +85,7 @@ export async function announceCurrentLocation(lat, lng) {
 
   const state = address.state;
 
-  let phrase = 'Your current location is ';
+  let phrase = approximate ? 'Your approximate location is ' : 'Your current location is ';
   if (specific && axis && specific !== axis) {
     phrase += `${specific}, within ${axis} axis`;
   } else if (specific) {
