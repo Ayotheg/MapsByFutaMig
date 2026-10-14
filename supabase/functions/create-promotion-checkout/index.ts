@@ -30,9 +30,21 @@ const MAX_DAYS = 30;
 const PROMO_CODE = 'IAMAFUTARIAN';
 const PROMO_DISCOUNT = 0.5;
 
+// The browser calls this cross-origin. Without these headers on EVERY
+// response, the browser hides an error reply's body and supabase-js can
+// only say "Failed to send a request to the Edge Function".
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: CORS_HEADERS });
+  }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return new Response('Method not allowed', { status: 405, headers: CORS_HEADERS });
   }
 
   let promotionId;
@@ -167,11 +179,13 @@ Deno.serve(async (req) => {
       },
     });
   } catch (e) {
+    console.error('[create-promotion-checkout] BACHS checkout failed:', promotion.id, e.message);
     return json({ error: `Could not start BACHS checkout: ${e.message}` }, 502);
   }
 
   const checkoutUrl = checkout.url || checkout.checkout_url;
   if (!checkoutUrl) {
+    console.error('[create-promotion-checkout] no checkout URL in BACHS reply:', promotion.id, JSON.stringify(checkout).slice(0, 500));
     return json({ error: 'BACHS did not return a checkout URL.' }, 502);
   }
 
@@ -194,6 +208,6 @@ Deno.serve(async (req) => {
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
 }
