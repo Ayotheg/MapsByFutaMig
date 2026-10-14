@@ -34,10 +34,12 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
   const mapRef = useRef(null);
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
-  // Shown when the tile layer is clearly not loading (see tileHealth.js) —
-  // asks the person to refresh. Stays until dismissed, refreshed, or (if it
-  // was only a slow network) tiles start arriving.
+  // Shown when the tile layer is clearly not loading (see tileHealth.js).
+  // Failed tiles keep retrying in the background meanwhile; the alert's
+  // Retry button just retries them all now instead of reloading the page.
+  // Stays until dismissed or until the failing tiles load.
   const [tileAlert, setTileAlert] = useState(false);
+  const tileWatchersRef = useRef(new Set());
 
   useEffect(() => {
     if (mapRef.current) return; // guard against StrictMode double-invoke
@@ -69,14 +71,14 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     if (window.innerWidth <= 768) map.zoomControl.remove();
 
     // Tile retry + "map isn't loading" alert — see tileHealth.js.
-    const tileDisposers = new Set();
+    const tileWatchers = tileWatchersRef.current;
     const watchTiles = (layer) => {
-      const dispose = watchTileLayer(layer, {
+      const watcher = watchTileLayer(layer, {
         onProblem: () => setTileAlert(true),
         onRecovered: () => setTileAlert(false),
       });
-      tileDisposers.add(dispose);
-      layer.once('remove', () => tileDisposers.delete(dispose));
+      tileWatchers.add(watcher);
+      layer.once('remove', () => tileWatchers.delete(watcher));
     };
 
     // ── Base tile: built from the style catalogue in `basemaps.js` so the
@@ -220,7 +222,8 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     return () => {
       clearTimeout(readyTimer);
       clearTimeout(interactTimeout);
-      [...tileDisposers].forEach((d) => d());
+      [...tileWatchers].forEach((w) => w.dispose());
+      tileWatchers.clear();
       map.off('zoomend', updateZoomClass);
       map.off('moveend', saveView);
       map.off('dragstart mousedown touchstart', onInteractStart);
@@ -239,9 +242,13 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       {tileAlert && (
         <div className={styles.tileAlert} role="alert">
           <TriangleAlert size={16} className={styles.tileAlertIcon} />
-          <span>The map isn't loading properly. Check your connection, then refresh the page.</span>
-          <button type="button" className={styles.tileAlertRefresh} onClick={() => window.location.reload()}>
-            <RefreshCw size={12} /> Refresh
+          <span>The map isn't loading properly. Still trying in the background — check your connection or tap Retry.</span>
+          <button
+            type="button"
+            className={styles.tileAlertRefresh}
+            onClick={() => tileWatchersRef.current.forEach((w) => w.retryNow())}
+          >
+            <RefreshCw size={12} /> Retry
           </button>
           <button
             type="button"

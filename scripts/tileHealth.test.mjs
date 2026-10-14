@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 import {
   watchTileLayer, TILE_STALL_MS, TILE_FAIL_THRESHOLD, TILE_GIVEUP_THRESHOLD, TILE_MAX_RETRIES,
+  TILE_BG_FIRST_MS, TILE_BG_MAX_MS,
 } from '../src/features/map/tileHealth.js';
 
 function stubLayer() {
@@ -20,10 +21,10 @@ function stubLayer() {
 const mkTile = (src = 'https://t/1.png') => ({ src, isConnected: true, srcSets: [] });
 const setup = (opts = {}) => {
   const layer = stubLayer(); const log = [];
-  const dispose = watchTileLayer(layer, {
+  const watcher = watchTileLayer(layer, {
     onProblem: () => log.push('problem'), onRecovered: () => log.push('recovered'), ...opts,
   });
-  return { layer, log, dispose };
+  return { layer, log, ...watcher };
 };
 mock.timers.enable({ apis: ['setTimeout'] });
 
@@ -50,16 +51,19 @@ mock.timers.enable({ apis: ['setTimeout'] });
   layer.fire('tileload', {}); assert.deepEqual(log, ['problem', 'recovered']);
   console.log('ok 4: alert withdraws itself when tiles start arriving'); }
 
-// 5. retry: same src re-assigned with backoff, max TILE_MAX_RETRIES, then gives up
+// 5. retry: quick retries, then background retries that never give up (capped backoff)
 { const { layer } = setup();
   const tile = mkTile(); let assigns = 0;
   let src = tile.src; Object.defineProperty(tile, 'src', { get: () => src, set: (v) => { assigns++; src = v; } });
   layer.fire('tileerror', { tile }); mock.timers.tick(799); assert.equal(assigns, 0);
   mock.timers.tick(1); assert.equal(assigns, 1, 'first retry at 0.8s');
   layer.fire('tileerror', { tile }); mock.timers.tick(1600); assert.equal(assigns, 2, 'second retry at 1.6s');
-  layer.fire('tileerror', { tile }); mock.timers.tick(10000); assert.equal(assigns, 2, 'no third retry');
   assert.equal(TILE_MAX_RETRIES, 2);
-  console.log('ok 5: retries with backoff, capped at', TILE_MAX_RETRIES); }
+  layer.fire('tileerror', { tile }); mock.timers.tick(TILE_BG_FIRST_MS - 1); assert.equal(assigns, 2);
+  mock.timers.tick(1); assert.equal(assigns, 3, 'background retry at 5s');
+  for (let i = 0; i < 6; i++) { layer.fire('tileerror', { tile }); mock.timers.tick(TILE_BG_MAX_MS); }
+  assert.equal(assigns, 9, 'keeps retrying, every 30s at most');
+  console.log('ok 5: quick retries then background retries, capped at', TILE_BG_MAX_MS / 1000, 's'); }
 
 // 6. retry skipped if tile was removed from the DOM / src changed
 { const { layer } = setup();
@@ -69,15 +73,38 @@ mock.timers.enable({ apis: ['setTimeout'] });
   assert.equal(assigns, 0);
   console.log('ok 6: no retry for a tile Leaflet already discarded'); }
 
-// 7. patchy: some tiles load, but N tiles fail after all retries → alert, NOT auto-withdrawn
+// 7. patchy: N tiles still failing after quick retries → alert; stays while
+//    other tiles load, withdrawn once the holes themselves load
 { const { layer, log } = setup();
   layer.fire('tileload', {});
+  const holes = [];
   for (let i = 0; i < TILE_GIVEUP_THRESHOLD; i++) {
-    const t = mkTile(); t.__retries = TILE_MAX_RETRIES; layer.fire('tileerror', { tile: t });
+    const t = mkTile(`https://t/${i}.png`); t.__retries = TILE_MAX_RETRIES; holes.push(t); layer.fire('tileerror', { tile: t });
   }
   assert.deepEqual(log, ['problem']);
-  layer.fire('tileload', {}); assert.deepEqual(log, ['problem'], 'other tiles loading does not hide it');
-  console.log('ok 7: grey holes after retries → alert stays'); }
+  layer.fire('tileload', { tile: mkTile('https://t/other.png') });
+  assert.deepEqual(log, ['problem'], 'other tiles loading does not hide it');
+  holes.slice(0, -1).forEach((tile) => layer.fire('tileload', { tile }));
+  assert.deepEqual(log, ['problem']);
+  layer.fire('tileload', { tile: holes[holes.length - 1] });
+  assert.deepEqual(log, ['problem', 'recovered']);
+  console.log('ok 7: grey holes → alert until those tiles load in the background'); }
+
+// 7b. retryNow refetches every failed tile immediately, without a duplicate later
+{ const { layer, retryNow } = setup();
+  const tile = mkTile(); let assigns = 0; let src = tile.src;
+  Object.defineProperty(tile, 'src', { get: () => src, set: (v) => { assigns++; src = v; } });
+  layer.fire('tileerror', { tile }); retryNow(); assert.equal(assigns, 1, 'retried at once');
+  mock.timers.tick(5000); assert.equal(assigns, 1, 'scheduled retry was replaced, not duplicated');
+  console.log('ok 7b: Retry button refetches failed tiles now'); }
+
+// 7c. offline: retries hold off, then all fire on retryNow (what the online event calls)
+{ let online = false; const { layer, retryNow } = setup({ isOnline: () => online });
+  const tile = mkTile(); let assigns = 0; let src = tile.src;
+  Object.defineProperty(tile, 'src', { get: () => src, set: (v) => { assigns++; src = v; } });
+  layer.fire('tileerror', { tile }); mock.timers.tick(60000); assert.equal(assigns, 0);
+  online = true; retryNow(); assert.equal(assigns, 1);
+  console.log('ok 7c: no retries while offline, all at once when back'); }
 
 // 8. offline → no alert (OfflineBanner covers it), and it can still fire once online
 { let online = false; const { layer, log } = setup({ isOnline: () => online });
