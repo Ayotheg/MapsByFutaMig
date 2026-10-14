@@ -147,25 +147,15 @@ Deno.serve(async (req) => {
 
   let checkout;
   try {
-    // ⚠️ Product-based checkout, per _shared/bachs.ts's flag — Bachs's
-    // SDK examples check out against a pre-created Product rather than
-    // an ad-hoc amount. A fresh, single-use Product per promotion keeps
-    // this correct (never reuses/mutates a shared "Promotion" product
-    // that different campaigns' prices would fight over) at the cost of
-    // one extra API call per checkout. Replace this whole block with a
-    // direct ad-hoc-amount checkout call if/once step 2 of that flag's
-    // checklist finds one.
-    const product = await bachsRequest('/v1/products', {
+    // Ported from cefa161 (BachTest), CONFIRMED by a real sandbox checkout
+    // + webhook round-trip: `/v1/checkout-sessions` (hyphen; the underscore
+    // path 404s) takes an ad-hoc `pricing: { amount, currency }` directly,
+    // so no Product is created first. (The old two-step product flow sent
+    // `price` as a bare number, which BACHS rejects, and needed an extra
+    // products:write scope.)
+    checkout = await bachsRequest('/v1/checkout-sessions', {
       body: {
-        name: `Promotion (${days} day${days === 1 ? '' : 's'})${promoApplied ? ' [50% off]' : ''} — ${promotion.business_name}`,
-        price: amount,
-        currency,
-      },
-    });
-
-    checkout = await bachsRequest('/v1/checkout_sessions', {
-      body: {
-        product_cart: [{ product_id: product.id, quantity: 1 }],
+        pricing: { amount, currency },
         success_url: successUrl,
         cancel_url: cancelUrl,
         // `reference` round-trips through BACHS and back onto the
