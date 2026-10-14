@@ -64,17 +64,29 @@ export default function GpsPanel({ gps, embedded = false }) {
     gpsBtnLabel,
     isTracking,
     toggleTracking,
+    acquiring,
+    approximate,
+    error,
   } = gps;
 
-  const statusText = gpsBtnDisabled
-    ? warning.text || 'Location unavailable'
-    : !isTracking
-      ? 'Tap start to begin tracking'
-      : tier === 'good'
-        ? 'Live GPS tracking active'
-        : tier === 'fair'
-          ? 'Locking in — accuracy improving'
-          : 'Acquiring high-accuracy lock';
+  // `error`/`acquiring`/`approximate` (GPS fix pass) are text-only states
+  // from the hook: a GeolocationPositionError message, a fresh fix being
+  // acquired, and the weak-signal fallback fix respectively.
+  const statusText = error
+    ? error
+    : gpsBtnDisabled
+      ? warning.text || 'Location unavailable'
+      : !isTracking
+        ? 'Tap start to begin tracking'
+        : acquiring
+          ? 'Getting a fresh GPS fix…'
+          : approximate
+            ? 'Approximate location — weak signal'
+            : tier === 'good'
+              ? 'Live GPS tracking active'
+              : tier === 'fair'
+                ? 'Locking in — accuracy improving'
+                : 'Acquiring high-accuracy lock';
 
   // Visualization card caption — real data only (see file header): no
   // satellite count exists in useGpsTracking.js, so the Figma frame's

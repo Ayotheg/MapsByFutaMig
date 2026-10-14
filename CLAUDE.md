@@ -581,6 +581,25 @@ early "just in case."
     Vite-scaffold stubs, not yet built out.
   - **Folder structure was reorganized in Slice 2's session** — if an
     older commit's file paths don't match the section above, that's why.
+- **GPS fixes (Oct 2026) — caching rules, read before touching geolocation:**
+  - **One watcher app-wide.** `features/navigation/gpsWatch.js` owns the
+    only `watchPosition` (`maximumAge: 0`). `useGpsTracking` and
+    `NavigationController` call `subscribeGps()`; never start another
+    watcher. One-shot `getCurrentPosition` calls (Promote, Suggest,
+    Explore, nav's start/resume) are fine. In dev, `[gps]` debug logs show
+    every watch start/clear.
+  - Fixes older than 30s (`pos.timestamp`) are dropped as cached, unless
+    their timestamps keep advancing (a device clock skew, not a cache).
+    The watch restarts on `visibilitychange` → visible.
+  - **No location or place name is persisted** (no localStorage). "Find
+    my location" announces only a fix accepted after the tap: a live fix
+    ≤10s old, a fresh one within the accuracy threshold (`tier` not
+    `poor`), or after 18s the best reading so far, labelled
+    "Approximate · ±Nm". No readings at all → error + RETRY (a retry
+    restarts the watch). Error codes 1/2/3 each have their own message.
+  - `announceLocation.js` caches the reverse-geocode result in memory
+    together with its coordinates: reused only within 150m and 3 min.
+    A failed lookup says so out loud, never an old name.
 - **WhatsApp channel link (announcements + new features):** one URL constant
   in `src/lib/whatsappChannel.js`, brand glyph in `src/lib/WhatsAppIcon.jsx`
   (official mark inlined as SVG, like the Google "G" in `AuthModal.jsx`).

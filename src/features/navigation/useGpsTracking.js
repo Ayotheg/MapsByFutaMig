@@ -3,8 +3,17 @@ import L from 'leaflet';
 import { haversine } from '../../lib/geoUtils';
 import { SMOOTH_WALK, SMOOTH_VEHICLE, VEHICLE_SPEED_KMH, TRAIL_MAX, tier } from './gpsConstants';
 import { announceCurrentLocation } from './announceLocation';
+import { subscribeGps, restartGpsWatch, gpsErrorText } from './gpsWatch';
 import { unlockSpeech } from '../../lib/speech';
 import './navMapLayers.css';
+
+// "Find my location" waits this long for a fix inside the accuracy
+// threshold (anything better than `poor`) before settling for the best
+// reading it has and labelling it approximate.
+const ACQUIRE_FALLBACK_MS = 18000;
+// A fix the live watcher delivered this recently is current enough to use
+// on tap without restarting acquisition.
+const RECENT_FIX_MS = 10000;
 
 // ── Divicon caches, module-scope like legacy's `_dotIconCache`/`_arrowIconCache` ──
 const dotIconCache = {};
@@ -167,17 +176,26 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     warning: { visible: false, poor: false, text: '' },
     gpsBtnDisabled: false,
     gpsBtnLabel: 'FIND MY LOCATION',
+    // True between a "Find my location" tap and the fix it accepts.
+    acquiring: false,
+    // True while the shown position is the weak-signal fallback fix.
+    approximate: false,
+    // Message for the last GeolocationPositionError, null once a fix lands.
+    error: null,
   });
 
   const lastKnownPosRef = useRef(null);
+  const lastFixAtRef = useRef(0);
   const lastAccuracyRef = useRef(Infinity);
   const isWarmedUpRef = useRef(false);
   const isTrackingRef = useRef(false);
   const hiddenRef = useRef(hidden);
   hiddenRef.current = hidden;
 
-  const warmupWatchIdRef = useRef(null);
-  const watchIdRef = useRef(null);
+  const acquiringRef = useRef(false);
+  const approximateRef = useRef(false);
+  const bestFixRef = useRef(null);
+  const acquireTimerRef = useRef(null);
 
   const gpsMarkerRef = useRef(null);
   const headingMarkerRef = useRef(null);
@@ -215,15 +233,23 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     const t = tier(accuracy);
     const nBars = { good: 5, fair: 3, poor: 1 }[t];
     const isTracking = isTrackingRef.current;
+    const acquiring = acquiringRef.current;
+    const approximate = approximateRef.current;
 
     setState((prev) => {
       const next = { ...prev };
       next.tier = t;
       next.isTracking = isTracking;
+      next.acquiring = acquiring;
+      next.approximate = approximate;
+      next.error = null;
       next.activeBars = nBars;
-      next.signalBadgeClass = isTracking ? 'tracking' : t;
-      next.signalBadgeText = isTracking ? 'LIVE' : t.toUpperCase();
-      next.accuracyText = `±${Math.round(accuracy)}m`;
+      next.signalBadgeClass = isTracking && !acquiring ? 'tracking' : t;
+      next.signalBadgeText = acquiring ? 'LOCATING' : isTracking ? 'LIVE' : t.toUpperCase();
+      // The live reading is shown even while warming up, so "weak
+      // readings" can be told apart from "no readings at all".
+      const acc = `±${Math.round(accuracy)}m`;
+      next.accuracyText = acquiring ? `Warming up · ${acc}` : approximate ? `Approximate · ${acc}` : acc;
       next.speedText = speedKmh !== null && speedKmh >= 0 ? `${speedKmh.toFixed(1)} km/h` : '—';
       if (headingDeg !== null && headingDeg >= 0) {
         const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -242,40 +268,21 @@ export function useGpsTracking(map, { hidden = false } = {}) {
           next.gpsBtnDisabled = false;
           next.gpsBtnLabel = 'LOCATE ANYWAY';
         } else {
+          // No longer a dead end: tapping still starts acquisition, which
+          // falls back to an approximate fix (see ACQUIRE_FALLBACK_MS).
           next.warning = { visible: true, poor: true, text: 'Signal too weak. Step outside.' };
-          next.gpsBtnDisabled = true;
-          next.gpsBtnLabel = 'SIGNAL TOO WEAK';
+          next.gpsBtnDisabled = false;
+          next.gpsBtnLabel = 'LOCATE ANYWAY';
         }
+      } else {
+        next.gpsBtnDisabled = false;
+        next.gpsBtnLabel = 'STOP TRACKING';
+        next.warning = approximate
+          ? { visible: true, poor: false, text: `Approximate location (${acc}). Go outdoors for a better fix.` }
+          : { visible: false, poor: false, text: '' };
       }
       return next;
     });
-  }, []);
-
-  // ── Warm-up watcher — starts unconditionally on mount, matching
-  // legacy's unconditional `if (navigator.geolocation) {...}` at script
-  // load (app.js ~1301–1313). Real, flagged consequence: this means GPS
-  // warm-up begins on first paint regardless of whether the sidebar's GPS
-  // panel is even open — see this session's tracker note on why the GPS
-  // *tracking* logic (this hook) is NOT part of the Slice 9 lazy-load
-  // boundary even though the Navigation feature (destination search +
-  // HUD) is.
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-    setState((s) => ({ ...s, accuracyText: 'Warming up…' }));
-    warmupWatchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        isWarmedUpRef.current = true;
-        lastKnownPosRef.current = pos;
-        setState((s) => (s.isWarmedUp ? s : { ...s, isWarmedUp: true }));
-        if (!isTrackingRef.current) updateGauge(pos.coords.accuracy, null, null);
-      },
-      () => setState((s) => ({ ...s, accuracyText: 'GPS unavailable' })),
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-    );
-    return () => {
-      if (warmupWatchIdRef.current !== null) navigator.geolocation.clearWatch(warmupWatchIdRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onPositionUpdate = useCallback(
@@ -364,86 +371,195 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     }
   }, [hidden, map]);
 
+  const stopTracking = useCallback(() => {
+    clearTimeout(acquireTimerRef.current);
+    acquiringRef.current = false;
+    approximateRef.current = false;
+    bestFixRef.current = null;
+    isTrackingRef.current = false;
+    drRef.current.stop();
+    if (trailLineRef.current) {
+      map.removeLayer(trailLineRef.current);
+      trailLineRef.current = null;
+    }
+    if (headingMarkerRef.current) {
+      map.removeLayer(headingMarkerRef.current);
+      headingMarkerRef.current = null;
+    }
+    if (accCircleRef.current) {
+      map.removeLayer(accCircleRef.current);
+      accCircleRef.current = null;
+    }
+    trailPtsRef.current = [];
+    smoothRef.current = { lat: null, lng: null };
+  }, [map]);
+
+  // The fix "Find my location" settles on — the only place the voice
+  // announcement is triggered, always with the coordinates of this fix.
+  const acceptFix = useCallback(
+    (pos, approximate) => {
+      clearTimeout(acquireTimerRef.current);
+      acquiringRef.current = false;
+      approximateRef.current = approximate;
+      bestFixRef.current = null;
+      announceCurrentLocation(pos.coords.latitude, pos.coords.longitude, { approximate });
+      onPositionUpdate(pos);
+    },
+    [onPositionUpdate]
+  );
+
+  const failWithError = useCallback(
+    (text, accuracyText) => {
+      stopTracking();
+      setState((s) => ({
+        ...s,
+        isTracking: false,
+        acquiring: false,
+        approximate: false,
+        error: text,
+        accuracyText,
+        signalBadgeText: 'INACTIVE',
+        signalBadgeClass: '',
+        activeBars: 0,
+        warning: { visible: true, poor: true, text },
+        gpsBtnDisabled: false,
+        gpsBtnLabel: 'RETRY',
+      }));
+    },
+    [stopTracking]
+  );
+
+  const handleFix = useCallback(
+    (pos) => {
+      lastKnownPosRef.current = pos;
+      lastFixAtRef.current = Date.now();
+      if (!isWarmedUpRef.current) {
+        isWarmedUpRef.current = true;
+        setState((s) => ({ ...s, isWarmedUp: true }));
+      }
+      const accuracy = pos.coords.accuracy;
+
+      if (acquiringRef.current) {
+        if (!bestFixRef.current || accuracy <= bestFixRef.current.coords.accuracy) bestFixRef.current = pos;
+        if (tier(accuracy) !== 'poor') acceptFix(pos, false);
+        else updateGauge(accuracy, null, null);
+        return;
+      }
+      if (isTrackingRef.current) {
+        if (approximateRef.current && tier(accuracy) !== 'poor') approximateRef.current = false;
+        onPositionUpdate(pos);
+      } else {
+        updateGauge(accuracy, null, null);
+      }
+    },
+    [acceptFix, onPositionUpdate, updateGauge]
+  );
+
+  const handleError = useCallback(
+    (err) => {
+      if (acquiringRef.current && err.code === 3 && bestFixRef.current) {
+        acceptFix(bestFixRef.current, true);
+        return;
+      }
+      // A timeout between fixes while already tracking isn't fatal — the
+      // watch keeps running and the next fix carries on.
+      if (isTrackingRef.current && !acquiringRef.current && err.code === 3) {
+        console.warn('GPS err:', err.message);
+        return;
+      }
+      failWithError(gpsErrorText(err), err.code === 1 ? 'Location blocked' : err.code === 2 ? 'GPS unavailable' : 'No GPS signal');
+    },
+    [acceptFix, failWithError]
+  );
+
+  // ── Subscribes to the shared watcher unconditionally on mount, matching
+  // legacy's unconditional warm-up `if (navigator.geolocation) {...}` at
+  // script load (app.js ~1301–1313). Real, flagged consequence: this means
+  // GPS warm-up begins on first paint regardless of whether the sidebar's
+  // GPS panel is even open — see the Slice 9 tracker note on why the GPS
+  // *tracking* logic (this hook) is NOT part of the Slice 9 lazy-load
+  // boundary even though the Navigation feature (destination search +
+  // HUD) is. Warm-up and tracking are the same subscription now (see
+  // gpsWatch.js); the handlers go through refs so it's made exactly once.
+  const handleFixRef = useRef(handleFix);
+  const handleErrorRef = useRef(handleError);
+  handleFixRef.current = handleFix;
+  handleErrorRef.current = handleError;
+
+  useEffect(() => {
+    if (!navigator.geolocation) return undefined;
+    setState((s) => ({ ...s, accuracyText: 'Warming up…' }));
+    const unsubscribe = subscribeGps(
+      (pos) => handleFixRef.current(pos),
+      (err) => handleErrorRef.current(err)
+    );
+    return () => {
+      unsubscribe();
+      clearTimeout(acquireTimerRef.current);
+      drRef.current.stop();
+    };
+  }, []);
+
   const toggleTracking = useCallback(() => {
     if (!navigator.geolocation) {
       alert('Geolocation not supported.');
       return;
     }
     if (isTrackingRef.current) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      isTrackingRef.current = false;
-      drRef.current.stop();
-      if (trailLineRef.current) {
-        map.removeLayer(trailLineRef.current);
-        trailLineRef.current = null;
-      }
-      if (headingMarkerRef.current) {
-        map.removeLayer(headingMarkerRef.current);
-        headingMarkerRef.current = null;
-      }
-      if (accCircleRef.current) {
-        map.removeLayer(accCircleRef.current);
-        accCircleRef.current = null;
-      }
-      trailPtsRef.current = [];
-      smoothRef.current = { lat: null, lng: null };
-
-      if (warmupWatchIdRef.current === null) {
-        warmupWatchIdRef.current = navigator.geolocation.watchPosition(
-          (pos) => {
-            lastKnownPosRef.current = pos;
-            updateGauge(pos.coords.accuracy, null, null);
-          },
-          () => {},
-          { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-        );
-      }
-      setState((s) => ({ ...s, isTracking: false, gpsBtnLabel: 'FIND MY LOCATION', gpsBtnDisabled: false }));
-    } else {
-      if (!isWarmedUpRef.current) {
-        alert('GPS warming up, wait a moment.');
-        return;
-      }
-      if (tier(lastAccuracyRef.current) === 'poor') return;
-      unlockSpeech();
-      if (warmupWatchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(warmupWatchIdRef.current);
-        warmupWatchIdRef.current = null;
-      }
-
-      // Speak the current location out loud on every "Find my location"
-      // tap (both the mobile FAB and the desktop GPS panel call this
-      // same toggleTracking) — see announceLocation.js. Uses whatever
-      // fix the warm-up watcher already has (isWarmedUpRef is checked
-      // truthy above, so lastKnownPosRef.current is guaranteed set);
-      // fire-and-forget since it's a nice-to-have voice cue, not
-      // something tracking start should ever wait on or fail over.
-      const warmFix = lastKnownPosRef.current;
-      if (warmFix) {
-        announceCurrentLocation(warmFix.coords.latitude, warmFix.coords.longitude);
-      }
-
-      isTrackingRef.current = true;
-      smoothRef.current = { lat: null, lng: null };
-      trailPtsRef.current = [];
-      drRef.current.start();
-      setState((s) => ({ ...s, isTracking: true, gpsBtnLabel: 'STOP TRACKING' }));
-      watchIdRef.current = navigator.geolocation.watchPosition(onPositionUpdate, (err) => console.warn('GPS err:', err.message), {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 20000,
-      });
+      stopTracking();
+      setState((s) => ({
+        ...s,
+        isTracking: false,
+        acquiring: false,
+        approximate: false,
+        gpsBtnLabel: 'FIND MY LOCATION',
+        gpsBtnDisabled: false,
+        warning: { visible: false, poor: false, text: '' },
+      }));
+      return;
     }
-  }, [map, onPositionUpdate, updateGauge]);
 
-  // Cleanup all watchers/layers on unmount.
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-      drRef.current.stop();
-    };
-  }, []);
+    // Also the retry path: every tap resets the acquisition state below.
+    unlockSpeech();
+    isTrackingRef.current = true;
+    approximateRef.current = false;
+    bestFixRef.current = null;
+    smoothRef.current = { lat: null, lng: null };
+    trailPtsRef.current = [];
+    drRef.current.start();
+
+    // Speak the current location out loud on every "Find my location"
+    // tap — see announceLocation.js. Only a fix the live watcher delivered
+    // moments ago is used straight away; otherwise the watch is restarted
+    // and the announcement waits for the fix that acquisition accepts.
+    const recent = lastKnownPosRef.current;
+    if (recent && Date.now() - lastFixAtRef.current <= RECENT_FIX_MS && tier(recent.coords.accuracy) !== 'poor') {
+      acceptFix(recent, false);
+      return;
+    }
+
+    acquiringRef.current = true;
+    setState((s) => ({
+      ...s,
+      isTracking: true,
+      acquiring: true,
+      approximate: false,
+      error: null,
+      accuracyText: 'Warming up…',
+      signalBadgeText: 'LOCATING',
+      signalBadgeClass: '',
+      warning: { visible: false, poor: false, text: '' },
+      gpsBtnDisabled: false,
+      gpsBtnLabel: 'STOP TRACKING',
+    }));
+    restartGpsWatch();
+    clearTimeout(acquireTimerRef.current);
+    acquireTimerRef.current = setTimeout(() => {
+      if (!acquiringRef.current) return;
+      if (bestFixRef.current) acceptFix(bestFixRef.current, true);
+      else failWithError('No GPS readings yet. Turn on Location, move outdoors, then retry.', 'No GPS signal');
+    }, ACQUIRE_FALLBACK_MS);
+  }, [stopTracking, acceptFix, failWithError]);
 
   return {
     ...state,
