@@ -117,7 +117,12 @@ begin
 end;
 $$;
 
-revoke all on function promotion_release_waypoint(text, text, boolean, boolean, boolean) from public;
+-- Internal helper only: the approve/remove/expiry functions and the delete
+-- trigger call it as the function owner. Supabase grants EXECUTE on new
+-- functions to anon/authenticated by default, and `from public` alone does
+-- not undo that — without this, anyone could call it over the API and
+-- delete any waypoint.
+revoke all on function promotion_release_waypoint(text, text, boolean, boolean, boolean) from public, anon, authenticated;
 
 -- ── Approve ──────────────────────────────────────────────────────────────
 create or replace function admin_approve_promotion(p_id text)
