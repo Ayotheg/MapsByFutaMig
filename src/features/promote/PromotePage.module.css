@@ -655,6 +655,68 @@
   color: var(--v2-text-variant);
 }
 
+/* ── Promo code ───────────────────────────────────────────────────── */
+.durationPriceOld {
+  margin-right: 6px;
+  font-weight: 500;
+  color: var(--v2-text-variant);
+}
+.promoBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(204, 195, 216, 0.3);
+}
+.promoRow {
+  display: flex;
+  gap: 8px;
+}
+.promoRow .linkInputWrap {
+  flex: 1;
+  min-width: 0;
+}
+.promoApplyBtn {
+  flex-shrink: 0;
+  padding: 0 18px;
+  border: none;
+  border-radius: var(--r-xl);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  font-family: var(--font-label);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: opacity var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.promoApplyBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.promoAppliedText {
+  flex: 1;
+  min-width: 0;
+}
+.promoRemoveBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--v2-text-variant);
+  cursor: pointer;
+}
+.promoRemoveBtn:hover {
+  background: var(--v2-primary-glow);
+}
+.coordBanner .promoRemoveBtn svg {
+  color: var(--v2-text-variant);
+}
+
 /* ── Bottom actions ───────────────────────────────────────────────── */
 .actions {
   display: flex;

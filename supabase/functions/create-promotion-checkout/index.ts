@@ -22,14 +22,23 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { bachsRequest } from '../_shared/bachs.ts';
 
+// Mirrors src/features/promote/pricing.js — keep the two in sync. These
+// copies are the ones that decide what BACHS actually collects.
+const NAIRA_PER_DAY = 200;
+const MIN_DAYS = 1;
+const MAX_DAYS = 30;
+const PROMO_CODE = 'IAMAFUTARIAN';
+const PROMO_DISCOUNT = 0.5;
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
   }
 
   let promotionId;
+  let promoCode;
   try {
-    ({ promotionId } = await req.json());
+    ({ promotionId, promoCode } = await req.json());
   } catch {
     return json({ error: 'Malformed request body — expected { promotionId }' }, 400);
   }
@@ -70,15 +79,27 @@ Deno.serve(async (req) => {
     return json({ error: `This promotion is already ${promotion.payment_status}.` }, 409);
   }
 
-  // The amount charged is re-derived from the stored row, NEVER taken
-  // from the request body — submitPromotion.js doesn't even send one.
-  // A tampered client could otherwise ask BACHS to collect ₦1 for a
-  // 30-day campaign; this function is the one place that can't be
-  // tricked into that, since `promotion.amount` was itself computed
-  // server-side-equivalent at insert time from `days` (pricing.js's
-  // computeAmount, mirrored — see submitPromotion.js).
-  const amount = promotion.amount;
+  // The amount charged is re-derived here from the stored `days` and the
+  // optional promo code, NEVER taken from the client-inserted `amount` or
+  // the request body. A tampered client could otherwise ask BACHS to
+  // collect ₦1 for a 30-day campaign; the promo discount only applies
+  // when the code matches PROMO_CODE above.
+  const days = Math.min(MAX_DAYS, Math.max(MIN_DAYS, Number(promotion.days) || MIN_DAYS));
+  const promoApplied =
+    typeof promoCode === 'string' && promoCode.trim().toUpperCase() === PROMO_CODE;
+  const fullAmount = days * NAIRA_PER_DAY;
+  const amount = promoApplied ? Math.round(fullAmount * (1 - PROMO_DISCOUNT)) : fullAmount;
   const currency = promotion.currency || 'NGN';
+
+  // Overwrite whatever amount the client inserted, so the row (and the
+  // admin Promotions tab) shows what is actually being charged.
+  if (Number(promotion.amount) !== amount) {
+    const { error: amountError } = await adminClient
+      .from('promotions')
+      .update({ amount })
+      .eq('id', promotion.id);
+    if (amountError) return json({ error: amountError.message }, 500);
+  }
 
   const siteUrl = Deno.env.get('SITE_URL') || req.headers.get('Origin') || '';
   const successUrl = `${siteUrl}/promote/callback?promotion=${promotion.id}`;
@@ -96,7 +117,7 @@ Deno.serve(async (req) => {
     // checklist finds one.
     const product = await bachsRequest('/v1/products', {
       body: {
-        name: `Promotion (${promotion.days} day${promotion.days === 1 ? '' : 's'}) — ${promotion.business_name}`,
+        name: `Promotion (${days} day${days === 1 ? '' : 's'})${promoApplied ? ' [50% off]' : ''} — ${promotion.business_name}`,
         price: amount,
         currency,
       },

@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { uploadImage, insertImageRows } from '../admin/adminSave';
 import { track } from '../../lib/analytics';
-import { MIN_DAYS, MAX_DAYS, MAX_PHOTOS, computeAmount, CURRENCY } from './pricing';
+import { MIN_DAYS, MAX_DAYS, MAX_PHOTOS, computeAmount, CURRENCY, isValidPromoCode, normalizePromoCode } from './pricing';
 
 // ── Promote checkout (payment half only — see PROMOTE_PAYMENT_INTEGRATION.md) ──
 //
@@ -113,6 +113,7 @@ export async function submitPromotion({
   contactValue,
   days,
   photos, // { id, file, previewUrl }[]
+  promoCode, // optional; ignored unless it matches pricing.js's PROMO_CODE
 }) {
   if (!userId) {
     throw new Error('Sign in first — a promotion has to be tied to your account.');
@@ -132,7 +133,8 @@ export async function submitPromotion({
     throw new Error(errors[0]);
   }
 
-  const amount = computeAmount(days);
+  const appliedPromo = isValidPromoCode(promoCode) ? normalizePromoCode(promoCode) : null;
+  const amount = computeAmount(days, appliedPromo);
   const contactLink = listingType === 'online' ? buildContactLink(contactPlatform, contactValue) : null;
   const promotionId = crypto.randomUUID();
 
@@ -172,7 +174,9 @@ export async function submitPromotion({
   }
 
   const { data, error: fnError } = await supabase.functions.invoke('create-promotion-checkout', {
-    body: { promotionId },
+    // The function re-derives the amount from `days` + this code itself and
+    // overwrites the row's `amount`, so a tampered client amount is never charged.
+    body: { promotionId, promoCode: appliedPromo },
   });
   if (fnError) {
     throw new Error(
@@ -184,7 +188,11 @@ export async function submitPromotion({
     throw new Error('Payment could not be started (no checkout URL returned). Try again.');
   }
 
-  track('promotion_checkout_started', { listing_type: listingType, days: Number(days) });
+  track('promotion_checkout_started', {
+    listing_type: listingType,
+    days: Number(days),
+    promo_applied: Boolean(appliedPromo),
+  });
 
   return { promotionId, checkoutUrl: data.checkoutUrl };
 }

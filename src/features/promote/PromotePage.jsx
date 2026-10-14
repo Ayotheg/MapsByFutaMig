@@ -16,13 +16,25 @@ import {
   Search,
   Send,
   ShieldCheck,
+  Tag,
   X,
 } from "lucide-react";
 import { useSeo } from "../../lib/useSeo";
 import { useAuth, friendlyError } from "../auth/useAuth";
 import WaypointSearchPanel from "./WaypointSearchPanel";
 import { submitPromotion } from "./submitPromotion";
-import { MIN_DAYS, MAX_DAYS, DEFAULT_DAYS, NAIRA_PER_DAY, MAX_PHOTOS, formatNaira } from "./pricing";
+import {
+  MIN_DAYS,
+  MAX_DAYS,
+  DEFAULT_DAYS,
+  NAIRA_PER_DAY,
+  MAX_PHOTOS,
+  PROMO_DISCOUNT,
+  computeAmount,
+  formatNaira,
+  isValidPromoCode,
+  normalizePromoCode,
+} from "./pricing";
 import styles from "./PromotePage.module.css";
 
 // AuthModal is a full sign-in/sign-up surface, not needed for this page's
@@ -155,6 +167,11 @@ export default function PromotePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  // Optional promo code. `promoInput` is what's typed; `appliedPromo` is only
+  // set once Apply accepts a valid code, and is what checkout actually sends.
+  const [promoInput, setPromoInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [promoError, setPromoError] = useState(null);
 
   // Returning from the payment provider with the browser's Back button.
   //
@@ -185,11 +202,33 @@ export default function PromotePage() {
     [contactPlatform],
   );
 
-  const totalPrice = useMemo(() => days * NAIRA_PER_DAY, [days]);
+  const fullPrice = useMemo(() => computeAmount(days), [days]);
+  const totalPrice = useMemo(() => computeAmount(days, appliedPromo), [days, appliedPromo]);
   const sliderPct = useMemo(
     () => ((days - MIN_DAYS) / (MAX_DAYS - MIN_DAYS)) * 100,
     [days],
   );
+
+  function handleApplyPromo() {
+    const code = normalizePromoCode(promoInput);
+    if (!code) {
+      setPromoError(null);
+      return;
+    }
+    if (isValidPromoCode(code)) {
+      setAppliedPromo(code);
+      setPromoError(null);
+    } else {
+      setAppliedPromo(null);
+      setPromoError("That promo code isn't valid.");
+    }
+  }
+
+  function handleRemovePromo() {
+    setAppliedPromo(null);
+    setPromoInput("");
+    setPromoError(null);
+  }
 
   function handleListingTypeChange(type) {
     if (listingType === type) {
@@ -292,6 +331,7 @@ export default function PromotePage() {
         contactValue,
         days,
         photos,
+        promoCode: appliedPromo,
       });
       window.location.href = checkoutUrl; // full redirect — BACHS's hosted checkout, not an in-app modal
     } catch (e) {
@@ -584,6 +624,9 @@ export default function PromotePage() {
               <div className={styles.durationValueRow}>
                 <span className={styles.durationDays}>{days} Day{days === 1 ? "" : "s"}</span>
                 <span className={styles.durationPrice}>
+                  {appliedPromo && (
+                    <s className={styles.durationPriceOld}>{formatNaira(fullPrice)}</s>
+                  )}
                   {formatNaira(totalPrice)}{" "}
                   <span className={styles.durationPerDay}>
                     • ~{formatNaira(NAIRA_PER_DAY)}/day
@@ -606,6 +649,66 @@ export default function PromotePage() {
                 <span>1 Day</span>
                 <span>15 Days</span>
                 <span>30 Days</span>
+              </div>
+
+              {/* Promo code — optional */}
+              <div className={styles.promoBlock}>
+                <label htmlFor="promote-promo" className={styles.sectionLabel}>
+                  Promo Code (optional)
+                </label>
+                {appliedPromo ? (
+                  <div className={styles.coordBanner}>
+                    <CheckCircle2 size={16} strokeWidth={2} />
+                    <span className={styles.promoAppliedText}>
+                      <strong>{appliedPromo}</strong> applied — {Math.round(PROMO_DISCOUNT * 100)}% off
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.promoRemoveBtn}
+                      onClick={handleRemovePromo}
+                      aria-label="Remove promo code"
+                    >
+                      <X size={14} strokeWidth={2.25} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className={styles.promoRow}>
+                    <div className={styles.linkInputWrap}>
+                      <Tag size={15} strokeWidth={2} className={styles.linkInputIcon} />
+                      <input
+                        id="promote-promo"
+                        type="text"
+                        className={styles.linkInput}
+                        placeholder="Enter promo code"
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        spellCheck={false}
+                        value={promoInput}
+                        onChange={(e) => {
+                          setPromoInput(e.target.value);
+                          if (promoError) setPromoError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleApplyPromo();
+                          }
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.promoApplyBtn}
+                      onClick={handleApplyPromo}
+                      disabled={!promoInput.trim()}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+                {promoError && (
+                  <div className={`${styles.locStatus} ${styles.locStatusError}`}>{promoError}</div>
+                )}
               </div>
             </div>
 
