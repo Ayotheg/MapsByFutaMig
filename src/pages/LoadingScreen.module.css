@@ -1,116 +1,79 @@
 /*
- * Loading screen — redesign (Oct 2026) from maps-by-futa-loading.png.
- * Same warm off-white + indigo palette as the Promote redesign, declared
- * page-scoped here since tokens-v2.css doesn't carry it.
- *
- * Animated: the two ripples expanding out of the centre, the dot orbiting
- * the second ring, the centre circle's soft glow, the progress bar (width
- * transition + shimmer) and each new status label fading in. All of it is
- * gated on prefers-reduced-motion: no-preference.
+ * Loading screen. The original light design (v2 violet, uppercase spaced
+ * title, single breathing ring, hairline progress bar), with a few
+ * additions kept from the Oct 2026 redesign:
+ *   - wide background rings + ripples behind the icon, masked to fade out
+ *     below it so they never reach the title or progress text
+ *   - the thicker, wider progress bar
+ *   - a small dot orbiting the ring
+ *   - a soft shimmer on the bar and a fade-in on each new status label
+ *   - roomier slow-connection state, with "Continue with saved data" as a
+ *     quiet grey option at the bottom (the tagline steps aside for it)
+ * All motion is gated on prefers-reduced-motion: no-preference.
  */
 
 .screen {
-  --ld-bg: #fbfaf8;
-  --ld-ink: #15131d;
-  --ld-muted: #6e6b7b;
-  --ld-accent: #4b2fe0;
-  --ld-ring: rgba(75, 47, 224, 0.14);
-  --ld-ring-strong: rgba(75, 47, 224, 0.3);
-  --ld-track: #e8e6f1;
-
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--ld-bg);
+  background: var(--v2-surface);
   overflow: hidden;
   z-index: 9999;
 }
 
-/* Lavender wash centred on the beacon, fading out before the bar. */
+/* Ambient violet glow behind the icon, faded out before it reaches
+   the top/bottom edges so it reads as a soft wash, not a hard blob. */
 .screen::before {
   content: "";
   position: absolute;
-  top: 36%;
+  top: 50%;
   left: 50%;
-  width: 760px;
-  height: 760px;
+  width: 500px;
+  height: 500px;
+  max-width: 130vw;
+  max-height: 130vw;
   transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(75, 47, 224, 0.1) 0%,
-    rgba(75, 47, 224, 0.05) 40%,
-    rgba(251, 250, 248, 0) 70%
-  );
+  border-radius: var(--r-full);
+  background: var(--v2-primary-glow);
+  filter: blur(40px);
+  pointer-events: none;
+}
+.screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, var(--v2-surface) 0%, transparent 18%, transparent 82%, var(--v2-surface) 100%);
   pointer-events: none;
 }
 
 .content {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 100%;
-  padding: 0 44px;
-  transform: translateY(-4%);
+  padding: 0 var(--pad-lg);
+  transform: translateY(-6%);
 }
 
-/* ── Beacon ───────────────────────────────────────────────────────── */
-.beacon {
+/* ── Icon ─────────────────────────────────────────────────────────── */
+.iconWrap {
   position: relative;
-  width: 176px;
-  height: 176px;
+  width: 160px;
+  height: 160px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 72px;
+  margin-bottom: 36px;
 }
 
-.ring,
-.ripple {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-.ring {
-  border: 1px solid var(--ld-ring);
-}
-.ring1 {
-  width: 132px;
-  height: 132px;
-  border-color: var(--ld-ring-strong);
-  border-width: 1.5px;
-}
-.ring2 {
-  width: 176px;
-  height: 176px;
-  border-color: rgba(75, 47, 224, 0.2);
-}
-.ring3 {
-  width: 300px;
-  height: 300px;
-}
-.ring4 {
-  width: 420px;
-  height: 420px;
-  opacity: 0.8;
-}
-.ring5 {
-  width: 600px;
-  height: 600px;
-  opacity: 0.6;
-}
-
-/* Holds the outer rings + ripples, sized to the widest ring. Full
-   strength above the beacon's centre, fading out over the next ~110px
-   below it, so the rings stay wide toward the top of the screen but never
-   run through the title or the progress text. */
+/* ── Background rings ─────────────────────────────────────────────── */
+/* Sized to the widest ring. Full strength above the icon's centre, faded
+   out ~100px below it — the title starts ~116px below the centre. */
 .halo {
   position: absolute;
   top: 50%;
@@ -119,89 +82,123 @@
   height: 600px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, #000 50%, transparent 68%);
-  mask-image: linear-gradient(to bottom, #000 50%, transparent 68%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 48%, transparent 66%);
+  mask-image: linear-gradient(to bottom, #000 48%, transparent 66%);
 }
-
+.ring,
 .ripple {
-  width: 96px;
-  height: 96px;
-  border: 1.5px solid var(--ld-ring-strong);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: var(--r-full);
+  transform: translate(-50%, -50%);
+}
+.ring {
+  border: 1px solid var(--v2-primary-outline);
+}
+.ringMd {
+  width: 260px;
+  height: 260px;
+  opacity: 0.8;
+}
+.ringLg {
+  width: 400px;
+  height: 400px;
+  opacity: 0.6;
+}
+.ringXl {
+  width: 580px;
+  height: 580px;
+  opacity: 0.45;
+}
+.ripple {
+  width: 80px;
+  height: 80px;
+  border: 1px solid var(--v2-primary-outline);
   opacity: 0;
 }
 
-/* Dot riding the second ring. The wrapper spins; the dot sits on its edge. */
+.ringOuter {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  border: 1px solid var(--v2-primary-outline);
+}
+
+/* Small dot riding the ring. The wrapper spins; the dot sits on its edge. */
 .orbit {
   position: absolute;
   inset: 0;
-  border-radius: 50%;
-  transform: rotate(-52deg);
+  border-radius: var(--r-full);
+  transform: rotate(-40deg);
 }
 .orbitDot {
   position: absolute;
-  top: -5px;
+  top: -3px;
   left: 50%;
-  width: 10px;
-  height: 10px;
-  margin-left: -5px;
-  border-radius: 50%;
-  background: var(--ld-accent);
-  box-shadow: 0 0 0 6px rgba(75, 47, 224, 0.16);
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  box-shadow: 0 0 0 4px var(--v2-primary-glow);
 }
 
 .iconCircle {
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: 80px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--ld-accent);
-  box-shadow: 0 12px 32px rgba(75, 47, 224, 0.35);
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
 }
 .pinIcon {
-  width: 28px;
-  height: 28px;
+  width: 25px;
+  height: 25px;
   color: #ffffff;
 }
 
 /* ── Text ─────────────────────────────────────────────────────────── */
 .title {
-  margin: 0 0 12px;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 30px;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  color: var(--ld-ink);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 35px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--v2-primary);
   text-align: center;
+  margin: 0 0 8px;
 }
 .subtitle {
-  margin: 0 0 48px;
-  max-width: 240px;
   font-family: var(--font-ui);
-  font-size: 15px;
-  line-height: 1.55;
-  color: var(--ld-muted);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--v2-text-variant);
+  opacity: 0.85;
   text-align: center;
+  max-width: 320px;
+  margin: 0 0 40px;
 }
 
 /* ── Progress ─────────────────────────────────────────────────────── */
 .barTrack {
   position: relative;
-  width: min(100%, 320px);
+  width: min(78vw, 300px);
   height: 3px;
-  border-radius: 999px;
-  background: var(--ld-track);
+  border-radius: var(--r-full);
+  background: var(--v2-track);
   overflow: hidden;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 .barFill {
   position: relative;
   height: 100%;
-  border-radius: 999px;
-  background: var(--ld-accent);
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  box-shadow: 0 0 8px var(--v2-primary-glow-strong);
   overflow: hidden;
   transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -209,12 +206,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.55) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.6) 50%, transparent 100%);
   transform: translateX(-100%);
 }
 
@@ -223,19 +215,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  width: min(100%, 320px);
+  width: min(78vw, 300px);
 }
 .statusLabel {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--font-ui);
   font-weight: 500;
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ld-muted);
+  color: var(--v2-text-variant);
+  white-space: nowrap;
 }
 .statusPercent {
   flex-shrink: 0;
@@ -244,22 +236,23 @@
   font-size: 12px;
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
-  color: var(--ld-accent);
+  color: var(--v2-primary);
 }
 
 .footerMeta {
   position: absolute;
+  z-index: 1; /* above .screen::after's edge fade */
   bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   left: 24px;
   right: 24px;
-  margin: 0;
   font-family: var(--font-ui);
-  font-weight: 500;
   font-size: 10px;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--ld-muted);
+  color: var(--v2-text-variant);
+  opacity: 0.7;
   text-align: center;
+  margin: 0;
 }
 
 /* ── Boot-timeout failsafe (HomeRoute.jsx's BOOT_TIMEOUT_MS) ───────── */
@@ -267,211 +260,133 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 18px;
-  margin-top: 40px;
-  width: min(100%, 300px);
+  gap: 16px;
+  margin-top: 36px;
+  max-width: min(80vw, 300px);
 }
 .stuckMessage {
-  margin: 0;
   font-family: var(--font-ui);
   font-size: 13px;
-  line-height: 1.55;
-  color: var(--ld-muted);
+  line-height: 19px;
+  color: var(--v2-text-variant);
   text-align: center;
+  margin: 0;
 }
 .stuckButtonPrimary {
-  min-height: 44px;
-  min-width: 140px;
-  padding: 10px 28px;
+  min-height: 40px;
+  min-width: 120px;
+  padding: 10px 24px;
   border: none;
-  border-radius: 999px;
-  background: var(--ld-accent);
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
   color: #ffffff;
   font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 8px 20px rgba(75, 47, 224, 0.22);
-  transition: filter 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 .stuckButtonPrimary:hover {
-  filter: brightness(1.08);
+  opacity: 0.85;
 }
 
-/* Secondary escape hatch — plain grey text near the bottom, an option
+/* "Continue with saved data": plain grey text near the bottom, an option
    rather than a second button. */
 .continueOption {
   position: absolute;
+  z-index: 1;
   left: 50%;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   padding: 10px 16px;
   border: none;
   background: transparent;
   font-family: var(--font-ui);
-  font-weight: 400;
-  font-size: 13px;
-  color: #9a97a6;
+  font-size: 12px;
+  color: var(--v2-text-variant);
+  opacity: 0.8;
   white-space: nowrap;
   cursor: pointer;
   transition: color 0.15s ease;
 }
 .continueOption:hover {
-  color: var(--ld-muted);
+  color: var(--v2-text-variant);
   text-decoration: underline;
 }
-
-/* Stuck: the tagline footer steps aside so the Continue option has the
-   bottom to itself, and the beacon gives up some height on short screens. */
 .screenStuck .footerMeta {
   display: none;
-}
-.screenStuck .continueOption {
-  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-}
-@media (max-height: 760px) {
-  .screenStuck .beacon {
-    margin-bottom: 40px;
-  }
-  .screenStuck .subtitle {
-    margin-bottom: 32px;
-  }
-  .screenStuck .stuckPanel {
-    margin-top: 28px;
-  }
 }
 
 /* ── Motion ───────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: no-preference) {
-  .ripple {
-    animation: ripple 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-  }
-  .rippleDelayed {
-    animation-delay: 1.6s;
+  .ringOuter {
+    animation: breathe var(--v2-duration-breathe) var(--v2-ease-standard) infinite;
   }
   .orbit {
-    animation: orbit 6s linear infinite;
+    animation: orbit 7s linear infinite;
   }
-  .iconCircle {
-    animation: glow 2.4s ease-in-out infinite;
+  .ripple {
+    animation: ripple 3.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
   }
-  .ring1 {
-    animation: breathe 2.4s ease-in-out infinite;
+  .rippleDelayed {
+    animation-delay: 1.7s;
   }
   .barFill::after {
-    animation: shimmer 1.6s ease-in-out infinite;
+    animation: shimmer 1.8s ease-in-out infinite;
   }
   .statusLabel {
-    animation: labelIn 0.35s ease-out;
-  }
-  .content {
-    animation: contentIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: labelIn 0.3s ease-out;
   }
 }
-
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
 @keyframes ripple {
   0% {
-    width: var(--ripple-from, 96px);
-    height: var(--ripple-from, 96px);
-    opacity: 0.7;
+    width: 80px;
+    height: 80px;
+    opacity: 0.8;
   }
   100% {
-    width: var(--ripple-to, 420px);
-    height: var(--ripple-to, 420px);
+    width: 440px;
+    height: 440px;
     opacity: 0;
   }
 }
 @keyframes orbit {
-  from { transform: rotate(-52deg); }
-  to { transform: rotate(308deg); }
-}
-@keyframes glow {
-  0%, 100% {
-    box-shadow: 0 12px 32px rgba(75, 47, 224, 0.3), 0 0 0 0 rgba(75, 47, 224, 0.18);
-  }
-  50% {
-    box-shadow: 0 14px 40px rgba(75, 47, 224, 0.42), 0 0 0 10px rgba(75, 47, 224, 0);
-  }
-}
-@keyframes breathe {
-  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-  50% { transform: translate(-50%, -50%) scale(1.04); opacity: 0.7; }
+  from { transform: rotate(-40deg); }
+  to { transform: rotate(320deg); }
 }
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
 @keyframes labelIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(3px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes contentIn {
-  from { opacity: 0; transform: translateY(-2%); }
-  to { opacity: 1; transform: translateY(-4%); }
-}
 
-@media (min-width: 600px) {
-  .title {
-    font-size: 36px;
-  }
-  .subtitle {
-    max-width: 320px;
-  }
-}
-
-/* Desktop (Loading — Desktop@2x.png): bigger beacon and rings, one-line
-   subtitle, wider bar. */
+/* Desktop: a little more room and a wider bar. */
 @media (min-width: 900px) and (min-height: 640px) {
-  .screen::before {
-    top: 38%;
-    width: 1100px;
-    height: 1100px;
-  }
-  .beacon {
-    width: 220px;
-    height: 220px;
-    margin-bottom: 72px;
-  }
-  .iconCircle {
-    width: 120px;
-    height: 120px;
-  }
-  .pinIcon {
-    width: 34px;
-    height: 34px;
-  }
-  .ring1 { width: 194px; height: 194px; }
-  .ring2 { width: 220px; height: 220px; }
-  .ring3 { width: 380px; height: 380px; }
-  .ring4 { width: 540px; height: 540px; }
-  .ring5 { width: 720px; height: 720px; }
   .halo {
-    width: 720px;
-    height: 720px;
+    width: 760px;
+    height: 760px;
+    /* same ~100px fade below the icon centre, at this larger box size */
+    -webkit-mask-image: linear-gradient(to bottom, #000 48%, transparent 62%);
+    mask-image: linear-gradient(to bottom, #000 48%, transparent 62%);
   }
-  .ripple {
-    width: 120px;
-    height: 120px;
-    --ripple-from: 120px;
-    --ripple-to: 560px;
-  }
-  .title {
-    font-size: 48px;
-    margin-bottom: 14px;
-  }
-  .subtitle {
-    max-width: none;
-    font-size: 17px;
-    margin-bottom: 56px;
-  }
+  .ringMd { width: 300px; height: 300px; }
+  .ringLg { width: 480px; height: 480px; }
+  .ringXl { width: 720px; height: 720px; }
   .barTrack,
   .status {
-    width: 360px;
-  }
-  .statusLabel {
-    font-size: 11px;
-  }
-  .statusPercent {
-    font-size: 13px;
+    width: 340px;
   }
 }

@@ -178,19 +178,18 @@ function LoadingScreen({
   return (
     <div className={`${styles.screen} ${stuck ? styles.screenStuck : ""}`}>
       <div className={styles.content}>
-        <div className={styles.beacon} aria-hidden="true">
-          {/* Outer halo: the wide rings and the expanding ripples. They reach
-              up toward the top of the screen but are masked to fade out
-              below the beacon, before the title and progress text. */}
+        <div className={styles.iconWrap} aria-hidden="true">
+          {/* Wide background rings + ripples. Reach up toward the top of
+              the screen; masked to fade out just below the icon so they
+              never sit behind the title or progress text. */}
           <span className={styles.halo}>
-            <span className={`${styles.ring} ${styles.ring5}`} />
-            <span className={`${styles.ring} ${styles.ring4}`} />
-            <span className={`${styles.ring} ${styles.ring3}`} />
+            <span className={`${styles.ring} ${styles.ringXl}`} />
+            <span className={`${styles.ring} ${styles.ringLg}`} />
+            <span className={`${styles.ring} ${styles.ringMd}`} />
             <span className={styles.ripple} />
             <span className={`${styles.ripple} ${styles.rippleDelayed}`} />
           </span>
-          <span className={`${styles.ring} ${styles.ring2}`} />
-          <span className={`${styles.ring} ${styles.ring1}`} />
+          <span className={styles.ringOuter} />
           <span className={styles.orbit}>
             <span className={styles.orbitDot} />
           </span>
@@ -199,7 +198,7 @@ function LoadingScreen({
           </span>
         </div>
 
-        <h1 className={styles.title}>Maps by FUTA</h1>
+        <h1 className={styles.title}>Maps By Futa</h1>
         <p className={styles.subtitle}>
           Your personal guide to campus navigation.
         </p>
@@ -219,6 +218,7 @@ function LoadingScreen({
           {/* keyed so each new step fades in */}
           <span key={currentLabel} className={styles.statusLabel}>
             {currentLabel}
+            <span aria-hidden="true">&hellip;</span>
           </span>
           <span className={styles.statusPercent}>{Math.round(percent)}%</span>
         </div>
@@ -232,7 +232,7 @@ function LoadingScreen({
                   : "You seem to be offline. Check your connection and try again."
                 : hasSavedData
                   ? "This is taking longer than usual — your connection may be slow."
-                  : "This is taking longer than usual — your connection may be slow. tap Retry."}
+                  : "This is taking longer than usual — your connection may be slow. Tap Retry."}
             </p>
             {onRetry && (
               <button type="button" className={styles.stuckButtonPrimary} onClick={onRetry}>
