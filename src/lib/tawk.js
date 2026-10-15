@@ -38,7 +38,16 @@ function loadTawk() {
       mobile: { position: 'br', xOffset: 12, yOffset: 96 },
     },
   };
-  t.onLoad = () => window.dispatchEvent(new Event('tawk:load'));
+  t.onLoad = () => {
+    // Always start as the small bubble — never open over the page on load
+    // (a dashboard greeting trigger can otherwise expand it by itself).
+    try {
+      if (t.isChatMaximized?.()) t.minimize();
+    } catch {
+      // ignore — widget still initialising
+    }
+    window.dispatchEvent(new Event('tawk:load'));
+  };
   t.onChatMaximized = () => window.dispatchEvent(new Event('tawk:open'));
   t.onChatMinimized = () => window.dispatchEvent(new Event('tawk:close'));
   const s1 = document.createElement('script');

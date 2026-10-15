@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import styles from './ZoomHint.module.css';
+import { setTawkHidden } from '../../lib/tawk';
 
 const DISMISSED_KEY = 'mbf_zoom_hint_dismissed';
 const FADE_MS = 280;
@@ -70,6 +71,12 @@ export default function ZoomHint({ map }) {
 
     return () => map.off('zoomend', onZoomEnd);
   }, [map, dismiss]);
+
+  // One thing at a time: the live-chat bubble waits until this is gone.
+  useEffect(() => {
+    setTawkHidden('zoom-hint', visible);
+    return () => setTawkHidden('zoom-hint', false);
+  }, [visible]);
 
   // The overlay lives inside the Leaflet container, whose own listeners
   // would otherwise treat a tap on the button as a map click.

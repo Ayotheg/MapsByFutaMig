@@ -76,6 +76,8 @@ const EMPTY_KML_ANNOTATIONS = [];
  * mounted once `navOpen` is set — see its own import comment for why
  * that split, not "the whole slice," is the real lazy-load boundary.
  */
+const CHAT_SETTLE_MS = 20 * 1000;
+
 export default function MapPage({ onReadinessChange }) {
   // The live map is a real-time interactive tool, not static content —
   // keep it out of the search index (crawling/indexing a constantly
@@ -545,6 +547,24 @@ export default function MapPage({ onReadinessChange }) {
     setTawkHidden('map-busy', onMapRoute && mapBusy);
     return () => setTawkHidden('map-busy', false);
   }, [onMapRoute, mapBusy]);
+
+  // The chat bubble doesn't arrive with the map: it stays hidden until the
+  // person first zooms/drags the map, or CHAT_SETTLE_MS passes.
+  const [mapSettled, setMapSettled] = useState(false);
+  useEffect(() => {
+    if (!map || mapSettled) return undefined;
+    const settle = () => setMapSettled(true);
+    const timer = setTimeout(settle, CHAT_SETTLE_MS);
+    map.once('zoomstart dragstart', settle);
+    return () => {
+      clearTimeout(timer);
+      map.off('zoomstart dragstart', settle);
+    };
+  }, [map, mapSettled]);
+  useEffect(() => {
+    setTawkHidden('map-settling', onMapRoute && !mapSettled);
+    return () => setTawkHidden('map-settling', false);
+  }, [onMapRoute, mapSettled]);
 
   return (
     <>
