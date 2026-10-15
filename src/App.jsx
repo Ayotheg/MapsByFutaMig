@@ -28,7 +28,7 @@ function ScrollToTop() {
   return null;
 }
 
-// Tawk.to live chat — /map and /promote only (see lib/tawk.js).
+// Tawk.to live chat — /map, /promote and /promote/callback only (see lib/tawk.js).
 function TawkChat() {
   useTawkOnRoutes(useLocation().pathname);
   return null;

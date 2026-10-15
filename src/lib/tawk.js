@@ -13,15 +13,20 @@ import { useEffect, useState } from 'react';
 // shown again only once no reason is left. An open chat is never hidden.
 
 const TAWK_SRC = 'https://embed.tawk.to/6ad143736df7e334c4c14ca3/1k50muv02';
-const TAWK_ROUTES = new Set(['/map', '/promote']);
+// /promote/callback: where someone lands if a payment won't confirm.
+const TAWK_ROUTES = new Set(['/map', '/promote', '/promote/callback']);
 
 const reasons = new Set();
 let chatOpen = false;
 let injected = false;
 
-// The embed snippet from the Tawk dashboard, plus offsets that keep the
-// bubble clear of Leaflet's attribution (desktop) and the mobile bottom
-// sheet's 76px peek bar, and callbacks this module listens to.
+// The embed snippet from the Tawk dashboard, plus offsets and callbacks this
+// module listens to. Offsets are read once at load, so one set has to suit
+// every chat route:
+// - desktop 36px up: clears Leaflet's attribution on /map; just a corner
+//   on /promote (right of the sticky summary card) and the callback page.
+// - mobile 96px up: sits just above the map's 76px sheet peek bar and the
+//   promote page's ~70px checkout bar, never on top of either.
 function loadTawk() {
   if (injected) return;
   injected = true;

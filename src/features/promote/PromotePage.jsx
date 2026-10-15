@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useSeo } from "../../lib/useSeo";
+import { setTawkHidden } from "../../lib/tawk";
 import { useAuth, friendlyError } from "../auth/useAuth";
 import WaypointSearchPanel from "./WaypointSearchPanel";
 import { submitPromotion } from "./submitPromotion";
@@ -69,6 +70,17 @@ function useIsDesktop() {
     return () => mql.removeEventListener("change", onChange);
   }, []);
   return isDesktop;
+}
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setMatches(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [query]);
+  return matches;
 }
 
 // True while the on-screen keyboard is up. Focus alone isn't a reliable
@@ -569,6 +581,19 @@ export default function PromotePage() {
   // placeholder tiles so the row reads as "room for more". Desktop fills
   // to 3 trailing tiles, mobile to 2 (the 3rd placeholder is desktop-only).
   const placeholderCount = Math.max(0, 3 - photos.length);
+
+  // Live-chat bubble (lib/tawk.js) sits just above the mobile checkout bar.
+  // It steps aside while the person is filling in the form (keyboard up) or
+  // has the map search / sign-in open, so it never covers a field or
+  // competes with the Checkout button for attention.
+  // Between 960px and ~1210px wide the sticky summary card (with the desktop
+  // Checkout button) reaches into the bubble's corner, so it's hidden there.
+  const narrowDesktop = useMediaQuery("(min-width: 960px) and (max-width: 1219px)");
+  const hideChat = authModalOpen || mapSearchOpen || narrowDesktop || (!isDesktop && hideMobileBar);
+  useEffect(() => {
+    setTawkHidden("promote-busy", hideChat);
+    return () => setTawkHidden("promote-busy", false);
+  }, [hideChat]);
 
   return (
     <div className={styles.page}>
