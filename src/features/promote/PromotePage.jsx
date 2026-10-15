@@ -71,6 +71,39 @@ function useIsDesktop() {
   return isDesktop;
 }
 
+// True while the on-screen keyboard is up. Focus alone isn't a reliable
+// signal: on Android, closing the keyboard with the back gesture leaves the
+// field focused, so a focus-based check kept the checkout bar hidden until
+// focus happened to move (e.g. tapping the promo "Apply" button). The
+// keyboard shrinks the visual viewport, so compare against the tallest
+// height seen (reset on rotation). Returns null where visualViewport isn't
+// supported, so the caller can fall back to focus.
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(() =>
+    typeof window !== "undefined" && window.visualViewport ? false : null,
+  );
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    let tallest = vv.height;
+    const update = () => {
+      tallest = Math.max(tallest, vv.height);
+      setOpen(vv.height < tallest * 0.75);
+    };
+    const onRotate = () => {
+      tallest = vv.height;
+      update();
+    };
+    vv.addEventListener("resize", update);
+    window.addEventListener("orientationchange", onRotate);
+    return () => {
+      vv.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", onRotate);
+    };
+  }, []);
+  return open;
+}
+
 // Text-entry fields only — focusing the slider or a button doesn't open a keyboard.
 function isTextField(el) {
   if (!el) return false;
@@ -197,8 +230,11 @@ export default function PromotePage() {
   const [submitError, setSubmitError] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const isDesktop = useIsDesktop();
-  // True while a text field has focus (i.e. the mobile keyboard is up).
+  // True while a text field has focus. Only used to hide the mobile
+  // checkout bar where the keyboard itself can't be detected.
   const [typing, setTyping] = useState(false);
+  const keyboardOpen = useKeyboardOpen();
+  const hideMobileBar = keyboardOpen ?? typing;
   // Optional promo code. `promoInput` is what's typed; `appliedPromo` is only
   // set once Apply accepts a valid code, and is what checkout actually sends.
   const [promoInput, setPromoInput] = useState("");
@@ -481,10 +517,12 @@ export default function PromotePage() {
     </div>
   );
 
-  const submitErrorBanner = submitError && (
+  // Shown next to the checkout button too, so a blocked tap never looks like
+  // it did nothing.
+  const submitErrorBanner = (submitError || activePromoNotice) && (
     <div className={`${styles.locStatus} ${styles.locStatusError}`} role="alert">
       <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-      {submitError}
+      {submitError || activePromoNotice}
     </div>
   );
 
@@ -493,7 +531,7 @@ export default function PromotePage() {
       type="button"
       className={styles.checkoutBtn}
       onClick={handleCheckout}
-      disabled={submitting}
+      disabled={submitting || !!activePromoNotice}
       aria-busy={submitting}
     >
       <span>{submitting ? "Starting checkout…" : "Continue to checkout"}</span>
@@ -559,6 +597,13 @@ export default function PromotePage() {
                 Thousands of students and campus explorers, every day.
               </p>
             </div>
+
+            {activePromoNotice && (
+              <div className={`${styles.locStatus} ${styles.locStatusError}`} role="status">
+                <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+                {activePromoNotice}
+              </div>
+            )}
 
             {showCancelledNotice && (
               <div className={`${styles.locStatus} ${styles.locStatusError}`}>
@@ -923,11 +968,15 @@ export default function PromotePage() {
         </div>
       </div>
 
-      {/* Mobile checkout bar. Hidden while a text field is focused so it
-          doesn't ride up on top of the on-screen keyboard and cover the
-          field being typed in. */}
+      {/* Mobile checkout bar. Hidden while the on-screen keyboard is up so
+          it doesn't cover the field being typed in. Fixed to the bottom and
+          hidden by sliding away, never removed from the layout, so showing
+          or hiding it doesn't make the page jump. */}
       {!isDesktop && (
-        <div className={`${styles.mobileBar} ${typing ? styles.mobileBarHidden : ""}`}>
+        <div
+          className={`${styles.mobileBar} ${hideMobileBar ? styles.mobileBarHidden : ""}`}
+          aria-hidden={hideMobileBar || undefined}
+        >
           <div className={styles.mobileBarTotal}>
             <span className={styles.totalLabel}>Total</span>
             <span className={styles.mobileBarValue}>{formatNaira(totalPrice)}</span>

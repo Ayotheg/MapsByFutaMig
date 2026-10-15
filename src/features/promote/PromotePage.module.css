@@ -53,7 +53,8 @@
   width: 100%;
   max-width: 1120px;
   margin: 0 auto;
-  padding: calc(var(--mob-safe-top, 0px) + 20px) 24px 32px;
+  /* Bottom room for the fixed mobile checkout bar (desktop resets this). */
+  padding: calc(var(--mob-safe-top, 0px) + 20px) 24px calc(120px + env(safe-area-inset-bottom, 0px));
 }
 
 .srOnly {
@@ -837,10 +838,16 @@
 }
 
 /* ── Mobile bottom bar ────────────────────────────────────────────── */
+/* Fixed (not sticky) and hidden with a slide, so toggling it never adds or
+   removes height from the page. .shell reserves room for it underneath. */
 .mobileBar {
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
   z-index: 10;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+    visibility 0s linear 0s;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -851,7 +858,16 @@
   border-top: 1px solid var(--pr-line);
 }
 .mobileBarHidden {
-  display: none;
+  transform: translateY(100%);
+  visibility: hidden;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+    visibility 0s linear var(--v2-duration-quick);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobileBar,
+  .mobileBarHidden {
+    transition: none;
+  }
 }
 .mobileBarTotal {
   display: flex;
