@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowRight,
   AtSign,
-  Camera,
   CheckCircle2,
   Info,
   Link2,
@@ -13,10 +12,10 @@ import {
   MapPin,
   MessageCircle,
   Navigation,
+  Plus,
   Search,
   Send,
   ShieldCheck,
-  Tag,
   X,
 } from "lucide-react";
 import { useSeo } from "../../lib/useSeo";
@@ -53,6 +52,31 @@ import styles from "./PromotePage.module.css";
 // but the real fix is making MapPage.jsx's own AuthModal import lazy
 // too, which is out of this slice's scope (touches a different page).
 const AuthModal = lazy(() => import("../auth/AuthModal"));
+
+// Desktop gets the two-column layout with the sticky summary card; below
+// this width the page is a single column with a bottom checkout bar.
+const DESKTOP_QUERY = "(min-width: 960px)";
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(DESKTOP_QUERY).matches,
+  );
+  useEffect(() => {
+    const mql = window.matchMedia(DESKTOP_QUERY);
+    const onChange = () => setIsDesktop(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return isDesktop;
+}
+
+// Text-entry fields only — focusing the slider or a button doesn't open a keyboard.
+function isTextField(el) {
+  if (!el) return false;
+  if (el.tagName === "TEXTAREA") return true;
+  return el.tagName === "INPUT" && !["range", "file", "checkbox", "radio"].includes(el.type);
+}
 
 // ── Promote Your Business ───────────────────────────────────────────────
 //
@@ -172,6 +196,9 @@ export default function PromotePage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const isDesktop = useIsDesktop();
+  // True while a text field has focus (i.e. the mobile keyboard is up).
+  const [typing, setTyping] = useState(false);
   // Optional promo code. `promoInput` is what's typed; `appliedPromo` is only
   // set once Apply accepts a valid code, and is what checkout actually sends.
   const [promoInput, setPromoInput] = useState("");
@@ -233,6 +260,15 @@ export default function PromotePage() {
     () => ((days - MIN_DAYS) / (MAX_DAYS - MIN_DAYS)) * 100,
     [days],
   );
+
+  function handleFieldFocus(e) {
+    if (isTextField(e.target)) setTyping(true);
+  }
+
+  function handleFieldBlur(e) {
+    // Moving focus straight from one text field to another keeps it true.
+    if (isTextField(e.target) && !isTextField(e.relatedTarget)) setTyping(false);
+  }
 
   function handleApplyPromo() {
     const code = normalizePromoCode(promoInput);
@@ -384,423 +420,521 @@ export default function PromotePage() {
     // `submitting` so the button doesn't stay stuck.
   }
 
+  // Promo field + checkout button render in the desktop summary card or in
+  // the mobile campaign card / bottom bar — one copy at a time (never both),
+  // so there's only ever one #promote-promo input in the DOM.
+  const promoBlock = (
+    <div className={styles.promoBlock}>
+      {appliedPromo ? (
+        <div className={styles.promoApplied}>
+          <CheckCircle2 size={16} strokeWidth={2} />
+          <span className={styles.promoAppliedText}>
+            <strong>{appliedPromo}</strong> applied · {Math.round(PROMO_DISCOUNT * 100)}% off
+          </span>
+          <button
+            type="button"
+            className={styles.promoRemoveBtn}
+            onClick={handleRemovePromo}
+            aria-label="Remove promo code"
+          >
+            <X size={14} strokeWidth={2.25} />
+          </button>
+        </div>
+      ) : (
+        <div className={styles.promoRow}>
+          <label htmlFor="promote-promo" className={styles.srOnly}>
+            Promo code (optional)
+          </label>
+          <input
+            id="promote-promo"
+            type="text"
+            className={styles.promoInput}
+            placeholder="Promo code"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            value={promoInput}
+            onChange={(e) => {
+              setPromoInput(e.target.value);
+              if (promoError) setPromoError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleApplyPromo();
+              }
+            }}
+          />
+          <button
+            type="button"
+            className={styles.promoApplyBtn}
+            onClick={handleApplyPromo}
+            disabled={!promoInput.trim()}
+          >
+            Apply
+          </button>
+        </div>
+      )}
+      {promoError && (
+        <div className={`${styles.locStatus} ${styles.locStatusError}`}>{promoError}</div>
+      )}
+    </div>
+  );
+
+  const submitErrorBanner = submitError && (
+    <div className={`${styles.locStatus} ${styles.locStatusError}`} role="alert">
+      <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+      {submitError}
+    </div>
+  );
+
+  const checkoutButton = (
+    <button
+      type="button"
+      className={styles.checkoutBtn}
+      onClick={handleCheckout}
+      disabled={submitting}
+      aria-busy={submitting}
+    >
+      <span>{submitting ? "Starting checkout…" : "Continue to checkout"}</span>
+      {submitting ? (
+        <Loader2 size={16} strokeWidth={2.5} className={styles.spinner} />
+      ) : (
+        <ArrowRight size={16} strokeWidth={2.5} />
+      )}
+    </button>
+  );
+
+  // "Secured by BACHS" stands on its own as a trust signal, and Cancel is
+  // a quiet text option set apart from it. Anyone on this page is here to
+  // pay, so leaving shouldn't compete with the checkout button.
+  const footerRow = (
+    <div className={styles.footerRow}>
+      <span className={styles.securedRow}>
+        <ShieldCheck size={14} strokeWidth={2} />
+        <span>
+          Secured by <strong>BACHS</strong>
+        </span>
+      </span>
+      <button
+        type="button"
+        className={styles.cancelLink}
+        onClick={() => navigate(-1)}
+        disabled={submitting}
+      >
+        Cancel and go back
+      </button>
+    </div>
+  );
+
+  // Photo grid: the "Add photo" tile, each chosen photo, then empty
+  // placeholder tiles so the row reads as "room for more". Desktop fills
+  // to 3 trailing tiles, mobile to 2 (the 3rd placeholder is desktop-only).
+  const placeholderCount = Math.max(0, 3 - photos.length);
+
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
+      <div className={styles.shell}>
+        <header className={styles.topBar}>
           <button
             type="button"
             className={styles.backBtn}
             onClick={() => navigate(-1)}
             aria-label="Go back"
           >
-            <ArrowLeft size={16} strokeWidth={2.25} />
+            <span className={styles.backCircle}>
+              <ArrowLeft size={18} strokeWidth={2} />
+            </span>
+            <span className={styles.backLabel}>Back</span>
           </button>
-        </div>
-      </header>
+          <span className={styles.stepLabel}>Step 1 of 2</span>
+        </header>
 
-      <main className={styles.main}>
-        <div className={styles.container}>
-          <div className={styles.titleBlock}>
-            <h1 className={styles.title}>Promote Your Business</h1>
-            <p className={styles.subtitle}>
-              Reach thousands of FUTA students and campus explorers daily.
-            </p>
-          </div>
-
-          {showCancelledNotice && (
-            <div className={`${styles.locStatus} ${styles.locStatusError}`} style={{ marginBottom: 16 }}>
-              <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-              Checkout was cancelled — nothing was charged. Your details below are still filled in,
-              so you can just try again.
-            </div>
-          )}
-
-          {activePromoNotice && (
-            <div className={`${styles.locStatus} ${styles.locStatusError}`} style={{ marginBottom: 16 }}>
-              <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-              {activePromoNotice}
-            </div>
-          )}
-
-          <form
-            className={styles.form}
-            onSubmit={(e) => e.preventDefault()}
-          >
-            {/* Business name */}
-            <div className={styles.fieldCard}>
-              <label htmlFor="promote-name" className={styles.fieldLabel}>
-                Business Name
-              </label>
-              <input
-                id="promote-name"
-                type="text"
-                className={styles.fieldInput}
-                placeholder="e.g. Debby’s Fragrances"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-              />
+        <div className={styles.layout}>
+          <main className={styles.formCol}>
+            <div className={styles.titleBlock}>
+              <span className={styles.eyebrow}>Promote</span>
+              <h1 className={styles.title}>Put your business in front of FUTA.</h1>
+              <p className={styles.subtitle}>
+                Thousands of students and campus explorers, every day.
+              </p>
             </div>
 
-            {/* Description */}
-            <div className={styles.fieldCard}>
-              <label htmlFor="promote-desc" className={styles.fieldLabel}>
-                Description (optional)
-              </label>
-              <textarea
-                id="promote-desc"
-                className={styles.fieldTextarea}
-                placeholder="Brief details about your product"
-                rows={3}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
+            {showCancelledNotice && (
+              <div className={`${styles.locStatus} ${styles.locStatusError}`}>
+                <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
+                Checkout was cancelled — nothing was charged. Your details below are still filled in,
+                so you can just try again.
+              </div>
+            )}
 
-            {/* Type selector */}
-            <div className={styles.section}>
-              <span className={styles.sectionLabel}>Type</span>
-              <div className={styles.typeSwitch} role="tablist" aria-label="Listing type">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={listingType === "physical"}
-                  className={`${styles.typeBtn} ${listingType === "physical" ? styles.typeBtnActive : ""}`}
-                  onClick={() => handleListingTypeChange("physical")}
-                >
-                  Physical Shop
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={listingType === "online"}
-                  className={`${styles.typeBtn} ${listingType === "online" ? styles.typeBtnActive : ""}`}
-                  onClick={() => handleListingTypeChange("online")}
-                >
-                  Online Store
-                </button>
+            <form
+              className={styles.form}
+              onSubmit={(e) => e.preventDefault()}
+              onFocus={handleFieldFocus}
+              onBlur={handleFieldBlur}
+            >
+              {/* Business name */}
+              <div className={styles.field}>
+                <label htmlFor="promote-name" className={styles.fieldLabel}>
+                  Business name
+                </label>
+                <input
+                  id="promote-name"
+                  type="text"
+                  className={styles.fieldInput}
+                  placeholder="e.g. Debby’s Fragrances"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                />
               </div>
 
-              <div
-                className={`${styles.typeDetailsRegion} ${listingType ? styles.typeDetailsRegionOpen : ""}`}
-                aria-hidden={listingType === null}
-                inert={listingType === null}
-                onTransitionEnd={(event) => {
-                  if (
-                    event.target === event.currentTarget &&
-                    event.propertyName === "grid-template-rows" &&
-                    listingType === null
-                  ) {
-                    setDetailsType(null);
-                  }
-                }}
-              >
-                <div className={styles.typeDetailsInner}>
-                  {/* Location — Physical Shop only. */}
-                  {detailsType === "physical" && (
-                    <div className={styles.section}>
-                <div className={styles.noticeBanner}>
-                  <Info size={15} strokeWidth={2} className={styles.noticeIcon} />
-                  <p className={styles.noticeText}>
-                    You must be physically present at your shop location
-                    right now to map your student pin.
-                  </p>
-                </div>
+              {/* Description */}
+              <div className={styles.field}>
+                <label htmlFor="promote-desc" className={styles.fieldLabel}>
+                  Description <span className={styles.fieldLabelHint}>· optional</span>
+                </label>
+                <textarea
+                  id="promote-desc"
+                  className={styles.fieldTextarea}
+                  placeholder="A line or two about what you offer"
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
 
-                <div className={styles.locationHeadingRow}>
-                  <span className={styles.sectionLabel}>Location</span>
-                  <MapPin size={15} strokeWidth={2} className={styles.locationHeadingIcon} />
-                </div>
-
-                <div className={styles.locationRow}>
+              {/* Type selector */}
+              <div className={styles.section}>
+                <span className={styles.fieldLabel}>Type</span>
+                <div className={styles.typeSwitch} role="tablist" aria-label="Listing type">
                   <button
                     type="button"
-                    className={styles.locBtn}
-                    onClick={handleUseGps}
+                    role="tab"
+                    aria-selected={listingType === "physical"}
+                    className={`${styles.typeBtn} ${listingType === "physical" ? styles.typeBtnActive : ""}`}
+                    onClick={() => handleListingTypeChange("physical")}
                   >
-                    <Navigation size={18} strokeWidth={2} />
-                    <span>Use Current GPS</span>
+                    Physical shop
                   </button>
                   <button
                     type="button"
-                    className={styles.locBtn}
-                    onClick={() => setMapSearchOpen((v) => !v)}
-                    aria-expanded={mapSearchOpen}
+                    role="tab"
+                    aria-selected={listingType === "online"}
+                    className={`${styles.typeBtn} ${listingType === "online" ? styles.typeBtnActive : ""}`}
+                    onClick={() => handleListingTypeChange("online")}
                   >
-                    <Search size={18} strokeWidth={2} />
-                    <span>Search on Map</span>
+                    Online store
                   </button>
                 </div>
 
-                {mapSearchOpen && (
-                  <WaypointSearchPanel
-                    onSelect={handleWaypointPicked}
-                    onClose={() => setMapSearchOpen(false)}
-                  />
-                )}
+                <div
+                  className={`${styles.typeDetailsRegion} ${listingType ? styles.typeDetailsRegionOpen : ""}`}
+                  aria-hidden={listingType === null}
+                  inert={listingType === null}
+                  onTransitionEnd={(event) => {
+                    if (
+                      event.target === event.currentTarget &&
+                      event.propertyName === "grid-template-rows" &&
+                      listingType === null
+                    ) {
+                      setDetailsType(null);
+                    }
+                  }}
+                >
+                  <div className={styles.typeDetailsInner}>
+                    {/* Location — Physical Shop only. */}
+                    {detailsType === "physical" && (
+                      <div className={styles.detailsSection}>
+                        <div className={styles.noticeBanner}>
+                          <Info size={15} strokeWidth={2} className={styles.noticeIcon} />
+                          <p className={styles.noticeText}>
+                            You must be physically present at your shop location
+                            right now to map your student pin.
+                          </p>
+                        </div>
 
-                {lat !== "" && lng !== "" && (
-                  <div className={styles.coordBanner}>
-                    <CheckCircle2 size={16} strokeWidth={2} />
-                    <span>
-                      Coordinates selected ({Number(lat).toFixed(5)}, {Number(lng).toFixed(5)})
-                    </span>
+                        <div className={styles.locationHeadingRow}>
+                          <span className={styles.fieldLabel}>Location</span>
+                          <MapPin size={14} strokeWidth={2} className={styles.locationHeadingIcon} />
+                        </div>
+
+                        <div className={styles.locationRow}>
+                          <button
+                            type="button"
+                            className={styles.locBtn}
+                            onClick={handleUseGps}
+                          >
+                            <Navigation size={17} strokeWidth={2} />
+                            <span>Use current GPS</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.locBtn}
+                            onClick={() => setMapSearchOpen((v) => !v)}
+                            aria-expanded={mapSearchOpen}
+                          >
+                            <Search size={17} strokeWidth={2} />
+                            <span>Search on map</span>
+                          </button>
+                        </div>
+
+                        {mapSearchOpen && (
+                          <WaypointSearchPanel
+                            onSelect={handleWaypointPicked}
+                            onClose={() => setMapSearchOpen(false)}
+                          />
+                        )}
+
+                        {lat !== "" && lng !== "" && (
+                          <div className={styles.coordBanner}>
+                            <CheckCircle2 size={16} strokeWidth={2} />
+                            <span>
+                              Coordinates selected ({Number(lat).toFixed(5)}, {Number(lng).toFixed(5)})
+                            </span>
+                          </div>
+                        )}
+
+                        {locStatus && (
+                          <div className={`${styles.locStatus} ${locStatus.error ? styles.locStatusError : ""}`}>
+                            {locStatus.text}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Contact — Online Store only. */}
+                    {detailsType === "online" && (
+                      <div className={styles.detailsSection}>
+                        <div className={styles.rowHeadingWithHint}>
+                          <span className={styles.fieldLabel}>Platform</span>
+                          <span className={styles.hintText}>Sets the prefix &amp; icon</span>
+                        </div>
+
+                        <div className={styles.platformRow} role="tablist" aria-label="Contact platform">
+                          {CONTACT_PLATFORMS.map(({ id, label, Icon }) => (
+                            <button
+                              key={id}
+                              type="button"
+                              role="tab"
+                              aria-selected={contactPlatform === id}
+                              className={`${styles.platformBtn} ${contactPlatform === id ? styles.platformBtnActive : ""}`}
+                              onClick={() => setContactPlatform(id)}
+                            >
+                              <Icon size={15} strokeWidth={2} />
+                              <span>{label}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className={styles.rowHeadingWithHint}>
+                          <label htmlFor="promote-contact" className={styles.fieldLabel}>
+                            {activePlatform.fieldLabel} <span className={styles.required}>*</span>
+                          </label>
+                          <span className={styles.hintText}>How customers reach you</span>
+                        </div>
+
+                        <div className={styles.linkInputWrap}>
+                          {activePlatform.prefix ? (
+                            <span className={styles.linkPrefix}>{activePlatform.prefix}</span>
+                          ) : (
+                            <Link2 size={15} strokeWidth={2} className={styles.linkInputIcon} />
+                          )}
+                          <input
+                            id="promote-contact"
+                            type="text"
+                            inputMode={activePlatform.id === "whatsapp" ? "tel" : "text"}
+                            className={styles.linkInput}
+                            placeholder={activePlatform.placeholder}
+                            value={contactValue}
+                            onChange={(e) => setContactValue(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-
-                {locStatus && (
-                  <div className={`${styles.locStatus} ${locStatus.error ? styles.locStatusError : ""}`}>
-                    {locStatus.text}
-                  </div>
-                )}
-                    </div>
-                  )}
-
-                  {/* Contact — Online Store only. */}
-                  {detailsType === "online" && (
-                    <div className={styles.section}>
-                <div className={styles.rowHeadingWithHint}>
-                  <span className={styles.sectionLabel}>Platform</span>
-                  <span className={styles.hintText}>Sets the prefix &amp; icon</span>
-                </div>
-
-                <div className={styles.platformRow} role="tablist" aria-label="Contact platform">
-                  {CONTACT_PLATFORMS.map(({ id, label, Icon }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      role="tab"
-                      aria-selected={contactPlatform === id}
-                      className={`${styles.platformBtn} ${contactPlatform === id ? styles.platformBtnActive : ""}`}
-                      onClick={() => setContactPlatform(id)}
-                    >
-                      <Icon size={15} strokeWidth={2} />
-                      <span>{label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <div className={styles.rowHeadingWithHint}>
-                  <label htmlFor="promote-contact" className={styles.sectionLabel}>
-                    {activePlatform.fieldLabel} <span className={styles.required}>*</span>
-                  </label>
-                  <span className={styles.hintText}>How customers reach you</span>
-                </div>
-
-                <div className={styles.linkInputWrap}>
-                  {activePlatform.prefix ? (
-                    <span className={styles.linkPrefix}>{activePlatform.prefix}</span>
-                  ) : (
-                    <Link2 size={15} strokeWidth={2} className={styles.linkInputIcon} />
-                  )}
-                  <input
-                    id="promote-contact"
-                    type="text"
-                    inputMode={activePlatform.id === "whatsapp" ? "tel" : "text"}
-                    className={styles.linkInput}
-                    placeholder={activePlatform.placeholder}
-                    value={contactValue}
-                    onChange={(e) => setContactValue(e.target.value)}
-                  />
-                </div>
-                    </div>
-                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Photos */}
-            <div className={styles.section}>
-              <span className={styles.sectionLabel}>Photos</span>
+              {/* Photos */}
+              <div className={styles.section}>
+                <div className={styles.rowHeadingWithHint}>
+                  <span className={styles.fieldLabel}>Photos</span>
+                  <span className={styles.hintText}>JPG or PNG · up to {MAX_PHOTOS}</span>
+                </div>
 
-              <button
-                type="button"
-                className={styles.dropzone}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={photos.length >= MAX_PHOTOS}
-              >
-                <span className={styles.dropzoneIconBadge}>
-                  <Camera size={20} strokeWidth={2} />
-                </span>
-                <span className={styles.dropzoneTextWrap}>
-                  <span className={styles.dropzoneTitle}>
-                    Tap to upload a photo
-                  </span>
-                  <span className={styles.dropzoneHint}>
-                    JPG, PNG — up to {MAX_PHOTOS} photos
-                  </span>
-                </span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg"
-                multiple
-                className={styles.hiddenFileInput}
-                onChange={handleFilesSelected}
-              />
-
-              {photos.length > 0 && (
-                <div className={styles.photoChipRow}>
+                <div className={styles.photoGrid}>
+                  <button
+                    type="button"
+                    className={styles.addPhotoTile}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={photos.length >= MAX_PHOTOS}
+                  >
+                    {photos.length >= MAX_PHOTOS ? (
+                      <span>{MAX_PHOTOS} of {MAX_PHOTOS} added</span>
+                    ) : (
+                      <>
+                        <Plus size={22} strokeWidth={1.75} />
+                        <span>Add photo</span>
+                      </>
+                    )}
+                  </button>
                   {photos.map((p) => (
-                    <div key={p.id} className={styles.photoChip}>
-                      <img src={p.previewUrl} alt="" className={styles.photoChipImg} />
+                    <div key={p.id} className={styles.photoTile}>
+                      <img src={p.previewUrl} alt="" className={styles.photoTileImg} />
                       <button
                         type="button"
-                        className={styles.photoChipRemove}
+                        className={styles.photoRemove}
                         onClick={() => removePhoto(p.id)}
                         aria-label="Remove photo"
                       >
-                        <X size={11} strokeWidth={2.5} />
+                        <X size={12} strokeWidth={2.5} />
                       </button>
                     </div>
                   ))}
+                  {Array.from({ length: placeholderCount }, (_, i) => (
+                    <div
+                      key={`empty-${i}`}
+                      className={`${styles.photoTileEmpty} ${photos.length + i === 2 ? styles.desktopOnly : ""}`}
+                      aria-hidden="true"
+                    />
+                  ))}
                 </div>
-              )}
-            </div>
-
-            {/* Campaign duration */}
-            <div className={styles.durationCard}>
-              <div className={styles.durationHeader}>
-                <span className={styles.durationTitle}>Campaign Duration</span>
-                <span className={styles.durationReach}>Daily Student Reach</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  multiple
+                  className={styles.hiddenFileInput}
+                  onChange={handleFilesSelected}
+                />
               </div>
 
-              <div className={styles.durationValueRow}>
-                <span className={styles.durationDays}>{days} Day{days === 1 ? "" : "s"}</span>
-                <span className={styles.durationPrice}>
-                  {appliedPromo && (
-                    <s className={styles.durationPriceOld}>{formatNaira(fullPrice)}</s>
-                  )}
-                  {formatNaira(totalPrice)}{" "}
-                  <span className={styles.durationPerDay}>
-                    • ~{formatNaira(NAIRA_PER_DAY)}/day
-                  </span>
-                </span>
-              </div>
-
-              <input
-                type="range"
-                min={MIN_DAYS}
-                max={MAX_DAYS}
-                value={days}
-                onChange={(e) => setDays(Number(e.target.value))}
-                className={styles.durationSlider}
-                style={{ "--pct": `${sliderPct}%` }}
-                aria-label="Campaign duration in days"
-              />
-
-              <div className={styles.durationTicks}>
-                <span>1 Day</span>
-                <span>15 Days</span>
-                <span>30 Days</span>
-              </div>
-
-              {/* Promo code — optional */}
-              <div className={styles.promoBlock}>
-                <label htmlFor="promote-promo" className={styles.sectionLabel}>
-                  Promo Code (optional)
-                </label>
-                {appliedPromo ? (
-                  <div className={styles.coordBanner}>
-                    <CheckCircle2 size={16} strokeWidth={2} />
-                    <span className={styles.promoAppliedText}>
-                      <strong>{appliedPromo}</strong> applied — {Math.round(PROMO_DISCOUNT * 100)}% off
+              {/* Campaign length — a plain section on desktop (the summary
+                  card carries price + promo), a card with price + promo on
+                  mobile. */}
+              <div className={styles.campaignCard}>
+                <div className={styles.campaignHeader}>
+                  <span className={styles.fieldLabel}>Campaign length</span>
+                  {!isDesktop && <span className={styles.reachLabel}>Daily student reach</span>}
+                  {isDesktop && (
+                    <span className={styles.daysValue}>
+                      <span className={styles.daysNumber}>{days}</span>{" "}
+                      {days === 1 ? "day" : "days"}
                     </span>
-                    <button
-                      type="button"
-                      className={styles.promoRemoveBtn}
-                      onClick={handleRemovePromo}
-                      aria-label="Remove promo code"
-                    >
-                      <X size={14} strokeWidth={2.25} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className={styles.promoRow}>
-                    <div className={styles.linkInputWrap}>
-                      <Tag size={15} strokeWidth={2} className={styles.linkInputIcon} />
-                      <input
-                        id="promote-promo"
-                        type="text"
-                        className={styles.linkInput}
-                        placeholder="Enter promo code"
-                        autoCapitalize="characters"
-                        autoComplete="off"
-                        spellCheck={false}
-                        value={promoInput}
-                        onChange={(e) => {
-                          setPromoInput(e.target.value);
-                          if (promoError) setPromoError(null);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleApplyPromo();
-                          }
-                        }}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.promoApplyBtn}
-                      onClick={handleApplyPromo}
-                      disabled={!promoInput.trim()}
-                    >
-                      Apply
-                    </button>
-                  </div>
-                )}
-                {promoError && (
-                  <div className={`${styles.locStatus} ${styles.locStatusError}`}>{promoError}</div>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom actions */}
-            <div className={styles.actions}>
-              {(submitError || activePromoNotice) && (
-                <div className={`${styles.locStatus} ${styles.locStatusError}`}>
-                  <AlertCircle size={14} strokeWidth={2} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-                  {submitError || activePromoNotice}
-                </div>
-              )}
-
-              <div className={styles.actionRow}>
-                <button
-                  type="button"
-                  className={styles.cancelBtn}
-                  onClick={() => navigate(-1)}
-                  disabled={submitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className={styles.checkoutBtn}
-                  onClick={handleCheckout}
-                  disabled={submitting || !!activePromoNotice}
-                  aria-busy={submitting}
-                >
-                  <span>{submitting ? "Starting checkout…" : "Proceed to checkout"}</span>
-                  {submitting ? (
-                    <Loader2 size={14} strokeWidth={2.5} className={styles.spinner} />
-                  ) : (
-                    <ArrowRight size={14} strokeWidth={2.5} />
                   )}
-                </button>
+                </div>
+
+                {!isDesktop && (
+                  <div className={styles.campaignValueRow}>
+                    <span className={styles.daysValue}>
+                      <span className={styles.daysNumber}>{days}</span>{" "}
+                      {days === 1 ? "day" : "days"}
+                    </span>
+                    <span className={styles.campaignPrice}>
+                      <span className={styles.campaignTotal}>
+                        {appliedPromo && (
+                          <s className={styles.priceOld}>{formatNaira(fullPrice)}</s>
+                        )}
+                        {formatNaira(totalPrice)}
+                      </span>
+                      <span className={styles.campaignRate}>{formatNaira(NAIRA_PER_DAY)} per day</span>
+                    </span>
+                  </div>
+                )}
+
+                <input
+                  type="range"
+                  min={MIN_DAYS}
+                  max={MAX_DAYS}
+                  value={days}
+                  onChange={(e) => setDays(Number(e.target.value))}
+                  className={styles.durationSlider}
+                  style={{ "--pct": `${sliderPct}%` }}
+                  aria-label="Campaign duration in days"
+                />
+
+                <div className={styles.durationTicks}>
+                  <span>1 day</span>
+                  <span>15</span>
+                  <span>30 days</span>
+                </div>
+
+                {!isDesktop && (
+                  <>
+                    <hr className={styles.divider} />
+                    {promoBlock}
+                  </>
+                )}
               </div>
 
-              <div className={styles.securedRow}>
-                <ShieldCheck size={14} strokeWidth={2} />
-                <span>
-                  Secured by <strong>BACHS</strong>
-                </span>
+              {!isDesktop && (
+                <>
+                  {submitErrorBanner}
+                  {footerRow}
+                </>
+              )}
+            </form>
+          </main>
+
+          {isDesktop && (
+            <aside className={styles.summaryCol}>
+              <div className={styles.summaryCard}>
+                <div className={styles.summaryHeader}>
+                  <span className={styles.fieldLabel}>Summary</span>
+                  <span className={styles.reachLabel}>Daily student reach</span>
+                </div>
+
+                <dl className={styles.summaryRows}>
+                  <div className={styles.summaryRow}>
+                    <dt>Campaign length</dt>
+                    <dd>{days} {days === 1 ? "day" : "days"}</dd>
+                  </div>
+                  <div className={styles.summaryRow}>
+                    <dt>Rate</dt>
+                    <dd>{formatNaira(NAIRA_PER_DAY)} / day</dd>
+                  </div>
+                  {appliedPromo && (
+                    <div className={`${styles.summaryRow} ${styles.summaryRowDiscount}`}>
+                      <dt>Promo ({Math.round(PROMO_DISCOUNT * 100)}% off)</dt>
+                      <dd>−{formatNaira(fullPrice - totalPrice)}</dd>
+                    </div>
+                  )}
+                </dl>
+
+                <hr className={styles.divider} />
+
+                {promoBlock}
+
+                <div className={styles.totalRow}>
+                  <span className={styles.totalLabel}>Total</span>
+                  <span className={styles.totalValue}>
+                    {appliedPromo && <s className={styles.priceOld}>{formatNaira(fullPrice)}</s>}
+                    {formatNaira(totalPrice)}
+                  </span>
+                </div>
+
+                {submitErrorBanner}
+                {checkoutButton}
+                {footerRow}
               </div>
-            </div>
-          </form>
+            </aside>
+          )}
         </div>
-      </main>
+      </div>
+
+      {/* Mobile checkout bar. Hidden while a text field is focused so it
+          doesn't ride up on top of the on-screen keyboard and cover the
+          field being typed in. */}
+      {!isDesktop && (
+        <div className={`${styles.mobileBar} ${typing ? styles.mobileBarHidden : ""}`}>
+          <div className={styles.mobileBarTotal}>
+            <span className={styles.totalLabel}>Total</span>
+            <span className={styles.mobileBarValue}>{formatNaira(totalPrice)}</span>
+          </div>
+          {checkoutButton}
+        </div>
+      )}
 
       {authModalOpen && (
         <Suspense fallback={null}>
