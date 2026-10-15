@@ -603,16 +603,19 @@ early "just in case."
 - **WhatsApp channel link (announcements + new features):** one URL constant
   in `src/lib/whatsappChannel.js`, brand glyph in `src/lib/WhatsAppIcon.jsx`
   (official mark inlined as SVG, like the Google "G" in `AuthModal.jsx`).
-  Three placements, each firing `whatsapp_channel_click` with a
-  `props.source` so they can be compared in Insights:
-  - `explore_mobile` — `features/explore/ExploreChannelLink.jsx`
-    (`variant="text"`), one muted line in `ExplorePanel.jsx`: under the
-    rotating cards in the compact/half sheet, under the header in the full
-    sheet.
-  - `explore_desktop` — same component (`variant="row"`), a pinned row in
-    `ExplorePanelDesktop.jsx` between the list and the footer.
   - `landing_footer` — a pill next to the Crowdr pill in
-    `pages/landing/Footer.jsx`.
+    `pages/landing/Footer.jsx`, firing `whatsapp_channel_click`.
+  - The Explore placements (`features/explore/ExploreChannelLink.jsx`,
+    `explore_mobile` / `explore_desktop`) no longer point at WhatsApp: as of
+    Oct 2026 they're "Want to be featured? Start here." router `<Link>`s to
+    `/promote`, firing `promote_link_click` with the same `source` values.
+- **Map kept alive behind /promote (Oct 2026):** `App.jsx`'s
+  `PersistentMap` renders `HomeRoute` outside `<Routes>` and hides it
+  (`display: none`, `active={false}`) instead of unmounting when the person
+  goes /map → /promote, so coming back skips the loading screen. Any other
+  route still unmounts it. While inactive, HomeRoute releases its viewport
+  and body-scroll locks; on return it fires a window resize so Leaflet
+  re-measures.
   **Deliberately not a card inside the Explore list** (promoted "Featured
   Partner" picks live there, and the desktop footer counts "verified
   vendors"). **Footer.jsx loads `lib/analytics` lazily on click**, not via a

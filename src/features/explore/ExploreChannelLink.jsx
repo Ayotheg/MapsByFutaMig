@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { MoveUpRight } from 'lucide-react';
 import { track } from '../../lib/analytics';
 import styles from './ExploreChannelLink.module.css';
@@ -21,28 +22,31 @@ import styles from './ExploreChannelLink.module.css';
  *
  * `source` tags the click event so placements can be compared in the
  * Insights tab.
+ *
+ * A router <Link>, not a plain <a href>: /promote is an in-app route, and a
+ * plain anchor made the browser reload the whole app to get there.
  */
 export default function ExploreChannelLink({ variant = 'text', source }) {
   const linkProps = {
-    href: '/promote',
-    onClick: () => track('whatsapp_channel_click', { source }),
+    to: '/promote',
+    onClick: () => track('promote_link_click', { source }),
   };
 
   if (variant === 'row') {
     return (
-      <a className={styles.row} {...linkProps}>
+      <Link className={styles.row} {...linkProps}>
         <span>Want to be featured?</span>{' '}
         <strong>Start here.</strong>
         <MoveUpRight size={14} className={styles.rowArrow} aria-hidden="true" />
-      </a>
+      </Link>
     );
   }
 
   return (
-    <a className={styles.text} {...linkProps}>
+    <Link className={styles.text} {...linkProps}>
       Want to be featured? <strong>Start here.</strong>
       <MoveUpRight size={13} className={styles.arrow} aria-hidden="true" />
-    </a>
+    </Link>
   );
 }
 

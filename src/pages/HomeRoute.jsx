@@ -54,7 +54,13 @@ function useFontsReady() {
 //
 // Lives in its own file rather than inline in App.jsx so the map route
 // can mount the complete experience without duplicating this component.
-function HomeRoute() {
+//
+// `active` is false while the map is kept alive in the background behind
+// another page (App.jsx's PersistentMap — currently /promote). The map,
+// its data and the finished boot state all stay as they are; only the
+// page-level locks below (viewport zoom, body scroll) are released so the
+// other page behaves normally, and they're re-applied on return.
+function HomeRoute({ active = true }) {
   const [readiness, setReadiness] = useState({
     mapReady: false,
     waypointsReady: false,
@@ -110,23 +116,36 @@ function HomeRoute() {
   // gesture handler on the browsers that do respect it, which is what was
   // producing the "interface moves/gets stuck" symptom.
   useEffect(() => {
+    if (!active) return undefined;
     const meta = document.querySelector('meta[name="viewport"]');
     const original = meta?.getAttribute('content') ?? null;
     meta?.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
     return () => {
       if (original !== null) meta?.setAttribute('content', original);
     };
-  }, []);
+  }, [active]);
 
   // Lock the viewport for the map's fixed-canvas layout, only while
   // this route is mounted — the landing page at "/" needs normal
   // document scroll instead. See the .map-viewport rule in index.css.
   useEffect(() => {
+    if (!active) return undefined;
     document.body.classList.add("map-viewport");
     return () => {
       document.body.classList.remove("map-viewport");
     };
-  }, []);
+  }, [active]);
+
+  // Coming back from a background stay: the map container was
+  // display:none, so Leaflet has a stale size. A window resize makes it
+  // re-measure (Leaflet's trackResize) and redraw tiles.
+  const wasActive = useRef(active);
+  useEffect(() => {
+    if (active && !wasActive.current) {
+      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    }
+    wasActive.current = active;
+  }, [active]);
 
   const completed =
     Number(readiness.mapReady) +

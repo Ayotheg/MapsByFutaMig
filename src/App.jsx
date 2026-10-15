@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import './index.css'
 import LoadingScreen from './pages/LoadingScreen'
@@ -27,13 +27,40 @@ function ScrollToTop() {
   return null;
 }
 
+// Pages the map stays alive behind once it has loaded. Going /map →
+// /promote → back is instant: no reload, no second loading screen. Any
+// other route (landing page, legal pages…) unmounts the map as before.
+const KEEP_MAP_ALIVE = new Set(["/map", "/promote"]);
+
+// The map lives outside <Routes> so leaving /map for a keep-alive page
+// hides it (display: none) instead of unmounting it.
+function PersistentMap() {
+  const { pathname } = useLocation();
+  const onMap = pathname === "/map";
+  const [loaded, setLoaded] = useState(onMap);
+
+  useEffect(() => {
+    if (onMap) setLoaded(true);
+    else if (!KEEP_MAP_ALIVE.has(pathname)) setLoaded(false);
+  }, [onMap, pathname]);
+
+  if (!onMap && !(loaded && KEEP_MAP_ALIVE.has(pathname))) return null;
+  return (
+    <div style={{ display: onMap ? "contents" : "none" }}>
+      <HomeRoute active={onMap} />
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/map" element={<HomeRoute />} />
+        {/* Rendered by <PersistentMap /> below; this entry just keeps
+            /map out of the catch-all 404. */}
+        <Route path="/map" element={null} />
         {/* Landing spot for the "Forgot password?" email link. See
           useAuth.js's
             resetPassword() + ResetPasswordPage.jsx's header comment for
@@ -56,6 +83,7 @@ function App() {
         <Route path="/cookies" element={<CookiePolicy />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <PersistentMap />
     </BrowserRouter>
   );
 }
