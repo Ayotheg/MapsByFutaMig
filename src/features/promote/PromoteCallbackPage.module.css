@@ -59,3 +59,18 @@
 .homeBtn:hover {
   filter: brightness(1.06);
 }
+/* Timed-out state: same color as pending but not spinning — nothing is in flight. */
+.iconStill { color: var(--v2-primary); }
+.secondaryBtn {
+  margin-top: 10px;
+  background: transparent;
+  color: var(--v2-primary);
+  border: 1.5px solid var(--v2-primary);
+  border-radius: var(--r-xl);
+  padding: 10.5px 22px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+}
+.secondaryBtn + .homeBtn { margin-top: 0; }
