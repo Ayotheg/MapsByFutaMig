@@ -33,6 +33,18 @@ if (!template.includes('<div id="root"></div>')) {
   process.exit(1);
 }
 
+// Every route except "/" is served this un-prerendered shell instead (see
+// vercel.json's rewrites). Serving them index.html meant the landing page's
+// static markup showed on /map, /promote/callback etc. until the JS bundle
+// arrived — on a slow network a person refreshing the payment callback saw
+// the home page and thought they'd been sent back there. The shell shows a
+// plain loading line instead; main.jsx clears it on mount.
+const shellHtml = template.replace(
+  '<div id="root"></div>',
+  '<div id="root"><p style="margin:40vh 16px 0;text-align:center;font-family:system-ui,sans-serif;color:#6b7280">Loading…</p></div>'
+);
+fs.writeFileSync(path.join(distDir, "app.html"), shellHtml, "utf-8");
+
 const finalHtml = template.replace(
   '<div id="root"></div>',
   `<div id="root">${appHtml}</div>`

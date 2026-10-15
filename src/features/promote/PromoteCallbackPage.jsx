@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { useSeo } from '../../lib/useSeo';
@@ -36,43 +36,62 @@ export default function PromoteCallbackPage() {
 
   const [promotion, setPromotion] = useState(null);
   const [timedOut, setTimedOut] = useState(false);
-  const [error, setError] = useState(null);
-  const startedAtRef = useRef(Date.now());
+  const [offline, setOffline] = useState(false);
+  // Bumped by "Check again" to restart the poll loop from scratch.
+  const [attempt, setAttempt] = useState(0);
+  const error = promotionId ? null : 'Missing promotion reference — nothing to confirm.';
 
   useEffect(() => {
-    if (!promotionId) {
-      setError('Missing promotion reference — nothing to confirm.');
-      return;
-    }
+    if (!promotionId) return;
 
     let cancelled = false;
     let timer;
+    const startedAt = Date.now();
 
+    // A failed request is treated as "network blip, try again", not a
+    // dead end: this page is exactly where someone on a bad connection
+    // lands right after paying, and a single dropped request used to leave
+    // them on "Something went wrong" with no way to re-check.
     async function poll() {
       try {
         const row = await fetchPromotionStatus(promotionId);
         if (cancelled) return;
+        setOffline(false);
         setPromotion(row);
         if (row?.payment_status === 'paid' || row?.payment_status === 'failed') {
           return; // terminal state — stop polling
         }
-      } catch (e) {
-        if (!cancelled) setError(e.message || 'Could not check payment status.');
-        return;
+      } catch {
+        if (cancelled) return;
+        setOffline(true);
       }
-      if (Date.now() - startedAtRef.current > POLL_TIMEOUT_MS) {
-        if (!cancelled) setTimedOut(true);
+      if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+        setTimedOut(true);
         return;
       }
       timer = setTimeout(poll, POLL_INTERVAL_MS);
     }
 
     poll();
+    // Coming back online re-checks right away instead of waiting out the timer.
+    function onOnline() {
+      clearTimeout(timer);
+      poll();
+    }
+    window.addEventListener('online', onOnline);
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      window.removeEventListener('online', onOnline);
     };
-  }, [promotionId]);
+  }, [promotionId, attempt]);
+
+  function checkAgain() {
+    setTimedOut(false);
+    setAttempt((n) => n + 1);
+  }
+
+  const settled = promotion?.payment_status === 'paid' || promotion?.payment_status === 'failed';
 
   let body;
   if (error) {
@@ -108,11 +127,12 @@ export default function PromoteCallbackPage() {
   } else if (timedOut) {
     body = (
       <>
-        <Clock size={40} strokeWidth={2} className={styles.iconPending} />
+        <Clock size={40} strokeWidth={2} className={styles.iconStill} />
         <h1 className={styles.title}>Still confirming…</h1>
         <p className={styles.subtitle}>
-          This is taking longer than usual. If BACHS took your payment, it'll still go through —
-          check back in a few minutes, or contact support if it doesn't update.
+          {offline
+            ? "We couldn't reach our servers — your connection may be down. If BACHS took your payment, it'll still go through. Tap Check again once you're back online."
+            : "This is taking longer than usual. If BACHS took your payment, it'll still go through — check again in a few minutes, or contact support if it doesn't update."}
         </p>
       </>
     );
@@ -121,7 +141,11 @@ export default function PromoteCallbackPage() {
       <>
         <Clock size={40} strokeWidth={2} className={styles.iconPending} />
         <h1 className={styles.title}>Confirming your payment…</h1>
-        <p className={styles.subtitle}>Hang tight, this only takes a moment.</p>
+        <p className={styles.subtitle}>
+          {offline
+            ? 'Your connection looks weak — still trying. You can safely refresh this page.'
+            : 'Hang tight, this only takes a moment.'}
+        </p>
       </>
     );
   }
@@ -130,6 +154,11 @@ export default function PromoteCallbackPage() {
     <div className={styles.page}>
       <div className={styles.card}>
         {body}
+        {timedOut && !settled && (
+          <button type="button" className={styles.secondaryBtn} onClick={checkAgain}>
+            Check again
+          </button>
+        )}
         <button type="button" className={styles.homeBtn} onClick={() => navigate('/map')}>
           Back to the map
         </button>
