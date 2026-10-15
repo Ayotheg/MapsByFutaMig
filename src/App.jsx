@@ -12,6 +12,7 @@ import PromoteCallbackPage from './features/promote/PromoteCallbackPage'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import TermsOfService from './pages/legal/TermsOfService'
 import CookiePolicy from './pages/legal/CookiePolicy'
+import { useTawkOnRoutes } from './lib/tawk'
 
 // React Router doesn't reset scroll position on navigation by default —
 // without this, clicking e.g. the footer's "Privacy Policy" link (or any
@@ -24,6 +25,12 @@ function ScrollToTop() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+  return null;
+}
+
+// Tawk.to live chat — /map and /promote only (see lib/tawk.js).
+function TawkChat() {
+  useTawkOnRoutes(useLocation().pathname);
   return null;
 }
 
@@ -56,6 +63,7 @@ function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <TawkChat />
       <Routes>
         <Route path="/" element={<LandingPage />} />
         {/* Rendered by <PersistentMap /> below; this entry just keeps

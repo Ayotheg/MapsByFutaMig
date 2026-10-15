@@ -632,3 +632,9 @@ early "just in case."
     (`profiles.whatsapp_channel_joined_at`, set only via the
     `mark_whatsapp_channel_joined` RPC — `supabase/whatsapp_channel.sql`,
     must be run manually; until then the app falls back to device-only).
+- **Tawk.to live chat (Oct 2026):** `/map` and `/promote` only. Not in
+  `index.html` — `lib/tawk.js` injects the script on first visit to one of
+  those routes (App.jsx's `TawkChat`) and hides the bubble on any other
+  route. On the map it also steps aside via `setTawkHidden(reason, …)`
+  while MapPage's `mapBusy` is true or the WhatsApp prompt is up; the
+  WhatsApp prompt never shows while the chat window is open.

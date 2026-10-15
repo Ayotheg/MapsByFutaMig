@@ -5,6 +5,7 @@ import WhatsAppIcon from '../../lib/WhatsAppIcon';
 import { WHATSAPP_CHANNEL_URL, readChannelPrompt, writeChannelPrompt } from '../../lib/whatsappChannel';
 import { track } from '../../lib/analytics';
 import { fetchChannelJoined, recordChannelJoined } from './channelAccount';
+import { setTawkHidden, useTawkChatOpen } from '../../lib/tawk';
 import styles from './ChannelPrompt.module.css';
 
 // "Join our WhatsApp channel" nudge on the live map.
@@ -60,6 +61,8 @@ export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
   const [due, setDue] = useState(false);
   const [closed, setClosed] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  // Someone mid-conversation in the Tawk live chat counts as busy.
+  const chatOpen = useTawkChatOpen();
   const shownRef = useRef(false);
   const countedRef = useRef(false);
   // Account check result for the signed-in user: { forUser, joined }.
@@ -98,7 +101,13 @@ export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
     return () => clearInterval(id);
   }, [eligible, due, ready, onMap]);
 
-  const visible = eligible && accountAllows && due && !closed && !blocked && onMap;
+  const visible = eligible && accountAllows && due && !closed && !blocked && !chatOpen && onMap;
+
+  // Same corner as the Tawk chat bubble — hide the bubble while this is up.
+  useEffect(() => {
+    setTawkHidden('whatsapp-prompt', visible);
+    return () => setTawkHidden('whatsapp-prompt', false);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || shownRef.current) return;
@@ -109,8 +118,8 @@ export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
   // Covered by something else (or the person left /map) after it appeared:
   // close for this visit without counting it.
   useEffect(() => {
-    if (shownRef.current && !closed && (blocked || !onMap)) setClosed(true);
-  }, [blocked, onMap, closed]);
+    if (shownRef.current && !closed && (blocked || chatOpen || !onMap)) setClosed(true);
+  }, [blocked, chatOpen, onMap, closed]);
 
   // Auto-fade after AUTO_HIDE_MS of time the tab is actually visible.
   useEffect(() => {

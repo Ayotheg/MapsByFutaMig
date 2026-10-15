@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MapShell from '../features/map/MapShell';
 import ZoomHint from '../features/map/ZoomHint';
 import ChannelPrompt from '../features/whatsapp/ChannelPrompt';
+import { setTawkHidden } from '../lib/tawk';
+import { useLocation } from 'react-router-dom';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
 import { useWaypoints } from '../features/waypoints/useWaypoints';
@@ -521,6 +523,29 @@ export default function MapPage({ onReadinessChange }) {
     setActiveChip(chip);
   }
 
+  // Something is open on the map. The WhatsApp prompt waits for this to
+  // clear, and the Tawk chat bubble steps aside meanwhile so it doesn't sit
+  // on top of panels/the expanded mobile sheet.
+  const mapBusy =
+    !!selected ||
+    !!selectedSegment ||
+    !!activeChip ||
+    mobileSearchOpen ||
+    navOpen ||
+    !!reviewTarget ||
+    authModalOpen ||
+    adminPin.pinOpen ||
+    adminPanelOpen ||
+    suggestModalOpen ||
+    mySubmissionsOpen ||
+    !!submissionToast ||
+    (isMobile && sheetState !== 'peek');
+  const onMapRoute = useLocation().pathname === '/map';
+  useEffect(() => {
+    setTawkHidden('map-busy', onMapRoute && mapBusy);
+    return () => setTawkHidden('map-busy', false);
+  }, [onMapRoute, mapBusy]);
+
   return (
     <>
       <MapShell onMapReady={setMap} initialView={mapView} onViewChange={persistMapView} />
@@ -738,22 +763,7 @@ export default function MapPage({ onReadinessChange }) {
         ready={!!map && !waypointsLoading && !auth.loading}
         isMobile={isMobile}
         userId={auth.loading ? null : auth.user?.id || null}
-        blocked={
-          !!selected ||
-          !!selectedSegment ||
-          !!activeChip ||
-          mobileSearchOpen ||
-          navOpen ||
-          !!reviewTarget ||
-          authModalOpen ||
-          adminPin.pinOpen ||
-          adminPanelOpen ||
-          suggestModalOpen ||
-          mySubmissionsOpen ||
-          !!submissionToast ||
-          isOffline ||
-          (isMobile && sheetState !== 'peek')
-        }
+        blocked={mapBusy || isOffline}
       />
     </>
   );
