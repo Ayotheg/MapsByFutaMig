@@ -1,38 +1,50 @@
+/*
+ * Loading screen — redesign (Oct 2026) from maps-by-futa-loading.png.
+ * Same warm off-white + indigo palette as the Promote redesign, declared
+ * page-scoped here since tokens-v2.css doesn't carry it.
+ *
+ * Animated: the two ripples expanding out of the centre, the dot orbiting
+ * the second ring, the centre circle's soft glow, the progress bar (width
+ * transition + shimmer) and each new status label fading in. All of it is
+ * gated on prefers-reduced-motion: no-preference.
+ */
+
 .screen {
+  --ld-bg: #fbfaf8;
+  --ld-ink: #15131d;
+  --ld-muted: #6e6b7b;
+  --ld-accent: #4b2fe0;
+  --ld-ring: rgba(75, 47, 224, 0.14);
+  --ld-ring-strong: rgba(75, 47, 224, 0.3);
+  --ld-track: #e8e6f1;
+
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--v2-surface);
+  background: var(--ld-bg);
   overflow: hidden;
   z-index: 9999;
 }
 
-/* Ambient violet glow behind the icon, faded out before it reaches
-   the top/bottom edges so it reads as a soft wash, not a hard blob. */
+/* Lavender wash centred on the beacon, fading out before the bar. */
 .screen::before {
   content: "";
   position: absolute;
-  top: 50%;
+  top: 36%;
   left: 50%;
-  width: 500px;
-  height: 500px;
-  max-width: 130vw;
-  max-height: 130vw;
+  width: 760px;
+  height: 760px;
   transform: translate(-50%, -50%);
-  border-radius: var(--r-full);
-  background: var(--v2-primary-glow);
-  filter: blur(40px);
-  pointer-events: none;
-}
-.screen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, var(--v2-surface) 0%, transparent 18%, transparent 82%, var(--v2-surface) 100%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(75, 47, 224, 0.1) 0%,
+    rgba(75, 47, 224, 0.05) 40%,
+    rgba(251, 250, 248, 0) 70%
+  );
   pointer-events: none;
 }
 
@@ -41,178 +53,425 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 var(--pad-lg);
-  transform: translateY(-6%);
+  width: 100%;
+  padding: 0 44px;
+  transform: translateY(-4%);
 }
 
-/* Icon */
-.iconWrap {
+/* ── Beacon ───────────────────────────────────────────────────────── */
+.beacon {
   position: relative;
-  width: 160px;
-  height: 160px;
+  width: 176px;
+  height: 176px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: var(--pad-lg);
+  margin-bottom: 72px;
 }
-.ringOuter {
+
+.ring,
+.ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.ring {
+  border: 1px solid var(--ld-ring);
+}
+.ring1 {
+  width: 132px;
+  height: 132px;
+  border-color: var(--ld-ring-strong);
+  border-width: 1.5px;
+}
+.ring2 {
+  width: 176px;
+  height: 176px;
+  border-color: rgba(75, 47, 224, 0.2);
+}
+.ring3 {
+  width: 300px;
+  height: 300px;
+}
+.ring4 {
+  width: 420px;
+  height: 420px;
+  opacity: 0.8;
+}
+.ring5 {
+  width: 600px;
+  height: 600px;
+  opacity: 0.6;
+}
+
+/* Holds the outer rings + ripples, sized to the widest ring. Full
+   strength above the beacon's centre, fading out over the next ~110px
+   below it, so the rings stay wide toward the top of the screen but never
+   run through the title or the progress text. */
+.halo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 600px;
+  height: 600px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 50%, transparent 68%);
+  mask-image: linear-gradient(to bottom, #000 50%, transparent 68%);
+}
+
+.ripple {
+  width: 96px;
+  height: 96px;
+  border: 1.5px solid var(--ld-ring-strong);
+  opacity: 0;
+}
+
+/* Dot riding the second ring. The wrapper spins; the dot sits on its edge. */
+.orbit {
   position: absolute;
   inset: 0;
-  border-radius: var(--r-full);
-  border: 1px solid var(--v2-primary-outline);
+  border-radius: 50%;
+  transform: rotate(-52deg);
 }
-@media (prefers-reduced-motion: no-preference) {
-  .ringOuter {
-    animation: breathe var(--v2-duration-breathe) var(--v2-ease-standard) infinite;
-  }
+.orbitDot {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--ld-accent);
+  box-shadow: 0 0 0 6px rgba(75, 47, 224, 0.16);
 }
-@keyframes breathe {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 1;
-  }
-}
+
 .iconCircle {
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 96px;
+  height: 96px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--r-full);
-  background: var(--v2-primary);
+  border-radius: 50%;
+  background: var(--ld-accent);
+  box-shadow: 0 12px 32px rgba(75, 47, 224, 0.35);
 }
 .pinIcon {
-  width: 25px;
-  height: 25px;
+  width: 28px;
+  height: 28px;
   color: #ffffff;
 }
 
-/* Text */
+/* ── Text ─────────────────────────────────────────────────────────── */
 .title {
+  margin: 0 0 12px;
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 28px;
-  line-height: 35px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--v2-primary);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--ld-ink);
   text-align: center;
-  margin: 0 0 8px;
 }
 .subtitle {
+  margin: 0 0 48px;
+  max-width: 240px;
   font-family: var(--font-ui);
-  font-size: 16px;
-  line-height: 24px;
-  color: var(--v2-text);
-  opacity: 0.8;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ld-muted);
   text-align: center;
-  max-width: 320px;
-  margin: 0 0 40px;
 }
 
-/* Progress bar */
+/* ── Progress ─────────────────────────────────────────────────────── */
 .barTrack {
   position: relative;
-  width: min(70vw, 240px);
-  height: 2px;
-  border-radius: var(--r-full);
-  background: var(--v2-track);
+  width: min(100%, 320px);
+  height: 3px;
+  border-radius: 999px;
+  background: var(--ld-track);
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 .barFill {
+  position: relative;
   height: 100%;
-  border-radius: var(--r-full);
-  background: var(--v2-primary);
-  box-shadow: 0 0 8px var(--v2-primary-glow-strong);
-  transition: width 0.35s ease;
+  border-radius: 999px;
+  background: var(--ld-accent);
+  overflow: hidden;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.barFill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
 }
 
 .status {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: min(70vw, 240px);
-  padding: 0 4px;
+  gap: 12px;
+  width: min(100%, 320px);
 }
 .statusLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-ui);
+  font-weight: 500;
   font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--v2-text-variant);
-  white-space: nowrap;
+  color: var(--ld-muted);
 }
 .statusPercent {
+  flex-shrink: 0;
   font-family: var(--font-ui);
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  color: var(--v2-primary);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ld-accent);
 }
 
 .footerMeta {
   position: absolute;
-  bottom: 32px;
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
   left: 24px;
   right: 24px;
-  font-family: var(--font-ui);
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--v2-muted);
-  text-align: center;
   margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ld-muted);
+  text-align: center;
 }
 
-/* Boot-timeout failsafe (HomeRoute.jsx's BOOT_TIMEOUT_MS) */
+/* ── Boot-timeout failsafe (HomeRoute.jsx's BOOT_TIMEOUT_MS) ───────── */
 .stuckPanel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 28px;
-  max-width: min(80vw, 300px);
+  gap: 18px;
+  margin-top: 40px;
+  width: min(100%, 300px);
 }
 .stuckMessage {
+  margin: 0;
   font-family: var(--font-ui);
   font-size: 13px;
-  line-height: 19px;
-  color: var(--v2-text-variant);
+  line-height: 1.55;
+  color: var(--ld-muted);
   text-align: center;
-  margin: 0 0 14px;
-}
-.stuckActions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  width: 100%;
-}
-.stuckButtonPrimary,
-.stuckButtonSecondary {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 10px 20px;
-  border-radius: var(--r-full);
-  border: 1px solid var(--v2-primary-outline);
-  cursor: pointer;
-  transition: opacity 0.15s ease;
 }
 .stuckButtonPrimary {
-  background: var(--v2-primary);
+  min-height: 44px;
+  min-width: 140px;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ld-accent);
   color: #ffffff;
-  border-color: transparent;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(75, 47, 224, 0.22);
+  transition: filter 0.15s ease;
 }
-.stuckButtonSecondary {
+.stuckButtonPrimary:hover {
+  filter: brightness(1.08);
+}
+
+/* Secondary escape hatch — plain grey text near the bottom, an option
+   rather than a second button. */
+.continueOption {
+  position: absolute;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border: none;
   background: transparent;
-  color: var(--v2-text);
+  font-family: var(--font-ui);
+  font-weight: 400;
+  font-size: 13px;
+  color: #9a97a6;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease;
 }
-.stuckButtonPrimary:hover,
-.stuckButtonSecondary:hover {
-  opacity: 0.85;
+.continueOption:hover {
+  color: var(--ld-muted);
+  text-decoration: underline;
+}
+
+/* Stuck: the tagline footer steps aside so the Continue option has the
+   bottom to itself, and the beacon gives up some height on short screens. */
+.screenStuck .footerMeta {
+  display: none;
+}
+.screenStuck .continueOption {
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+}
+@media (max-height: 760px) {
+  .screenStuck .beacon {
+    margin-bottom: 40px;
+  }
+  .screenStuck .subtitle {
+    margin-bottom: 32px;
+  }
+  .screenStuck .stuckPanel {
+    margin-top: 28px;
+  }
+}
+
+/* ── Motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .ripple {
+    animation: ripple 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+  .rippleDelayed {
+    animation-delay: 1.6s;
+  }
+  .orbit {
+    animation: orbit 6s linear infinite;
+  }
+  .iconCircle {
+    animation: glow 2.4s ease-in-out infinite;
+  }
+  .ring1 {
+    animation: breathe 2.4s ease-in-out infinite;
+  }
+  .barFill::after {
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+  .statusLabel {
+    animation: labelIn 0.35s ease-out;
+  }
+  .content {
+    animation: contentIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    width: var(--ripple-from, 96px);
+    height: var(--ripple-from, 96px);
+    opacity: 0.7;
+  }
+  100% {
+    width: var(--ripple-to, 420px);
+    height: var(--ripple-to, 420px);
+    opacity: 0;
+  }
+}
+@keyframes orbit {
+  from { transform: rotate(-52deg); }
+  to { transform: rotate(308deg); }
+}
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 12px 32px rgba(75, 47, 224, 0.3), 0 0 0 0 rgba(75, 47, 224, 0.18);
+  }
+  50% {
+    box-shadow: 0 14px 40px rgba(75, 47, 224, 0.42), 0 0 0 10px rgba(75, 47, 224, 0);
+  }
+}
+@keyframes breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.04); opacity: 0.7; }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes labelIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes contentIn {
+  from { opacity: 0; transform: translateY(-2%); }
+  to { opacity: 1; transform: translateY(-4%); }
+}
+
+@media (min-width: 600px) {
+  .title {
+    font-size: 36px;
+  }
+  .subtitle {
+    max-width: 320px;
+  }
+}
+
+/* Desktop (Loading — Desktop@2x.png): bigger beacon and rings, one-line
+   subtitle, wider bar. */
+@media (min-width: 900px) and (min-height: 640px) {
+  .screen::before {
+    top: 38%;
+    width: 1100px;
+    height: 1100px;
+  }
+  .beacon {
+    width: 220px;
+    height: 220px;
+    margin-bottom: 72px;
+  }
+  .iconCircle {
+    width: 120px;
+    height: 120px;
+  }
+  .pinIcon {
+    width: 34px;
+    height: 34px;
+  }
+  .ring1 { width: 194px; height: 194px; }
+  .ring2 { width: 220px; height: 220px; }
+  .ring3 { width: 380px; height: 380px; }
+  .ring4 { width: 540px; height: 540px; }
+  .ring5 { width: 720px; height: 720px; }
+  .halo {
+    width: 720px;
+    height: 720px;
+  }
+  .ripple {
+    width: 120px;
+    height: 120px;
+    --ripple-from: 120px;
+    --ripple-to: 560px;
+  }
+  .title {
+    font-size: 48px;
+    margin-bottom: 14px;
+  }
+  .subtitle {
+    max-width: none;
+    font-size: 17px;
+    margin-bottom: 56px;
+  }
+  .barTrack,
+  .status {
+    width: 360px;
+  }
+  .statusLabel {
+    font-size: 11px;
+  }
+  .statusPercent {
+    font-size: 13px;
+  }
 }

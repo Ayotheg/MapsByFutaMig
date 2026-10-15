@@ -20,6 +20,98 @@ const DEFAULT_STEPS = [
   "Finalizing map view",
 ];
 
+// ── Loading music ─────────────────────────────────────────────────────
+// The FUTA anthem plays from the start every time this screen mounts (new
+// and returning visitors alike) and fades out when it unmounts, i.e. once
+// the bar has filled and the map is revealed, or the person taps
+// "Continue with saved data". Nothing is stored anywhere — no
+// localStorage, no "already heard it" flag.
+//
+// Browsers only allow sound once the person has interacted with the site.
+// Arriving from the landing page by tap/click counts, so it plays straight
+// away. On a cold load (typed URL, refresh, shared link) play() is
+// refused; it then starts on the first tap/key press while this screen is
+// still up.
+//
+// MP3 plays in every browser (iPhones included), so one file covers all.
+const LOADING_MUSIC_SRC = "/futa-new-anthem.mp3";
+const MUSIC_VOLUME = 0.6;
+const FADE_IN_MS = 800;
+const FADE_OUT_MS = 700;
+
+function fadeVolume(audio, to, ms, done) {
+  const from = audio.volume;
+  const start = performance.now();
+  let frame = requestAnimationFrame(function tick(now) {
+    const t = Math.min(1, (now - start) / ms);
+    audio.volume = Math.max(0, Math.min(1, from + (to - from) * t));
+    if (t < 1) frame = requestAnimationFrame(tick);
+    else done?.();
+  });
+  return () => cancelAnimationFrame(frame);
+}
+
+function useLoadingMusic() {
+  useEffect(() => {
+    if (typeof Audio === "undefined") return undefined;
+    const audio = new Audio(LOADING_MUSIC_SRC);
+    audio.loop = true;
+    audio.preload = "auto";
+    audio.volume = 0;
+    let stopped = false;
+    let cancelFade = null;
+
+    const start = () => {
+      if (stopped) return;
+      audio.currentTime = 0;
+      audio
+        .play()
+        .then(() => {
+          // The screen may have closed while play() was still pending.
+          if (stopped) {
+            audio.pause();
+            return;
+          }
+          removeUnlock();
+          cancelFade?.();
+          cancelFade = fadeVolume(audio, MUSIC_VOLUME, FADE_IN_MS);
+        })
+        .catch(() => {
+          // Autoplay blocked (no interaction yet) or format unsupported —
+          // wait for the first interaction below and try once more.
+        });
+    };
+
+    const unlockEvents = ["pointerdown", "keydown", "touchstart"];
+    const onFirstInteraction = () => {
+      removeUnlock();
+      start();
+    };
+    const removeUnlock = () => {
+      unlockEvents.forEach((e) => window.removeEventListener(e, onFirstInteraction, true));
+    };
+    unlockEvents.forEach((e) => window.addEventListener(e, onFirstInteraction, true));
+
+    start();
+
+    return () => {
+      stopped = true;
+      removeUnlock();
+      cancelFade?.();
+      if (audio.paused) {
+        audio.removeAttribute("src");
+        audio.load();
+        return;
+      }
+      fadeVolume(audio, 0, FADE_OUT_MS, () => {
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load(); // release the network/decoder
+      });
+    };
+  }, []);
+}
+
 function LoadingScreen({
   steps = DEFAULT_STEPS,
   current,
@@ -42,6 +134,7 @@ function LoadingScreen({
   onContinue,
 }) {
   const total = steps.length;
+  useLoadingMusic();
   const isControlled = typeof current === "number";
   const [autoStep, setAutoStep] = useState(1);
   const intervalRef = useRef(null);
@@ -83,28 +176,49 @@ function LoadingScreen({
   const currentLabel = steps[Math.min(Math.max(step - 1, 0), total - 1)] ?? label;
 
   return (
-    <div className={styles.screen}>
+    <div className={`${styles.screen} ${stuck ? styles.screenStuck : ""}`}>
       <div className={styles.content}>
-        <div className={styles.iconWrap}>
-          <span className={styles.ringOuter} aria-hidden="true" />
+        <div className={styles.beacon} aria-hidden="true">
+          {/* Outer halo: the wide rings and the expanding ripples. They reach
+              up toward the top of the screen but are masked to fade out
+              below the beacon, before the title and progress text. */}
+          <span className={styles.halo}>
+            <span className={`${styles.ring} ${styles.ring5}`} />
+            <span className={`${styles.ring} ${styles.ring4}`} />
+            <span className={`${styles.ring} ${styles.ring3}`} />
+            <span className={styles.ripple} />
+            <span className={`${styles.ripple} ${styles.rippleDelayed}`} />
+          </span>
+          <span className={`${styles.ring} ${styles.ring2}`} />
+          <span className={`${styles.ring} ${styles.ring1}`} />
+          <span className={styles.orbit}>
+            <span className={styles.orbitDot} />
+          </span>
           <span className={styles.iconCircle}>
             <Navigation className={styles.pinIcon} strokeWidth={1.75} />
           </span>
         </div>
 
-        <h1 className={styles.title}>Maps By Futa</h1>
+        <h1 className={styles.title}>Maps by FUTA</h1>
         <p className={styles.subtitle}>
           Your personal guide to campus navigation.
         </p>
 
-        <div className={styles.barTrack}>
+        <div
+          className={styles.barTrack}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(percent)}
+          aria-label={currentLabel}
+        >
           <div className={styles.barFill} style={{ width: `${percent}%` }} />
         </div>
 
         <div className={styles.status}>
-          <span className={styles.statusLabel}>
+          {/* keyed so each new step fades in */}
+          <span key={currentLabel} className={styles.statusLabel}>
             {currentLabel}
-            <span aria-hidden="true">&hellip;</span>
           </span>
           <span className={styles.statusPercent}>{Math.round(percent)}%</span>
         </div>
@@ -120,23 +234,24 @@ function LoadingScreen({
                   ? "This is taking longer than usual — your connection may be slow."
                   : "This is taking longer than usual — your connection may be slow. tap Retry."}
             </p>
-            <div className={styles.stuckActions}>
-              {onRetry && (
-                <button type="button" className={styles.stuckButtonPrimary} onClick={onRetry}>
-                  Retry
-                </button>
-              )}
-              {onContinue && (
-                <button type="button" className={styles.stuckButtonSecondary} onClick={onContinue}>
-                  Continue with saved data
-                </button>
-              )}
-            </div>
+            {onRetry && (
+              <button type="button" className={styles.stuckButtonPrimary} onClick={onRetry}>
+                Retry
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      <p className={styles.footerMeta}>Navigating made easy..</p>
+      {/* A quiet way out, kept down by the footer so it doesn't crowd the
+          progress bar or compete with Retry. */}
+      {stuck && onContinue && (
+        <button type="button" className={styles.continueOption} onClick={onContinue}>
+          Continue with saved data
+        </button>
+      )}
+
+      <p className={styles.footerMeta}>Navigating made easy</p>
     </div>
   );
 }
