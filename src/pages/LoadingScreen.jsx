@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Navigation } from "lucide-react";
+import { Navigation, Volume2 } from "lucide-react";
+import {
+  claimLoadingMusic,
+  startLoadingMusic,
+  stopLoadingMusic,
+} from "../lib/loadingMusic";
 import styles from "./LoadingScreen.module.css";
 
 // Default sequence of things the app is actually assembling on first
@@ -21,95 +26,53 @@ const DEFAULT_STEPS = [
 ];
 
 // ── Loading music ─────────────────────────────────────────────────────
-// The FUTA anthem plays from the start every time this screen mounts (new
-// and returning visitors alike) and fades out when it unmounts, i.e. once
-// the bar has filled and the map is revealed, or the person taps
-// "Continue with saved data". Nothing is stored anywhere — no
-// localStorage, no "already heard it" flag.
-//
-// Browsers only allow sound once the person has interacted with the site.
-// Arriving from the landing page by tap/click counts, so it plays straight
-// away. On a cold load (typed URL, refresh, shared link) play() is
-// refused; it then starts on the first tap/key press while this screen is
-// still up.
-//
-// MP3 plays in every browser (iPhones included), so one file covers all.
-const LOADING_MUSIC_SRC = "/futa-new-anthem.mp3";
-const MUSIC_VOLUME = 0.6;
-const FADE_IN_MS = 800;
-const FADE_OUT_MS = 700;
-
-function fadeVolume(audio, to, ms, done) {
-  const from = audio.volume;
-  const start = performance.now();
-  let frame = requestAnimationFrame(function tick(now) {
-    const t = Math.min(1, (now - start) / ms);
-    audio.volume = Math.max(0, Math.min(1, from + (to - from) * t));
-    if (t < 1) frame = requestAnimationFrame(tick);
-    else done?.();
-  });
-  return () => cancelAnimationFrame(frame);
-}
+// The anthem (lib/loadingMusic.js) plays while this screen is up and fades
+// out when it unmounts — bar filled and map revealed, or "Continue with
+// saved data". It may already be playing when this mounts (started by the
+// tap on the landing page's link to /map, which is what makes it work on
+// iPhones). If the browser refused to start it, every tap/key press on this
+// screen tries again, and a small "Tap for sound" pill appears at the top
+// to invite that tap. Nothing is stored anywhere.
+const SOUND_PROMPT_DELAY_MS = 500; // don't flash the pill on fast loads
 
 function useLoadingMusic() {
+  const [blocked, setBlocked] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+
   useEffect(() => {
-    if (typeof Audio === "undefined") return undefined;
-    const audio = new Audio(LOADING_MUSIC_SRC);
-    audio.loop = true;
-    audio.preload = "auto";
-    audio.volume = 0;
-    let stopped = false;
-    let cancelFade = null;
+    let active = true;
+    claimLoadingMusic();
 
-    const start = () => {
-      if (stopped) return;
-      audio.currentTime = 0;
-      audio
-        .play()
-        .then(() => {
-          // The screen may have closed while play() was still pending.
-          if (stopped) {
-            audio.pause();
-            return;
-          }
-          removeUnlock();
-          cancelFade?.();
-          cancelFade = fadeVolume(audio, MUSIC_VOLUME, FADE_IN_MS);
-        })
-        .catch(() => {
-          // Autoplay blocked (no interaction yet) or format unsupported —
-          // wait for the first interaction below and try once more.
-        });
-    };
-
-    const unlockEvents = ["pointerdown", "keydown", "touchstart"];
-    const onFirstInteraction = () => {
-      removeUnlock();
-      start();
-    };
-    const removeUnlock = () => {
-      unlockEvents.forEach((e) => window.removeEventListener(e, onFirstInteraction, true));
-    };
-    unlockEvents.forEach((e) => window.addEventListener(e, onFirstInteraction, true));
-
-    start();
-
-    return () => {
-      stopped = true;
-      removeUnlock();
-      cancelFade?.();
-      if (audio.paused) {
-        audio.removeAttribute("src");
-        audio.load();
-        return;
-      }
-      fadeVolume(audio, 0, FADE_OUT_MS, () => {
-        audio.pause();
-        audio.removeAttribute("src");
-        audio.load(); // release the network/decoder
+    const tryStart = () => {
+      startLoadingMusic().then((ok) => {
+        if (!active) return;
+        setBlocked(!ok);
+        if (ok) removeUnlock();
       });
     };
+
+    // Only these count as "the person interacted" for sound. On touch
+    // screens that's the finger lifting (touchend/pointerup/click) — not
+    // touchstart/pointerdown, which phones (iOS Safari especially) reject.
+    // Listeners stay attached until playback actually starts.
+    const unlockEvents = ["pointerup", "touchend", "click", "keydown"];
+    const removeUnlock = () => {
+      unlockEvents.forEach((e) => window.removeEventListener(e, tryStart, true));
+    };
+    unlockEvents.forEach((e) => window.addEventListener(e, tryStart, true));
+
+    tryStart();
+    const promptTimer = setTimeout(() => active && setShowPrompt(true), SOUND_PROMPT_DELAY_MS);
+
+    return () => {
+      active = false;
+      clearTimeout(promptTimer);
+      removeUnlock();
+      stopLoadingMusic();
+    };
   }, []);
+
+  return blocked && showPrompt;
 }
 
 function LoadingScreen({
@@ -134,7 +97,7 @@ function LoadingScreen({
   onContinue,
 }) {
   const total = steps.length;
-  useLoadingMusic();
+  const showSoundPrompt = useLoadingMusic();
   const isControlled = typeof current === "number";
   const [autoStep, setAutoStep] = useState(1);
   const intervalRef = useRef(null);
@@ -177,6 +140,15 @@ function LoadingScreen({
 
   return (
     <div className={`${styles.screen} ${stuck ? styles.screenStuck : ""}`}>
+      {showSoundPrompt && (
+        // The tap itself starts the music (window listeners in
+        // useLoadingMusic); the click handler is a direct second attempt.
+        <button type="button" className={styles.soundPrompt} onClick={() => startLoadingMusic()}>
+          <Volume2 size={14} strokeWidth={2} />
+          Tap for sound
+        </button>
+      )}
+
       <div className={styles.content}>
         <div className={styles.iconWrap} aria-hidden="true">
           {/* Wide background rings + ripples. Reach up toward the top of
