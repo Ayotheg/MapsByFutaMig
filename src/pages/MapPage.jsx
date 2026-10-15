@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import MapShell from '../features/map/MapShell';
 import ZoomHint from '../features/map/ZoomHint';
+import ChannelPrompt from '../features/whatsapp/ChannelPrompt';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
 import { useWaypoints } from '../features/waypoints/useWaypoints';
@@ -733,6 +734,27 @@ export default function MapPage({ onReadinessChange }) {
         <MyWaypointSubmissionsPanel user={auth.user} onClose={() => setMySubmissionsOpen(false)} />
       )}
       <SubmissionToast message={submissionToast} onDismiss={dismissSubmissionToast} />
+      <ChannelPrompt
+        ready={!!map && !waypointsLoading && !auth.loading}
+        isMobile={isMobile}
+        userId={auth.loading ? null : auth.user?.id || null}
+        blocked={
+          !!selected ||
+          !!selectedSegment ||
+          !!activeChip ||
+          mobileSearchOpen ||
+          navOpen ||
+          !!reviewTarget ||
+          authModalOpen ||
+          adminPin.pinOpen ||
+          adminPanelOpen ||
+          suggestModalOpen ||
+          mySubmissionsOpen ||
+          !!submissionToast ||
+          isOffline ||
+          (isMobile && sheetState !== 'peek')
+        }
+      />
     </>
   );
 }

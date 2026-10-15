@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Heart, ArrowRight, HeartHandshake, Mail, MapPin, MessageCircle } from 'lucide-react'
 import { MapLink } from './shared'
 import WhatsAppIcon from '../../lib/WhatsAppIcon'
-import { WHATSAPP_CHANNEL_URL } from '../../lib/whatsappChannel'
+import { WHATSAPP_CHANNEL_URL, markChannelJoined } from '../../lib/whatsappChannel'
 
 const CROWDR_DONATE_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
 const CONTACT_EMAIL = 'hello@mapsbyfuta.xyz'
@@ -151,7 +151,9 @@ function Footer() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Get Maps By FUTA updates on WhatsApp"
+            onAuxClick={markChannelJoined}
             onClick={() => {
+              markChannelJoined()
               import('../../lib/analytics')
                 .then(({ track }) => track('whatsapp_channel_click', { source: 'landing_footer' }))
                 .catch(() => {})

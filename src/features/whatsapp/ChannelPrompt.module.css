@@ -1,0 +1,96 @@
+/*
+ * Small, quiet corner card — light v2 surface, no backdrop. WhatsApp green
+ * only on the icon badge and the Join button, so it reads as "WhatsApp"
+ * without being the loudest thing on the map.
+ *
+ * Desktop: bottom-right, above Leaflet's attribution (bottom-left already
+ * holds the view-mode toggle and the place card).
+ * Mobile: just above the bottom sheet's peek bar, inside the 16px gutters.
+ */
+.card {
+  position: fixed;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 10px 12px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-lg);
+  box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.12);
+  font-family: var(--font-ui);
+  animation: promptIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.desktop {
+  right: 16px;
+  bottom: 32px;
+  width: 340px;
+}
+.mobile {
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom) + 12px);
+}
+
+.badge {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(37, 211, 102, 0.12);
+  color: #1da851;
+}
+.text {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+.sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--v2-text-variant);
+}
+.join {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #1da851;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.join:hover {
+  filter: brightness(1.06);
+}
+.close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--v2-text-variant);
+  cursor: pointer;
+}
+.close:hover {
+  background: var(--v2-track);
+}
+
+@keyframes promptIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}

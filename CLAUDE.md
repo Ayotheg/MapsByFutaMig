@@ -622,4 +622,13 @@ early "just in case."
   top-level import: the landing page is prerendered by `entry-server.jsx`,
   and analytics pulls in the Supabase client. Vite prints an
   `INEFFECTIVE_DYNAMIC_IMPORT` note for that import (analytics is also in
-  the main chunk) — expected, not an error. No timed popup was added.
+  the main chunk) — expected, not an error.
+  - `map_prompt` — timed "join the channel" card on /map
+    (`features/whatsapp/ChannelPrompt.jsx`): after 40s of visible map time,
+    only when MapPage's `blocked` says nothing else is open; max 2 shows per
+    device, 14 days apart; joining (here or via the footer's
+    `markChannelJoined()`) stops it for good. State in localStorage via
+    `lib/whatsappChannel.js`; for signed-in users also on the account
+    (`profiles.whatsapp_channel_joined_at`, set only via the
+    `mark_whatsapp_channel_joined` RPC — `supabase/whatsapp_channel.sql`,
+    must be run manually; until then the app falls back to device-only).
