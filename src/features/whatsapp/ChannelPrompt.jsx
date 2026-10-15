@@ -14,11 +14,14 @@ import styles from './ChannelPrompt.module.css';
 //   loaded), so it never greets someone who just arrived to find a place.
 // - Never on top of anything: hidden while a place card, search, nav,
 //   modal, chip results or an expanded mobile sheet is open (MapPage
-//   passes that as `blocked`), and waits until they're closed.
-// - Small, non-modal corner card: no backdrop, no focus steal.
+//   passes that as `blocked`), and waits until they're closed. If something
+//   opens on top of it once it's up, it's gone for this visit — it doesn't
+//   pop back when that thing closes — and that showing isn't counted.
+// - Small, non-modal corner card: no backdrop, no focus steal. Fades out
+//   by itself after AUTO_HIDE_MS of visible time if left alone.
 // - Frequency (per device, localStorage): shown at most MAX_SHOWS times
-//   ever, at least SNOOZE_MS apart. Showing it counts, whether it's closed
-//   with X or ignored, so a refresh never re-nags. Joining — here or via any
+//   ever, at least SNOOZE_MS apart. A showing counts once it ends with X,
+//   Join or the auto-fade, so ignoring it is a "no" too. Joining — here or via any
 //   other channel link — stops it for good. Existing users get the same
 //   treatment as new ones: they've never been offered the channel either.
 // - Signed-in users: "joined" is also stored on their account
@@ -29,6 +32,8 @@ import styles from './ChannelPrompt.module.css';
 const DELAY_MS = 40 * 1000;
 const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
 const MAX_SHOWS = 2;
+const AUTO_HIDE_MS = 20 * 1000;
+const FADE_MS = 250; // matches .leaving's transition
 
 function isEligible() {
   const s = readChannelPrompt();
@@ -54,7 +59,9 @@ export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
   const [eligible] = useState(isEligible);
   const [due, setDue] = useState(false);
   const [closed, setClosed] = useState(false);
-  const recordedRef = useRef(false);
+  const [leaving, setLeaving] = useState(false);
+  const shownRef = useRef(false);
+  const countedRef = useRef(false);
   // Account check result for the signed-in user: { forUser, joined }.
   const [account, setAccount] = useState(null);
 
@@ -94,12 +101,34 @@ export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
   const visible = eligible && accountAllows && due && !closed && !blocked && onMap;
 
   useEffect(() => {
-    if (!visible || recordedRef.current) return;
-    recordedRef.current = true;
-    const s = readChannelPrompt();
-    writeChannelPrompt({ ...s, shows: (s.shows || 0) + 1, lastShownAt: Date.now() });
+    if (!visible || shownRef.current) return;
+    shownRef.current = true;
     track('whatsapp_prompt_shown', { source: 'map_prompt' });
   }, [visible]);
+
+  // Covered by something else (or the person left /map) after it appeared:
+  // close for this visit without counting it.
+  useEffect(() => {
+    if (shownRef.current && !closed && (blocked || !onMap)) setClosed(true);
+  }, [blocked, onMap, closed]);
+
+  // Auto-fade after AUTO_HIDE_MS of time the tab is actually visible.
+  useEffect(() => {
+    if (!visible || leaving) return undefined;
+    let elapsed = 0;
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      elapsed += 1000;
+      if (elapsed >= AUTO_HIDE_MS) {
+        clearInterval(id);
+        countShow();
+        track('whatsapp_prompt_dismissed', { source: 'map_prompt', reason: 'auto' });
+        setLeaving(true);
+        setTimeout(() => setClosed(true), FADE_MS);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [visible, leaving]);
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -110,12 +139,21 @@ export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  function countShow() {
+    if (countedRef.current) return;
+    countedRef.current = true;
+    const s = readChannelPrompt();
+    writeChannelPrompt({ ...s, shows: (s.shows || 0) + 1, lastShownAt: Date.now() });
+  }
+
   function dismiss() {
+    countShow();
     setClosed(true);
-    track('whatsapp_prompt_dismissed', { source: 'map_prompt' });
+    track('whatsapp_prompt_dismissed', { source: 'map_prompt', reason: 'close' });
   }
 
   function join() {
+    countShow();
     writeChannelPrompt({ ...readChannelPrompt(), joined: true });
     if (userId) syncJoinToAccount(userId);
     track('whatsapp_channel_click', { source: 'map_prompt' });
@@ -125,7 +163,7 @@ export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
   if (!visible) return null;
 
   return (
-    <aside className={`${styles.card} ${isMobile ? styles.mobile : styles.desktop}`} aria-label="WhatsApp channel">
+    <aside className={`${styles.card} ${isMobile ? styles.mobile : styles.desktop}${leaving ? ` ${styles.leaving}` : ''}`} aria-label="WhatsApp channel">
       <span className={styles.badge}>
         <WhatsAppIcon size={18} />
       </span>

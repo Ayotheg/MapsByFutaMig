@@ -94,3 +94,10 @@
 @media (prefers-reduced-motion: reduce) {
   .card { animation: none; }
 }
+/* Auto-fade exit (FADE_MS in ChannelPrompt.jsx). */
+.leaving {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 250ms var(--v2-ease-standard), transform 250ms var(--v2-ease-standard);
+  pointer-events: none;
+}
