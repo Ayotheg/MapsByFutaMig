@@ -346,6 +346,37 @@
   background: #ffffff;
 }
 
+/* Mute toggle: faded into the top-right corner so it's there for anyone
+   tired of the anthem without competing with the loader. 40px hit area. */
+.muteToggle {
+  position: absolute;
+  z-index: 2;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  right: calc(14px + env(safe-area-inset-right, 0px));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--v2-text-variant);
+  opacity: 0.45;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+.muteToggle:hover,
+.muteToggle:focus-visible {
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.6);
+}
+.muteToggle:focus-visible {
+  outline: 2px solid var(--v2-primary-outline);
+  outline-offset: 2px;
+}
+
 /* ── Motion ───────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: no-preference) {
   .ringOuter {

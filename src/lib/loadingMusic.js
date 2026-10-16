@@ -15,6 +15,11 @@
 //
 // If the loading screen never claims a primed song (the link click was
 // cancelled, say), it's stopped again after PRIME_TIMEOUT_MS.
+//
+// The loading screen's mute button sets `muted`, which lasts for the rest
+// of the visit (in memory only — a fresh page load plays again). While
+// muted, startLoadingMusic() does nothing, so the link primer and the
+// tap-to-unlock listeners can't bring the song back.
 
 const SRC = "/futa-new-anthem.mp3";
 const VOLUME = 0.6;
@@ -27,6 +32,7 @@ let pending = null; // in-flight play() promise
 let wanted = false; // false once stopped, so a late play() result is undone
 let cancelFade = null;
 let primeTimer = null;
+let muted = false;
 
 function getAudio() {
   if (!audio) {
@@ -67,7 +73,7 @@ export function isLoadingMusicPlaying() {
  * the browser refused (no tap yet).
  */
 export function startLoadingMusic() {
-  if (typeof Audio === "undefined") return Promise.resolve(false);
+  if (muted || typeof Audio === "undefined") return Promise.resolve(false);
   const a = getAudio();
   wanted = true;
 
@@ -110,6 +116,16 @@ export function stopLoadingMusic() {
     return;
   }
   fadeTo(0, FADE_OUT_MS, () => audio.pause());
+}
+
+export function isLoadingMusicMuted() {
+  return muted;
+}
+
+/** Mutes (fades out) or unmutes the song for the rest of the visit. */
+export function setLoadingMusicMuted(value) {
+  muted = value;
+  if (muted) stopLoadingMusic();
 }
 
 /** Called by the loading screen on mount: it now owns the song. */
