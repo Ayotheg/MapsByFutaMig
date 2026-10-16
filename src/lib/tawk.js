@@ -85,6 +85,20 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// Opens the chat window if the widget is loaded on this route. Returns false
+// when it isn't (off-route or still loading) so callers can fall back to email.
+export function openTawkChat() {
+  const t = api();
+  if (!t || typeof t.maximize !== 'function' || reasons.has('route')) return false;
+  try {
+    t.showWidget();
+    t.maximize();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function setTawkHidden(reason, hidden) {
   if (hidden) reasons.add(reason);
   else reasons.delete(reason);

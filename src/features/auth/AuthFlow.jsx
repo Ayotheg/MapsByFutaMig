@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, TriangleAlert, CheckCircle2, X } from 'lucide-react';
 import styles from './AuthFlow.module.css';
+import { openTawkChat } from '../../lib/tawk';
+import { CONTACT_EMAIL } from '../../lib/contactInfo';
 import senateBuilding from '../../assets/SENATE_BUILDING.jpg';
 import albertIlemobade from '../../assets/ALBERT-ILEMOBADE LIBRARY.jpg';
 import sls from '../../assets/SLS.jpg';
@@ -27,6 +29,11 @@ import tiFrancis from '../../assets/TI_FRANCIS.jpg';
  * returns to the password step so they sign in with the new one. The
  * Supabase "Reset Password" email template must show `{{ .Token }}`.
  *
+ * "Can't access this email?" (quiet link under the password step's
+ * button) → a help step: know your password → sign in and change email
+ * from the account card; forgot it too → live chat / email support, since
+ * moving an account with neither password nor inbox needs a human check.
+ *
  * Steps fade out/in (FADE_MS) on Continue / Change. On desktop the card
  * sits beside a campus photo slideshow; on mobile it's the card alone.
  */
@@ -48,6 +55,7 @@ const TITLES = {
   password: 'Enter your password',
   create: 'Create your account',
   reset: 'Reset your password',
+  help: 'Can’t access your email?',
 };
 
 function prefersReducedMotion() {
@@ -236,6 +244,12 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
     }
   }
 
+  // Live chat only exists on the map/promote pages; elsewhere fall back to email.
+  function handleChat() {
+    if (openTawkChat()) onClose();
+    else window.location.href = `mailto:${CONTACT_EMAIL}`;
+  }
+
   function endRecovery() {
     if (!recoveryOpen.current) return;
     recoveryOpen.current = false;
@@ -362,7 +376,31 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
                   {busy ? 'Please wait…' : 'Continue'}
                 </button>
               )}
+              <button type="button" className={styles.quietLink} onClick={() => goTo('help')}>
+                Can’t access this email?
+              </button>
             </form>
+          )}
+
+          {step === 'help' && (
+            <div className={styles.form}>
+              {emailChip}
+              <p className={styles.helpText}>
+                <strong>Still know your password?</strong> Sign in, then open your account and tap <strong>Change</strong> next to your email.
+              </p>
+              <button type="button" className={styles.primaryBtn} onClick={() => goTo('password')} autoFocus>
+                Back to sign in
+              </button>
+              <p className={`${styles.helpText} ${styles.helpTextSpaced}`}>
+                <strong>Forgot your password too?</strong> We can move your account to a new email after a quick check that it’s yours.
+              </p>
+              <div className={styles.helpActions}>
+                <button type="button" className={styles.secondaryBtn} onClick={handleChat}>Chat with us</button>
+                <a className={styles.secondaryBtn} href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Can’t access my email')}&body=${encodeURIComponent(`Account email: ${email}\n\n`)}`}>
+                  Email us
+                </a>
+              </div>
+            </div>
           )}
 
           {step === 'reset' && (

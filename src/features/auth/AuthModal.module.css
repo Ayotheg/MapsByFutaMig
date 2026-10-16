@@ -127,6 +127,136 @@
   white-space: nowrap;
 }
 
+/* Email + a quiet inline "Change" — text only, no fill, so it reads as part
+   of the email line rather than another action competing with Sign out. */
+.emailRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.emailChange {
+  flex: none;
+  padding: 4px 2px;
+  margin: -4px 0;
+  border: none;
+  background: none;
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.emailChange:hover { text-decoration: underline; }
+
+/* ── Change-email view ─────────────────────────────────────────────── */
+.viewIn { animation: viewIn 220ms var(--v2-ease-standard); }
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viewIn { animation: none; }
+}
+
+.accountHeaderShown { gap: 4px; }
+.backBtn {
+  width: 40px;
+  height: 40px;
+  margin-left: -10px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--v2-neutral);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.backBtn:hover { background: var(--v2-primary-glow); color: var(--v2-primary); }
+.viewTitle {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+}
+.formNote {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--v2-text);
+  overflow-wrap: anywhere;
+}
+.formNote strong { color: var(--v2-neutral); font-weight: 600; }
+.label {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--v2-neutral);
+}
+.label ~ .label { margin-top: 14px; }
+.input {
+  width: 100%;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid var(--v2-border);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  outline: none;
+  transition: border-color var(--v2-duration-standard) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.input:focus {
+  border-color: var(--v2-primary);
+  box-shadow: 0 0 0 4px var(--v2-primary-glow);
+}
+.codeInput {
+  font-size: 20px;
+  letter-spacing: 0.3em;
+}
+.primaryBtn {
+  margin-top: 16px;
+  height: 48px;
+  border: none;
+  border-radius: 14px;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primaryBtn:disabled { opacity: 0.65; cursor: default; }
+.formLinks {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+.textBtn {
+  min-height: 36px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.textBtn:disabled { opacity: 0.6; cursor: default; }
+
 .statsGrid {
   margin-top: 24px;
   display: grid;
@@ -282,6 +412,8 @@
     left: calc(var(--sidebar-rail-w) + 12px);
   }
   .accountHeader { display: none; }
+  .accountHeaderShown { display: flex; margin-bottom: 12px; }
+  .closeMobile { display: none; }
   .avatar { width: 56px; height: 56px; font-size: 21px; }
   .identity { gap: 14px; }
   .identityText { gap: 2px; }

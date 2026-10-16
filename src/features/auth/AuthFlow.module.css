@@ -268,6 +268,57 @@
 .linkBtn:hover { background: var(--v2-primary-glow); }
 .linkBtn:disabled { opacity: 0.6; cursor: default; }
 
+/* Low-emphasis escape hatch under the password step's button — small,
+   grey, no fill, so it never competes with Continue. */
+.quietLink {
+  align-self: center;
+  margin-top: 12px;
+  min-height: 36px;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  color: var(--v2-text-variant);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+}
+.quietLink:hover { color: var(--v2-text); text-decoration: underline; }
+
+.helpText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--v2-text);
+}
+.helpText strong { color: var(--v2-neutral); font-weight: 600; }
+.helpTextSpaced {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+.helpActions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.secondaryBtn {
+  height: 44px;
+  border: 1px solid var(--v2-border);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.secondaryBtn:hover { background: #f8fafc; }
+
 .codeInput {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 20px;

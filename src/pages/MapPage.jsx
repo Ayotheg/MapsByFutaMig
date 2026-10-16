@@ -733,6 +733,8 @@ export default function MapPage({ onReadinessChange }) {
           resetPassword={auth.resetPassword}
           verifyRecoveryCode={auth.verifyRecoveryCode}
           setNewPassword={auth.setNewPassword}
+          requestEmailChange={auth.requestEmailChange}
+          confirmEmailChange={auth.confirmEmailChange}
           signOut={auth.signOut}
           friendlyError={friendlyError}
           message={authModalMessage}

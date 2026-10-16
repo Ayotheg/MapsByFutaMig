@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, TriangleAlert, X, Mail, LogOut, Megaphone } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, TriangleAlert, X, Mail, LogOut, Megaphone } from 'lucide-react';
 import styles from './AuthModal.module.css';
 import AuthFlow from './AuthFlow';
 import { supabase } from '../../lib/supabase';
@@ -28,8 +28,12 @@ import { track } from '../../lib/analytics';
  *    button lives in the Sidebar footer, so it opens beside that instead.
  *  - Kept beyond the artboards so nothing is lost: the running-ad card
  *    (only for advertisers) and the Email / WhatsApp support links.
+ *  - "Change" beside the email (password accounts only — a Google
+ *    account's email belongs to Google) swaps the card to Change email:
+ *    new email + current password → code sent to the new inbox → done.
+ *    For people who lost their old inbox; see useAuth's requestEmailChange.
  */
-export default function AuthModal({ initialTab, user, onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, verifyRecoveryCode, setNewPassword, signOut, friendlyError, message }) {
+export default function AuthModal({ initialTab, user, onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, verifyRecoveryCode, setNewPassword, requestEmailChange, confirmEmailChange, signOut, friendlyError, message }) {
   // Opened signed out → stays the sign-in flow even if a session appears
   // mid-flow (the code reset briefly signs in before signing back out).
   const tab = initialTab === 'profile' && user ? 'profile' : 'auth';
@@ -85,6 +89,79 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
     }
   }
 
+  // Change email: view 'account' | 'email'; phase 'request' | 'code'.
+  const [view, setView] = useState('account');
+  const [phase, setPhase] = useState('request');
+  const [newEmail, setNewEmail] = useState('');
+  const [currentPw, setCurrentPw] = useState('');
+  const [emailCode, setEmailCode] = useState('');
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailStatus, setEmailStatus] = useState(null); // { text, error }
+  const [accountNotice, setAccountNotice] = useState(null);
+
+  function openChangeEmail() {
+    setNewEmail('');
+    setCurrentPw('');
+    setEmailCode('');
+    setEmailStatus(null);
+    setAccountNotice(null);
+    setPhase('request');
+    setView('email');
+  }
+
+  async function handleSendEmailCode(e) {
+    e?.preventDefault();
+    if (emailBusy) return;
+    const target = newEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+      setEmailStatus({ text: 'Enter a valid email address.', error: true });
+      return;
+    }
+    if (target.toLowerCase() === user.email?.toLowerCase()) {
+      setEmailStatus({ text: 'That’s already your email.', error: true });
+      return;
+    }
+    if (!currentPw) {
+      setEmailStatus({ text: 'Enter your current password.', error: true });
+      return;
+    }
+    setEmailBusy(true);
+    setEmailStatus(null);
+    try {
+      await requestEmailChange(user.email, currentPw, target);
+      setNewEmail(target);
+      setEmailCode('');
+      setPhase('code');
+      setEmailStatus({ text: `We sent a code to ${target}.`, error: false });
+    } catch (err) {
+      setEmailStatus({ text: friendlyError(err), error: true });
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
+  async function handleConfirmEmail(e) {
+    e.preventDefault();
+    if (emailBusy) return;
+    const token = emailCode.replace(/\s/g, '');
+    if (!/^\d{6,8}$/.test(token)) {
+      setEmailStatus({ text: 'Enter the code from your email.', error: true });
+      return;
+    }
+    setEmailBusy(true);
+    setEmailStatus(null);
+    try {
+      await confirmEmailChange(newEmail, token);
+      setCurrentPw('');
+      setView('account');
+      setAccountNotice(`Your email is now ${newEmail}.`);
+    } catch (err) {
+      setEmailStatus({ text: friendlyError(err), error: true });
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
   // Focus the card on open so Escape works (desktop has no visible close).
   const accountRef = useRef(null);
   useEffect(() => {
@@ -115,6 +192,9 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
 
   const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture;
   const joined = joinedLabel(user.created_at);
+  // Only email+password accounts can change email here; a Google-only
+  // account's address comes from Google.
+  const hasPassword = (user.app_metadata?.providers || [user.app_metadata?.provider]).includes('email');
 
   return (
     <div
@@ -122,7 +202,49 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
       onClick={closeOnBackdrop}
       onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
     >
-      <div className={styles.account} role="dialog" aria-modal="true" aria-labelledby="account-name" tabIndex={-1} ref={accountRef}>
+      <div className={styles.account} role="dialog" aria-modal="true" aria-labelledby={view === 'email' ? 'change-email-title' : 'account-name'} tabIndex={-1} ref={accountRef}>
+        {view === 'email' ? (
+          <div className={styles.viewIn} key={phase}>
+            <div className={`${styles.accountHeader} ${styles.accountHeaderShown}`}>
+              <button type="button" className={styles.backBtn} onClick={() => setView('account')} aria-label="Back to your account">
+                <ChevronLeft size={18} />
+              </button>
+              <h2 id="change-email-title" className={styles.viewTitle}>Change email</h2>
+              <button type="button" className={`${styles.close} ${styles.closeMobile}`} onClick={onClose} aria-label="Close">
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+
+            {phase === 'request' ? (
+              <form className={styles.form} onSubmit={handleSendEmailCode} noValidate>
+                <p className={styles.formNote}>Currently <strong>{user.email}</strong></p>
+                <label className={styles.label} htmlFor="new-email">New email</label>
+                <input id="new-email" className={styles.input} type="email" inputMode="email" autoComplete="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} autoFocus />
+                <label className={styles.label} htmlFor="current-password">Current password</label>
+                <input id="current-password" className={styles.input} type="password" autoComplete="current-password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} />
+                {emailStatus && <StatusMsg status={emailStatus} />}
+                <button type="submit" className={styles.primaryBtn} disabled={emailBusy}>
+                  {emailBusy ? 'Sending…' : 'Send code'}
+                </button>
+              </form>
+            ) : (
+              <form className={styles.form} onSubmit={handleConfirmEmail} noValidate>
+                <p className={styles.formNote}>Enter the code we sent to <strong>{newEmail}</strong>.</p>
+                <label className={styles.label} htmlFor="email-code">Code</label>
+                <input id="email-code" className={`${styles.input} ${styles.codeInput}`} type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={8} placeholder="123456" value={emailCode} onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))} autoFocus />
+                {emailStatus && <StatusMsg status={emailStatus} />}
+                <button type="submit" className={styles.primaryBtn} disabled={emailBusy}>
+                  {emailBusy ? 'Confirming…' : 'Confirm new email'}
+                </button>
+                <div className={styles.formLinks}>
+                  <button type="button" className={styles.textBtn} onClick={() => handleSendEmailCode()} disabled={emailBusy}>Resend code</button>
+                  <button type="button" className={styles.textBtn} onClick={() => { setEmailStatus(null); setPhase('request'); }}>Use a different email</button>
+                </div>
+              </form>
+            )}
+          </div>
+        ) : (
+        <div className={view === 'account' && accountNotice ? styles.viewIn : undefined}>
         <div className={styles.accountHeader}>
           <span className={styles.eyebrow}>Your account</span>
           <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
@@ -138,9 +260,18 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
           )}
           <div className={styles.identityText}>
             <h2 id="account-name" className={styles.name}>{displayName(user)}</h2>
-            <span className={styles.email}>{user.email}</span>
+            <div className={styles.emailRow}>
+              <span className={styles.email}>{user.email}</span>
+              {hasPassword && (
+                <button type="button" className={styles.emailChange} onClick={openChangeEmail} aria-label="Change email">
+                  Change
+                </button>
+              )}
+            </div>
           </div>
         </div>
+
+        {accountNotice && <StatusMsg status={{ text: accountNotice, error: false }} />}
 
         <div className={styles.statsGrid}>
           <div className={styles.statCell}>
@@ -218,6 +349,8 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
             WhatsApp
           </a>
         </div>
+        </div>
+        )}
       </div>
     </div>
   );

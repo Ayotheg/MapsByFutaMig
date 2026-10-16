@@ -160,6 +160,31 @@ export function useAuth() {
     if (error) throw error;
   }, []);
 
+  // Change email (account card). Re-checks the current password first, so
+  // an unattended signed-in device can't be used to move the account to
+  // another inbox. Supabase then emails a code to the NEW address only —
+  // requires "Secure email change" OFF (otherwise the old inbox, which the
+  // person may have lost, must confirm too) and the "Change Email Address"
+  // template showing `{{ .Token }}`.
+  const requestEmailChange = useCallback(async (currentEmail, password, newEmail) => {
+    const { error: pwError } = await supabase.auth.signInWithPassword({ email: currentEmail, password });
+    if (pwError) {
+      if (pwError.code === 'invalid_credentials') {
+        const wrong = new Error('Wrong password.');
+        wrong.code = 'wrong_current_password';
+        throw wrong;
+      }
+      throw pwError;
+    }
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    if (error) throw error;
+  }, []);
+
+  const confirmEmailChange = useCallback(async (newEmail, code) => {
+    const { error } = await supabase.auth.verifyOtp({ email: newEmail, token: code, type: 'email_change' });
+    if (error) throw error;
+  }, []);
+
   const setNewPassword = useCallback(async (password) => {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw error;
@@ -172,7 +197,7 @@ export function useAuth() {
   // user informed instead of assuming they're signed out. See signOut.js.
   const signOut = useCallback(() => signOutOrThrow(supabase.auth), []);
 
-  return { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, verifyRecoveryCode, setNewPassword, signOut };
+  return { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, verifyRecoveryCode, setNewPassword, requestEmailChange, confirmEmailChange, signOut };
 }
 
 // ── Display helpers ──────────────────────────────────────────────────────
@@ -211,6 +236,8 @@ const ERROR_MESSAGES = {
   validation_failed: 'Please enter a valid email address.',
   otp_expired: 'That code is wrong or has expired. Check the latest email, or resend a new code.',
   same_password: 'Choose a password different from your old one.',
+  wrong_current_password: 'Wrong password.',
+  email_exists: 'Another account already uses that email.',
   over_request_rate_limit: 'Too many attempts. Wait a minute and try again.',
 };
 
