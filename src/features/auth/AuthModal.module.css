@@ -149,6 +149,13 @@
 }
 .emailChange:hover { text-decoration: underline; }
 
+/* Wraps the account view so it can swap with Change email — must stay a
+   column like .account, or full-width children (Sign out) shrink to fit. */
+.accountBody {
+  display: flex;
+  flex-direction: column;
+}
+
 /* ── Change-email view ─────────────────────────────────────────────── */
 .viewIn { animation: viewIn 220ms var(--v2-ease-standard); }
 @keyframes viewIn {

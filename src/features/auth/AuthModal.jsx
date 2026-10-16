@@ -244,7 +244,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
             )}
           </div>
         ) : (
-        <div className={view === 'account' && accountNotice ? styles.viewIn : undefined}>
+        <div className={`${styles.accountBody} ${accountNotice ? styles.viewIn : ''}`}>
         <div className={styles.accountHeader}>
           <span className={styles.eyebrow}>Your account</span>
           <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
