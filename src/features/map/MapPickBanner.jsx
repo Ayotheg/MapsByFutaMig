@@ -3,22 +3,17 @@ import styles from './MapPickBanner.module.css';
 
 /**
  * Shown while MapPage is waiting for the one map click that resolves a
- * cross-route location pick (see MapPage.jsx's `externalPick` state,
- * fed by PromotePage.jsx's "Pick on Map" button).
- *
- * Distinct from SuggestWaypointModal/AdminPanel's own tap-to-place flow:
- * those just hide their own modal/panel in place, since the picker and
- * the form live on the same screen. A cross-route pick sends the person
- * to a different route (`/map`) with no modal left open to hint at what
- * to do, so this banner is what replaces that context — same
- * fixed-top/v2-token construction as OfflineBanner, since both are
- * "float above the map regardless of its own theme" banners.
+ * location pick — currently SuggestWaypointModal's "Pick on map", which
+ * hides the form while the person taps the map, leaving nothing else on
+ * screen to say what to do. Same fixed-top/v2-token construction as
+ * OfflineBanner, since both are "float above the map regardless of its
+ * own theme" banners.
  */
-export default function MapPickBanner({ onCancel }) {
+export default function MapPickBanner({ message = 'Tap the map to set your location', onCancel }) {
   return (
     <div className={styles.banner} role="status">
       <Crosshair size={14} className={styles.icon} />
-      <span>Tap the map to set your location</span>
+      <span>{message}</span>
       <button type="button" className={styles.cancelButton} onClick={onCancel}>
         <X size={12} />
         Cancel

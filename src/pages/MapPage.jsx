@@ -44,6 +44,7 @@ import AdminPinGate from '../features/auth/AdminPinGate';
 import AdminPanel from '../features/admin/AdminPanel';
 import SuggestWaypointModal from '../features/waypoint-submissions/SuggestWaypointModal';
 import MyWaypointSubmissionsPanel from '../features/waypoint-submissions/MyWaypointSubmissionsPanel';
+import MapPickBanner from '../features/map/MapPickBanner';
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
 // data — see the comment where it's used below for why this stays a
@@ -389,6 +390,18 @@ export default function MapPage({ onReadinessChange }) {
   const [submissionToast, setSubmissionToast] = useState(null);
   const dismissSubmissionToast = useCallback(() => setSubmissionToast(null), []);
   const suggestClickHandlerRef = useRef(null);
+  const [suggestPicking, setSuggestPicking] = useState(false);
+
+  // Closing the form (directly or via closeOtherOverlays) mid-pick drops
+  // the pending map click, so a later tap doesn't reopen it.
+  useEffect(() => {
+    if (suggestModalOpen) return;
+    setSuggestPicking(false);
+    if (suggestClickHandlerRef.current) {
+      map?.off('click', suggestClickHandlerRef.current);
+      suggestClickHandlerRef.current = null;
+    }
+  }, [suggestModalOpen, map]);
 
   useEffect(
     () => () => {
@@ -460,15 +473,26 @@ export default function MapPage({ onReadinessChange }) {
     setSuggestModalOpen(true);
   }
 
+  // The form stays mounted (just hidden) while picking, so its draft
+  // survives the trip to the map.
   function handleRequestMapPick() {
     if (!map) return;
-    setSuggestModalOpen(false);
+    setSuggestPicking(true);
     const handler = (e) => {
+      suggestClickHandlerRef.current = null;
       setSuggestPickedCoord({ lat: e.latlng.lat, lng: e.latlng.lng });
-      setSuggestModalOpen(true);
+      setSuggestPicking(false);
     };
     suggestClickHandlerRef.current = handler;
     map.once('click', handler);
+  }
+
+  function handleCancelMapPick() {
+    if (suggestClickHandlerRef.current) {
+      map?.off('click', suggestClickHandlerRef.current);
+      suggestClickHandlerRef.current = null;
+    }
+    setSuggestPicking(false);
   }
 
   function handleNavLaunch() {
@@ -774,11 +798,15 @@ export default function MapPage({ onReadinessChange }) {
           onRequestMapPick={handleRequestMapPick}
           onClose={() => setSuggestModalOpen(false)}
           onSubmitted={(message) => setSubmissionToast(message)}
+          hidden={suggestPicking}
           onViewSubmissions={() => {
             closeOtherOverlays('submissions');
             setMySubmissionsOpen(true);
           }}
         />
+      )}
+      {suggestModalOpen && suggestPicking && (
+        <MapPickBanner message="Tap the map where the place is" onCancel={handleCancelMapPick} />
       )}
       {mySubmissionsOpen && (
         <MyWaypointSubmissionsPanel user={auth.user} onClose={() => setMySubmissionsOpen(false)} />
