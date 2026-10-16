@@ -25,6 +25,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// A reset-password LINK lands with `#access_token=…&type=recovery` in the
+// URL, and supabase-js would turn that into a signed-in session on whatever
+// page it hits (e.g. /map when /reset-password isn't in Supabase's Redirect
+// URLs) — the "click the link and you're just logged in" bug. Before the
+// client reads the URL, forward it, hash intact, to ResetPasswordPage, which
+// asks for a new password and signs out afterwards. The sign-in card's
+// code-based reset never puts this in the URL, so it's unaffected.
+if (
+  typeof window !== 'undefined' &&
+  /(^|[#&])type=recovery(&|$)/.test(window.location.hash) &&
+  window.location.pathname !== '/reset-password'
+) {
+  window.location.replace(`/reset-password${window.location.hash}`);
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ── Storage helper ──────────────────────────────────────────────────────────
