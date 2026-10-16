@@ -1021,6 +1021,8 @@ export default function PromotePage() {
             signUpWithEmail={auth.signUpWithEmail}
             checkEmailStatus={auth.checkEmailStatus}
             resetPassword={auth.resetPassword}
+            verifyRecoveryCode={auth.verifyRecoveryCode}
+            setNewPassword={auth.setNewPassword}
             signOut={auth.signOut}
             friendlyError={friendlyError}
             message="Sign in to promote your business — this ties your payment and listing to your account so you can track its status."

@@ -266,6 +266,23 @@
   cursor: pointer;
 }
 .linkBtn:hover { background: var(--v2-primary-glow); }
+.linkBtn:disabled { opacity: 0.6; cursor: default; }
+
+.codeInput {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 20px;
+  letter-spacing: 0.3em;
+}
+.codeInput::placeholder { letter-spacing: 0.3em; }
+
+.resetLinks {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+}
+.resetLinks .linkBtn:first-child { margin-left: -12px; }
+.resetLinks .linkBtn:last-child { margin-right: -12px; }
+
 .altLink {
   align-self: flex-start;
   margin: 4px 0 0 -12px;

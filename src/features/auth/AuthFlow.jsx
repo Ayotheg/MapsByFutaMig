@@ -21,6 +21,12 @@ import tiFrancis from '../../assets/TI_FRANCIS.jpg';
  * If that check fails we can't tell, so "Wrong password" also offers
  * "Create an account".
  *
+ * Forgot password? → we email a code (no link) and the card fades to
+ * "Reset your password": code + new password + confirm. Saving verifies
+ * the code (a short recovery session), sets the password, signs out, and
+ * returns to the password step so they sign in with the new one. The
+ * Supabase "Reset Password" email template must show `{{ .Token }}`.
+ *
  * Steps fade out/in (FADE_MS) on Continue / Change. On desktop the card
  * sits beside a campus photo slideshow; on mobile it's the card alone.
  */
@@ -41,6 +47,7 @@ const TITLES = {
   email: 'Welcome',
   password: 'Enter your password',
   create: 'Create your account',
+  reset: 'Reset your password',
 };
 
 function prefersReducedMotion() {
@@ -58,7 +65,7 @@ function useMediaQuery(query) {
   return matches;
 }
 
-export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, friendlyError, message }) {
+export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, verifyRecoveryCode, setNewPassword, signOut, friendlyError, message }) {
   const isDesktop = useMediaQuery(DESKTOP_QUERY);
 
   const [step, setStep] = useState('email');
@@ -74,19 +81,35 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
   // { text, error, kind } — kind: 'wrong' | 'wrong-unknown' | 'google' adds an action
   const [status, setStatus] = useState(null);
 
-  function goTo(next) {
+  // Reset step
+  const [code, setCode] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  // True once the code is verified and a recovery session exists. If the
+  // card closes before the new password is saved, sign that session out
+  // so the code never leaves anyone signed in.
+  const recoveryOpen = useRef(false);
+  const signOutRef = useRef(signOut);
+  signOutRef.current = signOut;
+  useEffect(() => () => {
+    if (recoveryOpen.current) signOutRef.current().catch((err) => console.error('Recovery sign-out failed:', err));
+  }, []);
+
+  function goTo(next, nextStatus = null) {
     setStatus(null);
     const ms = prefersReducedMotion() ? 0 : FADE_MS;
     setLeaving(true);
     clearTimeout(fadeTimer.current);
     fadeTimer.current = setTimeout(() => {
       setStep(next);
+      setStatus(nextStatus);
       setLeaving(false);
     }, ms);
   }
 
   function changeEmail() {
+    endRecovery();
     setPassword('');
+    setConfirmPw('');
     setShowPw(false);
     goTo('email');
   }
@@ -143,13 +166,87 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
     }
   }
 
+  async function sendCode() {
+    await resetPassword(email);
+    return { text: `We sent a code to ${email}. It may take a minute to arrive.`, error: false };
+  }
+
   async function handleForgot() {
+    if (busy) return;
+    setBusy(true);
     try {
-      await resetPassword(email);
-      setStatus({ text: `We sent a reset link to ${email}.`, error: false });
+      const sent = await sendCode();
+      setCode('');
+      setPassword('');
+      setConfirmPw('');
+      setShowPw(false);
+      goTo('reset', sent);
+    } catch (err) {
+      setStatus({ text: friendlyError(err), error: true, kind: status?.kind });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResend() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      setStatus(await sendCode());
     } catch (err) {
       setStatus({ text: friendlyError(err), error: true });
+    } finally {
+      setBusy(false);
     }
+  }
+
+  async function handleReset(e) {
+    e.preventDefault();
+    if (busy) return;
+    const token = code.replace(/\s/g, '');
+    if (!recoveryOpen.current && !/^\d{6,8}$/.test(token)) {
+      setStatus({ text: 'Enter the code from your email.', error: true });
+      return;
+    }
+    if (password.length < 6) {
+      setStatus({ text: 'Password must be at least 6 characters.', error: true });
+      return;
+    }
+    if (password !== confirmPw) {
+      setStatus({ text: 'Passwords do not match.', error: true });
+      return;
+    }
+    setStatus(null);
+    setBusy(true);
+    try {
+      if (!recoveryOpen.current) {
+        await verifyRecoveryCode(email, token);
+        recoveryOpen.current = true;
+      }
+      await setNewPassword(password);
+      recoveryOpen.current = false;
+      setPassword('');
+      setConfirmPw('');
+      setShowPw(false);
+      goTo('password', { text: 'Password changed. Sign in with your new password.', error: false });
+    } catch (err) {
+      setStatus({ text: friendlyError(err), error: true });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function endRecovery() {
+    if (!recoveryOpen.current) return;
+    recoveryOpen.current = false;
+    signOut().catch((err) => console.error('Recovery sign-out failed:', err));
+  }
+
+  function handleResetBack() {
+    endRecovery();
+    setPassword('');
+    setConfirmPw('');
+    goTo('password');
   }
 
   async function handleCreate(e) {
@@ -249,7 +346,7 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
               {status && (
                 <StatusMsg status={status}>
                   {(status.kind === 'wrong' || status.kind === 'wrong-unknown') && (
-                    <button type="button" className={styles.statusAction} onClick={handleForgot}>Forgot password?</button>
+                    <button type="button" className={styles.statusAction} onClick={handleForgot} disabled={busy}>Forgot password?</button>
                   )}
                 </StatusMsg>
               )}
@@ -265,6 +362,46 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
                   {busy ? 'Please wait…' : 'Continue'}
                 </button>
               )}
+            </form>
+          )}
+
+          {step === 'reset' && (
+            <form className={styles.form} onSubmit={handleReset} noValidate>
+              {emailChip}
+              {usernameField}
+              <label className={styles.label} htmlFor="auth-code">Code from your email</label>
+              <input
+                id="auth-code"
+                className={`${styles.input} ${styles.codeInput}`}
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={8}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="123456"
+                autoFocus
+              />
+              <label className={styles.label} htmlFor="auth-password">New password</label>
+              {passwordField('new-password')}
+              <label className={styles.label} htmlFor="auth-confirm">Confirm new password</label>
+              <input
+                id="auth-confirm"
+                className={styles.input}
+                type={showPw ? 'text' : 'password'}
+                value={confirmPw}
+                onChange={(e) => setConfirmPw(e.target.value)}
+                autoComplete="new-password"
+              />
+              <div className={styles.hint}>At least 6 characters.</div>
+              {status && <StatusMsg status={status} />}
+              <button type="submit" className={styles.primaryBtn} disabled={busy}>
+                {busy ? 'Saving…' : 'Save password'}
+              </button>
+              <div className={styles.resetLinks}>
+                <button type="button" className={styles.linkBtn} onClick={handleResend} disabled={busy}>Resend code</button>
+                <button type="button" className={styles.linkBtn} onClick={handleResetBack}>Back to sign in</button>
+              </div>
             </form>
           )}
 

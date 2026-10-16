@@ -138,11 +138,32 @@ export function useAuth() {
   // and sends them to sign in again with it — matching the intended
   // "reset, then log in with the new password" flow instead of an
   // auto-login side effect of the link.
+  //
+  // Oct 2026: the sign-in card now resets with a code instead of the link.
+  // The "Reset Password" email template in Supabase must show
+  // `{{ .Token }}` (the code) — see AuthFlow.jsx. redirectTo is kept only
+  // so any old link still lands on ResetPasswordPage, not a silent login.
   const resetPassword = useCallback(async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) throw error;
+  }, []);
+
+  // Code-based reset (AuthFlow's "Reset your password" step). verifyOtp
+  // briefly signs the person in on a recovery session — needed to call
+  // updateUser — then we sign straight out so they sign in again with the
+  // new password. Split in two because a code is single use: if the new
+  // password is rejected, the retry only calls setNewPassword.
+  const verifyRecoveryCode = useCallback(async (email, code) => {
+    const { error } = await supabase.auth.verifyOtp({ email, token: code, type: 'recovery' });
+    if (error) throw error;
+  }, []);
+
+  const setNewPassword = useCallback(async (password) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    await signOutOrThrow(supabase.auth);
   }, []);
 
   // `supabase.auth.signOut()` resolves with `{ error }` rather than throwing,
@@ -151,7 +172,7 @@ export function useAuth() {
   // user informed instead of assuming they're signed out. See signOut.js.
   const signOut = useCallback(() => signOutOrThrow(supabase.auth), []);
 
-  return { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, signOut };
+  return { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, verifyRecoveryCode, setNewPassword, signOut };
 }
 
 // ── Display helpers ──────────────────────────────────────────────────────
@@ -188,6 +209,9 @@ const ERROR_MESSAGES = {
   email_not_confirmed: 'Please confirm your email before signing in (Check your email for the confirmation link).',
   over_email_send_rate_limit: 'Too many attempts. Try again later.',
   validation_failed: 'Please enter a valid email address.',
+  otp_expired: 'That code is wrong or has expired. Check the latest email, or resend a new code.',
+  same_password: 'Choose a password different from your old one.',
+  over_request_rate_limit: 'Too many attempts. Wait a minute and try again.',
 };
 
 export function friendlyError(err) {

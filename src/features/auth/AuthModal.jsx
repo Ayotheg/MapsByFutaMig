@@ -29,7 +29,9 @@ import { track } from '../../lib/analytics';
  *  - Kept beyond the artboards so nothing is lost: the running-ad card
  *    (only for advertisers) and the Email / WhatsApp support links.
  */
-export default function AuthModal({ initialTab, user, onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, signOut, friendlyError, message }) {
+export default function AuthModal({ initialTab, user, onClose, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, verifyRecoveryCode, setNewPassword, signOut, friendlyError, message }) {
+  // Opened signed out → stays the sign-in flow even if a session appears
+  // mid-flow (the code reset briefly signs in before signing back out).
   const tab = initialTab === 'profile' && user ? 'profile' : 'auth';
 
   // Profile stats — legacy's `loadProfileStats()` (app.js ~7379–7415),
@@ -101,6 +103,9 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
           signUpWithEmail={signUpWithEmail}
           checkEmailStatus={checkEmailStatus}
           resetPassword={resetPassword}
+          verifyRecoveryCode={verifyRecoveryCode}
+          setNewPassword={setNewPassword}
+          signOut={signOut}
           friendlyError={friendlyError}
           message={message}
         />
