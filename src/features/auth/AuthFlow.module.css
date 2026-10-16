@@ -1,0 +1,460 @@
+/*
+ * Sign-in flow card (Auth Redesign canvas, Oct 2026) — see AuthFlow.jsx.
+ * Mobile: a single centered card. Desktop (≥1024px wide): a 1040×640
+ * dialog with the card on the left and a campus photo slideshow right.
+ * Lives inside AuthModal.module.css's `.overlay`.
+ */
+
+.shell {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+  display: flex;
+  animation: shellIn var(--v2-duration-standard) var(--v2-ease-standard);
+  font-family: var(--font-ui);
+  color: var(--v2-text);
+}
+@keyframes shellIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cardCol {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ── Step fade ─────────────────────────────────────────────────────── */
+.stepIn { animation: stepIn 220ms var(--v2-ease-standard); }
+.stepOut { animation: stepOut 160ms var(--v2-ease-standard) forwards; }
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes stepOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell, .stepIn, .stepOut { animation: none; }
+  .slide { transition: none; }
+}
+
+.logo {
+  display: block;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  margin-bottom: 16px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--v2-neutral);
+}
+.subtitle {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--v2-text);
+}
+
+.limitMessage {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  background: var(--v2-primary-glow);
+  color: var(--v2-text);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  margin-top: 24px;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+.googleBtn,
+.primaryBtn {
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background var(--v2-duration-standard) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-standard) var(--v2-ease-standard),
+              transform 120ms var(--v2-ease-standard);
+}
+.googleBtn {
+  background: #ffffff;
+  border: 1px solid var(--v2-border);
+  color: var(--v2-neutral);
+}
+.googleBtn:hover { background: #f8fafc; }
+
+.primaryBtn {
+  margin-top: 16px;
+  border: none;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.28);
+}
+.primaryBtn:hover:not(:disabled) { box-shadow: 0 8px 22px rgba(124, 58, 237, 0.38); }
+.googleBtn:active,
+.primaryBtn:active:not(:disabled) { transform: scale(0.98); }
+.primaryBtn:disabled { opacity: 0.65; cursor: default; }
+
+/* Google button as the action on the password step ("signs in with Google") */
+.form > .status + .googleBtn { margin-top: 4px; }
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  font-size: 13px;
+  color: var(--v2-text-variant);
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--v2-border);
+}
+
+/* ── Fields ────────────────────────────────────────────────────────── */
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--v2-neutral);
+  margin: 0 0 8px;
+}
+.label ~ .label { margin-top: 16px; }
+
+.input,
+.inputWrap input {
+  width: 100%;
+  height: 52px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border: 1px solid var(--v2-border);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 16px; /* 16px stops iOS zooming on focus */
+  outline: none;
+  transition: border-color var(--v2-duration-standard) var(--v2-ease-standard),
+              box-shadow var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.input:focus,
+.inputWrap input:focus {
+  border-color: var(--v2-primary);
+  box-shadow: 0 0 0 4px var(--v2-primary-glow);
+}
+.input::placeholder { color: var(--v2-text-variant); }
+
+.inputWrap { position: relative; }
+.hasToggle { padding-right: 52px !important; }
+.pwToggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  color: var(--v2-text-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.pwToggle:hover { color: var(--v2-primary); }
+
+.hint {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--v2-text-variant);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* ── Email chip (password / create steps) ──────────────────────────── */
+.emailChip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 8px;
+  margin-bottom: 20px;
+  border: 1px solid var(--v2-border);
+  border-radius: 999px;
+  background: var(--v2-hud-upnext-bg);
+}
+.chipAvatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chipEmail {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--v2-neutral);
+}
+
+.linkBtn {
+  flex: none;
+  min-height: 36px;
+  padding: 0 12px;
+  border: none;
+  background: none;
+  border-radius: 999px;
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.linkBtn:hover { background: var(--v2-primary-glow); }
+.altLink {
+  align-self: flex-start;
+  margin: 4px 0 0 -12px;
+}
+
+/* ── Status ────────────────────────────────────────────────────────── */
+.status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.statusText { flex: 1; min-width: 0; }
+.statusError { background: var(--v2-error-container); color: var(--v2-error-text); }
+.statusOk { background: rgba(13, 148, 136, 0.1); color: var(--v2-secondary); }
+.statusAction {
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.legalLine {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--v2-text-variant);
+}
+.legalLine a { color: var(--v2-primary); text-decoration: none; }
+.legalLine a:hover { text-decoration: underline; }
+
+/* ── Close ─────────────────────────────────────────────────────────── */
+.close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--v2-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+}
+.close:hover { background: var(--v2-primary-glow); color: var(--v2-primary); }
+
+/* ── Desktop: split dialog with slideshow ──────────────────────────── */
+@media (min-width: 1024px) and (min-height: 600px) {
+  .shell {
+    max-width: 1040px;
+    height: min(640px, calc(100dvh - 32px));
+    padding: 12px;
+    gap: 12px;
+    border-radius: 28px;
+    box-shadow: 0 32px 80px rgba(15, 23, 42, 0.3);
+    overflow: hidden;
+  }
+  .cardCol {
+    flex: none;
+    width: 440px;
+    padding: 28px 48px 24px;
+    overflow-y: auto;
+  }
+  .close {
+    top: 32px;
+    right: 32px;
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+  }
+  .close:hover { background: rgba(255, 255, 255, 0.32); color: #ffffff; }
+}
+
+.slideshow {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--v2-neutral);
+}
+.slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 700ms var(--v2-ease-standard);
+}
+.slideActive { opacity: 1; }
+.slideScrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 60%;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0));
+  pointer-events: none;
+}
+
+.caption {
+  position: absolute;
+  left: 32px;
+  right: 32px;
+  bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #ffffff;
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+}
+.place {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 40px;
+  line-height: 44px;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+.blurb {
+  margin: 0;
+  max-width: 380px;
+  font-size: 15px;
+  line-height: 22px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.controls {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.dots { display: flex; align-items: center; gap: 2px; }
+.dotBtn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+  transition: width 300ms var(--v2-ease-standard), background 300ms var(--v2-ease-standard);
+}
+.dotActive { width: 22px; background: #ffffff; }
+
+.arrows { display: flex; gap: 8px; }
+.glassBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.glassBtn:hover { background: rgba(255, 255, 255, 0.32); }

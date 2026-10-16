@@ -1019,6 +1019,7 @@ export default function PromotePage() {
             signInWithGoogle={auth.signInWithGoogle}
             signInWithEmail={auth.signInWithEmail}
             signUpWithEmail={auth.signUpWithEmail}
+            checkEmailStatus={auth.checkEmailStatus}
             resetPassword={auth.resetPassword}
             signOut={auth.signOut}
             friendlyError={friendlyError}

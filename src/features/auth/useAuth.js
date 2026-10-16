@@ -98,13 +98,30 @@ export function useAuth() {
   // needed for the name itself) — the `profiles` row for review/nav
   // counts is created separately by a DB trigger, see
   // FIREBASE_TO_SUPABASE_MIGRATION.md's new "Step 7".
+  // Email confirmation is turned off in Supabase, so `data.session` is set
+  // and the person is signed in straight away. Returned so the caller can
+  // tell if confirmation is ever switched back on (session would be null).
   const signUpWithEmail = useCallback(async (name, email, password) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { display_name: name } },
     });
     if (error) throw error;
+    return data;
+  }, []);
+
+  // 'none' | 'password' | 'oauth', or null if the check itself failed
+  // (e.g. supabase/auth_email_status.sql not run yet). Used by AuthFlow
+  // after a failed password sign-in to decide between "Wrong password"
+  // and "Create your account".
+  const checkEmailStatus = useCallback(async (email) => {
+    const { data, error } = await supabase.rpc('auth_email_status', { p_email: email });
+    if (error) {
+      console.error('auth_email_status failed:', error);
+      return null;
+    }
+    return data;
   }, []);
 
   // Legacy: `auth.sendPasswordResetEmail(email)` (app.js ~7264–7275).
@@ -134,7 +151,7 @@ export function useAuth() {
   // user informed instead of assuming they're signed out. See signOut.js.
   const signOut = useCallback(() => signOutOrThrow(supabase.auth), []);
 
-  return { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, resetPassword, signOut };
+  return { user, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, checkEmailStatus, resetPassword, signOut };
 }
 
 // ── Display helpers ──────────────────────────────────────────────────────
