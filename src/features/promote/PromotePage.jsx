@@ -130,7 +130,7 @@ function isTextField(el) {
 // rest: photo upload, the duration slider actually driving the charged
 // amount (pricing.js), and "Proceed to checkout" submitting through
 // submitPromotion.js → the create-promotion-checkout Edge Function →
-// a real BACHS hosted-checkout redirect. See PROMOTE_PAYMENT_INTEGRATION.md
+// a real BACHS hosted-checkout redirect. See docs/payments.md
 // for the full payment architecture (Edge Functions, webhook, schema).
 //
 // Deliberately NOT this pass's job: what happens to a *paid* promotion —

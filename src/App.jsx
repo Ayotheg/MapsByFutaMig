@@ -81,7 +81,7 @@ function App() {
         <Route path="/promote" element={<PromotePage />} />
         {/* BACHS's success_url lands here (see
           features/promote/submitPromotion.js's create-promotion-checkout
-          call + PROMOTE_PAYMENT_INTEGRATION.md) — polls the promotions
+          call + docs/payments.md) — polls the promotions
           row for a webhook-confirmed payment_status rather than trusting
           the redirect itself. cancel_url points back at /promote?cancelled=1
           instead, so a cancelled checkout never reaches this route. */}

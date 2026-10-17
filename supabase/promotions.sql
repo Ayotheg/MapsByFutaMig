@@ -21,7 +21,7 @@
 --    none of them are auto-applied, confirmed by grep (no migrations/
 --    directory, no CI step references these files).
 -- 2. Deploy the two Edge Functions under supabase/functions/ (see
---    PROMOTE_PAYMENT_INTEGRATION.md §4 for the exact CLI commands + the
+--    docs/payments.md for the functions + the
 --    secrets they need — those are NOT set by this SQL file).
 -- 3. Create the `promotion-images` Storage bucket if it doesn't already
 --    exist as a variant of `place-images` — see the "Storage" note near

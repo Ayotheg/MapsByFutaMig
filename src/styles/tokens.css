@@ -1,10 +1,7 @@
 /* ─────────────────────────────────────────────────────────────
    Maps By FUTA — design tokens
-   Ported verbatim from legacy `style.css` (feature/login2), both
-   :root blocks merged (main tokens ~line 42, font tokens ~line 945).
-   Do not edit values here — this is the single source of truth,
-   copied byte-for-byte. Change brand values in BRAND_GUIDELINES.md
-   first, then re-sync this file.
+   v1 (dark) tokens, still used by older screens. Don't use them in new
+   work — new UI uses tokens-v2.css (see DESIGN_SYSTEM.md).
    ───────────────────────────────────────────────────────────── */
 
 :root {

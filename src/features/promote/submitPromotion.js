@@ -3,7 +3,7 @@ import { uploadImage, insertImageRows } from '../admin/adminSave';
 import { track } from '../../lib/analytics';
 import { MIN_DAYS, MAX_DAYS, MAX_PHOTOS, computeAmount, CURRENCY, isValidPromoCode, normalizePromoCode } from './pricing';
 
-// ── Promote checkout (payment half only — see PROMOTE_PAYMENT_INTEGRATION.md) ──
+// ── Promote checkout (payment half only — see docs/payments.md) ──
 //
 // Mirrors `waypoints/submitWaypoint.js`'s shape (student-facing write, own
 // file rather than admin/adminSave.js, reuses uploadImage/insertImageRows
