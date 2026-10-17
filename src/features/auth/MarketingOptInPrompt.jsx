@@ -108,7 +108,7 @@ export default function MarketingOptInPrompt({ user, ready, blocked, isMobile, o
         <div className={styles.text}>
           <p className={styles.title}>Get updates from Maps By FUTA?</p>
           <p className={styles.sub}>
-            {failed ? 'Couldn’t save that. Check your connection and try again.' : 'Occasional emails about new features. Unsubscribe anytime.'}
+            {failed ? 'Couldn’t save that. Check your connection and try again.' : 'Occasional product updates'}
           </p>
         </div>
       </div>

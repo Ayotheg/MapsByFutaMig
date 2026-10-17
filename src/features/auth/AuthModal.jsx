@@ -357,7 +357,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
           <label className={styles.prefRow}>
             <span className={styles.prefText}>
               <span className={styles.prefTitle}>Email updates</span>
-              <span className={styles.prefSub}>News and new features. Unsubscribe anytime.</span>
+              <span className={styles.prefSub}>Occasional product updates</span>
             </span>
             <span className={styles.switch}>
               <input

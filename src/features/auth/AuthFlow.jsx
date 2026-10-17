@@ -466,7 +466,7 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
               <div className={styles.hint}>At least 6 characters.</div>
               <label className={styles.optIn}>
                 <input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} />
-                <span>Send me updates and new features from Maps By FUTA. Unsubscribe anytime.</span>
+                <span>Occasional product updates</span>
               </label>
               {status && <StatusMsg status={status} />}
               <button type="submit" className={styles.primaryBtn} disabled={busy}>
