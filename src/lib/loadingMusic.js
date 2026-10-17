@@ -28,7 +28,7 @@ const FADE_OUT_MS = 700;
 const PRIME_TIMEOUT_MS = 4000;
 
 let audio = null;
-let pending = null; // in-flight play() promise
+let starting = null; // in-flight start: true once any play() in it succeeded
 let wanted = false; // false once stopped, so a late play() result is undone
 let cancelFade = null;
 let primeTimer = null;
@@ -62,8 +62,21 @@ function fadeTo(to, ms, done) {
   cancelFade = () => cancelAnimationFrame(frame);
 }
 
+// audio.paused flips to false as soon as play() is called, so a start that
+// is still loading (and may yet be refused) doesn't count as playing.
 export function isLoadingMusicPlaying() {
-  return !!audio && !audio.paused;
+  return !!audio && !audio.paused && !starting;
+}
+
+/**
+ * Calls `onPause` whenever the song stops — including when the system
+ * takes the audio away (a phone call, another app). Returns an unsubscribe.
+ */
+export function onLoadingMusicPause(onPause) {
+  if (typeof Audio === "undefined") return () => {};
+  const a = getAudio();
+  a.addEventListener("pause", onPause);
+  return () => a.removeEventListener("pause", onPause);
 }
 
 /**
@@ -77,33 +90,33 @@ export function startLoadingMusic() {
   const a = getAudio();
   wanted = true;
 
-  if (!a.paused) {
+  if (!a.paused && !starting) {
     // Already playing (primed by the link tap, or a fade-out in progress) —
     // bring the volume back up rather than restarting.
     fadeTo(VOLUME, FADE_IN_MS);
     return Promise.resolve(true);
   }
-  if (pending) return pending;
-
-  cancelFade?.();
-  a.currentTime = 0;
-  a.volume = 0;
-  pending = a
-    .play()
-    .then(() => {
-      if (!wanted) {
-        // Stopped while play() was still loading.
-        a.pause();
-        return false;
-      }
-      fadeTo(VOLUME, FADE_IN_MS);
-      return true;
-    })
-    .catch(() => false)
-    .finally(() => {
-      pending = null;
-    });
-  return pending;
+  if (!starting) {
+    cancelFade?.();
+    a.currentTime = 0;
+    a.volume = 0;
+  }
+  // Call play() even with a start in flight: that one may rest on a tap iOS
+  // has since expired, while this call may be inside a fresh one.
+  const attempt = a.play().then(() => true, () => false);
+  const run = starting ? Promise.all([starting, attempt]).then(([x, y]) => x || y) : attempt;
+  starting = run;
+  return run.then((ok) => {
+    if (starting === run) starting = null;
+    if (!ok) return false;
+    if (!wanted) {
+      // Stopped while play() was still loading.
+      a.pause();
+      return false;
+    }
+    fadeTo(VOLUME, FADE_IN_MS);
+    return true;
+  });
 }
 
 /** Fades the song out and pauses it. */

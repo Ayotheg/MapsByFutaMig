@@ -317,18 +317,20 @@
   display: none;
 }
 
-/* "Tap for sound": only shown when the browser blocked the music (mostly
-   iPhones on a direct link/refresh). Small and quiet, top centre. */
+/* Sound toggle: "Mute" while the anthem plays, "Tap for sound" while it
+   doesn't (browser blocked it, or muted). Small and quiet, top centre;
+   44px tall to meet iOS touch-target size. */
 .soundPrompt {
   position: absolute;
   z-index: 2;
-  top: calc(20px + env(safe-area-inset-top, 0px));
+  top: calc(14px + env(safe-area-inset-top, 0px));
   left: 50%;
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  min-height: 44px;
+  padding: 8px 16px;
   border: 1px solid var(--v2-primary-outline);
   border-radius: var(--r-full);
   background: rgba(255, 255, 255, 0.75);
@@ -345,34 +347,7 @@
 .soundPrompt:hover {
   background: #ffffff;
 }
-
-/* Mute toggle: faded into the top-right corner so it's there for anyone
-   tired of the anthem without competing with the loader. 40px hit area. */
-.muteToggle {
-  position: absolute;
-  z-index: 2;
-  top: calc(14px + env(safe-area-inset-top, 0px));
-  right: calc(14px + env(safe-area-inset-right, 0px));
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: none;
-  border-radius: var(--r-full);
-  background: transparent;
-  color: var(--v2-text-variant);
-  opacity: 0.45;
-  cursor: pointer;
-  transition: opacity 0.15s ease, background 0.15s ease;
-}
-.muteToggle:hover,
-.muteToggle:focus-visible {
-  opacity: 0.9;
-  background: rgba(255, 255, 255, 0.6);
-}
-.muteToggle:focus-visible {
+.soundPrompt:focus-visible {
   outline: 2px solid var(--v2-primary-outline);
   outline-offset: 2px;
 }

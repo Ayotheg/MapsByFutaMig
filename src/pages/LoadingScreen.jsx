@@ -3,6 +3,8 @@ import { Navigation, Volume2, VolumeX } from "lucide-react";
 import {
   claimLoadingMusic,
   isLoadingMusicMuted,
+  isLoadingMusicPlaying,
+  onLoadingMusicPause,
   setLoadingMusicMuted,
   startLoadingMusic,
   stopLoadingMusic,
@@ -33,29 +35,27 @@ const DEFAULT_STEPS = [
 // saved data". It may already be playing when this mounts (started by the
 // tap on the landing page's link to /map, which is what makes it work on
 // iPhones). If the browser refused to start it, every tap/key press on this
-// screen tries again, and a small "Tap for sound" pill appears at the top
-// to invite that tap. A faded mute toggle sits in the top-right corner for
-// anyone who'd rather not hear it; muting lasts for the rest of the visit
-// (in memory only). Nothing is stored anywhere.
-const SOUND_PROMPT_DELAY_MS = 500; // don't flash the pill on fast loads
+// screen tries again. One pill at the top covers both cases: "Mute" while
+// the song plays, "Tap for sound" while it doesn't (blocked or muted).
+// Muting lasts for the rest of the visit (in memory only). Nothing is
+// stored anywhere.
+const SOUND_PROMPT_DELAY_MS = 500; // don't flash "Tap for sound" on fast loads
 
 function useLoadingMusic() {
-  const [blocked, setBlocked] = useState(false);
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [muted, setMuted] = useState(isLoadingMusicMuted);
-  const tryStartRef = useRef(null);
+  const [playing, setPlaying] = useState(() => !isLoadingMusicMuted() && isLoadingMusicPlaying());
+  const [promptReady, setPromptReady] = useState(false);
 
   useEffect(() => {
     let active = true;
     claimLoadingMusic();
 
     const tryStart = (e) => {
-      // A press on the mute toggle shouldn't count as "tap for sound" —
-      // pointerup fires before its click, so the song would blip on first.
+      // The pill handles its own taps — otherwise pointerup would start the
+      // song just before a "Mute" click stops it again.
       if (e?.target?.closest?.("[data-music-toggle]")) return;
       startLoadingMusic().then((ok) => {
         if (!active) return;
-        setBlocked(!ok);
+        setPlaying(ok);
         if (ok) removeUnlock();
       });
     };
@@ -70,27 +70,32 @@ function useLoadingMusic() {
     };
     unlockEvents.forEach((e) => window.addEventListener(e, tryStart, true));
 
-    tryStartRef.current = tryStart;
     tryStart();
-    const promptTimer = setTimeout(() => active && setShowPrompt(true), SOUND_PROMPT_DELAY_MS);
+    const offPause = onLoadingMusicPause(() => active && setPlaying(false));
+    const promptTimer = setTimeout(() => active && setPromptReady(true), SOUND_PROMPT_DELAY_MS);
 
     return () => {
       active = false;
       clearTimeout(promptTimer);
+      offPause();
       removeUnlock();
       stopLoadingMusic();
     };
   }, []);
 
-  const toggleMute = () => {
-    const next = !muted;
-    setLoadingMusicMuted(next);
-    setMuted(next);
-    // Unmuting happens inside this tap, so the browser lets it play.
-    if (!next) tryStartRef.current?.();
+  const toggleSound = () => {
+    if (playing) {
+      setLoadingMusicMuted(true);
+      setPlaying(false);
+      return;
+    }
+    // Runs inside this tap, so the browser lets it play.
+    setLoadingMusicMuted(false);
+    startLoadingMusic().then(setPlaying);
   };
 
-  return { showPrompt: blocked && showPrompt && !muted, muted, toggleMute };
+  // Hidden only during the first moment while autoplay is still being tried.
+  return { playing, showToggle: playing || promptReady, toggleSound };
 }
 
 function LoadingScreen({
@@ -115,7 +120,7 @@ function LoadingScreen({
   onContinue,
 }) {
   const total = steps.length;
-  const { showPrompt: showSoundPrompt, muted, toggleMute } = useLoadingMusic();
+  const { playing: soundPlaying, showToggle: showSoundToggle, toggleSound } = useLoadingMusic();
   const isControlled = typeof current === "number";
   const [autoStep, setAutoStep] = useState(1);
   const intervalRef = useRef(null);
@@ -158,26 +163,17 @@ function LoadingScreen({
 
   return (
     <div className={`${styles.screen} ${stuck ? styles.screenStuck : ""}`}>
-      {showSoundPrompt && (
-        // The tap itself starts the music (window listeners in
-        // useLoadingMusic); the click handler is a direct second attempt.
-        <button type="button" className={styles.soundPrompt} onClick={() => startLoadingMusic()}>
-          <Volume2 size={14} strokeWidth={2} />
-          Tap for sound
+      {showSoundToggle && (
+        <button
+          type="button"
+          data-music-toggle
+          className={styles.soundPrompt}
+          onClick={toggleSound}
+        >
+          {soundPlaying ? <VolumeX size={14} strokeWidth={2} /> : <Volume2 size={14} strokeWidth={2} />}
+          {soundPlaying ? "Mute" : "Tap for sound"}
         </button>
       )}
-
-      <button
-        type="button"
-        data-music-toggle
-        className={styles.muteToggle}
-        onClick={toggleMute}
-        aria-pressed={muted}
-        aria-label={muted ? "Unmute music" : "Mute music"}
-        title={muted ? "Unmute music" : "Mute music"}
-      >
-        {muted ? <VolumeX size={18} strokeWidth={2} /> : <Volume2 size={18} strokeWidth={2} />}
-      </button>
 
       <div className={styles.content}>
         <div className={styles.iconWrap} aria-hidden="true">
