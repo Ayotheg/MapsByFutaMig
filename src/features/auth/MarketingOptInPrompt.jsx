@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Mail } from 'lucide-react';
-import { setTawkHidden } from '../../lib/tawk';
+import { setTawkHidden, useTawkChatOpen } from '../../lib/tawk';
 import { track } from '../../lib/analytics';
 import { fetchMarketingConsent, saveMarketingConsent } from './marketingConsent';
 import styles from './MarketingOptInPrompt.module.css';
@@ -18,7 +18,8 @@ import styles from './MarketingOptInPrompt.module.css';
 //   thanks" whose save failed: still not asked again on this device.
 // - Same corner as ChannelPrompt / the Tawk bubble; MapPage hides
 //   ChannelPrompt while this is up. Waits while anything else is open
-//   (`blocked`) and just reappears afterwards — it's not answered yet.
+//   (`blocked`, or the Tawk chat open) and just reappears afterwards —
+//   it's not answered yet.
 const ASKED_KEY = 'mbf_optin_asked';
 
 function askedHere(userId) {
@@ -51,8 +52,11 @@ export default function MarketingOptInPrompt({ user, ready, blocked, isMobile, o
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Someone mid-conversation in the Tawk live chat counts as busy.
+  const chatOpen = useTawkChatOpen();
 
   useEffect(() => {
+    setAccount(null);
     setAnswered(false);
     setFailed(false);
     if (!userId || !google || askedHere(userId)) return undefined;
@@ -66,7 +70,7 @@ export default function MarketingOptInPrompt({ user, ready, blocked, isMobile, o
   }, [userId, google]);
 
   const visible =
-    !!userId && ready && !blocked && !answered && pathname === '/map' &&
+    !!userId && ready && !blocked && !chatOpen && !answered && pathname === '/map' &&
     account?.forUser === userId && account.undecided;
 
   useEffect(() => {

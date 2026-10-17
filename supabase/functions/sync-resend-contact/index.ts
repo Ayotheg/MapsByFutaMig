@@ -115,24 +115,40 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } },
   );
 
-  const { data: profile, error: readError } = await admin
-    .from('profiles')
-    .select('marketing_opt_in')
-    .eq('id', user_id)
-    .maybeSingle();
-  if (readError || !profile) {
-    console.error('[sync-resend-contact] profile read failed', user_id, readError);
-    return json(500, { error: 'Database error' });
-  }
-  const optIn = profile.marketing_opt_in === true;
+  const readOptIn = async (): Promise<boolean | null> => {
+    const { data, error } = await admin
+      .from('profiles')
+      .select('marketing_opt_in')
+      .eq('id', user_id)
+      .maybeSingle();
+    if (error || !data) {
+      console.error('[sync-resend-contact] profile read failed', user_id, error);
+      return null;
+    }
+    return data.marketing_opt_in === true;
+  };
 
-  const result = optIn
-    ? await subscribe(key, segmentId, email, (payload.first_name ?? '').trim())
-    : await unsubscribe(key, email);
-
-  if (!result.ok) {
-    console.error('[sync-resend-contact] Resend error', user_id, optIn ? 'opt_in' : 'opt_out', result.status, result.detail);
-    return json(500, { error: 'Resend failed', status: result.status });
+  // Two requests can also run at the same time (switch flipped on then
+  // off): if the value changed while we were talking to Resend, apply the
+  // newer one too, so Resend always ends on the latest choice.
+  let optIn = await readOptIn();
+  if (optIn === null) return json(500, { error: 'Database error' });
+  for (let attempt = 0; ; attempt++) {
+    const result = optIn
+      ? await subscribe(key, segmentId, email, (payload.first_name ?? '').trim())
+      : await unsubscribe(key, email);
+    if (!result.ok) {
+      console.error('[sync-resend-contact] Resend error', user_id, optIn ? 'opt_in' : 'opt_out', result.status, result.detail);
+      return json(500, { error: 'Resend failed', status: result.status });
+    }
+    const latest = await readOptIn();
+    if (latest === null) return json(500, { error: 'Database error' });
+    if (latest === optIn) break;
+    if (attempt >= 2) {
+      console.error('[sync-resend-contact] consent kept changing, giving up', user_id);
+      return json(500, { error: 'Consent changed during sync' });
+    }
+    optIn = latest;
   }
 
   const { error: stampError } = await admin

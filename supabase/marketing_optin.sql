@@ -55,6 +55,11 @@ begin
      set marketing_opt_in = opt_in,
          marketing_opt_in_at = now()
    where id = auth.uid();
+  -- No profile row (handle_new_user swallowed an error): fail loudly so
+  -- the client shows "couldn't save" instead of a choice that went nowhere.
+  if not found then
+    raise exception 'No profile row for this user';
+  end if;
 end;
 $$;
 
