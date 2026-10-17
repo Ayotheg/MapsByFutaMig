@@ -339,7 +339,7 @@
   transform: scale(0.97);
 }
 
-/* Admin is a desktop-only surface (UI_REDESIGN_GUIDE.md Section 7): the
+/* Admin is a desktop-only surface: the
    mobile tab strip (MobileSheet.jsx) no longer has an Admin entry point
    at all, and Sidebar itself only mounts on desktop per MapPage's
    isMobile check. This query is a defensive second layer for the same

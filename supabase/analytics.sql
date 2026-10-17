@@ -1,9 +1,7 @@
 -- ── Slice 14: Analytics / "Insights" admin feature ──────────────────────
 --
 -- File-per-feature convention (same as supabase/quick_chips.sql /
--- supabase/waypoint_submissions.sql) — NOT appended to
--- FIREBASE_TO_SUPABASE_MIGRATION.md, whose own "Step" numbering was
--- already abandoned after Slice 10 (see Slice 13's tracker row).
+-- supabase/waypoint_submissions.sql).
 --
 -- **PARTIALLY RUN AGAINST A LIVE DATABASE, then fixed to be re-runnable**
 -- — the first live run got through creating `analytics_events`,

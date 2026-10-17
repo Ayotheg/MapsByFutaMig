@@ -22,7 +22,7 @@ import { GROUP_META, GROUP_ROWS } from './placeTypeGroups';
  * Visual redesign (this pass): the legacy cascade forced solid white
  * cards with the dark-theme's light text colors still applied — a
  * legibility bug, not a style choice. Rebuilt on the brand's solid
- * token scale from BRAND_GUIDELINES.md (--surface-container/-high/
+ * v1 token scale (--surface-container/-high/
  * -highest, --border, --primary-container, --secondary-container) —
  * no backdrop-filter, no translucent "glass" overlays, flat brand
  * colors only. One surface per group with a colored spine instead of

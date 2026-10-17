@@ -93,9 +93,7 @@
 
   /* Bottom navbar's "in navigation" state (Figma node 4:488, "Nav -
      Applying relevance logic..."): a distinct solid blue, not
-     --v2-primary — confirmed from the actual frame, not guessed (see
-     this session's flag in UI_REDESIGN_GUIDE.md for how the earlier,
-     wrong violet-fill guess got corrected once Figma access was fixed).
+     --v2-primary — confirmed from the actual Figma frame.
      The always-accented "Nav" tab keeps its normal --v2-primary-outline
      pill unchanged on this bar; only its label color swaps to
      --v2-nav-active-accent, a teal-mint distinct from --v2-secondary. */

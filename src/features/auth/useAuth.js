@@ -5,13 +5,6 @@ import { signOutOrThrow } from './signOut';
 
 // ── FUTA Auth — Supabase Auth port of legacy's `initFutaAuth()` ────────────
 //
-// Legacy source: app.js ~7073–7421 (the real `initFutaAuth` IIFE — NOT
-// ~2744–3095 as MIGRATION_PLAN.md's Slice 10 entry originally said; that
-// range is actually `_cacheRead`/OSM-dedup code, unrelated to auth. Same
-// "plan's line range is a starting pointer, not gospel" lesson Slices
-// 4/5/7/8 already hit — found by grepping for `initFutaAuth`/`FUTA_AUTH`.
-// Corrected in MIGRATION_PLAN.md's Slice 10 row).
-//
 // Legacy is Firebase Auth (compat SDK) with a global `window.FUTA_USER` +
 // a `futa:authchange` DOM event other modules listen to. This port has no
 // global mutable state or DOM events — `useAuth()` is called once in
@@ -74,9 +67,6 @@ export function useAuth() {
   // popup (no `auth/popup-closed-by-user` case here — closing/cancelling
   // just leaves the user on Google's page or bounces back with no
   // session, `onAuthStateChange` simply never fires a signed-in event).
-  // NOT YET CONFIRMED LIVE: needs the Google OAuth client re-registered
-  // under Supabase Auth (FIREBASE_TO_SUPABASE_MIGRATION.md's Step 5) —
-  // flagged in MIGRATION_PLAN.md's tracker row, not assumed done here.
   const signInWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -96,8 +86,7 @@ export function useAuth() {
   // pass `data: { display_name }` as OAuth-style user metadata on signUp
   // (lands in `auth.users.raw_user_meta_data`, no separate table write
   // needed for the name itself) — the `profiles` row for review/nav
-  // counts is created separately by a DB trigger, see
-  // FIREBASE_TO_SUPABASE_MIGRATION.md's new "Step 7".
+  // counts is created separately by a DB trigger (`handle_new_user`).
   // Email confirmation is turned off in Supabase, so `data.session` is set
   // and the person is signed in straight away. Returned so the caller can
   // tell if confirmation is ever switched back on (session would be null).

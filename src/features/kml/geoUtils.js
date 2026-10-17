@@ -6,8 +6,7 @@
  * used by `processImportPipeline` (Slice 5) to filter/smooth an imported
  * GPS track before it's saved as a segment.
  *
- * NOTE for whoever builds Slice 9 (GPS & Navigation): MIGRATION_PLAN.md
- * lists "path simplification (Douglas-Peucker)" under Slice 9 too — legacy
+ * NOTE: the plan listed "path simplification (Douglas-Peucker)" under Slice 9 too — legacy
  * only has ONE copy of this code, reused by both the import pipeline and
  * live route recording. Slice 5 needs it first (recording doesn't exist
  * yet), so it lives here. Per CLAUDE.md's "no premature shared

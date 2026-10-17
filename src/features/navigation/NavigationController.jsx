@@ -809,8 +809,7 @@ const NavigationController = forwardRef(function NavigationController(
     updateHUD();
     persistNavigation();
 
-    // Flagged bug fix (explicit user instruction, UI_REDESIGN_GUIDE.md Nav/
-    // GPS HUD session): was `map.fitBounds(L.latLngBounds(routeData.coords),
+    // Flagged bug fix (explicit user instruction): was `map.fitBounds(L.latLngBounds(routeData.coords),
     // { padding: [80, 80] })`, framing the entire route — usually a wide,
     // zoomed-out view that then never changes again (see gpsConstants.js's
     // `NAV_START_ZOOM` comment for the full story). Center on the user at a

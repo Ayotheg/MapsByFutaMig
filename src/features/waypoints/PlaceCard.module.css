@@ -1,10 +1,8 @@
 /* Ported from legacy style.css (feature/login2), the PLACE CARD block
    (~lines 3900-4130). Structure/behavior kept 1:1; colors/spacing/radii/
-   fonts now come from design tokens per BRAND_GUIDELINES.md instead of
-   literals. See the font-mapping note near .name below for one inference
-   this port had to make that isn't explicitly covered by that doc.
+   fonts now come from design tokens instead of literals.
 
-   UI_REDESIGN_GUIDE.md pass (this session): restyled to the v2 "Lumina
+   v2 redesign: restyled to the v2 "Lumina
    Campus Utility" light theme per Figma node 7:943 ("Bottom Sheet Card").
    Class names are unchanged from the port above — only their declarations
    and a couple of purely-visual additions (.closeOnHero, .metaRow), so

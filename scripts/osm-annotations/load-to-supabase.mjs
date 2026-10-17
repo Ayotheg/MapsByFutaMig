@@ -3,8 +3,7 @@
 // EXISTING `waypoints` table (no new table) — same table useWaypoints.js,
 // search, admin, and navigation already read from. Reuses the existing
 // `source_type = 'osm_import'` value the schema/app already defines for
-// exactly this purpose (see FIREBASE_TO_SUPABASE_MIGRATION.md and
-// useWaypoints.js).
+// exactly this purpose (see useWaypoints.js).
 //
 // IMPORTANT — read before running:
 // useWaypoints.js currently does `if (wp.source_type === 'osm_import')

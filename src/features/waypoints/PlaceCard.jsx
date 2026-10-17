@@ -10,8 +10,8 @@ import { track } from '../../lib/analytics';
 // ── Rating badge ─────────────────────────────────────────────────────────
 // Ported from legacy `_ratingBadgeHtml` (app.js ~2450–2456), now that
 // Slice 8 added `avg_rating`/`review_count` (via `useWaypoints.js` reading
-// the new columns) + the `reviews` table/trigger that populates them (see
-// FIREBASE_TO_SUPABASE_MIGRATION.md's "Step 6"). Non-rateable types render
+// the new columns) + the `reviews` table/trigger that populates them.
+// Non-rateable types render
 // nothing at all, matching legacy exactly.
 function RatingBadge({ type, avgRating, reviewCount }) {
   if (!isRateablePOI(type)) return null;
@@ -49,7 +49,7 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  * (see `.tapHint` in PlaceCard.module.css). The viewer shares `photoIdx`
  * with the card, so closing it leaves the hero on the last-viewed photo.
  *
- * UI_REDESIGN_GUIDE.md pass (this session): restyled to v2 light theme
+ * v2 redesign: restyled to v2 light theme
  * per Figma node 7:943 ("Bottom Sheet Card") — see PlaceCard.module.css's
  * header comment. Two structural (not functional) notes:
  *  - Close button: Figma shows it floating on the hero photo, not in the
@@ -58,8 +58,8 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  *    so closing is never unreachable. Same `onClose` handler either way —
  *    no behavior change.
  *  - Badge/rating row: Figma pairs the type badge with a secondary text
- *    label (a location string this app's data shape doesn't have — see
- *    UI_REDESIGN_GUIDE.md's flags). Paired the existing `data.badge` chip
+ *    label (a location string this app's data shape doesn't have).
+ *    Paired the existing `data.badge` chip
  *    with the existing rating indicator instead, side by side, to match
  *    the visual pattern without inventing a new data field.
  */

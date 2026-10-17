@@ -101,7 +101,7 @@
  * sans-serif`. Neither font is imported anywhere in the legacy app
  * (not in the Google Fonts <link>, not elsewhere), so it was silently
  * falling back to the browser's generic sans-serif the entire time —
- * this looks like dead code, not intentional. BRAND_GUIDELINES.md
+ * this looks like dead code, not intentional. DESIGN_SYSTEM.md
  * documents --font-ui as the intended global UI font. I've used
  * --font-ui here since that matches the documented design system and
  * every actual component in the legacy CSS. Flag if you want the

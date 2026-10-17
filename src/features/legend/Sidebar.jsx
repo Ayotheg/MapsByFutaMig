@@ -16,7 +16,7 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
 const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
 
 // ── Rail button icons: previously hand-drawn inline SVGs copied verbatim
-// from legacy index.html (~96–119). UI redesign (UI_REDESIGN_GUIDE.md)
+// from legacy index.html (~96–119). The v2 redesign
 // swaps these for lucide-react equivalents — a component swap only, same
 // as the Loading Screen's icon swap flag — chosen to match the icon
 // treatment just established on the mobile MobileSheet tab strip

@@ -15,8 +15,7 @@
 --
 -- What this fixes (found by reading the current implementation):
 --
---  1. `recompute_profile_review_count()` (FIREBASE_TO_SUPABASE_MIGRATION.md
---     Step 7) was NOT `security definer`. It ran as the reviewing user,
+--  1. `recompute_profile_review_count()` was NOT `security definer`. It ran as the reviewing user,
 --     who has no UPDATE policy on `profiles`, so Postgres RLS silently
 --     filtered the UPDATE to zero rows and `review_count` never moved.
 --     It was also insert-only, so deleted/cascaded reviews left the count

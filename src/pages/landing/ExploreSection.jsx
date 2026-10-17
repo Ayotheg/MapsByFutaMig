@@ -9,7 +9,7 @@ import { MapLink } from './shared'
  * most-visited student spots the plan calls out, in the specified
  * order, plus a "+ more" tile linking into the map's full category
  * list. Church and mosque are both included, side by side,
- * deliberately even — see LANDING_PAGE_REDESIGN_PLAN.md Slice 5.
+ * deliberately.
  *
  * Icons come from the existing LEGACY_ICON_MAP (src/lib/legacyIconMap.js)
  * rather than guessed ad hoc — 'mosque' already resolves to a

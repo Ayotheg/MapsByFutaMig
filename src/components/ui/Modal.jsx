@@ -6,7 +6,7 @@ import styles from './Modal.module.css';
  *
  * Extracted from `features/segments/DetailModal.jsx` now that Slice 5's
  * save modal is the *second* real usage of the "Modal shell" pattern
- * BRAND_GUIDELINES.md documents (`.modal-overlay > .modal > .modal-header
+ * uses (`.modal-overlay > .modal > .modal-header
  * (.modal-title + .modal-close) > .modal-body > .modal-footer`). Per
  * CLAUDE.md's "no premature shared components" rule, this was deliberately
  * NOT pre-extracted from DetailModal alone — see that file's own comment,

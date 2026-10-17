@@ -23,7 +23,7 @@ const MIN_VISIBLE = 4;
  * `activeChip` and threads it to DesktopSearchBar/MobileSearchBar too —
  * this component only renders the row and reports clicks upward.
  *
- * UI_REDESIGN_GUIDE.md pass: restyled to v2 tokens per Figma node 29:23's
+ * v2 redesign: restyled to v2 tokens per Figma node 29:23's
  * Category Chips row — white/bordered by default, teal-green
  * (`--v2-chip-active-*`) when active. Structure/props/handlers unchanged.
  *

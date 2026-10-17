@@ -2,8 +2,7 @@ import { Crosshair, Gauge, Compass, LocateFixed, CircleStop } from 'lucide-react
 import styles from './GpsPanel.module.css';
 
 /**
- * GPS Signal panel body — v2 redesign (UI_REDESIGN_GUIDE.md, Nav/GPS HUD
- * row; Figma node 31:52 "GPS Screen", pulled via the Figma MCP
+ * GPS Signal panel body — v2 redesign (Figma node 31:52 "GPS Screen", pulled via the Figma MCP
  * connection). Ported from legacy `index.html` ~542–561 originally; this
  * pass only restyles markup/CSS per the guide's Rule 1/2 — `gps` still
  * carries every value from `useGpsTracking.js` unchanged, same props in,
@@ -20,7 +19,7 @@ import styles from './GpsPanel.module.css';
  * **Subtitle line (`statusText` below) is computed inline from data the
  * hook already returns (`gpsBtnDisabled`/`isTracking`/`tier`/`warning`) —
  * no new prop, no new state.** Same precedent as ChipResultsPanel's
- * status-line consolidation (see UI_REDESIGN_GUIDE.md). The Figma copy
+ * status-line consolidation. The Figma copy
  * "Acquiring high-accuracy lock" is used verbatim for the
  * tracking-but-not-yet-`good` case, which is exactly what that phrase
  * describes.

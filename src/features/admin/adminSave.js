@@ -196,7 +196,7 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
 
 // Legacy: `adminDeleteBtn`'s waypoint branch (app.js ~4283–4300). Only
 // deletes the waypoints row — `waypoint_images` cascade-deletes per the DB
-// FK (FIREBASE_TO_SUPABASE_MIGRATION.md Step 0), but the Storage *files*
+// FK, but the Storage *files*
 // themselves don't (a DB cascade can't reach Storage) — callers should
 // pass the waypoint's image storage_paths so this can also call
 // removeStorageFiles, or they'll be orphaned. Flagged, not silently
@@ -458,16 +458,15 @@ function promotionRpcError(error, verb) {
 // Legacy: `adminSaveBtn`'s segment branch (app.js ~4156–4197) also
 // batch-writes a denormalized `segmentName` onto every child waypoint doc.
 // Not ported — waypoints join to `segments.name` live via `segment_id`
-// (Slice 4/5's established deviation, confirmed against
-// FIREBASE_TO_SUPABASE_MIGRATION.md), so there's no copy to keep in sync.
+// so there's no copy to keep in sync.
 export async function updateSegment(id, { name, description, category }) {
   const { error } = await supabase.from('segments').update({ name, description, category }).eq('id', id);
   if (error) throw error;
   track('admin_action', { action: 'update', entity: 'segment' });
 }
 
-// Legacy: `adminDeleteBtn`'s segment branch (app.js ~4302–4318). Per
-// FIREBASE_TO_SUPABASE_MIGRATION.md's schema, `segment_points`/
+// Legacy: `adminDeleteBtn`'s segment branch (app.js ~4302–4318). In the
+// schema, `segment_points`/
 // `segment_images` cascade-delete with the segment; `waypoints.segment_id`
 // is `on delete set null` (children are orphaned from the route, not
 // deleted) — matches legacy's own behavior of only ever deleting the

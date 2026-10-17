@@ -32,7 +32,7 @@ export const GROUP_META = [
 // ── Per-type rows within each group: [type, display name, row swatch] ──────
 // Swatches now match `wpTypeMeta.js`'s WP_TYPE_COLORS 1:1 — the legacy
 // inconsistency where legend swatches and map-pin colors disagreed (flagged
-// in the pre-consolidation version of this file and in BRAND_GUIDELINES.md)
+// in the pre-consolidation version of this file)
 // is resolved as a side effect of every type now having a real pin color.
 export const GROUP_ROWS = {
   academic: [

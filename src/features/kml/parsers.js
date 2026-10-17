@@ -12,8 +12,7 @@ import { sanitiseAnnotationName, cleanKmlDescription, extractKmlLabel } from './
  * npm package `@tmcw/togeojson` instead (same underlying conversion, real
  * module import) — added to package.json as part of this slice.
  *
- * NOT ported: a GeoJSON *import* parser. MIGRATION_PLAN.md's Slice 5
- * bullet says "parsers for KML/GPX/GeoJSON text", but tracing the actual
+ * NOT ported: a GeoJSON *import* parser. The plan said "parsers for KML/GPX/GeoJSON text", but tracing the actual
  * upload handler (`adminImportInput`'s change listener, app.js ~1846–1864)
  * shows it only ever branches on `.kml` -> parseKMLText or `.gpx` ->
  * parseGPXText; anything else hits the "Unsupported file format" alert.

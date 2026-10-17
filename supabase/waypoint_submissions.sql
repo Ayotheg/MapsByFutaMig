@@ -5,10 +5,7 @@
 -- (PendingTab.jsx). Run this once in the Supabase SQL editor.
 --
 -- Same file-per-feature convention as supabase/quick_chips.sql (that file
--- is the precedent for putting new-slice schema here instead of appending
--- to FIREBASE_TO_SUPABASE_MIGRATION.md, whose own "Step" numbering stops
--- at Step 7 / Slice 10 and was never continued for anything added after
--- Slice 11).
+-- is the precedent).
 
 -- ── 1. Review-workflow columns on the existing waypoints table ───────────
 

@@ -32,8 +32,7 @@
     box-shadow var(--v2-duration-standard) var(--v2-ease-standard);
 }
 
-/* ── Nav-active state (Figma node 4:488, pulled via the Figma MCP
-   connection — see this session's flag in UI_REDESIGN_GUIDE.md; an
+/* ── Nav-active state (Figma node 4:488; an
    earlier pass guessed a solid --v2-primary fill here before that
    connection was checked, this replaces it with the real design):
    the bar switches to a solid blue (not primary violet) while
@@ -178,8 +177,7 @@
   -webkit-overflow-scrolling: touch;
   /* Sheet body defaults to the v1 dark surface — still correct for
      NavPanel, which assumes light-on-dark text and hasn't been
-     redesigned (see "Filter/legend content" in UI_REDESIGN_GUIDE.md
-     Section 7). The Explore and GPS Signal tabs override this via
+     redesigned. The Explore and GPS Signal tabs override this via
      .panelLight below, since their content (ExplorePanel.jsx,
      GpsPanel.jsx) is real v2 light-theme design now, not a placeholder —
      without the override their own white card just floats inside this

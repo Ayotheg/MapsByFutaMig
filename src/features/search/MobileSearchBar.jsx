@@ -20,7 +20,7 @@ import styles from './MobileSearchBar.module.css';
  * NOT itself start navigation, that's what `#panelNavigate`'s own
  * "START NAVIGATION" button inside that tab is for.
  *
- * UI_REDESIGN_GUIDE.md pass (this session): restyled to the v2 "Lumina
+ * v2 redesign: restyled to the v2 "Lumina
  * Campus Utility" light theme per Figma node 29:23 ("Group 2" — the
  * floating search pill). Structure/props/handlers unchanged — only
  * classNames' declarations and icon sizes moved to match the design.

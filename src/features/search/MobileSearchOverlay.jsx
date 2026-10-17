@@ -23,7 +23,7 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
  * larger) mobile numbers — a minor, flagged simplification, not a
  * behavioral one.
  *
- * UI_REDESIGN_GUIDE.md pass (this session): restyled to v2 light tokens
+ * v2 redesign: restyled to v2 light tokens
  * per Figma node 4:249 ("Search Results Redesign") — see tokens-v2.css
  * for how this frame's colors/font map onto existing tokens. Structure,
  * props, handlers, and search behavior untouched; the show/close

@@ -1,6 +1,5 @@
 /* Landing page styles — plain global CSS, not a CSS Module.
-   Deliberate deviation from the project's CSS Modules convention
-   (LANDING_PAGE_BUILD_PLAN.md conflict #5): this page is almost
+   Deliberate deviation from the project's CSS Modules convention: this page is almost
    entirely inline `style={{...}}` per the original Figma Make export,
    and a CSS-Modules rewrite of that would be a lot of churn for a
    self-contained marketing page. The className-based pieces below

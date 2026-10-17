@@ -1,9 +1,7 @@
 -- ── Promote — payment half (supabase/promotions.sql) ────────────────────
 --
 -- File-per-feature convention (same as waypoint_submissions.sql,
--- quick_chips.sql, analytics.sql) — not appended to
--- FIREBASE_TO_SUPABASE_MIGRATION.md, which stopped being the live schema
--- doc after Slice 10 per that file's own note.
+-- quick_chips.sql, analytics.sql).
 --
 -- Deliberately a NEW table, not a repurposing of `waypoints`:
 -- `waypoints.status` ('pending'/'approved'/'rejected', waypoint_submissions.sql)

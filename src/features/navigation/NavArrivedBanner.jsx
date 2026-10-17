@@ -17,7 +17,7 @@ const CROWDR_CAMPAIGN_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
  * ("Destination Arrived"), pulled via the Figma MCP connection. Same
  * props/data flow as before — `destName` and `onDismiss` are untouched,
  * only the markup/CSS changed. Reuses the shared v2 Modal contract
- * (Section 5 of UI_REDESIGN_GUIDE.md — overlay/scrim/pop-in animation,
+ * (overlay/scrim/pop-in animation,
  * first set by `Modal.module.css`) even though this component doesn't
  * render through `Modal.jsx` itself (it never has — it's a standalone
  * fixed-position banner, not a dismiss-on-backdrop-click modal, and
