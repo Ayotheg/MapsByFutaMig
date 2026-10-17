@@ -177,6 +177,16 @@
   --v2-duration-standard: 250ms;
   --v2-duration-breathe:  2200ms;
 
+  /* Brand palette additions (Oct 2026) — the five colours from the Maps By
+     FUTA design system (see DESIGN_SYSTEM.md) that had no variable yet.
+     Additive only: nothing above changes value. #6d28d9 / #ede9fe /
+     #fff8f7 were already used as literals across admin/auth screens. */
+  --v2-primary-hover:   #6d28d9; /* hover/pressed on primary fills; violet text on primary-tint */
+  --v2-primary-tint:    #ede9fe; /* pale violet fill: badges, pills, selected rows */
+  --v2-text-muted:      #6b6478; /* captions/placeholders — 5.4:1 on surface, replaces --v2-text-variant for new work */
+  --v2-secondary-tint:  #e6f6f4; /* pale teal fill behind teal content */
+  --v2-error-tint:      #fff8f7; /* pale red fill: destructive hover, error banners */
+
   /* Not yet defined — add only when a screen actually needs it:
      --v2-secondary-container (lighter tint variant, e.g. for the
      "Secondary" button's light fill — --v2-tertiary-container was this

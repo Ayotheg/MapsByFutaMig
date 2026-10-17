@@ -29,6 +29,10 @@ of Technology Akure. It is being migrated in two parallel tracks:
   `rounded-lg`, etc. — never `bg-blue-500`, `p-4` from Tailwind's own default
   palette, since that introduces colors/spacing outside the established
   brand system.
+- **Design system.** Any screen you design, redesign or build uses the
+  16 brand colours and the type in `DESIGN_SYSTEM.md` (violet `#7c3aed`
+  is the brand). Use their CSS variables from `src/styles/tokens-v2.css`;
+  never invent a hex or start new work on the v1 dark or `--land-*` sets.
 - **CSS approach**: CSS Modules (`Component.module.css`) for real component
   styles, colocated with the component. Tailwind utility classes for small
   inline tweaks only. If a Tailwind utility needs to beat a CSS Module rule,
@@ -256,7 +260,8 @@ early "just in case."
 | Legacy source of truth | `github.com/Ayotheg/MapsByFuta`, branch `feature/login2` |
 | New React app | `github.com/Ayotheg/MapsByFutaMig`, branch `main` |
 | Full feature list + slice order | `MIGRATION_PLAN.md` |
-| Design tokens / brand system | `BRAND_GUIDELINES.md` |
+| **Design system (colours, type, icons, logos) — use for all new UI** | **`DESIGN_SYSTEM.md`** (+ `design-system/tokens.json`). Supersedes `BRAND_GUIDELINES.md` and `UI_REDESIGN_GUIDE.md` §3 wherever they disagree. |
+| Legacy v1 dark tokens (history) | `BRAND_GUIDELINES.md` |
 | Supabase schema/RLS | `FIREBASE_TO_SUPABASE_MIGRATION.md` — its Step 0 SQL is the real target schema. Landed in the Slice 2 commit but sat unlinked here until Slice 5 actually cross-checked `useSegments.js` against it and found real mismatches — see MIGRATION_PLAN.md's Slice 5 row. Still not confirmed against a *live* database (RLS policy state in particular — see that same row). |
 
 ## How to work a slice
