@@ -29,16 +29,12 @@ CSS Modules + Tailwind 4, Supabase (Postgres, Auth, Storage, Edge Functions), Re
 - Landing page is prerendered: don't import the Supabase client into `src/pages/landing/`.
 - Supabase `numeric` columns arrive as strings: wrap in `Number()`.
 
-## Backend rules
-- One live Supabase project `vzjlarvtssybglwzfrhi`. No staging, so changes hit real users.
-- Schema change = idempotent file `supabase/<topic>.sql`, then apply via Supabase MCP. Confirm with the user first.
-- Client writes go through `security definer` RPCs with `set search_path = ''`, granted to `authenticated` only.
-- DB → Edge Function calls: pg_net + Vault secrets + `x-webhook-secret` header (pattern: `supabase/welcome_email.sql`).
-- Triggers must never block signup: catch errors, `raise warning`.
-- Webhook-style functions deploy with `verify_jwt = false` and check their own secret.
-- Secrets only in Supabase secrets / Vault. Never in code, SQL files or commits.
+## Backend (owned by the backend engineer; may change)
+- The database is live (Supabase `vzjlarvtssybglwzfrhi`, no staging). Ask before any change to it or any deploy.
+- Read the existing code in `supabase/` and follow it; don't assume a pattern.
+- Never put secrets in code, SQL files or commits.
 
 ## Workflow
 - Branch per change → `npm run build` → PR with `gh pr create`.
 - Comments: short, say why. No history or "legacy" notes.
-- Skills: `/frontend-feature`, `/supabase-change`, `/ship`.
+- Skills: `/frontend-feature` (build or import a screen), `/ship` (build, commit, PR).
