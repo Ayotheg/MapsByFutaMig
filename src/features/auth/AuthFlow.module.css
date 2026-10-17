@@ -206,6 +206,26 @@
   color: var(--v2-text-variant);
 }
 
+/* Marketing opt-in — deliberately quiet so it reads as optional. */
+.optIn {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--v2-text-variant);
+  cursor: pointer;
+}
+.optIn input {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  margin: 2px 0 0;
+  accent-color: var(--v2-primary);
+  cursor: pointer;
+}
+
 .srOnly {
   position: absolute;
   width: 1px;

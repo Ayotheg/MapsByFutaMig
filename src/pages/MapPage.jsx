@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MapShell from '../features/map/MapShell';
 import ZoomHint from '../features/map/ZoomHint';
 import ChannelPrompt from '../features/whatsapp/ChannelPrompt';
+import MarketingOptInPrompt from '../features/auth/MarketingOptInPrompt';
 import { setTawkHidden } from '../lib/tawk';
 import { useLocation } from 'react-router-dom';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
@@ -389,6 +390,8 @@ export default function MapPage({ onReadinessChange }) {
   const [suggestPickedCoord, setSuggestPickedCoord] = useState(null);
   const [submissionToast, setSubmissionToast] = useState(null);
   const dismissSubmissionToast = useCallback(() => setSubmissionToast(null), []);
+  // Same corner as ChannelPrompt — the WhatsApp nudge waits while it's up.
+  const [optInPromptOpen, setOptInPromptOpen] = useState(false);
   const suggestClickHandlerRef = useRef(null);
   const [suggestPicking, setSuggestPicking] = useState(false);
 
@@ -812,11 +815,18 @@ export default function MapPage({ onReadinessChange }) {
         <MyWaypointSubmissionsPanel user={auth.user} onClose={() => setMySubmissionsOpen(false)} />
       )}
       <SubmissionToast message={submissionToast} onDismiss={dismissSubmissionToast} />
+      <MarketingOptInPrompt
+        user={auth.loading ? null : auth.user}
+        ready={!!map && !waypointsLoading}
+        isMobile={isMobile}
+        blocked={mapBusy || isOffline}
+        onVisibleChange={setOptInPromptOpen}
+      />
       <ChannelPrompt
         ready={!!map && !waypointsLoading && !auth.loading}
         isMobile={isMobile}
         userId={auth.loading ? null : auth.user?.id || null}
-        blocked={mapBusy || isOffline}
+        blocked={mapBusy || isOffline || optInPromptOpen}
       />
     </>
   );

@@ -85,6 +85,10 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [name, setName] = useState('');
+  // Marketing emails — unticked by default (a pre-ticked box isn't consent).
+  // Email signup only: Google users are asked once after they land
+  // (MarketingOptInPrompt.jsx), since the Google button here also signs in.
+  const [optIn, setOptIn] = useState(false);
   const [busy, setBusy] = useState(false);
   // { text, error, kind } — kind: 'wrong' | 'wrong-unknown' | 'google' adds an action
   const [status, setStatus] = useState(null);
@@ -277,7 +281,7 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
     setStatus(null);
     setBusy(true);
     try {
-      const data = await signUpWithEmail(name.trim(), email, password);
+      const data = await signUpWithEmail(name.trim(), email, password, optIn);
       if (data?.session) {
         onClose();
       } else {
@@ -460,6 +464,10 @@ export default function AuthFlow({ onClose, signInWithGoogle, signInWithEmail, s
               <label className={styles.label} htmlFor="auth-password">Password</label>
               {passwordField('new-password')}
               <div className={styles.hint}>At least 6 characters.</div>
+              <label className={styles.optIn}>
+                <input type="checkbox" checked={optIn} onChange={(e) => setOptIn(e.target.checked)} />
+                <span>Send me updates and new features from Maps By FUTA. Unsubscribe anytime.</span>
+              </label>
               {status && <StatusMsg status={status} />}
               <button type="submit" className={styles.primaryBtn} disabled={busy}>
                 {busy ? 'Creating account…' : 'Create account'}

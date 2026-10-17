@@ -101,11 +101,13 @@ export function useAuth() {
   // Email confirmation is turned off in Supabase, so `data.session` is set
   // and the person is signed in straight away. Returned so the caller can
   // tell if confirmation is ever switched back on (session would be null).
-  const signUpWithEmail = useCallback(async (name, email, password) => {
+  // `marketing_opt_in` is copied into profiles once the account is
+  // confirmed (supabase/marketing_optin.sql C3), never before.
+  const signUpWithEmail = useCallback(async (name, email, password, marketingOptIn = false) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { display_name: name } },
+      options: { data: { display_name: name, marketing_opt_in: marketingOptIn === true } },
     });
     if (error) throw error;
     return data;

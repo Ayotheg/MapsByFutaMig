@@ -1,0 +1,102 @@
+/*
+ * Light, non-modal corner card — same placement and surface as
+ * ChannelPrompt.module.css, which is hidden while this one is up.
+ */
+.card {
+  position: fixed;
+  z-index: 1001;
+  padding: 12px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-track);
+  border-radius: var(--r-lg);
+  box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.12);
+  font-family: var(--font-ui);
+  animation: promptIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.desktop {
+  right: 16px;
+  bottom: 32px;
+  width: 340px;
+}
+.mobile {
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom) + 12px);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.badge {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+}
+.text {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+.sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--v2-text-variant);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+.no,
+.yes {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.no {
+  border: none;
+  background: transparent;
+  color: var(--v2-text-variant);
+}
+.no:hover:not(:disabled) {
+  background: var(--v2-track);
+}
+.yes {
+  border: none;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+}
+.yes:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.no:disabled,
+.yes:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@keyframes promptIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}

@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
 import { fetchProfileStats, statTileValue } from './profileStats';
 import { fetchActivePromotion } from '../promote/activePromotion';
+import { fetchMarketingConsent, saveMarketingConsent } from './marketingConsent';
 import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
 import WhatsAppIcon from '../../lib/WhatsAppIcon';
 import { CONTACT_EMAIL, WHATSAPP_CHAT_URL } from '../../lib/contactInfo';
@@ -68,6 +69,36 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
     });
     return () => { cancelled = true; };
   }, [tab, userId]);
+
+  // "Email updates" switch (profiles.marketing_opt_in). Turning it off
+  // marks the Resend contact unsubscribed (marketing_optin.sql). Hidden
+  // until loaded so it never shows a guessed state.
+  const [optIn, setOptIn] = useState(null); // null = loading / unavailable
+  const [optInBusy, setOptInBusy] = useState(false);
+  const [optInError, setOptInError] = useState(null);
+  useEffect(() => {
+    if (tab !== 'profile' || !userId) return;
+    let cancelled = false;
+    setOptIn(null);
+    setOptInError(null);
+    fetchMarketingConsent(userId).then((consent) => {
+      if (!cancelled && consent) setOptIn(consent.optIn);
+    });
+    return () => { cancelled = true; };
+  }, [tab, userId]);
+
+  async function handleOptInChange(next) {
+    if (optInBusy) return;
+    setOptInError(null);
+    setOptInBusy(true);
+    setOptIn(next);
+    const ok = await saveMarketingConsent(next);
+    if (!ok) {
+      setOptIn(!next);
+      setOptInError('Couldn’t update email preferences. Try again.');
+    }
+    setOptInBusy(false);
+  }
 
   // Sign-out: `signOut` rejects when Supabase returns an error (useAuth.js
   // → signOut.js). Only a resolved call closes the card; a failure keeps
@@ -321,6 +352,28 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
             </div>
           </div>
         )}
+
+        {optIn !== null && (
+          <label className={styles.prefRow}>
+            <span className={styles.prefText}>
+              <span className={styles.prefTitle}>Email updates</span>
+              <span className={styles.prefSub}>News and new features. Unsubscribe anytime.</span>
+            </span>
+            <span className={styles.switch}>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={optIn}
+                disabled={optInBusy}
+                onChange={(e) => handleOptInChange(e.target.checked)}
+              />
+              <span className={styles.switchTrack}>
+                <span className={styles.switchKnob} />
+              </span>
+            </span>
+          </label>
+        )}
+        {optInError && <StatusMsg status={{ text: optInError, error: true }} />}
 
         {signOutError && <StatusMsg status={{ text: signOutError, error: true }} />}
         <button type="button" className={styles.signoutBtn} onClick={handleSignOut} disabled={signOutBusy}>
