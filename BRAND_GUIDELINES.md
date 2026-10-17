@@ -1,5 +1,9 @@
 # Maps By FUTA — Brand & Design Tokens
 
+> **Superseded for new work (Oct 2026):** the current brand is in
+> [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) — violet `#7c3aed` on light surfaces.
+> This file documents the legacy v1 dark palette that older screens still use.
+
 Extracted verbatim from `style.css` on `feature/login2`. These values are the
 single source of truth — copy them into `src/styles/tokens.css` in the new
 React app unchanged. Do not reinterpret or "improve" any of these; the goal

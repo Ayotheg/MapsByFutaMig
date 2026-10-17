@@ -104,6 +104,10 @@ done as a static mockup.
 
 ## 3. Design tokens v2
 
+> **Oct 2026:** the palette is now settled as 16 brand colours — see
+> [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) — which wins over this section where they disagree.
+> New screens use only those colours.
+
 The current palette (violet primary / cyan secondary / amber
 tertiary, see `src/styles/tokens.css`) is **up for a full redesign**,
 not just a refinement — direction is open.
