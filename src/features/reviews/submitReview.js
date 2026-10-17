@@ -9,8 +9,7 @@ import { track } from '../../lib/analytics';
 //   the new average into the waypoint via a client-side
 //   `db.runTransaction(...)` (app.js ~7033–7043). Both are gone here:
 //   `place_name`/`place_type` were dropped from the `reviews` table
-//   (see FIREBASE_TO_SUPABASE_MIGRATION.md's "Step 6" — same denormalize
-//   -vs-join call this doc already made for segments' `segmentName`), and
+//   (same denormalize-vs-join call made for segments' `segmentName`), and
 //   the rolling average is now a Postgres trigger on `reviews` insert
 //   instead of a client transaction, which is what CLAUDE.md's schema
 //   note flags legacy's approach as race-prone under concurrent reviews.
@@ -24,8 +23,7 @@ import { track } from '../../lib/analytics';
 // `userId` (Slice 10): legacy's `patchReviewWithAuth` (app.js ~7426–7471)
 // bumps `users/{uid}.reviewCount` after the fact via a fragile
 // poll-for-"Thanks"-text hack, once `window.FUTA_USER` exists. This port
-// does it properly at insert time instead — `reviews.user_id` (added in
-// FIREBASE_TO_SUPABASE_MIGRATION.md's "Step 7") is nullable, so an
+// does it properly at insert time instead — `reviews.user_id` is nullable, so an
 // anonymous review still works exactly as before if `userId` is omitted;
 // when it's set, the same `recompute_profile_review_count` trigger that
 // Step 7 adds keeps `profiles.review_count` accurate without any

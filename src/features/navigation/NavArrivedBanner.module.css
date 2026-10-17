@@ -3,7 +3,7 @@
  * ("Destination Arrived"), pulled via the Figma MCP connection.
  *
  * Reuses the shared v2 Modal contract for the overlay/scrim/pop-in
- * animation (Section 5 of UI_REDESIGN_GUIDE.md, first set by
+ * animation (first set by
  * `Modal.module.css` — same var(--v2-scrim) backdrop, same
  * var(--v2-duration-standard)/var(--v2-ease-standard) timing) even
  * though this component isn't rendered through `Modal.jsx` (see the

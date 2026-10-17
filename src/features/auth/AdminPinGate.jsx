@@ -10,7 +10,7 @@ import { ADMIN_PIN_HASH, PIN_LENGTH, hashPin } from './adminPin';
  * lives in `useAdminPin.js`, this component doesn't know about auth).
  *
  * NOT YET WIRED TO ANYTHING — flagged, not an oversight, same as
- * `ReviewModal` was in Slice 8. MIGRATION_PLAN.md lists "Separate PIN-gate
+ * `ReviewModal` was in Slice 8. The plan listed "Separate PIN-gate
  * for admin panel entry" under Slice 10's own scope (distinct from the
  * admin panel itself, Slice 11), so this component + `useAdminPin.js` are
  * built and ready here. `Sidebar.jsx`'s Admin toggle stays inert — wiring

@@ -53,7 +53,7 @@ const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
  * needed so `MobileSearchBar`'s nav trigger can force this onto the
  * "navigate" tab, matching legacy's `mobNavTrig` handler.
  *
- * UI redesign (per UI_REDESIGN_GUIDE.md): the `admin` tab that legacy
+ * v2 redesign: the `admin` tab that legacy
  * added here (index.html ~1149, app.js ~5752–5759) has been removed from
  * this mobile tab strip — explicit product decision that Admin is a
  * desktop-only surface. `onAdminClick` stays a declared prop so MapPage's
@@ -159,7 +159,7 @@ export default function MobileSheet({
       // away). Both entry points now call `onNavLaunch` directly instead,
       // matching how Sidebar's/DesktopSearchBar's equivalent nav buttons
       // already behaved on desktop. `NavPanel` is no longer reachable
-      // from either — see this session's flag in UI_REDESIGN_GUIDE.md.
+      // from either.
       if (tab.key === 'navigate') {
         setActiveTab(null);
         setSheetState('peek');
@@ -213,9 +213,7 @@ export default function MobileSheet({
         aria-hidden={!panelOpen}
       >
         <div className={styles.body}>
-          {/* In-app redesign (per the person's explicit instruction, not
-              a UI_REDESIGN_GUIDE default — flagged in that doc's Section
-              7 table): the tab keyed 'layers' was already labeled
+          {/* In-app redesign (per the owner's explicit instruction): the tab keyed 'layers' was already labeled
               "Explore" (TABS above) but rendered LayersPanel — a leftover
               from the tab-strip-only pass that had no Figma reference
               for the panel body yet. This is that body, now that one
@@ -241,8 +239,7 @@ export default function MobileSheet({
           )}
         </div>
       </div>
-      {/* UI redesign (per UI_REDESIGN_GUIDE.md, Nav/GPS HUD session, Figma
-          node 4:429): navbar switches to its "in navigation" treatment
+      {/* v2 redesign (Figma node 4:429): navbar switches to its "in navigation" treatment
           while `navActive` is true — same bar, same tabs, just restyled,
           driven entirely by the `navActive` prop this component already
           received (see NavPanel below) and already threaded from MapPage.

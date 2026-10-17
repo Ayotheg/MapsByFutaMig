@@ -30,8 +30,7 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
  * → `panelNavigate`). Flagging rather than guessing a trigger or inventing
  * new UI not present in legacy; revisit if Slice 9 turns out to need it.
  *
- * UI_REDESIGN_GUIDE.md pass (earlier session, paired with MobileSearchBar
- * per the guide's pairing rule): the collapsed pill (`.bar`/`.pill` and
+ * v2 redesign (paired with MobileSearchBar): the collapsed pill (`.bar`/`.pill` and
  * its buttons/input) restyled to v2 light tokens, reusing the same
  * decisions just made for the mobile bar (glass pill, v2-primary nav
  * button, etc.) — no separate Figma frame was given for desktop, per

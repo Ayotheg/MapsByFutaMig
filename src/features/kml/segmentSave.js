@@ -5,14 +5,13 @@ import { supabase } from '../../lib/supabase';
  *
  * Re-targets legacy `saveToFbBtn`'s click handler (app.js ~2219–2302),
  * which wrote straight to Firebase (`window.db`, `firebase.firestore.
- * FieldValue.serverTimestamp()`). Per MIGRATION_PLAN.md's Slice 5 row:
+ * FieldValue.serverTimestamp()`). Per the migration plan:
  * "Re-target saveToFbBtn's Firebase write to a Supabase segments insert —
  * do not port window.db/firebase.firestore.FieldValue.serverTimestamp()
  * as-is." Also per CLAUDE.md: "Supabase only. Do not write any Firebase
  * code, even temporarily."
  *
- * Schema used matches `FIREBASE_TO_SUPABASE_MIGRATION.md`'s Step 0 SQL
- * (see useSegments.js's schema note for the full cross-check):
+ * Schema used (see useSegments.js's schema note):
  *   segments(id, name, description, category, distance_m, duration_ms,
  *            recorded_at, created_at)
  *   segment_points(id, segment_id, seq, lat, lng, accuracy, speed,
@@ -25,9 +24,7 @@ import { supabase } from '../../lib/supabase';
  * - No `imageUrls` array on `segments` — images upload to the
  *   `place-images` Storage bucket first, then one `segment_images` row
  *   per file (storage_path + position), same normalization Slice 2 used
- *   for waypoint photos. FIREBASE_TO_SUPABASE_MIGRATION.md's "important
- *   finding" section explicitly calls out base64-in-row as the anti-
- *   pattern to not reintroduce.
+ *   for waypoint photos. Never store base64 images in rows.
  * - No denormalized `segmentName` on the inserted waypoints (legacy wrote
  *   `segmentName: name` alongside `segmentId`) — the migration doc's
  *   "Decision to confirm" section already resolves this: join to

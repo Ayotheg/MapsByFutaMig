@@ -6,8 +6,6 @@
 - Machine-readable copy: [`design-system/tokens.json`](design-system/tokens.json)
 - In code, the colours are CSS variables in `src/styles/tokens-v2.css`.
 
-The older docs (`BRAND_GUIDELINES.md` for the v1 dark palette, `UI_REDESIGN_GUIDE.md` section 3 for v2 tokens) are history. Where they disagree with this file, this file wins.
-
 ## Colour — 16 brand colours
 
 Violet `#7c3aed` is the brand. Never invent a hex; if a Figma frame shows a colour close to one of these, use the token.
@@ -50,7 +48,13 @@ Rules:
 
 Styles in use: modal title 24/32 600 (display) · panel title 17 / 1.2 700 (display) · button 14 600, 0.14px tracking (ui) · item title 14 600 (ui) · body 16/24 (ui) · small body 12 / 1.35 (ui) · overline 11 500, 0.1em, uppercase (ui) · mono value 12 (mono).
 
-Approved alternates for new design and motion work: Satoshi, Plus Jakarta Sans, Geist, Manrope. They are **not bundled in the app**. Only add one when a screen actually uses it — `@fontsource-variable/*` for Plus Jakarta Sans, Geist and Manrope; Satoshi has no npm package, so self-host its `.woff2` (in the design system's files) via `@font-face` as `UI_REDESIGN_GUIDE.md` section 4 describes. Then add a `--v2-font-*` variable.
+Approved alternates for new design and motion work: Satoshi, Plus Jakarta Sans, Geist, Manrope. They are **not bundled in the app**. Any other font is not allowed without the user's approval.
+
+### Adding a font (only when a screen uses it, after the user approves)
+1. Plus Jakarta Sans, Geist, Manrope: `npm i @fontsource-variable/<name>`, then `@import` it in `src/index.css`.
+   Satoshi (no npm package): put its `.woff2` files in `src/assets/fonts/satoshi/` and declare `@font-face` with `font-display: swap`.
+2. Add a variable with a fallback in `tokens-v2.css`, e.g. `--v2-font-geist: 'Geist Variable', var(--font-ui);`.
+3. Components use the variable, never the font name.
 
 ## Icons and logos
 

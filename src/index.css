@@ -2,9 +2,8 @@
 @import "./styles/tokens.css";
 @import "./styles/tokens-v2.css";
 
-/* ── Self-hosted fonts (npm @fontsource packages — see SETUP_NOTES.md
-   for the exact install command). Weights match the legacy Google
-   Fonts <link> exactly. ─────────────────────────────────────────── */
+/* ── Self-hosted fonts (@fontsource). To add one, see DESIGN_SYSTEM.md
+   › Adding a font. ──────────────────────────────────────────────── */
 @import "@fontsource/inter/300.css";
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
@@ -102,7 +101,7 @@
  * sans-serif`. Neither font is imported anywhere in the legacy app
  * (not in the Google Fonts <link>, not elsewhere), so it was silently
  * falling back to the browser's generic sans-serif the entire time —
- * this looks like dead code, not intentional. BRAND_GUIDELINES.md
+ * this looks like dead code, not intentional. DESIGN_SYSTEM.md
  * documents --font-ui as the intended global UI font. I've used
  * --font-ui here since that matches the documented design system and
  * every actual component in the legacy CSS. Flag if you want the

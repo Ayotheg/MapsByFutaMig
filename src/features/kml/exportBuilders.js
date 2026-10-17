@@ -2,9 +2,7 @@
  * exportBuilders.js — GPX/KML/GeoJSON string builders + browser download.
  *
  * Ported verbatim from legacy `app.js` ~2124–2200 (`buildGPX`, `buildKML`,
- * `buildGeoJSON`, `downloadFile`). Re-targeted here (Slice 5) per
- * MIGRATION_PLAN.md's row-5 note: these were originally miscategorized
- * under Slice 4's line range, but their only caller (`processImportPipeline`
+ * `buildGeoJSON`, `downloadFile`). Lives here because their only caller (`processImportPipeline`
  * -> `openSaveModal` -> `doExport`) doesn't exist until this slice.
  */
 

@@ -167,8 +167,8 @@
 }
 
 .dropdown {
-  /* UI_REDESIGN_GUIDE.md pass (this session, paired with the mobile
-     overlay per the guide's pairing rule): moved off v1 dark glass onto
+  /* v2 redesign (paired with the mobile
+     overlay): moved off v1 dark glass onto
      v2 light tokens now that MobileSearchOverlay — which shares this
      exact list content via SearchDropdownList/SearchResultItem — is
      redesigned too. Resolves the flag this file's header comment left

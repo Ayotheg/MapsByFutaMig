@@ -10,7 +10,7 @@ import styles from './NavHud.module.css';
  * imperative injection-once dance in React, same call as every other
  * slice's "this was a DOM workaround, not a real requirement" cases.
  *
- * UI redesign (per UI_REDESIGN_GUIDE.md, Nav/GPS HUD session — Figma node
+ * v2 redesign (Figma node
  * 4:429 "NAVIGATION pANEL", fetched directly via the Figma MCP connection
  * once it was confirmed available): the HUD is now two separate floating
  * cards instead of one edge-to-edge dark bar — a top instruction card

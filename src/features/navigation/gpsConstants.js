@@ -10,8 +10,7 @@ export const SMOOTH_VEHICLE = 0.55;
 export const VEHICLE_SPEED_KMH = 15;
 export const TRAIL_MAX = 80;
 
-// UI redesign (per UI_REDESIGN_GUIDE.md, Nav/GPS HUD session — explicit
-// user-flagged bug fix, not a guessed default): the close "eye level" zoom
+// v2 redesign (explicit user-flagged bug fix, not a guessed default): the close "eye level" zoom
 // the map snaps to the moment turn-by-turn navigation starts. Previously
 // there was no fixed nav zoom at all — `startNavigation()` called
 // `map.fitBounds()` on the *whole route*, which on anything but a short

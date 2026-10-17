@@ -9,7 +9,7 @@
 //
 // `computeAmount` is the one place `days → ₦` happens — the backend
 // (create-promotion-checkout Edge Function, see
-// PROMOTE_PAYMENT_INTEGRATION.md) independently re-derives the same amount
+// docs/payments.md) independently re-derives the same amount
 // from the stored `days` column rather than trusting a client-sent total,
 // so this function existing client-side is for display/optimistic-UI only,
 // never the source of truth for what gets charged.

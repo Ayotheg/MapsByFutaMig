@@ -15,7 +15,7 @@ import { track } from '../../lib/analytics';
  *     window.POI_REVIEW.open(arrivedDest);
  *   }
  * — i.e. Slice 9's arrival detection, which doesn't exist yet
- * (MIGRATION_PLAN.md: Slice 8 "ties into Slice 9's arrival detection").
+ * (Slice 8 "ties into Slice 9's arrival detection").
  * Unlike Slice 5's KML import (which had a real-but-not-yet-built trigger
  * point — the admin panel — to stand in front of), there is no legacy
  * trigger for this modal other than nav arrival, so there's nothing to

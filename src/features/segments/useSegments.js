@@ -16,31 +16,13 @@ const CACHE_KEY = 'segments';
  *   - segColorIdx's module-level running counter for polyline colour —
  *     that's a rendering concern, handled in SegmentsLayer.jsx instead.
  *
- * ── SCHEMA — CORRECTED as of Slice 5, see verification note below ──────
- * Slice 4 flagged this as an unverified guess ("mirroring waypoints/
- * waypoint_images") because CLAUDE.md's schema-doc link still said "TBD".
- * That's true of CLAUDE.md, but a real schema design doc —
- * `FIREBASE_TO_SUPABASE_MIGRATION.md` — already exists in the repo (landed
- * in the Slice 2 commit, just never linked from CLAUDE.md/MIGRATION_PLAN's
- * "Supabase schema/RLS" row). Its `Step 0` SQL is the actual target schema
- * a human would run in the Supabase SQL Editor, so it's a materially better
- * source of truth than a guess, even though it's still unconfirmed against
- * a *live* database (no DB credentials available to this session — see
- * repo-root notes for how to confirm live). Cross-checking against it found
- * two real mismatches in Slice 4's assumption, both fixed here:
- *
+ * ── SCHEMA ──────────────────────────────────────────────────────────────
  *   1. There is no `points` jsonb column on `segments`. The GPS track is
  *      its own table, `segment_points (segment_id, seq, lat, lng,
- *      accuracy, speed, recorded_at)`, ordered by `seq`. Slice 4's `select`
- *      would have thrown ("column segments.points does not exist") the
- *      moment it ran against a real database built from that SQL.
- *   2. The distance/duration columns are named `distance_m` (metres) and
- *      `duration_ms` (milliseconds), not `distance`/`duration`. Same units
- *      Slice 4 already assumed (matching legacy's own `totalDistance`
- *      metres / `Date.now() - recStartTime` ms), just different column
- *      names. Shaped output below still exposes `distance`/`duration` to
- *      keep SegmentsLayer.jsx/DetailModal.jsx unchanged — only the
- *      Supabase-facing column names changed.
+ *      accuracy, speed, recorded_at)`, ordered by `seq`.
+ *   2. The distance/duration columns are `distance_m` (metres) and
+ *      `duration_ms` (milliseconds). Shaped output below exposes them as
+ *      `distance`/`duration` for SegmentsLayer.jsx/DetailModal.jsx.
  *
  * `segment_images (segment_id, storage_path, position)` — Slice 4's
  * assumption already matched this doc exactly, no change needed there.

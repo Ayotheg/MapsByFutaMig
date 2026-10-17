@@ -65,7 +65,7 @@ export default function NavDestPanel({
                     styling. Reusing the shared component would silently pick up
                     Slice 7's hover color instead of the nav panel's own, which is a
                     real (if small) visual regression from "pixel-identical
-                    continuity" — see BRAND_GUIDELINES.md. Kept feature-local. */}
+                    continuity". Kept feature-local. */}
                 {dropdownResults.map((r, i) => (
                   <div
                     key={r.id || `${r.lat}-${r.lng}-${i}`}

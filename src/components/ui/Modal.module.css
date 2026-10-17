@@ -5,15 +5,13 @@
  *
  * v2 (this session — Waypoint suggestion, Figma node 1:253): FIRST
  * modal screen redesigned, so this file now sets the v2 Modal contract
- * (Section 5 of UI_REDESIGN_GUIDE.md) that every later modal session
+ * that every later modal session
  * (Auth modal, Review modal, Admin panel's AdminEditModal, plus
  * SaveModal/DetailModal which also reuse this shell) inherits for the
  * overlay/header/close/footer chrome — same "first session sets it"
  * precedent the Loading Screen established for the palette. Those
  * screens' own body content (their own .module.css files) is untouched
- * and stays on v1 styling until their own session runs — see this
- * session's flag in UI_REDESIGN_GUIDE.md for what that means visually
- * in the meantime.
+ * and stays on v1 styling until it is redesigned.
  *
  * `.btnPrimary` = Section 5's "Button — Primary" contract.
  * `.btnOutlined` is new: Section 5's "Button — Outlined" contract,

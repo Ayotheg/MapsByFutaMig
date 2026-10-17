@@ -1,9 +1,7 @@
 -- ── Promote — payment half (supabase/promotions.sql) ────────────────────
 --
 -- File-per-feature convention (same as waypoint_submissions.sql,
--- quick_chips.sql, analytics.sql) — not appended to
--- FIREBASE_TO_SUPABASE_MIGRATION.md, which stopped being the live schema
--- doc after Slice 10 per that file's own note.
+-- quick_chips.sql, analytics.sql).
 --
 -- Deliberately a NEW table, not a repurposing of `waypoints`:
 -- `waypoints.status` ('pending'/'approved'/'rejected', waypoint_submissions.sql)
@@ -21,7 +19,7 @@
 --    none of them are auto-applied, confirmed by grep (no migrations/
 --    directory, no CI step references these files).
 -- 2. Deploy the two Edge Functions under supabase/functions/ (see
---    PROMOTE_PAYMENT_INTEGRATION.md §4 for the exact CLI commands + the
+--    docs/payments.md for the functions + the
 --    secrets they need — those are NOT set by this SQL file).
 -- 3. Create the `promotion-images` Storage bucket if it doesn't already
 --    exist as a variant of `place-images` — see the "Storage" note near
