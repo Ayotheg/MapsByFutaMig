@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, TriangleAlert, X } from 'lucide-react';
 import L from 'leaflet';
+import './leafletGlobal';
+import 'leaflet-rotate';
 import styles from './MapShell.module.css';
 
 // ── Ported 1:1 from legacy app.js lines ~55–98 (feature/login2) ──────────
@@ -59,6 +61,15 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       // box the moment they leave it.
       minZoom: 5,
       maxZoom: 19,
+
+      // leaflet-rotate: navigation turns the map so the route ahead points
+      // up (NavigationController's setBearing). No rotate gestures or
+      // built-in control — the nav compass button is the only switch.
+      rotate: true,
+      bearing: 0,
+      rotateControl: false,
+      touchRotate: false,
+      shiftKeyRotate: false,
 
       preferCanvas: true,
 

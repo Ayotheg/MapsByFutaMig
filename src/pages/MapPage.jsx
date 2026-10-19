@@ -46,6 +46,7 @@ import AdminPanel from '../features/admin/AdminPanel';
 import SuggestWaypointModal from '../features/waypoint-submissions/SuggestWaypointModal';
 import MyWaypointSubmissionsPanel from '../features/waypoint-submissions/MyWaypointSubmissionsPanel';
 import MapPickBanner from '../features/map/MapPickBanner';
+import { WP_TYPE_LABELS } from '../features/waypoints/wpTypeMeta';
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
 // data — see the comment where it's used below for why this stays a
@@ -683,7 +684,9 @@ export default function MapPage({ onReadinessChange }) {
         cachedAt={cachedAt}
         onRetry={handleRetryData}
       />
-      {map && (
+      {/* Pins hide during a trip (the map turns with the route, and the
+          "Nearby places" list in NavigationController replaces them). */}
+      {map && !navActive && (
         <WaypointLayer
           map={map}
           waypoints={waypoints}
@@ -693,7 +696,7 @@ export default function MapPage({ onReadinessChange }) {
           badgeMerges={osmBadgeMerges}
         />
       )}
-      {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleMapPinSelect} />}
+      {map && !navActive && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleMapPinSelect} />}
       {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
       <PlaceCard
         data={selected}
@@ -821,6 +824,23 @@ export default function MapPage({ onReadinessChange }) {
           }}
           onActiveChange={setNavActive}
           placeCardOpen={!!selected}
+          waypoints={waypoints}
+          selectedPlace={selected}
+          onNearbySelect={(wp) =>
+            // Same card data WaypointLayer builds for a pin tap.
+            handleSelectPlace({
+              name: wp.name,
+              badge: WP_TYPE_LABELS[wp.type] || 'Waypoint',
+              description: wp.description,
+              lat: wp.lat,
+              lng: wp.lng,
+              imageUrls: wp.imageUrls,
+              id: wp.id,
+              type: wp.type,
+              avgRating: wp.avgRating,
+              reviewCount: wp.reviewCount,
+            })
+          }
           onStartingChange={(starting) => {
             navStartingRef.current = starting;
           }}
