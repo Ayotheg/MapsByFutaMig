@@ -11,6 +11,14 @@
   align-items: flex-end;
   gap: 10px;
 }
+/* Short screens (phones in landscape): the instruction card and the
+   distance card leave no room between them, so the controls step aside
+   rather than slide under the instruction card. */
+@media (max-height: 520px) {
+  .stack {
+    display: none;
+  }
+}
 
 .roundBtn {
   position: relative;
@@ -20,10 +28,8 @@
   width: 44px;
   height: 44px;
   border-radius: var(--r-full);
-  border: 1px solid rgba(209, 213, 219, 0.6);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--v2-divider);
+  background: var(--v2-on-primary);
   box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.15);
   color: var(--v2-primary);
   cursor: pointer;
@@ -31,6 +37,10 @@
 }
 .roundBtn:active {
   transform: scale(0.94);
+}
+.roundBtn:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
 }
 
 /* Compass: the arrow + N rotate with the map so they always point north. */
@@ -48,17 +58,13 @@
   font-weight: 700;
   margin-top: -1px;
 }
-.northUp {
-  background: var(--v2-primary);
-  border-color: var(--v2-primary);
-  color: var(--v2-on-primary);
-}
-
+.northUp,
 .nearbyBtnOpen {
   background: var(--v2-primary);
   border-color: var(--v2-primary);
   color: var(--v2-on-primary);
 }
+
 .badge {
   position: absolute;
   top: -4px;
@@ -69,15 +75,15 @@
   border-radius: var(--r-full);
   background: var(--v2-primary);
   color: var(--v2-on-primary);
-  border: 2px solid #ffffff;
-  font-family: var(--font-ui);
+  border: 2px solid var(--v2-on-primary);
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 14px;
   text-align: center;
 }
 .nearbyBtnOpen .badge {
-  background: #ffffff;
+  background: var(--v2-on-primary);
   color: var(--v2-primary);
   border-color: var(--v2-primary);
 }
@@ -98,17 +104,19 @@
 }
 
 /* Panel opens to the left of the buttons, growing from the "⋯" button.
-   max-height keeps its top below NavHud's instruction card (~170px). */
+   Its top stays below NavHud's instruction card (~175px with both the
+   "up next" and remaining-distance strips): stack bottom (196px) +
+   this max-height + ~194px = the full viewport height. */
 .panel {
   position: absolute;
   right: 56px;
   bottom: 0;
   width: min(280px, calc(100vw - 88px));
-  max-height: max(150px, calc(100dvh - var(--mob-safe-top) - var(--mob-safe-bottom) - 380px));
+  max-height: calc(100dvh - var(--mob-safe-top) - var(--mob-safe-bottom) - 390px);
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  border: 1px solid rgba(209, 213, 219, 0.4);
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
   border-radius: var(--r-2xl);
   box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.18);
   overflow: hidden;
@@ -124,12 +132,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 12px 8px 16px;
-  border-bottom: 1px solid #dae2fd;
+  border-bottom: 1px solid var(--v2-divider);
 }
 .panelTitle {
   font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 700;
   color: var(--v2-neutral);
 }
 .panelClose {
@@ -137,8 +146,8 @@
   padding: 6px;
   border: none;
   border-radius: var(--r-full);
-  background: var(--v2-icon-btn-bg);
-  color: var(--v2-neutral);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
   cursor: pointer;
 }
 .list {
@@ -158,8 +167,10 @@
   text-align: left;
   cursor: pointer;
 }
-.item:active {
-  background: var(--v2-icon-btn-bg);
+.item:active,
+.item:focus-visible {
+  background: var(--v2-primary-tint);
+  outline: none;
 }
 .itemIcon {
   display: flex;
@@ -169,7 +180,7 @@
   height: 30px;
   flex-shrink: 0;
   border-radius: var(--r-lg);
-  background: var(--v2-icon-btn-bg);
+  background: var(--v2-primary-tint);
   color: var(--v2-primary);
 }
 .itemText {
@@ -179,7 +190,7 @@
 }
 .itemName {
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--v2-neutral);
   white-space: nowrap;
@@ -189,14 +200,18 @@
 .itemMeta {
   font-family: var(--font-ui);
   font-size: 12px;
-  color: var(--v2-text-variant);
+  line-height: 1.35;
+  color: var(--v2-text-muted);
+}
+.itemDist {
+  font-family: var(--font-mono);
 }
 .empty {
   padding: 14px 16px 16px;
   font-family: var(--font-ui);
   font-size: 12px;
-  line-height: 1.45;
-  color: var(--v2-text-variant);
+  line-height: 1.35;
+  color: var(--v2-text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

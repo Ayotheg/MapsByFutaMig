@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import './waypointMarkers.css';
 import { buildWaypointMarker } from './waypointMarkers';
-import { WP_TYPE_LABELS } from './wpTypeMeta';
+import { waypointCardData } from './placeCardData';
 
 const MARKER_GAP = 8;
 const OFFSET_CANDIDATES = [
@@ -123,19 +123,7 @@ export default function WaypointLayer({ map, waypoints, isTypeVisible, onSelect,
     const entries = placeWaypoints.map((wp) => {
       const marker = buildWaypointMarker(wp.lat, wp.lng, wp.name, wp.type);
       marker._rendered = false;
-      marker._placeCardOpts = {
-        name: wp.name,
-        badge: WP_TYPE_LABELS[wp.type] || 'Waypoint',
-        description: wp.description,
-        lat: wp.lat,
-        lng: wp.lng,
-        imageUrls: wp.imageUrls,
-        id: wp.id,
-        type: wp.type,
-        // Slice 8: rating badge data — see PlaceCard.jsx's RatingBadge.
-        avgRating: wp.avgRating,
-        reviewCount: wp.reviewCount,
-      };
+      marker._placeCardOpts = waypointCardData(wp);
       marker.on('click', (e) => {
         // Leaflet bubbles marker clicks up to the map's own 'click' event
         // unless explicitly stopped here — matches legacy's

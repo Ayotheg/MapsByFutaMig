@@ -84,7 +84,7 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  * itself already uses — never gates the panel on a permission prompt.
  */
 const NavigationController = forwardRef(function NavigationController(
-  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, waypoints, onNearbySelect, selectedPlace },
+  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
   ref
 ) {
   // startNavigation() awaits GPS + routing; if this controller unmounts in
@@ -155,32 +155,77 @@ const NavigationController = forwardRef(function NavigationController(
   const [compassAngle, setCompassAngle] = useState(0);
   const compassAngleRef = useRef(0);
   const bearingAnimRef = useRef(null);
+  const bearingTargetRef = useRef(0);
+  const lastHeadingRef = useRef(null);
   const [nearby, setNearby] = useState([]);
-  const waypointsRef = useRef(waypoints);
-  waypointsRef.current = waypoints;
-  const routeCumRef = useRef({ coords: null, cum: null });
+  const nearbySigRef = useRef('');
+  const candidatesRef = useRef(nearbyCandidates);
+  candidatesRef.current = nearbyCandidates;
+  // Per-route cache: cumulative distances + how far along each turn is.
+  const routeCumRef = useRef({ coords: null, cum: null, stepAlong: null });
 
   const rotateMapTo = useCallback(
     (target, { force = false } = {}) => {
       if (!map.setBearing) return;
-      const start = map.getBearing();
-      const delta = ((((target - start) % 360) + 540) % 360) - 180;
+      const norm = (a) => ((((a % 360) + 540) % 360) - 180);
       // Small wobbles in the road shouldn't nudge the map every fix.
-      if (!force && Math.abs(delta) < 8) return;
-      cancelAnimationFrame(bearingAnimRef.current);
-      compassAngleRef.current += delta;
+      if (!force && Math.abs(norm(target - bearingTargetRef.current)) < 8) return;
+      bearingTargetRef.current = target;
+      // The compass follows the target, not the map's mid-turn angle, so an
+      // interrupted turn can't leave it pointing off north.
+      compassAngleRef.current += norm(target - compassAngleRef.current);
       setCompassAngle(compassAngleRef.current);
+
+      cancelAnimationFrame(bearingAnimRef.current);
+      const start = map.getBearing();
+      const delta = norm(target - start);
+      const userEl = navUserMarkerRef.current?.getElement();
+      const finish = () => {
+        bearingAnimRef.current = null;
+        if (userEl) userEl.style.transition = 'transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        // iOS tile layers only update on moveend (updateWhenIdle), which a
+        // turn doesn't fire — load the newly exposed corners now.
+        map.eachLayer((layer) => {
+          if (layer instanceof L.GridLayer) layer._update?.();
+        });
+        // The pan that ran alongside the turn was aimed at the old angle.
+        const pos = navUserPosRef.current;
+        if (navActiveRef.current && pos && !map._userInteracting && !placeCardOpenRef.current) {
+          map.panTo([pos.lat, pos.lng], { animate: true, duration: 0.4 });
+        }
+      };
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        map.setBearing(target);
+        finish();
+        return;
+      }
+      // The user dot's own 1.2s position transition would trail the turn.
+      if (userEl) userEl.style.transition = 'none';
       const t0 = performance.now();
       const duration = 600;
       const step = (now) => {
+        // The map may have been removed (left the page mid-turn).
+        if (!map._mapPane) {
+          bearingAnimRef.current = null;
+          return;
+        }
         const k = Math.min(1, (now - t0) / duration);
         map.setBearing(start + delta * (1 - (1 - k) ** 3));
-        bearingAnimRef.current = k < 1 ? requestAnimationFrame(step) : null;
+        if (k < 1) bearingAnimRef.current = requestAnimationFrame(step);
+        else finish();
       };
       bearingAnimRef.current = requestAnimationFrame(step);
     },
     [map]
   );
+
+  /** Jump an in-progress turn to its end (before panning to a place). */
+  const settleRotation = useCallback(() => {
+    if (!bearingAnimRef.current) return;
+    cancelAnimationFrame(bearingAnimRef.current);
+    bearingAnimRef.current = null;
+    if (map._mapPane) map.setBearing(bearingTargetRef.current);
+  }, [map]);
 
   const navDestRef = useRef(persistedNavigation?.dest || persistedDestination || null); // {lat,lng,name,id,type}
   const navModeRef = useRef(persistedNavigation?.mode || 'foot-walking');
@@ -598,35 +643,41 @@ const NavigationController = forwardRef(function NavigationController(
 
     // Route geometry for the turning map and the Nearby places list.
     if (routeCumRef.current.coords !== routeData.coords) {
-      routeCumRef.current = { coords: routeData.coords, cum: cumulativeDistances(routeData.coords) };
+      routeCumRef.current = {
+        coords: routeData.coords,
+        cum: cumulativeDistances(routeData.coords),
+        stepAlong: steps.map((s) => {
+          if (!s.location) return null;
+          const p = routePosition(routeData.coords, s.location[0], s.location[1]);
+          return p.distanceTotal - p.distanceRemaining;
+        }),
+      };
     }
-    const { cum } = routeCumRef.current;
+    const { cum, stepAlong } = routeCumRef.current;
     const along = routePos.distanceTotal - routePos.distanceRemaining;
+    lastHeadingRef.current = headingAhead(routeData.coords, cum, along);
     if (routeUpRef.current && !map._userInteracting && !placeCardOpenRef.current) {
-      rotateMapTo(-headingAhead(routeData.coords, cum, along));
+      rotateMapTo(-lastHeadingRef.current);
     }
     // "The road you're on": from here to the next turn (at least 150 m so
     // the list isn't empty just before a turn, at most 600 m).
     let legEnd = Infinity;
     for (let i = navStepIndexRef.current; i < steps.length; i++) {
-      if (!steps[i].location) continue;
-      const stepPos = routePosition(routeData.coords, steps[i].location[0], steps[i].location[1]);
-      const stepAlong = stepPos.distanceTotal - stepPos.distanceRemaining;
-      if (stepAlong > along + 20) {
-        legEnd = stepAlong;
+      if (stepAlong[i] != null && stepAlong[i] > along + 20) {
+        legEnd = stepAlong[i];
         break;
       }
     }
     legEnd = Math.min(Math.max(legEnd, along + 150), along + 600, cum[cum.length - 1]);
-    setNearby(
-      placesAlong(
-        routeData.coords,
-        cum,
-        along,
-        legEnd,
-        (waypointsRef.current || []).filter((wp) => wp.id !== dest.id)
-      )
-    );
+    const candidates = (candidatesRef.current || []).filter((c) => dest.id == null || c.id !== dest.id);
+    const nextNearby = placesAlong(routeData.coords, cum, along, legEnd, candidates);
+    // Only re-render the list when it meaningfully changed (not every fix),
+    // so it doesn't shuffle under the user's finger.
+    const sig = nextNearby.map((n) => `${n.place.key}:${n.side}:${Math.round(n.ahead / 10)}`).join('|');
+    if (sig !== nearbySigRef.current) {
+      nearbySigRef.current = sig;
+      setNearby(nextNearby);
+    }
 
     if (navStepIndexRef.current !== lastSpokenStepRef.current) {
       lastSpokenStepRef.current = navStepIndexRef.current;
@@ -949,6 +1000,8 @@ const NavigationController = forwardRef(function NavigationController(
     navGpsStaleTimerRef.current = null;
 
     rotateMapTo(0, { force: true });
+    lastHeadingRef.current = null;
+    nearbySigRef.current = '';
     setNearby([]);
 
     setHud({
@@ -1046,27 +1099,29 @@ const NavigationController = forwardRef(function NavigationController(
   );
 
   // ── Nearby places / compass handlers ──────────────────────────────
-  const [isMobile] = useState(() => window.innerWidth <= 768);
-
+  // Only turns the map — re-running updateHUD here would also count as a
+  // GPS tick (arrival/off-route counters).
   const handleToggleRouteUp = useCallback(() => {
     const next = !routeUpRef.current;
     routeUpRef.current = next;
     setRouteUp(next);
-    if (next) updateHUD();
-    else rotateMapTo(0, { force: true });
-  }, [updateHUD, rotateMapTo]);
+    if (!next) rotateMapTo(0, { force: true });
+    else if (lastHeadingRef.current != null) rotateMapTo(-lastHeadingRef.current, { force: true });
+  }, [rotateMapTo]);
 
   const handleNearbySelect = useCallback(
     (place) => {
       onNearbySelect?.(place);
+      // A turn still running would move the place off the pan target.
+      settleRotation();
       // Bring the place into the open part of the screen: above the card on
-      // phones (bottom slot), right of it on desktop (bottom-left).
+      // phones (bottom slot), right of the 380px card on desktop.
       const point = map.latLngToContainerPoint([Number(place.lat), Number(place.lng)]);
       const size = map.getSize();
-      const target = isMobile ? [size.x * 0.5, size.y * 0.36] : [size.x * 0.6, size.y * 0.45];
+      const target = isMobile ? [size.x * 0.5, size.y * 0.36] : [396 + (size.x - 396) / 2, size.y * 0.45];
       map.panBy([point.x - target[0], point.y - target[1]], { animate: true });
     },
-    [map, onNearbySelect, isMobile]
+    [map, onNearbySelect, isMobile, settleRotation]
   );
 
   // Waypoint pins are hidden during a trip (MapPage), so mark the place

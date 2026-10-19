@@ -101,6 +101,6 @@
   height: 18px;
   border-radius: 50%;
   background: var(--v2-primary);
-  border: 3px solid #ffffff;
+  border: 3px solid var(--v2-on-primary);
   box-shadow: 0 0 0 4px var(--v2-primary-outline), 0 2px 6px rgba(15, 23, 42, 0.3);
 }

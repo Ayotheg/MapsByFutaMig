@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import '../waypoints/waypointMarkers.css';
 import { buildWaypointMarker } from '../waypoints/waypointMarkers';
+import { osmCardData } from '../waypoints/placeCardData';
 
 /**
  * Renders every non-duplicate OSM item (already deduped by
@@ -26,15 +27,7 @@ export default function OSMAnnotationLayer({ map, items, onSelect }) {
 
     const markers = items.map((item) => {
       const marker = buildWaypointMarker(item.lat, item.lng, item.name, 'poi');
-      marker._placeCardOpts = {
-        name: item.name,
-        badge: item.badge,
-        description: item.desc,
-        lat: item.lat,
-        lng: item.lng,
-        imageUrls: [],
-        type: 'poi',
-      };
+      marker._placeCardOpts = osmCardData(item);
       marker.on('click', (e) => {
         L.DomEvent.stopPropagation(e);
         onSelect(marker._placeCardOpts);

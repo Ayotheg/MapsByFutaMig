@@ -90,3 +90,9 @@
    label at far/mid/near zoom anyway; this just extends that same
    "dot-only" look to close zoom too, driven by mode instead of zoom. */
 body.raw-mode .gm-pin-label { display: none !important; }
+/* During a trip pins are hidden (MapPage sets body.nav-active) — the
+   mid-trip "Nearby places" list replaces them. Hidden rather than removed
+   so ending the trip doesn't rebuild every marker. */
+body.nav-active .gm-pin-wrap {
+  display: none;
+}

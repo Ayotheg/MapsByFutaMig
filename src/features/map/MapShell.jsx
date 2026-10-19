@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, TriangleAlert, X } from 'lucide-react';
 import L from 'leaflet';
-import './leafletGlobal';
+import { LeafletTouchZoom } from './leafletGlobal';
 import 'leaflet-rotate';
 import styles from './MapShell.module.css';
 
@@ -77,6 +77,10 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       markerZoomAnimation: !IS_SAFARI_IOS,
     });
     mapRef.current = map;
+    // Keep only leaflet-rotate's pinch-zoom (see leafletGlobal.js).
+    map._handlers.forEach((h) => {
+      if (h instanceof LeafletTouchZoom && h !== map.touchZoom) h.disable();
+    });
 
     // ── Hide +/- zoom buttons on mobile (pinch-to-zoom is the native gesture)
     if (window.innerWidth <= 768) map.zoomControl.remove();

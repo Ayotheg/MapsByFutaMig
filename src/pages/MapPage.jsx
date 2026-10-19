@@ -46,7 +46,7 @@ import AdminPanel from '../features/admin/AdminPanel';
 import SuggestWaypointModal from '../features/waypoint-submissions/SuggestWaypointModal';
 import MyWaypointSubmissionsPanel from '../features/waypoint-submissions/MyWaypointSubmissionsPanel';
 import MapPickBanner from '../features/map/MapPickBanner';
-import { WP_TYPE_LABELS } from '../features/waypoints/wpTypeMeta';
+import { osmCardData, waypointCardData } from '../features/waypoints/placeCardData';
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
 // data — see the comment where it's used below for why this stays a
@@ -157,6 +157,30 @@ export default function MapPage({ onReadinessChange }) {
     [waypoints, kmlAnnotations]
   );
   const { items: osmItems, snaps: osmSnaps, badgeMerges: osmBadgeMerges } = useOSMAnnotations(dedupIndex);
+  // Everything the map shows as a pin, in the shape the mid-trip "Nearby
+  // places" list needs: snapped position + the same card data a pin tap
+  // opens.
+  const nearbyCandidates = useMemo(
+    () => [
+      ...waypoints
+        .filter((wp) => !wp.isPerson && !wp.isChannel && !wp.isBusiness && wp.lat != null && wp.lng != null)
+        .map((wp) => {
+          const key = `waypoint:${wp.id}`;
+          const card = waypointCardData(wp, osmSnaps?.[key], osmBadgeMerges?.[key]);
+          return { key, id: wp.id, name: wp.name, type: wp.type, lat: card.lat, lng: card.lng, card };
+        }),
+      ...osmItems.map((item) => ({
+        key: `osm:${item.name}:${item.lat}:${item.lng}`,
+        id: null,
+        name: item.name,
+        type: 'poi',
+        lat: item.lat,
+        lng: item.lng,
+        card: osmCardData(item),
+      })),
+    ],
+    [waypoints, osmItems, osmSnaps, osmBadgeMerges]
+  );
   const { viewMode, toggle: toggleViewMode, setViewMode } = useViewMode();
 
   const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations });
@@ -684,9 +708,10 @@ export default function MapPage({ onReadinessChange }) {
         cachedAt={cachedAt}
         onRetry={handleRetryData}
       />
-      {/* Pins hide during a trip (the map turns with the route, and the
-          "Nearby places" list in NavigationController replaces them). */}
-      {map && !navActive && (
+      {/* Pins are hidden during a trip by CSS (body.nav-active, see
+          waypointMarkers.css) — the "Nearby places" list replaces them.
+          Kept mounted so ending a trip doesn't rebuild every marker. */}
+      {map && (
         <WaypointLayer
           map={map}
           waypoints={waypoints}
@@ -696,7 +721,7 @@ export default function MapPage({ onReadinessChange }) {
           badgeMerges={osmBadgeMerges}
         />
       )}
-      {map && !navActive && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleMapPinSelect} />}
+      {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleMapPinSelect} />}
       {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
       <PlaceCard
         data={selected}
@@ -824,23 +849,10 @@ export default function MapPage({ onReadinessChange }) {
           }}
           onActiveChange={setNavActive}
           placeCardOpen={!!selected}
-          waypoints={waypoints}
+          nearbyCandidates={nearbyCandidates}
           selectedPlace={selected}
-          onNearbySelect={(wp) =>
-            // Same card data WaypointLayer builds for a pin tap.
-            handleSelectPlace({
-              name: wp.name,
-              badge: WP_TYPE_LABELS[wp.type] || 'Waypoint',
-              description: wp.description,
-              lat: wp.lat,
-              lng: wp.lng,
-              imageUrls: wp.imageUrls,
-              id: wp.id,
-              type: wp.type,
-              avgRating: wp.avgRating,
-              reviewCount: wp.reviewCount,
-            })
-          }
+          onNearbySelect={(place) => handleSelectPlace(place.card)}
+          isMobile={isMobile}
           onStartingChange={(starting) => {
             navStartingRef.current = starting;
           }}

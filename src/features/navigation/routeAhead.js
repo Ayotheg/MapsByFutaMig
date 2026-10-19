@@ -1,4 +1,4 @@
-import { haversine } from '../../lib/geoUtils';
+import { haversine } from '../../lib/geoUtils.js';
 
 // Route geometry for the rotating nav map and the "Nearby places" list.
 // `coords` is the route polyline as [lat, lng] pairs (fetchRoute's shape).
@@ -94,7 +94,10 @@ export function placesAlong(coords, cum, from, to, places, { maxOffset = 35, lim
       const dx = s.b.x - s.a.x;
       const dy = s.b.y - s.a.y;
       const den = dx * dx + dy * dy;
-      const t = den ? Math.max(0, Math.min(1, ((p.x - s.a.x) * dx + (p.y - s.a.y) * dy) / den)) : 0;
+      // Repeated route points give a zero-length segment with no direction
+      // (its cross product is always 0, i.e. a wrong "right").
+      if (den === 0) continue;
+      const t = Math.max(0, Math.min(1, ((p.x - s.a.x) * dx + (p.y - s.a.y) * dy) / den));
       const offset = Math.hypot(p.x - (s.a.x + dx * t), p.y - (s.a.y + dy * t));
       const along = s.start + s.len * t;
       if (offset > maxOffset || along < from || along > to) continue;
