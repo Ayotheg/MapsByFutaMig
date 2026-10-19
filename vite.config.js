@@ -34,6 +34,10 @@ export default defineConfig({
     rolldownOptions: {
       output: {
         manualChunks(id) {
+          // leaflet-rotate (in the leaflet chunk) reads the global `L` as
+          // soon as it runs, so the file that sets `window.L` must sit in
+          // that same chunk — in an app chunk it would run too late.
+          if (id.includes('leafletGlobal')) return 'leaflet';
           if (!id.includes('node_modules')) return undefined;
           if (id.includes('leaflet')) return 'leaflet';
           if (id.includes('@supabase')) return 'supabase';
