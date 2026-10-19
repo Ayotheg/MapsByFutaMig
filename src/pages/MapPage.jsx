@@ -352,13 +352,19 @@ export default function MapPage({ onReadinessChange }) {
   // `handleNavLaunch`/`handleGuestNavBlocked` already guarantee nav can't
   // even start while that modal is what's blocking it. Flagged for a
   // future session rather than guessed at if that turns out wrong.
+  const wasNavActiveRef = useRef(false);
   useEffect(() => {
     if (navActive) {
       setSelected(null);
       setSelectedSegmentId(null);
       setActiveChip(null);
       setMobileSearchOpen(false);
+    } else if (wasNavActiveRef.current) {
+      // A card opened mid-trip uses the trip layout; close it when the trip
+      // ends rather than letting it jump to the normal one.
+      setSelected(null);
     }
+    wasNavActiveRef.current = navActive;
   }, [navActive]);
 
   // The desktop sidebar is hidden during nav; the map stretches over its

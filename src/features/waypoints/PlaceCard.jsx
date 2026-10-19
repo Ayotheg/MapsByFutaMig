@@ -119,7 +119,9 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
   // those other components: swap the anchor via inline style.
   const cardStyle = {};
   if (dragY) {
-    cardStyle.transform = `translateY(${dragY}px)`;
+    // In trip mode the open card sits lifted by --nav-card-lift (CSS).
+    cardStyle.transform =
+      duringNav && isMobile ? `translateY(calc(${dragY}px - var(--nav-card-lift)))` : `translateY(${dragY}px)`;
     cardStyle.transition = 'none';
   }
   if (collapsed) {

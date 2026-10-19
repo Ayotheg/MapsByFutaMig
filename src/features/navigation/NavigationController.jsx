@@ -139,6 +139,8 @@ const NavigationController = forwardRef(function NavigationController(
   // comment on `guestNavBlocked`).
   const guestNavBlockedRef = useRef(false);
   guestNavBlockedRef.current = guestNavBlocked;
+  const placeCardOpenRef = useRef(false);
+  placeCardOpenRef.current = placeCardOpen;
 
   const navDestRef = useRef(persistedNavigation?.dest || persistedDestination || null); // {lat,lng,name,id,type}
   const navModeRef = useRef(persistedNavigation?.mode || 'foot-walking');
@@ -619,7 +621,8 @@ const NavigationController = forwardRef(function NavigationController(
 
     setHud((h) => ({ ...h, ...nextHud }));
 
-    if (!map._userInteracting) map.panTo([lat, lng], { animate: true, duration: 0.6 });
+    // Don't pull the map back to the user while they're looking at a place.
+    if (!map._userInteracting && !placeCardOpenRef.current) map.panTo([lat, lng], { animate: true, duration: 0.6 });
   }, [map, drawRoute, speak, arrivedAtDestination, maybeReroute]);
 
   // ── Single entry point for every GPS fix, live or resumed-from-

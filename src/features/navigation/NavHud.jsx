@@ -59,6 +59,16 @@ export default function NavHud({ arriving, arrived, turnIcon, turnInstruction, t
             <span className={styles.nextText}>{nextPreview}</span>
           </div>
         )}
+
+        {/* The distance card is hidden while a place card fills its slot,
+            so the remaining distance moves up here. */}
+        {hideDistance && (
+          <div className={`${styles.nextPreview} ${styles.remainStrip}`}>
+            <span className={styles.remainLabel}>LEFT</span>
+            <span className={styles.remainVal}>{distRemain}</span>
+            <span className={styles.nextText}>{destName}</span>
+          </div>
+        )}
       </div>
 
       {/* A place card opened mid-trip takes this slot (PlaceCard's navMode). */}

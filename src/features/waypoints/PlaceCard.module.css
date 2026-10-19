@@ -95,23 +95,36 @@
 .card.navMode {
   z-index: 2150;
   overflow-y: auto;
+  padding-bottom: 12px;
 }
+/* Mobile: stays anchored at bottom: 0 like the normal sheet (so the closed
+   card is fully off-screen and switching into trip mode never shows it);
+   only the open state lifts it into the distance card's slot. */
 .card.navMode:not(.desktop) {
+  --nav-card-lift: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom) + 12px);
   left: 12px;
   right: 12px;
-  bottom: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom) + 12px);
-  max-height: 46vh;
+  /* Top edge stays below the HUD's instruction card (up to ~165px with its
+     "up next" and remaining-distance strips), also on short/landscape
+     screens. */
+  max-height: min(46vh, calc(100dvh - var(--nav-card-lift) - 185px - var(--mob-safe-top)));
   border-radius: var(--r-2xl);
-  transform: translateY(calc(100% + var(--mob-sheet-peek) + 48px));
 }
 .card.navMode:not(.desktop).visible {
-  transform: translateY(0);
+  transform: translateY(calc(-1 * var(--nav-card-lift)));
+}
+/* The card scrolls as a whole here; keep the swipe-to-close handle in view. */
+.card.navMode .handle {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--v2-surface);
 }
 .card.desktop.navMode {
   left: 16px;
   bottom: 16px;
   /* Clears the full-width instruction card at the top. */
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 220px);
 }
 .card.navMode .hero {
   height: 120px;

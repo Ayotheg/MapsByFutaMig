@@ -165,6 +165,27 @@
   text-overflow: ellipsis;
 }
 
+/* Remaining distance, shown here only while a place card hides .distCard. */
+.remainStrip {
+  background: transparent;
+  border-top: 1px solid #dae2fd;
+}
+.remainLabel {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--v2-text-variant);
+  flex-shrink: 0;
+}
+.remainVal {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--v2-primary);
+  flex-shrink: 0;
+}
+
 /* ── Distance card — a separate floating card near the tab bar rather than
    stacked under the top card. Splitting the two leaves a clear band of
    map in the middle of the screen (this session's spacing fix — see the
