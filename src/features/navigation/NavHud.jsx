@@ -31,7 +31,7 @@ import styles from './NavHud.module.css';
  * the second FAB would duplicate `MobFabCluster`'s existing locate
  * button. Flagged in the guide rather than guessed at.
  */
-export default function NavHud({ arriving, arrived, turnIcon, turnInstruction, turnDist, nextPreview, distRemain, destName, voiceEnabled, onToggleVoice, onClose }) {
+export default function NavHud({ arriving, arrived, turnIcon, turnInstruction, turnDist, nextPreview, distRemain, destName, voiceEnabled, onToggleVoice, onClose, hideDistance }) {
   const TurnIcon = LEGACY_ICON_MAP[turnIcon] || LEGACY_ICON_MAP['arrow-up'];
   return (
     <>
@@ -61,11 +61,14 @@ export default function NavHud({ arriving, arrived, turnIcon, turnInstruction, t
         )}
       </div>
 
-      <div className={styles.distCard}>
-        <div className={styles.distLabel}>DISTANCE REMAINING</div>
-        <div className={styles.distVal}>{distRemain}</div>
-        <div className={styles.destName}>{destName}</div>
-      </div>
+      {/* A place card opened mid-trip takes this slot (PlaceCard's navMode). */}
+      {!hideDistance && (
+        <div className={styles.distCard}>
+          <div className={styles.distLabel}>DISTANCE REMAINING</div>
+          <div className={styles.distVal}>{distRemain}</div>
+          <div className={styles.destName}>{destName}</div>
+        </div>
+      )}
     </>
   );
 }

@@ -63,7 +63,7 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  *    with the existing rating indicator instead, side by side, to match
  *    the visual pattern without inventing a new data field.
  */
-export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobile }) {
+export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobile, duringNav }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [dragY, setDragY] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -129,11 +129,11 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
   return (
     <>
       <div
-        className={`${styles.scrim} ${isMobile ? '' : styles.desktop} ${isOpen ? '' : styles.hidden}`}
+        className={`${styles.scrim} ${isMobile ? '' : styles.desktop} ${duringNav ? styles.navMode : ''} ${isOpen ? '' : styles.hidden}`}
         onClick={onClose}
       />
       <div
-        className={`${styles.card} ${isMobile ? '' : styles.desktop} ${isOpen ? styles.visible : ''}`}
+        className={`${styles.card} ${isMobile ? '' : styles.desktop} ${duringNav ? styles.navMode : ''} ${isOpen ? styles.visible : ''}`}
         style={Object.keys(cardStyle).length ? cardStyle : undefined}
       >
         <div
@@ -283,7 +283,9 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
             card (photos, name, description, rating badge) renders
             identically for a Business as for a normal waypoint, per the
             person's own "card displays normally" instruction. */}
-        {data?.lat != null && data?.lng != null ? (
+        {/* No "Navigate Here" mid-trip: the card is for looking around, and
+            switching destination would silently end the current trip. */}
+        {duringNav ? null : data?.lat != null && data?.lng != null ? (
           <div className={styles.actions}>
             {/* Ported from legacy's live place-card controller
                 (app.js ~5995–6140, `onNavigate` opt): `window.openPlaceCard({

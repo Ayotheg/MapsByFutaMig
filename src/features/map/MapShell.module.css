@@ -36,7 +36,11 @@
 :global(.nav-panel-open.sidebar-collapsed) .map {
   left: calc(var(--sidebar-rail-w) + 320px);
 }
-
+/* Sidebar is hidden during active nav — cover its space. !important so
+   the nav-panel-open/sidebar-collapsed offsets above can never win. */
+:global(body.nav-active) .map {
+  left: 0 !important;
+}
 /* Mobile: map is always full-screen — there's no persistent sidebar on
    mobile at all (Sidebar.jsx doesn't render there), and NavDestPanel
    becomes a bottom sheet instead of a side panel. */

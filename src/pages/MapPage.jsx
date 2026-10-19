@@ -174,6 +174,15 @@ export default function MapPage({ onReadinessChange }) {
   // legacy's `_prevInfoMode` save-restore (app.js ~5058–5063, ~5160–5163).
   const [navOpen, setNavOpen] = useState(() => readPersistentState('navigation-open', false));
   const [navActive, setNavActive] = useState(false);
+  const navActiveRef = useRef(false);
+  navActiveRef.current = navActive;
+  const navOpenRef = useRef(navOpen);
+  navOpenRef.current = navOpen;
+  // True while NavigationController is fetching GPS + the route after
+  // "Start Navigation" — its panel must stay open until that finishes.
+  const navStartingRef = useRef(false);
+  // Bumped to close DesktopSearchBar's dropdown, which owns its own open state.
+  const [searchDismissKey, setSearchDismissKey] = useState(0);
   const [navSeedDest, setNavSeedDest] = useState(() => readPersistentState('navigation-seeded-destination', null));
   const [reviewTarget, setReviewTarget] = useState(null);
   const navControllerRef = useRef(null);
@@ -352,6 +361,17 @@ export default function MapPage({ onReadinessChange }) {
     }
   }, [navActive]);
 
+  // The desktop sidebar is hidden during nav; the map stretches over its
+  // space (MapShell.module.css) so no empty strip is left behind. Leaflet
+  // needs a resize once the 0.3s `left` transition finishes.
+  useEffect(() => {
+    document.body.classList.toggle('nav-active', navActive);
+    const id = setTimeout(() => map?.invalidateSize({ animate: false }), 320);
+    return () => {
+      clearTimeout(id);
+      document.body.classList.remove('nav-active');
+    };
+  }, [navActive, map]);
   // ── Admin panel (Slice 11) ────────────────────────────────────────────
   // Sidebar's Admin button previously had no onClick handler; a prior
   // stopgap (superseded here) pointed it at `ImportTrigger`'s KML/GPX
@@ -371,6 +391,8 @@ export default function MapPage({ onReadinessChange }) {
   const adminPin = useAdminPin(auth.user, openAuthModal);
 
   function handleAdminClick() {
+    // The PIN prompt is a surface too.
+    closeOtherOverlays('admin');
     adminPin.requestAdminAccess(() => {
       closeOtherOverlays('admin');
       setAdminPanelOpen(true);
@@ -428,7 +450,18 @@ export default function MapPage({ onReadinessChange }) {
   // path instead of only the nav-start moment. `keep` is whichever
   // surface is about to open, so its own state isn't clobbered by the
   // call that's opening it.
+  // The nav "Where to?" panel, the desktop search dropdown and the expanded
+  // desktop sidebar are part of the same rule. An active trip is never
+  // cancelled from here — only its End button does that.
   const closeOtherOverlays = useCallback((keep) => {
+    if (keep !== 'nav' && !navActiveRef.current && !navStartingRef.current) {
+      setNavOpen(false);
+      setNavSeedDest(null);
+    }
+    if (keep !== 'search') setSearchDismissKey((k) => k + 1);
+    // The search dropdown sits over the map, clear of the sidebar, and
+    // collapsing it would slide the search bar while someone types.
+    if (keep !== 'sidebar' && keep !== 'search' && !isMobile && !navActiveRef.current) setCollapsed(true);
     if (keep !== 'selected') setSelected(null);
     if (keep !== 'segment') setSelectedSegmentId(null);
     if (keep !== 'chip') setActiveChip(null);
@@ -457,12 +490,51 @@ export default function MapPage({ onReadinessChange }) {
     [closeOtherOverlays]
   );
 
+  const handleCollapsedChange = useCallback(
+    (next) => {
+      if (!next) closeOtherOverlays('sidebar');
+      setCollapsed(next);
+    },
+    [closeOtherOverlays]
+  );
+
+  // A reload restores each surface separately, so several could come back
+  // at once. Keep the most important one and close the rest.
+  useEffect(() => {
+    const restored =
+      (navOpen && 'nav') ||
+      (selected && 'selected') ||
+      (selectedSegmentId && 'segment') ||
+      (activeChip && 'chip') ||
+      (isMobile && mobileSearchOpen && 'search') ||
+      (isMobile && sheetState !== 'peek' && 'sheet') ||
+      (!isMobile && !collapsed && 'sidebar');
+    if (restored) closeOtherOverlays(restored);
+    if (!isMobile) setMobileSearchOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSelectPlace = useCallback(
     (wp) => {
+      // Allowed mid-trip (people check what's around them); PlaceCard's
+      // `duringNav` layout keeps it clear of the HUD.
       closeOtherOverlays('selected');
       setSelected(wp);
     },
     [closeOtherOverlays]
+  );
+
+  // Map pins: while "Where to?" is open, a pin tap picks the destination
+  // (the panel's own hint says to) instead of opening a place card.
+  const handleMapPinSelect = useCallback(
+    (wp) => {
+      if (navOpenRef.current && !navActiveRef.current) {
+        setNavSeedDest({ lat: wp.lat, lng: wp.lng, name: wp.name, id: wp.id, type: wp.type });
+        return;
+      }
+      handleSelectPlace(wp);
+    },
+    [handleSelectPlace]
   );
 
   function handleSuggestPlaceClick() {
@@ -506,16 +578,19 @@ export default function MapPage({ onReadinessChange }) {
     if (navOpen) {
       navControllerRef.current?.requestLaunchToggle();
     } else {
+      closeOtherOverlays('nav');
       setNavOpen(true);
       presence.updatePresence('navigating');
     }
   }
 
   function handlePlaceCardNavigate(entry) {
+    if (navActiveRef.current) return;
     if (guestNavBlocked) {
       handleGuestNavBlocked();
       return;
     }
+    closeOtherOverlays('nav');
     setNavSeedDest(entry);
     setNavOpen(true);
     presence.updatePresence(`navigating to ${entry?.name || 'a destination'}`);
@@ -607,19 +682,20 @@ export default function MapPage({ onReadinessChange }) {
           map={map}
           waypoints={waypoints}
           isTypeVisible={typeVisibilityProps.isVisible}
-          onSelect={handleSelectPlace}
+          onSelect={handleMapPinSelect}
           snaps={osmSnaps}
           badgeMerges={osmBadgeMerges}
         />
       )}
-      {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleSelectPlace} />}
+      {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleMapPinSelect} />}
       {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
       <PlaceCard
         data={selected}
         onClose={() => setSelected(null)}
         onNavigate={handlePlaceCardNavigate}
-        collapsed={!isMobile && collapsed}
+        collapsed={!isMobile && collapsed && !navActive}
         isMobile={isMobile}
+        duringNav={navActive}
       />
       {selectedSegment && (
         <DetailModal segment={selectedSegment} onClose={() => setSelectedSegmentId(null)} />
@@ -644,11 +720,14 @@ export default function MapPage({ onReadinessChange }) {
           onExploreSelect={handleSelectPlace}
         />
       ) : (
+        // Hidden (not unmounted) during nav so its body.sidebar-collapsed
+        // class stays put and the map doesn't shift.
+        <div style={navActive ? { display: 'none' } : undefined}>
         <Sidebar
           map={map}
           typeVisibilityProps={typeVisibilityProps}
           collapsed={collapsed}
-          onCollapsedChange={setCollapsed}
+          onCollapsedChange={handleCollapsedChange}
           gps={gps}
           navActive={navActive}
           onNavLaunch={handleNavLaunch}
@@ -661,10 +740,12 @@ export default function MapPage({ onReadinessChange }) {
           explorePicksLoading={waypointsLoading}
           onExploreSelect={handleSelectPlace}
         />
+        </div>
       )}
 
       {/* ── Slice 7: search ─────────────────────────────────────────── */}
-      {isMobile ? (
+      {/* Hidden during active nav so only the nav HUD/panel shows. */}
+      {navActive ? null : isMobile ? (
         <>
           <MobileSearchBar
             onOpenSearch={() => {
@@ -690,13 +771,17 @@ export default function MapPage({ onReadinessChange }) {
           searchIndex={searchIndex}
           onSelect={handleSelectPlace}
           collapsed={collapsed}
-          onToggleCollapsed={setCollapsed}
+          onToggleCollapsed={handleCollapsedChange}
+          dismissKey={searchDismissKey}
+          onDropdownOpen={() => closeOtherOverlays('search')}
           onManualType={() => setActiveChip(null)}
           activeChipLabel={activeChip?.label}
           onNavigateClick={handleNavLaunch}
         />
       )}
-      <QuickChips chips={quickChips.chips} activeChip={activeChip} onChipClick={handleChipClick} collapsed={collapsed} isMobile={isMobile} />
+      {!navActive && (
+        <QuickChips chips={quickChips.chips} activeChip={activeChip} onChipClick={handleChipClick} collapsed={collapsed} isMobile={isMobile} />
+      )}
       <ChipResultsPanel
         activeChip={activeChip}
         waypoints={waypoints}
@@ -729,6 +814,10 @@ export default function MapPage({ onReadinessChange }) {
             setNavSeedDest(null);
           }}
           onActiveChange={setNavActive}
+          placeCardOpen={!!selected}
+          onStartingChange={(starting) => {
+            navStartingRef.current = starting;
+          }}
           onArrival={(dest) => {
             closeOtherOverlays('review');
             setReviewTarget(dest);

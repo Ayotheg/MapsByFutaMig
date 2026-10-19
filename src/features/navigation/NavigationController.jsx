@@ -82,9 +82,19 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  * itself already uses — never gates the panel on a permission prompt.
  */
 const NavigationController = forwardRef(function NavigationController(
-  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks },
+  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen },
   ref
 ) {
+  // startNavigation() awaits GPS + routing; if this controller unmounts in
+  // between, the rest must not run (it would draw layers and start a GPS
+  // watch that nothing cleans up).
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const persistedNavigationRef = useRef(readPersistentState('navigation-session', null));
   const persistedNavigation = persistedNavigationRef.current;
   const persistedDestination = readPersistentState('navigation-destination', null);
@@ -723,106 +733,118 @@ const NavigationController = forwardRef(function NavigationController(
     // burn through it. See unlockSpeech() above for why.
     unlockSpeech();
 
-    setGoDisabled(true);
-    setGoLabel('Getting your location…');
+    // MapPage keeps this panel open while a route is being fetched.
+    onStartingChange?.(true);
+    try {
+      await beginTrip();
+    } finally {
+      onStartingChange?.(false);
+    }
 
-    // Smart location resolver — ported from app.js ~4991–5018.
-    async function resolveStartPosition() {
-      const MAX_CACHE_AGE_MS = 20000;
-      const MAX_CACHE_ACCURACY_M = 80;
-      const cached = gps.lastKnownPosRef.current;
-      if (cached) {
-        const ageMs = Date.now() - cached.timestamp;
-        const acc = cached.coords?.accuracy ?? Infinity;
-        if (ageMs <= MAX_CACHE_AGE_MS && acc <= MAX_CACHE_ACCURACY_M) return cached;
-      }
-      return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 25000,
+    async function beginTrip() {
+      setGoDisabled(true);
+      setGoLabel('Getting your location…');
+
+      // Smart location resolver — ported from app.js ~4991–5018.
+      async function resolveStartPosition() {
+        const MAX_CACHE_AGE_MS = 20000;
+        const MAX_CACHE_ACCURACY_M = 80;
+        const cached = gps.lastKnownPosRef.current;
+        if (cached) {
+          const ageMs = Date.now() - cached.timestamp;
+          const acc = cached.coords?.accuracy ?? Infinity;
+          if (ageMs <= MAX_CACHE_AGE_MS && acc <= MAX_CACHE_ACCURACY_M) return cached;
+        }
+        return new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 25000,
+          });
         });
-      });
-    }
+      }
 
-    let pos;
-    try {
-      pos = await resolveStartPosition();
-    } catch (err) {
+      let pos;
+      try {
+        pos = await resolveStartPosition();
+      } catch (err) {
+        setGoDisabled(false);
+        setGoLabel('Start Navigation');
+        const reason =
+          err.code === 1
+            ? 'Location permission denied — enable it in browser settings.'
+            : err.code === 2
+              ? 'GPS unavailable. Move to an open area and try again.'
+              : 'Could not get your location (timed out). Try again in a moment.';
+        setHint(reason);
+        return;
+      }
+      if (!mountedRef.current) return;
+
+      const { latitude: lat, longitude: lng } = pos.coords;
+      navUserPosRef.current = { lat, lng };
+      gps.lastKnownPosRef.current = pos;
+
+      setGoLabel('Calculating route…');
+
+      let routeData;
+      try {
+        routeData = await fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current);
+      } catch (e) {
+        setGoDisabled(false);
+        setGoLabel('Start Navigation');
+        setHint(`Routing failed: ${e.message}. Check your connection.`);
+        // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+        track('error_occurred', { context: 'nav_routing', message: e?.message || String(e) });
+        return;
+      }
+      if (!mountedRef.current) return;
+      navRouteDataRef.current = routeData;
+
+      setDestPanelOpen(false);
+      navActiveRef.current = true;
+      setNavActive(true);
+      onActiveChange?.(true);
+      navStartTimeRef.current = Date.now();
+      // New trip: fresh id, completion not yet reported.
+      tripRef.current = { tripId: createTripId(), completionReported: false };
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9). No named
+      // origin exists for a live GPS fix, so "from" is a fixed label
+      // rather than a guessed place name.
+      track('nav_started', { from: 'My Location', to: dest.name });
+      navStepIndexRef.current = 0;
+      navArrivalCountRef.current = 0;
+      navGpsTicksRef.current = 0;
+      navArrivedRef.current = false;
+      setHud((h) => ({ ...h, arrived: false, arriving: false }));
+
+      placeDestMarker(dest.lat, dest.lng, dest.name);
+      drawRoute(routeData.coords, 0, true);
+      updateNavUserDot(lat, lng);
+
+      lastSpokenStepRef.current = 0;
+      spokenTurnNowRef.current = false;
+      const firstInstruction = routeData.steps[0]?.instruction || 'Head towards your destination';
+      speak(`Starting navigation to ${dest.name}. ${firstInstruction}.`);
+
+      updateHUD();
+      persistNavigation();
+
+      // Flagged bug fix (explicit user instruction): was `map.fitBounds(L.latLngBounds(routeData.coords),
+      // { padding: [80, 80] })`, framing the entire route — usually a wide,
+      // zoomed-out view that then never changes again (see gpsConstants.js's
+      // `NAV_START_ZOOM` comment for the full story). Center on the user at a
+      // fixed close zoom instead, matching normal turn-by-turn nav framing.
+      // `minZoom`/`maxZoom` (MapShell.jsx) and Leaflet's default pinch/scroll
+      // zoom stay untouched, so the user is always free to zoom back out.
+      map.setView([lat, lng], NAV_START_ZOOM, { animate: true });
+
+      startWatch();
+
       setGoDisabled(false);
       setGoLabel('Start Navigation');
-      const reason =
-        err.code === 1
-          ? 'Location permission denied — enable it in browser settings.'
-          : err.code === 2
-            ? 'GPS unavailable. Move to an open area and try again.'
-            : 'Could not get your location (timed out). Try again in a moment.';
-      setHint(reason);
-      return;
     }
-
-    const { latitude: lat, longitude: lng } = pos.coords;
-    navUserPosRef.current = { lat, lng };
-    gps.lastKnownPosRef.current = pos;
-
-    setGoLabel('Calculating route…');
-
-    let routeData;
-    try {
-      routeData = await fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current);
-    } catch (e) {
-      setGoDisabled(false);
-      setGoLabel('Start Navigation');
-      setHint(`Routing failed: ${e.message}. Check your connection.`);
-      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
-      track('error_occurred', { context: 'nav_routing', message: e?.message || String(e) });
-      return;
-    }
-    navRouteDataRef.current = routeData;
-
-    setDestPanelOpen(false);
-    navActiveRef.current = true;
-    setNavActive(true);
-    onActiveChange?.(true);
-    navStartTimeRef.current = Date.now();
-    // New trip: fresh id, completion not yet reported.
-    tripRef.current = { tripId: createTripId(), completionReported: false };
-    // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9). No named
-    // origin exists for a live GPS fix, so "from" is a fixed label
-    // rather than a guessed place name.
-    track('nav_started', { from: 'My Location', to: dest.name });
-    navStepIndexRef.current = 0;
-    navArrivalCountRef.current = 0;
-    navGpsTicksRef.current = 0;
-    navArrivedRef.current = false;
-    setHud((h) => ({ ...h, arrived: false, arriving: false }));
-
-    placeDestMarker(dest.lat, dest.lng, dest.name);
-    drawRoute(routeData.coords, 0, true);
-    updateNavUserDot(lat, lng);
-
-    lastSpokenStepRef.current = 0;
-    spokenTurnNowRef.current = false;
-    const firstInstruction = routeData.steps[0]?.instruction || 'Head towards your destination';
-    speak(`Starting navigation to ${dest.name}. ${firstInstruction}.`);
-
-    updateHUD();
-    persistNavigation();
-
-    // Flagged bug fix (explicit user instruction): was `map.fitBounds(L.latLngBounds(routeData.coords),
-    // { padding: [80, 80] })`, framing the entire route — usually a wide,
-    // zoomed-out view that then never changes again (see gpsConstants.js's
-    // `NAV_START_ZOOM` comment for the full story). Center on the user at a
-    // fixed close zoom instead, matching normal turn-by-turn nav framing.
-    // `minZoom`/`maxZoom` (MapShell.jsx) and Leaflet's default pinch/scroll
-    // zoom stay untouched, so the user is always free to zoom back out.
-    map.setView([lat, lng], NAV_START_ZOOM, { animate: true });
-
-    startWatch();
-
-    setGoDisabled(false);
-    setGoLabel('Start Navigation');
-  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onGuestBlocked, startWatch]);
+  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch]);
 
   const stopNavigation = useCallback(() => {
     navActiveRef.current = false;
@@ -1009,6 +1031,7 @@ const NavigationController = forwardRef(function NavigationController(
             });
           }}
           onClose={handleHudClose}
+          hideDistance={placeCardOpen}
         />
       )}
       {arrivedBannerDest && <NavArrivedBanner destName={arrivedBannerDest} onDismiss={dismissArrivedBanner} />}

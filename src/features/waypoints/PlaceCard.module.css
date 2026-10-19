@@ -84,6 +84,38 @@
 .scrim.desktop {
   display: none !important;
 }
+
+/* During a trip: the card takes the NavHud distance card's slot (NavHud
+   hides that card while this is open) so the top instruction card and the
+   card never cover each other. No scrim, so the map stays draggable —
+   people use this to look around their destination. */
+.scrim.navMode {
+  display: none !important;
+}
+.card.navMode {
+  z-index: 2150;
+  overflow-y: auto;
+}
+.card.navMode:not(.desktop) {
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom) + 12px);
+  max-height: 46vh;
+  border-radius: var(--r-2xl);
+  transform: translateY(calc(100% + var(--mob-sheet-peek) + 48px));
+}
+.card.navMode:not(.desktop).visible {
+  transform: translateY(0);
+}
+.card.desktop.navMode {
+  left: 16px;
+  bottom: 16px;
+  /* Clears the full-width instruction card at the top. */
+  max-height: calc(100vh - 200px);
+}
+.card.navMode .hero {
+  height: 120px;
+}
 .handle.desktop {
   display: none;
 }

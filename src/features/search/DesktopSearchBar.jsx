@@ -45,7 +45,18 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
  * ChipResultsPanel's desktop panel treatment, since no separate desktop
  * Figma frame exists for it — same pairing-rule reuse as the pill above.
  */
-export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed, onToggleCollapsed, onManualType, activeChipLabel, onNavigateClick }) {
+export default function DesktopSearchBar({
+  map,
+  searchIndex,
+  onSelect,
+  collapsed,
+  onToggleCollapsed,
+  onManualType,
+  activeChipLabel,
+  onNavigateClick,
+  dismissKey,
+  onDropdownOpen,
+}) {
   const [query, setQuery] = useState(() => readPersistentState('desktop-search-query', ''));
   const [open, setOpen] = useState(false);
   const [osmResults, setOsmResults] = useState(null);
@@ -69,6 +80,17 @@ export default function DesktopSearchBar({ map, searchIndex, onSelect, collapsed
       setOpen(false);
     }
   }, [activeChipLabel]);
+
+  // Only one map surface open at a time: opening the dropdown tells MapPage
+  // to close the rest, and MapPage bumps `dismissKey` when something else
+  // opens.
+  useEffect(() => {
+    if (open) onDropdownOpen?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  useEffect(() => {
+    setOpen(false);
+  }, [dismissKey]);
 
   // Close on outside click — matches legacy's document-level listener.
   useEffect(() => {
