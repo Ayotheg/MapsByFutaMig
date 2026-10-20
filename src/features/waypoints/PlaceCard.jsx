@@ -69,10 +69,31 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
   const markFailed = (url) => setFailedUrls((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
   const rateable = Boolean(data?.id) && isRateablePOI(data?.type);
   const reviewCount = data?.reviewCount || 0;
-  // Mobile half/expanded sheet only for places with reviews; others are
+  // Mobile peek/expanded sheet only for places with reviews; others are
   // short, so the sheet just fits its content (design: "place without
   // reviews").
   const sheet = isMobile && !duringNav && rateable;
+  const peeking = sheet && !expanded;
+
+  // Peek height = everything down to "Navigate here", so a card with reviews
+  // opens the same size as one without; the reviews wait below the fold.
+  const summaryRef = useRef(null);
+  const [peekPx, setPeekPx] = useState(0);
+  useEffect(() => {
+    const el = summaryRef.current;
+    if (!sheet || !el) return;
+    const measure = () => setPeekPx(el.offsetTop + el.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sheet, placeKey]);
+
+  // Back to the peek: show the details again, not the middle of the reviews.
+  useEffect(() => {
+    if (!expanded && cardRef.current) cardRef.current.scrollTop = 0;
+  }, [expanded]);
 
   function handleTouchStart(e) {
     dragging.current = true;
@@ -104,6 +125,9 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
       duringNav && isMobile ? `translateY(calc(${dragY}px - var(--nav-card-lift)))` : `translateY(${dragY}px)`;
     cardStyle.transition = 'none';
   }
+  if (peeking && peekPx) {
+    cardStyle.height = `min(calc(${peekPx}px + 24px + var(--mob-safe-bottom)), calc(100dvh - var(--mob-safe-top) - 76px))`;
+  }
   if (collapsed) {
     cardStyle.left = 'calc(var(--sidebar-rail-w) + 16px)';
   }
@@ -114,8 +138,6 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
     duringNav ? styles.navMode : '',
     sheet && expanded ? styles.expanded : '',
     isMobile && !duringNav && !rateable ? styles.fit : '',
-    // Dark close button only over a real photo, not the pale fallback.
-    hasPhotos && !heroFailed ? styles.withHero : '',
     isOpen ? styles.visible : '',
   ].join(' ');
 
@@ -126,32 +148,28 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
         onClick={onClose}
       />
       <div ref={cardRef} className={cardClass} style={Object.keys(cardStyle).length ? cardStyle : undefined}>
+        {/* Mobile drag handle, sticky above the photo. */}
         {isMobile && (
-          <button
-            type="button"
-            className={styles.handle}
-            onClick={() => sheet && setExpanded((v) => !v)}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-            // Nothing to expand on short cards: just a drag grip there, and
-            // the close button is the accessible way out.
-            aria-label={sheet ? (expanded ? 'Show less' : 'Show more') : undefined}
-            aria-expanded={sheet ? expanded : undefined}
-            aria-hidden={sheet ? undefined : true}
-            tabIndex={sheet ? undefined : -1}
-          >
-            <span className={styles.handleBar} />
-          </button>
+          <div className={styles.topBar}>
+            <button
+              type="button"
+              className={styles.handle}
+              onClick={() => sheet && setExpanded((v) => !v)}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              // Nothing to expand on short cards: just a drag grip there, and
+              // the close button is the accessible way out.
+              aria-label={sheet ? (expanded ? 'Show less' : 'Show reviews') : undefined}
+              aria-expanded={sheet ? expanded : undefined}
+              aria-hidden={sheet ? undefined : true}
+              tabIndex={sheet ? undefined : -1}
+            >
+              {/* Glows a few times on the peek: "drag me up for reviews". */}
+              <span key={placeKey} className={`${styles.handleBar} ${peeking ? styles.hint : ''}`} />
+            </button>
+          </div>
         )}
-
-        {/* Zero-height sticky row: the button floats over the photo's
-            top-right corner and stays in view while the card scrolls. */}
-        <div className={styles.closeRow}>
-          <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
-            <X size={18} strokeWidth={2.25} />
-          </button>
-        </div>
 
         {/* No photos yet: a soft panel with the place type's icon, so every
             card keeps the same shape (lib/typeIcons.js). */}
@@ -209,7 +227,15 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
         )}
 
         <div className={styles.body}>
-          <h2 className={styles.name}>{data?.name || 'Location'}</h2>
+          <div ref={summaryRef} className={styles.summary}>
+          {/* Close sits at the end of the name row: off the photo (a near
+              miss there opens the full-screen viewer) and out of the way. */}
+          <div className={styles.titleRow}>
+            <h2 className={styles.name}>{data?.name || 'Location'}</h2>
+            <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
+              <X size={18} strokeWidth={2.25} />
+            </button>
+          </div>
 
           <div className={styles.meta}>
             {/* No reviews yet → nothing here; the Reviews section's empty
@@ -230,7 +256,11 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
             {data?.area && <span>{data.area}</span>}
           </div>
 
-          {data?.description?.trim() && <p className={styles.desc}>{data.description}</p>}
+          {/* Clamped on the peek so "Navigate here" always fits; full text
+              once expanded. */}
+          {data?.description?.trim() && (
+            <p className={`${styles.desc} ${peeking ? styles.clamp : ''}`}>{data.description}</p>
+          )}
 
           {/* People have no location; businesses have a link instead of a
               location. No "Navigate here" mid-trip: switching destination
@@ -265,6 +295,7 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
               </button>
             )
           )}
+          </div>
 
           {rateable && (
             <PlaceReviews

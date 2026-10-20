@@ -55,17 +55,26 @@
   max-height: calc(100dvh - var(--mob-safe-top) - 76px);
 }
 
-.handle {
+/* ── Mobile top bar: the drag handle, sticky above the photo. ── */
+.topBar {
   position: sticky;
   top: 0;
-  z-index: 4;
+  z-index: 5;
   flex-shrink: 0;
+  height: 30px;
+  background: var(--v2-on-primary);
+}
+
+.handle {
+  position: absolute;
+  inset: 0;
   display: flex;
+  align-items: center;
   justify-content: center;
   width: 100%;
-  padding: 10px 0 8px;
+  padding: 0;
   border: none;
-  background: var(--v2-on-primary);
+  background: transparent;
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -82,6 +91,22 @@
 }
 .handle:focus-visible .handleBar {
   background: var(--v2-primary);
+}
+/* Peek hint: the bar glows purple and nudges up a few times. */
+.handleBar.hint {
+  animation: handleHint 1.6s var(--v2-ease-standard) 0.7s 4;
+}
+@keyframes handleHint {
+  0%, 100% {
+    transform: translateY(0);
+    background: var(--v2-divider);
+    box-shadow: none;
+  }
+  45% {
+    transform: translateY(-4px);
+    background: var(--v2-primary);
+    box-shadow: 0 0 12px 3px var(--v2-primary-glow-strong);
+  }
 }
 
 /* ── Desktop: floating card under the search bar + chips (same top as
@@ -139,48 +164,33 @@
   height: 120px;
 }
 
-/* ── Close button: zero-height sticky row so it floats over the photo's
-   corner and stays reachable while the card scrolls. ── */
-.closeRow {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  height: 0;
+/* Name + close on one row; the close is quiet so the name leads. */
+.titleRow {
   display: flex;
-  justify-content: flex-end;
-  padding-right: 24px;
-  overflow: visible;
+  align-items: flex-start;
+  gap: 12px;
 }
-.card.mobile .closeRow {
-  top: 23px; /* below the sticky handle */
-  padding-right: 28px;
+.titleRow .name {
+  flex: 1;
+  min-width: 0;
 }
 .close {
-  margin-top: 12px;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
+  margin: -1px -4px 0 0;
   display: grid;
   place-items: center;
   border: none;
   border-radius: var(--r-full);
-  /* White on the pale no-photo panel. */
-  background: var(--v2-on-primary);
-  color: var(--v2-neutral);
-  box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.18);
+  background: var(--v2-primary-tint);
+  color: var(--v2-text-variant);
   cursor: pointer;
-  transition: transform var(--v2-duration-quick) var(--v2-ease-standard);
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+    background var(--v2-duration-quick) var(--v2-ease-standard);
 }
-/* Desktop has no handle above the photo, so inset from its top edge too. */
-.card.desktop .close {
-  margin-top: 24px;
-}
-/* Over a photo: dark, so it reads on any picture. */
-.withHero .close {
-  background: color-mix(in srgb, var(--v2-neutral) 72%, transparent);
-  color: var(--v2-on-primary);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+.close:hover {
+  background: var(--v2-primary-outline);
 }
 .close:active {
   transform: scale(0.94);
@@ -359,6 +369,13 @@
   color: var(--v2-text);
   overflow-wrap: anywhere;
 }
+.desc.clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
 
 .primaryBtn {
   margin-top: 20px;
@@ -409,5 +426,10 @@
   .card.mobile,
   .card.desktop {
     transition: none;
+  }
+  /* No motion: a still purple bar still says "there's more". */
+  .handleBar.hint {
+    animation: none;
+    background: var(--v2-primary);
   }
 }
