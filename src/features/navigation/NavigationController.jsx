@@ -24,6 +24,10 @@ import NearbyPlaces from './NearbyPlaces';
 // destination" flag glyph below is a hand-built inline SVG matching
 // Lucide's own Flag icon path — same visual language as the rest of the
 // app's icons, just usable outside a React tree.
+// Ending a trip this close to a rateable destination counts as a visit
+// (see `onArrival` in the header comment).
+const END_NEAR_DEST_M = 50;
+
 const SVG_FLAG = (size, color = 'currentColor') =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg>`;
 
@@ -39,11 +43,12 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  *    save/restore, app.js ~5058–5063, ~5160–5163 — kept in MapPage
  *    rather than here since it also touches a sibling component this
  *    module has no reason to know about).
- *  - `onArrival(dest)` — fired only when the arrived destination is a
- *    rateable POI (`isRateablePOI`), matching legacy's
- *    `finishArrival()` gate (app.js ~4966–4969). MapPage owns whether
- *    to actually show the review modal (see ReviewModal.jsx's wiring
- *    instructions).
+ *  - `onArrival(dest)` — fired only when the destination is a rateable
+ *    POI (`isRateablePOI`), matching legacy's `finishArrival()` gate
+ *    (app.js ~4966–4969): on arrival, and also when the user ends the
+ *    trip within END_NEAR_DEST_M of it (GPS near buildings often never
+ *    gets close enough for "arrived"). MapPage remembers the visit and
+ *    asks for a review later (reviews/pendingReview.js).
  *  - `onRequestClose()` — fired once neither the destination panel nor
  *    an active nav session needs to be shown, so MapPage can unmount
  *    this component. Legacy just leaves the (still-loaded) DOM hidden;
@@ -1038,9 +1043,14 @@ const NavigationController = forwardRef(function NavigationController(
       // completion.
       const dest = navDestRef.current;
       track('nav_abandoned', { from: 'My Location', to: dest?.name });
+      // Ended right by the place: they got there, GPS just never said so.
+      const pos = navUserPosRef.current;
+      const nearDest =
+        dest && pos && dest.id && isRateablePOI(dest.type) && haversine(pos.lat, pos.lng, dest.lat, dest.lng) <= END_NEAR_DEST_M;
       stopNavigation();
+      if (nearDest) onArrival?.(dest);
     }
-  }, [stopNavigation]);
+  }, [stopNavigation, onArrival]);
 
   // ── body.nav-panel-open — only reflects the *destination* panel being
   // shown, not active navigation (legacy's `setNavPanelVisible(false)` is

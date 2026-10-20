@@ -37,7 +37,11 @@
   transform: translateY(100%);
   transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
   will-change: transform;
-  overflow: hidden;
+  /* Scrolls when the Reviews list (PlaceReviews) makes it taller than
+     max-height. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   pointer-events: none;
 }
 .card.visible {

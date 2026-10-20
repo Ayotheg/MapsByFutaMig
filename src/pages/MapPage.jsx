@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import MapShell from '../features/map/MapShell';
 import ZoomHint from '../features/map/ZoomHint';
@@ -47,6 +47,10 @@ import SuggestWaypointModal from '../features/waypoint-submissions/SuggestWaypoi
 import MyWaypointSubmissionsPanel from '../features/waypoint-submissions/MyWaypointSubmissionsPanel';
 import MapPickBanner from '../features/map/MapPickBanner';
 import { osmCardData, waypointCardData } from '../features/waypoints/placeCardData';
+import { rememberVisit } from '../features/reviews/pendingReview';
+
+// Only shown an hour after a visit — not needed for first paint.
+const ReviewPrompt = lazy(() => import('../features/reviews/ReviewPrompt'));
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
 // data — see the comment where it's used below for why this stays a
@@ -210,6 +214,9 @@ export default function MapPage({ onReadinessChange }) {
   const [searchDismissKey, setSearchDismissKey] = useState(0);
   const [navSeedDest, setNavSeedDest] = useState(() => readPersistentState('navigation-seeded-destination', null));
   const [reviewTarget, setReviewTarget] = useState(null);
+  // Bumped when a review is submitted so an open place card reloads its
+  // Reviews list.
+  const [reviewsVersion, setReviewsVersion] = useState(0);
   const navControllerRef = useRef(null);
   const prevViewModeRef = useRef(null);
 
@@ -222,6 +229,17 @@ export default function MapPage({ onReadinessChange }) {
   }, []);
 
   useEffect(() => writePersistentState('selected-place', selected), [selected]);
+  // Keep an open card's rating badge in step with fresh waypoint data (e.g.
+  // the refetch after a review is submitted).
+  useEffect(() => {
+    if (!selected?.id) return;
+    const wp = waypoints.find((w) => w.id === selected.id);
+    if (!wp) return;
+    if (wp.avgRating !== selected.avgRating || wp.reviewCount !== selected.reviewCount) {
+      setSelected((s) => (s && s.id === wp.id ? { ...s, avgRating: wp.avgRating, reviewCount: wp.reviewCount } : s));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waypoints]);
   useEffect(() => writePersistentState('selected-segment', selectedSegmentId), [selectedSegmentId]);
   useEffect(() => writePersistentState('sidebar-collapsed', collapsed), [collapsed]);
   useEffect(() => writePersistentState('mobile-sheet-state', sheetState), [sheetState]);
@@ -445,6 +463,7 @@ export default function MapPage({ onReadinessChange }) {
   const dismissSubmissionToast = useCallback(() => setSubmissionToast(null), []);
   // Same corner as ChannelPrompt — the WhatsApp nudge waits while it's up.
   const [optInPromptOpen, setOptInPromptOpen] = useState(false);
+  const [reviewPromptOpen, setReviewPromptOpen] = useState(false);
   const suggestClickHandlerRef = useRef(null);
   const [suggestPicking, setSuggestPicking] = useState(false);
 
@@ -730,6 +749,7 @@ export default function MapPage({ onReadinessChange }) {
         collapsed={!isMobile && collapsed && !navActive}
         isMobile={isMobile}
         duringNav={navActive}
+        reviewsVersion={reviewsVersion}
       />
       {selectedSegment && (
         <DetailModal segment={selectedSegment} onClose={() => setSelectedSegmentId(null)} />
@@ -857,9 +877,9 @@ export default function MapPage({ onReadinessChange }) {
             navStartingRef.current = starting;
           }}
           onArrival={(dest) => {
-            closeOtherOverlays('review');
-            setReviewTarget(dest);
-            presence.updatePresence(`reviewing ${dest?.name || 'a place'}`);
+            // Not reviewed on arrival (they haven't had the service yet):
+            // ReviewPrompt asks an hour later.
+            rememberVisit(dest);
           }}
           guestNavBlocked={guestNavBlocked}
           onGuestBlocked={handleGuestNavBlocked}
@@ -873,7 +893,15 @@ export default function MapPage({ onReadinessChange }) {
         />
       )}
       {reviewTarget && (
-        <ReviewModal dest={reviewTarget} onClose={() => setReviewTarget(null)} onSubmitted={refetchWaypoints} user={auth.user} />
+        <ReviewModal
+          dest={reviewTarget}
+          onClose={() => setReviewTarget(null)}
+          onSubmitted={() => {
+            refetchWaypoints();
+            setReviewsVersion((v) => v + 1);
+          }}
+          user={auth.user}
+        />
       )}
       {authModalOpen && (
         <AuthModal
@@ -942,18 +970,33 @@ export default function MapPage({ onReadinessChange }) {
         <MyWaypointSubmissionsPanel user={auth.user} onClose={() => setMySubmissionsOpen(false)} />
       )}
       <SubmissionToast message={submissionToast} onDismiss={dismissSubmissionToast} />
+      {/* One corner card at a time: a due review goes first, then the
+          marketing opt-in, then the WhatsApp channel nudge. */}
+      <Suspense fallback={null}>
+        <ReviewPrompt
+          ready={!!map && !waypointsLoading}
+          isMobile={isMobile}
+          blocked={mapBusy || isOffline || optInPromptOpen}
+          onVisibleChange={setReviewPromptOpen}
+          onRate={(dest) => {
+            closeOtherOverlays('review');
+            setReviewTarget(dest);
+            presence.updatePresence(`reviewing ${dest?.name || 'a place'}`);
+          }}
+        />
+      </Suspense>
       <MarketingOptInPrompt
         user={auth.loading ? null : auth.user}
         ready={!!map && !waypointsLoading}
         isMobile={isMobile}
-        blocked={mapBusy || isOffline}
+        blocked={mapBusy || isOffline || reviewPromptOpen}
         onVisibleChange={setOptInPromptOpen}
       />
       <ChannelPrompt
         ready={!!map && !waypointsLoading && !auth.loading}
         isMobile={isMobile}
         userId={auth.loading ? null : auth.user?.id || null}
-        blocked={mapBusy || isOffline || optInPromptOpen}
+        blocked={mapBusy || isOffline || optInPromptOpen || reviewPromptOpen}
       />
     </>
   );

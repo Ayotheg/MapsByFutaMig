@@ -3,6 +3,7 @@ import { Star, X, Navigation, Maximize2, ExternalLink } from 'lucide-react';
 import styles from './PlaceCard.module.css';
 import { isRateablePOI } from './wpTypeMeta';
 import PhotoLightbox from './PhotoLightbox';
+import PlaceReviews from '../reviews/PlaceReviews';
 import { getTypeIcon } from '../../lib/typeIcons';
 import { businessPlatformMeta } from '../../lib/channelMeta';
 import { track } from '../../lib/analytics';
@@ -63,7 +64,7 @@ function RatingBadge({ type, avgRating, reviewCount }) {
  *    with the existing rating indicator instead, side by side, to match
  *    the visual pattern without inventing a new data field.
  */
-export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobile, duringNav }) {
+export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobile, duringNav, reviewsVersion }) {
   const [photoIdx, setPhotoIdx] = useState(0);
   const [dragY, setDragY] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -325,6 +326,15 @@ export default function PlaceCard({ data, onClose, onNavigate, collapsed, isMobi
               </button>
             </div>
           )
+        )}
+
+        {data?.id && isRateablePOI(data.type) && (
+          <PlaceReviews
+            waypointId={data.id}
+            reviewCount={data.reviewCount}
+            avgRating={data.avgRating}
+            version={reviewsVersion}
+          />
         )}
       </div>
 
