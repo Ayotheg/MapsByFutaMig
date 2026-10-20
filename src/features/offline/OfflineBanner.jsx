@@ -1,11 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { WifiOff, RefreshCw, Wifi } from 'lucide-react';
-import styles from './OfflineBanner.module.css';
+import { Check, WifiOff } from 'lucide-react';
+import StatusAlert from '../shared/StatusAlert';
 
-// Feature-local, not a shared component — same "no premature shared
-// components" call SubmissionToast.jsx made (grep-confirmed no shared
-// toast/banner exists yet). This one differs from that toast in the one
-// way that matters here: it does NOT auto-dismiss while offline. A
+// Unlike SubmissionToast, this does NOT auto-dismiss while offline. A
 // person browsing on stale/cached data needs to keep knowing that until
 // it's no longer true, not just for four seconds.
 //
@@ -17,11 +14,13 @@ import styles from './OfflineBanner.module.css';
 // e.g. a captive portal or a route to Supabase specifically being down).
 // `onRetry` re-runs both loads (MapPage wires this to refetchWaypoints +
 // refetchSegments).
+//
+// Look: shared StatusAlert (design: "Alert · all four states").
 function formatAge(cachedAt) {
   if (!cachedAt) return null;
   const mins = Math.round((Date.now() - cachedAt) / 60000);
   if (mins < 1) return 'moments ago';
-  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`;
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
   const hours = Math.round(mins / 60);
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
   const days = Math.round(hours / 24);
@@ -34,7 +33,6 @@ export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
   // straight to "online, nothing to say" shouldn't render anything at all.
   const [phase, setPhase] = useState('hidden'); // 'hidden' | 'offline' | 'reconnected'
   const wasOffline = useRef(false);
-  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     if (isOffline) {
@@ -44,7 +42,6 @@ export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
     }
     if (wasOffline.current) {
       wasOffline.current = false;
-      setRetrying(false);
       setPhase('reconnected');
       const t = setTimeout(() => setPhase('hidden'), 2500);
       return () => clearTimeout(t);
@@ -52,43 +49,31 @@ export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
     return undefined;
   }, [isOffline]);
 
+  // Lets the "map isn't loading" alert step aside while this one shows
+  // (StatusAlert.module.css).
+  useEffect(() => {
+    document.body.classList.toggle('status-offline', phase === 'offline');
+    return () => document.body.classList.remove('status-offline');
+  }, [phase]);
+
   if (phase === 'hidden') return null;
 
   if (phase === 'reconnected') {
-    return (
-      <div className={`${styles.banner} ${styles.reconnected}`} role="status">
-        <Wifi size={14} />
-        <span>Online </span>
-      </div>
-    );
+    return <StatusAlert icon={Check} tone="ok" title="Back online" />;
   }
 
   const age = formatAge(cachedAt);
 
   return (
-    <div className={`${styles.banner} ${styles.offline}`} role="status">
-      <WifiOff size={14} />
-      <span>
-        {age
-          ? `Showing saved data from ${age}`
-          : "Offline -- Turn on your cellular/WIFI"}
-      </span>
-      <button
-        type="button"
-        className={styles.retryButton}
-        disabled={retrying}
-        onClick={() => {
-          setRetrying(true);
-          onRetry?.();
-          // Data hooks resolve (success or fail-again) within their own
-          // 8s timeout — release the spin either way rather than tracking
-          // a separate in-flight flag just for this button.
-          setTimeout(() => setRetrying(false), 8000);
-        }}
-      >
-        <RefreshCw size={12} className={retrying ? styles.spinning : undefined} />
-        Retry
-      </button>
-    </div>
+    <StatusAlert
+      icon={WifiOff}
+      tone="offline"
+      title="You're offline"
+      message={age ? `Showing saved data from ${age}.` : 'Turn on mobile data or Wi-Fi.'}
+      onRetry={onRetry}
+      // Data hooks resolve (success or fail-again) within their own 8s
+      // timeout, so the spin stops then either way.
+      retrySpinMs={8000}
+    />
   );
 }

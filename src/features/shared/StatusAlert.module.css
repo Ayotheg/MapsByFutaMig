@@ -1,0 +1,131 @@
+/* Status card — design: "Auth Redesign" export, "Alert · mobile / desktop".
+   Phone: full width under the search bar. Desktop: top-right, clear of the
+   centred search bar (lower on narrower screens, under the chips). */
+
+.alert {
+  position: fixed;
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 10px 12px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--v2-divider);
+  background: var(--v2-on-primary);
+  box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.18);
+  font-family: var(--font-ui);
+  animation: statusAlertIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+@media (max-width: 768px) {
+  .alert {
+    top: calc(var(--mob-safe-top, env(safe-area-inset-top)) + 76px);
+    left: 16px;
+    right: 16px;
+  }
+}
+@media (min-width: 769px) {
+  .alert {
+    top: 124px;
+    right: 16px;
+    width: max-content;
+    max-width: min(440px, calc(100vw - 32px));
+    padding: 8px 8px 8px 10px;
+  }
+}
+/* Wide screens have room beside the search bar. */
+@media (min-width: 1440px) {
+  .alert {
+    top: 16px;
+  }
+}
+
+.icon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+}
+.warn .icon {
+  background: color-mix(in srgb, var(--v2-tertiary) 9%, var(--v2-on-primary));
+  color: var(--v2-tertiary);
+}
+.offline .icon {
+  background: var(--v2-primary-tint);
+  color: var(--v2-text);
+}
+.ok .icon {
+  background: color-mix(in srgb, var(--v2-secondary) 12%, var(--v2-on-primary));
+  color: var(--v2-secondary);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.message {
+  margin: 2px 0 0;
+  font-size: 14px;
+  line-height: 19px;
+  color: var(--v2-text);
+}
+
+.retry {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 16px 0 14px;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.retry:hover:not(:disabled) {
+  background: var(--v2-primary-outline);
+}
+.retry:disabled {
+  cursor: default;
+}
+.retry:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+
+.spinning {
+  animation: statusAlertSpin 1s linear infinite;
+}
+
+@keyframes statusAlertIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes statusAlertSpin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alert,
+  .spinning {
+    animation: none;
+  }
+}
+
+/* The offline card already explains a dead map; don't stack both. */
+:global(body.status-offline) .alert.warn {
+  display: none;
+}

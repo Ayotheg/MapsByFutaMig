@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, TriangleAlert, X } from 'lucide-react';
+import { Map as MapIcon } from 'lucide-react';
 import L from 'leaflet';
 import { LeafletTouchZoom } from './leafletGlobal';
 import 'leaflet-rotate';
 import styles from './MapShell.module.css';
+import StatusAlert from '../shared/StatusAlert';
 
 // ── Ported 1:1 from legacy app.js lines ~55–98 (feature/login2) ──────────
 // Leaflet map init, OSM tile layer, zoom-state class toggling, and
@@ -39,7 +40,7 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
   // Shown when the tile layer is clearly not loading (see tileHealth.js).
   // Failed tiles keep retrying in the background meanwhile; the alert's
   // Retry button just retries them all now instead of reloading the page.
-  // Stays until dismissed or until the failing tiles load.
+  // Stays until the failing tiles load (no close button in the design).
   const [tileAlert, setTileAlert] = useState(false);
   const tileWatchersRef = useRef(new Set());
 
@@ -255,25 +256,14 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     <>
       <div ref={containerRef} className={styles.map} />
       {tileAlert && (
-        <div className={styles.tileAlert} role="alert">
-          <TriangleAlert size={16} className={styles.tileAlertIcon} />
-          <span>The map isn't loading properly. Still trying in the background — check your connection or tap Retry.</span>
-          <button
-            type="button"
-            className={styles.tileAlertRefresh}
-            onClick={() => tileWatchersRef.current.forEach((w) => w.retryNow())}
-          >
-            <RefreshCw size={12} /> Retry
-          </button>
-          <button
-            type="button"
-            className={styles.tileAlertClose}
-            aria-label="Dismiss"
-            onClick={() => setTileAlert(false)}
-          >
-            <X size={14} />
-          </button>
-        </div>
+        <StatusAlert
+          icon={MapIcon}
+          tone="warn"
+          role="alert"
+          title="Map isn't loading"
+          message="Still trying. Check your connection or retry."
+          onRetry={() => tileWatchersRef.current.forEach((w) => w.retryNow())}
+        />
       )}
     </>
   );
