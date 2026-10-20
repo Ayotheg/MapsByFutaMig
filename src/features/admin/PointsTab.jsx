@@ -81,16 +81,24 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, onAd
     setSaving(true);
     setStatus(null);
     try {
-      await insertWaypoint({
-        name: trimmedName,
-        description: desc.trim(),
-        type,
-        lat: latNum,
-        lng: lngNum,
-        isPerson: isPeopleMode,
-        ...(!isPeopleMode && { area }),
+      let warning = null;
+      await insertWaypoint(
+        {
+          name: trimmedName,
+          description: desc.trim(),
+          type,
+          lat: latNum,
+          lng: lngNum,
+          isPerson: isPeopleMode,
+          ...(!isPeopleMode && { area }),
+        },
+        { onWarning: (w) => (warning = w) }
+      );
+      setStatus({
+        text: warning || (isPeopleMode ? 'Person added successfully!' : 'Point added successfully!'),
+        error: Boolean(warning),
+        icon: true,
       });
-      setStatus({ text: isPeopleMode ? 'Person added successfully!' : 'Point added successfully!', error: false, icon: true });
       setName('');
       setDesc('');
       setArea('');

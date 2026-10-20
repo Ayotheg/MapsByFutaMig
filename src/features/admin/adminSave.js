@@ -212,10 +212,12 @@ export async function updateWaypoint(id, { name, description, type, area, isExpl
   if (!data?.length) throw await blockedWriteError('save this waypoint');
   // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
   track('admin_action', { action: 'update', entity: 'waypoint' });
-  if (areaSkipped) {
-    throw new Error('Saved everything except the area — run supabase/waypoint_area.sql in the Supabase SQL editor first.');
-  }
+  // A warning, not an error: the save succeeded, so the caller must still
+  // run its photo upload and map refresh.
+  return areaSkipped ? { warning: AREA_NOT_SAVED } : {};
 }
+
+const AREA_NOT_SAVED = 'Saved, except the area — run supabase/waypoint_area.sql in the Supabase SQL editor first.';
 
 // Legacy: `adminDeleteBtn`'s waypoint branch (app.js ~4283–4300). Only
 // deletes the waypoints row — `waypoint_images` cascade-deletes per the DB
@@ -269,7 +271,7 @@ export async function insertWaypoint({
   isPromoted,
   sponsorName,
   promoLabel,
-}) {
+}, { onWarning } = {}) {
   const noLocation = isPerson || isChannel || isBusiness;
   const row = {
     id: crypto.randomUUID(),
@@ -318,6 +320,7 @@ export async function insertWaypoint({
     ({ data, error } = await supabase.from('waypoints').insert(withoutArea).select('id').single());
     if (!error) {
       track('admin_action', { action: 'insert', entity: 'waypoint' });
+      if (row.area) onWarning?.(AREA_NOT_SAVED);
       return data.id;
     }
   }
@@ -346,6 +349,7 @@ export async function insertWaypoint({
       .single();
     if (retryError) throw retryError;
     track('admin_action', { action: 'insert', entity: 'waypoint' });
+    if (row.area) onWarning?.(AREA_NOT_SAVED);
     return retryData.id;
   }
 

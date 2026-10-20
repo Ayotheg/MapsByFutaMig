@@ -133,7 +133,9 @@
   /* Clears the full-width instruction card at the top. */
   max-height: calc(100vh - 220px);
 }
-.card.navMode .hero {
+/* Specific enough to beat `.card.mobile .hero` below. */
+.card.mobile.navMode .hero,
+.card.desktop.navMode .hero {
   height: 120px;
 }
 
@@ -168,6 +170,10 @@
   box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.18);
   cursor: pointer;
   transition: transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+/* Desktop has no handle above the photo, so inset from its top edge too. */
+.card.desktop .close {
+  margin-top: 24px;
 }
 /* Over a photo: dark, so it reads on any picture. */
 .withHero .close {
@@ -216,7 +222,8 @@
 .card.mobile .heroEmpty {
   height: 140px;
 }
-.card.navMode .heroEmpty {
+.card.mobile.navMode .heroEmpty,
+.card.desktop.navMode .heroEmpty {
   height: 96px;
 }
 .heroEmptyIcon {

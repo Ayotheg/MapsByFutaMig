@@ -232,7 +232,9 @@ export default function MapPage({ onReadinessChange }) {
   // Fill an open card's rating and area from the loaded waypoint, whichever
   // way it was opened (pin, search, chip results, Explore — some of those
   // build their own card data without them) and after a refetch (e.g. a
-  // review was just submitted). Only sets when something differs.
+  // review was just submitted). Re-runs whenever the card data is replaced
+  // (re-opening the same place from Explore/Nearby builds new data without
+  // the area). Only sets when something differs, so it can't loop.
   useEffect(() => {
     if (!selected?.id || selected.isBusiness) return;
     const wp = waypoints.find((w) => w.id === selected.id);
@@ -243,8 +245,7 @@ export default function MapPage({ onReadinessChange }) {
         s && s.id === wp.id ? { ...s, avgRating: wp.avgRating, reviewCount: wp.reviewCount, area } : s
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, selected?.id]);
+  }, [waypoints, selected]);
   useEffect(() => writePersistentState('selected-segment', selectedSegmentId), [selectedSegmentId]);
   useEffect(() => writePersistentState('sidebar-collapsed', collapsed), [collapsed]);
   useEffect(() => writePersistentState('mobile-sheet-state', sheetState), [sheetState]);

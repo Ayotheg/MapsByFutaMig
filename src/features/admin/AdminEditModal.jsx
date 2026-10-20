@@ -264,26 +264,32 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           ? { isBusiness: true, businessLink: businessLink.trim(), businessPlatform }
           : {};
         const isPlace = !isPerson && !isChannel && !isBusiness;
+        // Saved, but one field (the area) needs a migration — shown instead
+        // of the success message once photos and refresh have run.
+        let warning = null;
         if (isNew) {
-          const newId = await insertWaypoint({
-            name: name.trim(),
-            description: description.trim(),
-            lat: null,
-            lng: null,
-            isPerson,
-            ...channelFields,
-            ...businessFields,
-            ...exploreFields,
-            ...(isPlace && { type: wpType, area }),
-          });
+          const newId = await insertWaypoint(
+            {
+              name: name.trim(),
+              description: description.trim(),
+              lat: null,
+              lng: null,
+              isPerson,
+              ...channelFields,
+              ...businessFields,
+              ...exploreFields,
+              ...(isPlace && { type: wpType, area }),
+            },
+            { onWarning: (w) => (warning = w) }
+          );
           await reconcileImages('waypoint_images', 'waypoint_id', newId, 'waypoints');
           setStatus({
-            text: isPerson ? 'Person added!' : isChannel ? 'Channel added!' : isBusiness ? 'Business added!' : 'Waypoint added!',
-            error: false,
+            text: warning || (isPerson ? 'Person added!' : isChannel ? 'Channel added!' : isBusiness ? 'Business added!' : 'Waypoint added!'),
+            error: Boolean(warning),
             icon: true,
           });
         } else {
-          await updateWaypoint(editContext.id, {
+          const result = await updateWaypoint(editContext.id, {
             name: name.trim(),
             description: description.trim(),
             ...(isPlace && { type: wpType, area }),
@@ -291,8 +297,13 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             ...businessFields,
             ...exploreFields,
           });
+          warning = result?.warning || null;
           await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
-          setStatus({ text: isChannel ? 'Channel updated!' : isBusiness ? 'Business updated!' : 'Waypoint updated!', error: false, icon: true });
+          setStatus({
+            text: warning || (isChannel ? 'Channel updated!' : isBusiness ? 'Business updated!' : 'Waypoint updated!'),
+            error: Boolean(warning),
+            icon: true,
+          });
         }
         onWaypointChanged?.();
       } else if (type === 'segment') {

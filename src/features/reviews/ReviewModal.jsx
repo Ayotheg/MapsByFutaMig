@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Star, TriangleAlert, X } from 'lucide-react';
 import styles from './ReviewModal.module.css';
 import { submitReview } from './submitReview';
@@ -91,6 +91,22 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
     setSubmitting(false);
   }, [dest]);
 
+  // Escape closes, like the backdrop and the X; focus moves into the sheet
+  // so keyboard users land on the form, not the card underneath.
+  // Ref, not a dependency: the caller passes a new onClose each render, and
+  // re-running this would pull focus out of the comment box mid-typing.
+  const sheetRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    sheetRef.current?.focus();
+    const onKey = (e) => {
+      if (e.key === 'Escape') onCloseRef.current?.();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   async function handleSubmit() {
     if (!dest || rating < 1) return;
 
@@ -141,14 +157,19 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
         className={styles.overlay}
         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       >
-        <div className={`${styles.sheet} ${styles.thanks}`} role="status">
+        <div
+          className={`${styles.sheet} ${styles.thanks}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="review-thanks-title"
+        >
           <span className={styles.checkRing} aria-hidden="true">
             <svg className={styles.check} viewBox="0 0 64 64" width="64" height="64">
               <circle className={styles.checkCircle} cx="32" cy="32" r="29" />
               <path className={styles.checkMark} d="M21 33l7.5 7.5L44 25" />
             </svg>
           </span>
-          <h2 className={styles.thanksTitle}>Thanks for your review</h2>
+          <h2 id="review-thanks-title" className={styles.thanksTitle}>Thanks for your review</h2>
           <p className={styles.thanksSub}>You&apos;re helping other FUTARIANs find great places.</p>
           <button type="button" className={styles.doneBtn} onClick={onClose} autoFocus>
             Done
@@ -163,31 +184,44 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
       className={styles.overlay}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className={styles.sheet}>
+      <div
+        ref={sheetRef}
+        className={styles.sheet}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="review-question"
+        tabIndex={-1}
+      >
         <div className={styles.header}>
           <div className={styles.eyebrow}>RATE THIS PLACE</div>
-          <button type="button" className={styles.closeBtn} onClick={onClose}>
+          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
             <X size={17} />
           </button>
         </div>
 
-        <div className={styles.question}>
+        <div id="review-question" className={styles.question}>
           How was your visit to <span className={styles.destName}>{dest?.name}</span>?
         </div>
 
         <div
           className={styles.stars}
+          role="radiogroup"
+          aria-label="Rating"
           onMouseLeave={() => setHoverRating(0)}
         >
           {[1, 2, 3, 4, 5].map((val) => (
-            <span
+            <button
+              type="button"
               key={val}
+              role="radio"
+              aria-checked={rating === val}
+              aria-label={`${val} star${val === 1 ? '' : 's'}`}
               className={`${styles.star} ${val <= displayRating ? styles.active : ''}`}
               onClick={() => setRating(val)}
               onMouseEnter={() => setHoverRating(val)}
             >
-              <Star size={26} fill={val <= displayRating ? 'currentColor' : 'none'} />
-            </span>
+              <Star size={26} fill={val <= displayRating ? 'currentColor' : 'none'} aria-hidden="true" />
+            </button>
           ))}
         </div>
 

@@ -34,6 +34,8 @@ export default function PlaceReviews({ waypointId, reviewCount, version, onWrite
   const [reviews, setReviews] = useState([]);
   const [status, setStatus] = useState('loading'); // loading | ready | unavailable
   const [loadingMore, setLoadingMore] = useState(false);
+  // A short page means there's nothing more, whatever the stored count says.
+  const [exhausted, setExhausted] = useState(false);
   // Ignores a "Show more" answer that arrives after the list was reloaded.
   const requestRef = useRef(0);
 
@@ -44,6 +46,7 @@ export default function PlaceReviews({ waypointId, reviewCount, version, onWrite
       .then((rows) => {
         if (request !== requestRef.current) return;
         setReviews(rows);
+        setExhausted(rows.length < REVIEWS_PAGE_SIZE);
         setStatus('ready');
       })
       .catch(() => {
@@ -58,6 +61,7 @@ export default function PlaceReviews({ waypointId, reviewCount, version, onWrite
       const rows = await fetchPlaceReviews(waypointId, reviews.length);
       if (request !== requestRef.current) return;
       setReviews((prev) => [...prev, ...rows.filter((r) => !prev.some((p) => p.id === r.id))]);
+      if (rows.length < REVIEWS_PAGE_SIZE) setExhausted(true);
     } catch {
       /* keep what's shown */
     } finally {
@@ -68,7 +72,7 @@ export default function PlaceReviews({ waypointId, reviewCount, version, onWrite
   if (status === 'unavailable') return null;
 
   const total = Math.max(reviewCount || 0, reviews.length);
-  const hasMore = status === 'ready' && reviews.length < total && reviews.length >= REVIEWS_PAGE_SIZE;
+  const hasMore = status === 'ready' && !exhausted && reviews.length < total;
   const empty = status === 'ready' && reviews.length === 0;
 
   return (

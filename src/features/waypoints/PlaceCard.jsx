@@ -9,9 +9,18 @@ import { businessPlatformMeta } from '../../lib/channelMeta';
 import { track } from '../../lib/analytics';
 
 // Some badges arrive in capitals (search results, OSM places); the design
-// shows "Shop", not "SHOP".
+// shows "Shop", not "SHOP". Short words stay as they are so acronyms like
+// ATM or SUB aren't turned into "Atm".
 function sentenceCase(text) {
-  return text === text.toUpperCase() ? text.charAt(0) + text.slice(1).toLowerCase() : text;
+  if (text !== text.toUpperCase()) return text;
+  return text
+    .split(/(\s+)/)
+    .map((word, i) => {
+      if (word.length <= 3) return word;
+      const lower = word.toLowerCase();
+      return i === 0 ? lower.charAt(0).toUpperCase() + lower.slice(1) : lower;
+    })
+    .join('');
 }
 
 /**
@@ -105,7 +114,8 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
     duringNav ? styles.navMode : '',
     sheet && expanded ? styles.expanded : '',
     isMobile && !duringNav && !rateable ? styles.fit : '',
-    hasPhotos ? styles.withHero : '',
+    // Dark close button only over a real photo, not the pale fallback.
+    hasPhotos && !heroFailed ? styles.withHero : '',
     isOpen ? styles.visible : '',
   ].join(' ');
 
@@ -124,8 +134,12 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            aria-label={sheet ? (expanded ? 'Show less' : 'Show more') : 'Drag down to close'}
+            // Nothing to expand on short cards: just a drag grip there, and
+            // the close button is the accessible way out.
+            aria-label={sheet ? (expanded ? 'Show less' : 'Show more') : undefined}
             aria-expanded={sheet ? expanded : undefined}
+            aria-hidden={sheet ? undefined : true}
+            tabIndex={sheet ? undefined : -1}
           >
             <span className={styles.handleBar} />
           </button>
@@ -202,14 +216,18 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
                 state already says so. */}
             {rateable && reviewCount > 0 && (
               <span className={styles.rating}>
-                <Star size={15} className={styles.star} fill="currentColor" aria-hidden="true" />
-                <span className={styles.ratingValue}>{(data.avgRating || 0).toFixed(1)}</span>
-                <span className={styles.ratingCount}>({reviewCount})</span>
-                <span className={styles.srOnly}> stars from {reviewCount} review{reviewCount === 1 ? '' : 's'}</span>
+                <span aria-hidden="true" className={styles.rating}>
+                  <Star size={15} className={styles.star} fill="currentColor" />
+                  <span className={styles.ratingValue}>{(data.avgRating || 0).toFixed(1)}</span>
+                  <span className={styles.ratingCount}>({reviewCount})</span>
+                </span>
+                <span className={styles.srOnly}>
+                  Rated {(data.avgRating || 0).toFixed(1)} out of 5 from {reviewCount} review{reviewCount === 1 ? '' : 's'}
+                </span>
               </span>
             )}
-            {data?.badge && <span className={styles.metaItem}>{sentenceCase(data.badge)}</span>}
-            {data?.area && <span className={styles.metaItem}>{data.area}</span>}
+            {data?.badge && <span>{sentenceCase(data.badge)}</span>}
+            {data?.area && <span>{data.area}</span>}
           </div>
 
           {data?.description?.trim() && <p className={styles.desc}>{data.description}</p>}

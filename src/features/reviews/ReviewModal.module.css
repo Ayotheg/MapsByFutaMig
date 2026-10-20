@@ -130,6 +130,8 @@
   align-items: center;
   justify-content: center;
   padding: 8px;
+  border: none;
+  background: transparent;
   border-radius: var(--r-full);
   color: var(--v2-muted);
   cursor: pointer;
@@ -138,6 +140,14 @@
 }
 .star:hover {
   transform: scale(1.12);
+}
+.star:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 1px;
+}
+/* The sheet takes focus on open (for keyboard users); no ring on it. */
+.sheet:focus {
+  outline: none;
 }
 .star.active {
   color: var(--v2-star);
@@ -282,9 +292,6 @@
   color: var(--v2-text-variant);
   letter-spacing: 0.03em;
   margin-bottom: 8px;
-}
-.status.success {
-  color: var(--v2-primary);
 }
 .status.error {
   color: var(--v2-error-text);

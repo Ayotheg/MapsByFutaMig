@@ -178,25 +178,27 @@ export const CATEGORY_LABELS = {
   laundry: 'Laundry',
 };
 
+// Kept in step with lib/typeIcons.js so a chip and its results' fallback
+// icons match.
 export const CATEGORY_ICON_KEYS = {
   toilet: 'toilet',
   hostel: 'house-door-fill',
   printing_shop: 'printer-fill',
-  garage: 'bus-front-fill',
-  library: 'building-fill',
+  garage: 'car-front',
+  library: 'library-big',
   kiosk: 'shop',
-  bank: 'bank2',
+  bank: 'credit-card', // the "POS / ATM" chip
   chapel: 'church',
   bus_stop: 'bus-front-fill',
   gate: 'gate-barrier', // no direct Lucide icon reads as a campus vehicle
                          // gate (Fence/DoorOpen don't fit) — custom SVG,
                          // see lib/GateIcon.jsx
-  clinic: 'hospital-fill',
+  clinic: 'stethoscope',
   restaurant: 'restaurant-fill',
   mosque: 'mosque',
   sports: 'football',
-  lecture_hall: 'building-fill',
-  faculty: 'building-fill',
+  lecture_hall: 'presentation',
+  faculty: 'school',
   shawarma: 'restaurant-fill', // no dedicated shawarma icon in the inventory
   car_wash: 'car-front',
   footwear: 'shop', // no dedicated footwear/shoe icon in legacyIconMap.js
@@ -205,7 +207,7 @@ export const CATEGORY_ICON_KEYS = {
   fuel: 'fuel',
   furniture: 'armchair',
   barber: 'scissors',
-  laundry: 'shirt',
+  laundry: 'washing-machine',
 };
 
 function norm(s) {
