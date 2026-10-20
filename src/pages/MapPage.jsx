@@ -229,17 +229,22 @@ export default function MapPage({ onReadinessChange }) {
   }, []);
 
   useEffect(() => writePersistentState('selected-place', selected), [selected]);
-  // Keep an open card's rating badge in step with fresh waypoint data (e.g.
-  // the refetch after a review is submitted).
+  // Fill an open card's rating and area from the loaded waypoint, whichever
+  // way it was opened (pin, search, chip results, Explore — some of those
+  // build their own card data without them) and after a refetch (e.g. a
+  // review was just submitted). Only sets when something differs.
   useEffect(() => {
-    if (!selected?.id) return;
+    if (!selected?.id || selected.isBusiness) return;
     const wp = waypoints.find((w) => w.id === selected.id);
     if (!wp) return;
-    if (wp.avgRating !== selected.avgRating || wp.reviewCount !== selected.reviewCount) {
-      setSelected((s) => (s && s.id === wp.id ? { ...s, avgRating: wp.avgRating, reviewCount: wp.reviewCount } : s));
+    const area = wp.area || '';
+    if (wp.avgRating !== selected.avgRating || wp.reviewCount !== selected.reviewCount || area !== (selected.area || '')) {
+      setSelected((s) =>
+        s && s.id === wp.id ? { ...s, avgRating: wp.avgRating, reviewCount: wp.reviewCount, area } : s
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints]);
+  }, [waypoints, selected?.id]);
   useEffect(() => writePersistentState('selected-segment', selectedSegmentId), [selectedSegmentId]);
   useEffect(() => writePersistentState('sidebar-collapsed', collapsed), [collapsed]);
   useEffect(() => writePersistentState('mobile-sheet-state', sheetState), [sheetState]);
@@ -750,6 +755,12 @@ export default function MapPage({ onReadinessChange }) {
         isMobile={isMobile}
         duringNav={navActive}
         reviewsVersion={reviewsVersion}
+        onWriteReview={(dest) => {
+          // The card stays open underneath, so the new review shows in it
+          // as soon as it's submitted (reviewsVersion).
+          setReviewTarget(dest);
+          presence.updatePresence(`reviewing ${dest?.name || 'a place'}`);
+        }}
       />
       {selectedSegment && (
         <DetailModal segment={selectedSegment} onClose={() => setSelectedSegmentId(null)} />

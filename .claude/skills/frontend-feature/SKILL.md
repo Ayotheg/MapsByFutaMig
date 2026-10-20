@@ -8,7 +8,7 @@ description: Build, import or redesign a screen or UI component (from a Figma li
 ## 1. Before writing code
 1. Read `DESIGN_SYSTEM.md`.
 2. If there's a design (Figma, screenshot, HTML), list every **font** and **colour** it uses.
-3. Map each colour to one of the 16 brand variables in `src/styles/tokens-v2.css`.
+3. Map each colour to one of the 17 brand variables in `src/styles/tokens-v2.css`.
 4. Map each font: Inter → `var(--font-ui)`, Bricolage Grotesque → `var(--font-display)`, DM Mono → `var(--font-mono)`.
 5. **If a font isn't one of those three: stop.** Tell the user the font name and the options:
    - use an existing font variable instead, or

@@ -49,7 +49,7 @@ const hexIn = (text) => new Set([...text.matchAll(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F
 if (brand.size) {
   const oldHex = hexIn(removed);
   const bad = [...hexIn(added)].filter((h) => !brand.has(h) && !oldHex.has(h));
-  if (bad.length) problems.push(`Colour ${bad.join(', ')} is not one of the 16 brand colours. Use the nearest variable from DESIGN_SYSTEM.md.`);
+  if (bad.length) problems.push(`Colour ${bad.join(', ')} is not one of the brand colours. Use the nearest variable from DESIGN_SYSTEM.md.`);
 }
 
 if (problems.length) {

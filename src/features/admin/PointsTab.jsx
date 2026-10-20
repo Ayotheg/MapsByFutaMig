@@ -28,6 +28,7 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, onAd
   const [category, setCategory] = useState('places');
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
+  const [area, setArea] = useState('');
   const [type, setType] = useState('lecture_hall');
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
@@ -87,10 +88,12 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, onAd
         lat: latNum,
         lng: lngNum,
         isPerson: isPeopleMode,
+        ...(!isPeopleMode && { area }),
       });
       setStatus({ text: isPeopleMode ? 'Person added successfully!' : 'Point added successfully!', error: false, icon: true });
       setName('');
       setDesc('');
+      setArea('');
       setLat('');
       setLng('');
       onWaypointsChanged?.();
@@ -197,6 +200,12 @@ export default function PointsTab({ waypoints, onEditWaypoint, onAddPerson, onAd
             <label>Description</label>
             <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Short note (optional)" />
           </div>
+          {!isPeopleMode && (
+            <div className={styles.fieldGroup}>
+              <label>Area</label>
+              <input value={area} maxLength={60} onChange={(e) => setArea(e.target.value)} placeholder="e.g. South Gate (optional)" />
+            </div>
+          )}
           <div className={styles.fieldGroup}>
             <label>Type</label>
             <select value={type} onChange={(e) => setType(e.target.value)}>

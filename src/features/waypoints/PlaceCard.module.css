@@ -1,15 +1,6 @@
-/* Ported from legacy style.css (feature/login2), the PLACE CARD block
-   (~lines 3900-4130). Structure/behavior kept 1:1; colors/spacing/radii/
-   fonts now come from design tokens instead of literals.
-
-   v2 redesign: restyled to the v2 "Lumina
-   Campus Utility" light theme per Figma node 7:943 ("Bottom Sheet Card").
-   Class names are unchanged from the port above — only their declarations
-   and a couple of purely-visual additions (.closeOnHero, .metaRow), so
-   PlaceCard.jsx's className contract and all props/handlers/state stay
-   exactly as they were. See PlaceCard.jsx's own header comment for the
-   two structural notes (close button placement, badge+rating row) this
-   pass made. */
+/* Place card — design: "Auth Redesign" export (Place card · desktop /
+   mobile). White card, rounded photo inset at the top, display-font name,
+   pill "Navigate here", reviews below (PlaceReviews). */
 
 .scrim {
   position: fixed;
@@ -24,63 +15,85 @@
 
 .card {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
   z-index: 1300;
-  background: var(--v2-surface);
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  max-height: 85vh;
-  transform: translateY(100%);
-  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
-  will-change: transform;
-  /* Scrolls when the Reviews list (PlaceReviews) makes it taller than
-     max-height. */
+  background: var(--v2-on-primary);
+  box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.22), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
+  font-family: var(--font-ui);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  will-change: transform;
   pointer-events: none;
 }
 .card.visible {
-  transform: translateY(0);
   pointer-events: auto;
 }
 
-/* Desktop: float as a sidebar-style card on the map's left edge,
-   anchored past the permanent sidebar (features/legend/Sidebar.jsx,
-   Slice 3) so it doesn't overlap the rail/panel — matches legacy's
-   `left: var(--sidebar-total-w)` exactly (style.css ~3949–3955).
+/* ── Mobile: bottom sheet, half-height until the handle expands it ── */
+.card.mobile {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 62dvh;
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  transform: translateY(100%);
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1), height 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.card.mobile.visible {
+  transform: translateY(0);
+}
+/* Expanded: up to just under the search bar. */
+.card.mobile.expanded {
+  height: calc(100dvh - var(--mob-safe-top) - 76px);
+}
+/* Places without reviews: as tall as their content, no expand step. */
+.card.mobile.fit {
+  height: auto;
+  max-height: calc(100dvh - var(--mob-safe-top) - 76px);
+}
 
-   Was a `@media (min-width: 769px)` block. Converted to a `.desktop`
-   class driven by MapPage's `isMobile` prop instead: MapPage decides
-   `isMobile` once at mount (window.innerWidth <= 768, a deliberate 1:1
-   port of legacy) and never re-checks it, but this media query
-   re-evaluated live — so a resize/zoom/monitor-dock/DevTools toggle
-   after mount could desync the two (React still rendering the desktop
-   <Sidebar>, this card silently flipping into its mobile bottom-sheet
-   layout). Same source of truth for both now. */
+.handle {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 0 8px;
+  border: none;
+  background: var(--v2-on-primary);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.handleBar {
+  width: 36px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: var(--v2-divider);
+}
+.handle:focus-visible {
+  outline: none;
+}
+.handle:focus-visible .handleBar {
+  background: var(--v2-primary);
+}
+
+/* ── Desktop: floating card under the search bar + chips (same top as
+   the chip results panel, so it never covers them) ── */
 .card.desktop {
-  left: var(--sidebar-total-w);
-  right: auto;
-  bottom: 32px;
-  width: 380px;
-  max-height: 78vh;
-  border-radius: var(--r-lg);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  /* Was a hardcoded `translateX(-420px)`. At left: var(--sidebar-total-w)
-     (304px), -420px only clears a card anchored at left:0 — it left the
-     closed card's box spanning roughly -116px to 264px, i.e. still
-     sitting inside the viewport on top of the sidebar. Derive the hide
-     distance from the anchor + the card's own width (100% in a
-     translateX context = this element's width) instead, plus a small
-     buffer, so it stays correct even if --sidebar-total-w or the card's
-     width ever change. Mirrors how the mobile state below already uses
-     a relative unit (translateY(100%)) for the same reason. */
-  transform: translateX(calc(-1 * (var(--sidebar-total-w) + 100% + 24px)));
-  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  left: calc(var(--sidebar-total-w) + 16px);
+  top: 118px;
+  width: 400px;
+  max-height: calc(100vh - 134px);
+  border-radius: var(--r-2xl);
+  transform: translateX(calc(-1 * (var(--sidebar-total-w) + 100% + 40px)));
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), left 0.3s var(--v2-ease-standard);
 }
 .card.desktop.visible {
   transform: translateX(0);
@@ -89,42 +102,32 @@
   display: none !important;
 }
 
-/* During a trip: the card takes the NavHud distance card's slot (NavHud
-   hides that card while this is open) so the top instruction card and the
-   card never cover each other. No scrim, so the map stays draggable —
-   people use this to look around their destination. */
+/* ── During a trip: compact card in NavHud's distance-card slot (NavHud
+   hides that card while this is open). No scrim, so the map stays
+   draggable for looking around the destination. ── */
 .scrim.navMode {
   display: none !important;
 }
 .card.navMode {
   z-index: 2150;
-  overflow-y: auto;
-  padding-bottom: 12px;
 }
-/* Mobile: stays anchored at bottom: 0 like the normal sheet (so the closed
-   card is fully off-screen and switching into trip mode never shows it);
-   only the open state lifts it into the distance card's slot. */
-.card.navMode:not(.desktop) {
+/* Mobile: anchored at bottom: 0 like the sheet (the closed card stays
+   fully off-screen); only the open state lifts into the distance slot. */
+.card.mobile.navMode {
   --nav-card-lift: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom) + 12px);
   left: 12px;
   right: 12px;
-  /* Top edge stays below the HUD's instruction card (up to ~165px with its
-     "up next" and remaining-distance strips), also on short/landscape
-     screens. */
+  height: auto;
+  /* Top edge stays below the HUD's instruction card (up to ~165px with
+     its "up next" and remaining-distance strips). */
   max-height: min(46vh, calc(100dvh - var(--nav-card-lift) - 185px - var(--mob-safe-top)));
   border-radius: var(--r-2xl);
 }
-.card.navMode:not(.desktop).visible {
+.card.mobile.navMode.visible {
   transform: translateY(calc(-1 * var(--nav-card-lift)));
 }
-/* The card scrolls as a whole here; keep the swipe-to-close handle in view. */
-.card.navMode .handle {
-  position: sticky;
-  top: 0;
-  z-index: 3;
-  background: var(--v2-surface);
-}
 .card.desktop.navMode {
+  top: auto;
   left: 16px;
   bottom: 16px;
   /* Clears the full-width instruction card at the top. */
@@ -133,37 +136,65 @@
 .card.navMode .hero {
   height: 120px;
 }
-.handle.desktop {
-  display: none;
-}
 
-.handle {
-  flex-shrink: 0;
+/* ── Close button: zero-height sticky row so it floats over the photo's
+   corner and stays reachable while the card scrolls. ── */
+.closeRow {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 0;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 8px 0 4px;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
+  justify-content: flex-end;
+  padding-right: 24px;
+  overflow: visible;
 }
-.handleBar {
-  width: 48px;
-  height: 6px;
-  background: var(--v2-muted);
+.card.mobile .closeRow {
+  top: 23px; /* below the sticky handle */
+  padding-right: 28px;
+}
+.close {
+  margin-top: 12px;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
   border-radius: var(--r-full);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+  cursor: pointer;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+/* Over a photo: dark, so it reads on any picture. */
+.withHero .close {
+  background: color-mix(in srgb, var(--v2-neutral) 72%, transparent);
+  color: var(--v2-on-primary);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.close:active {
+  transform: scale(0.94);
+}
+.close:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
 }
 
+/* ── Photo ── */
 .hero {
   position: relative;
-  height: 192px;
   flex-shrink: 0;
+  height: 230px;
+  margin: 12px 12px 0;
+  border-radius: 20px;
   overflow: hidden;
-  border-radius: var(--r-lg);
-  background: var(--v2-surface);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  margin: 4px 16px 0;
-  width: calc(100% - 32px);
+  background: var(--v2-primary-tint);
+}
+.card.mobile .hero {
+  height: 210px;
+  margin: 0 16px;
 }
 .hero > img {
   position: absolute;
@@ -172,26 +203,20 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: opacity 0.25s;
 }
-/* Type-icon panel behind the photo: visible while it loads, and if it fails. */
+/* Type icon behind the photo: visible while it loads, and if it fails. */
 .heroFallback {
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--v2-thumb-bg, var(--v2-surface));
+  display: grid;
+  place-items: center;
   color: var(--v2-primary);
 }
-/* Transparent full-hero button that opens the photo viewer. Sits under the
-   close / prev / next / count controls (z-index 2). */
+/* Whole photo opens the full-screen viewer; arrows and count sit above. */
 .heroTap {
   position: absolute;
   inset: 0;
   z-index: 1;
-  width: 100%;
-  height: 100%;
   padding: 0;
   border: none;
   background: transparent;
@@ -201,378 +226,163 @@
 .heroTap:focus-visible {
   outline: 2px solid var(--v2-primary);
   outline-offset: -3px;
-  border-radius: var(--r-lg);
+  border-radius: 20px;
 }
-
-/* "Tap to view full photo" hint. Pulses for ~6s and shows its label for
-   ~5s each time a card opens, then settles into a quiet expand icon so it
-   stays discoverable without nagging. */
-.tapHint {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  height: 28px;
-  padding: 4px;
-  border-radius: var(--r-full);
-  background: rgba(15, 23, 42, 0.62);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  color: #fff;
-  pointer-events: none;
-  animation: hintIn 0.45s var(--v2-ease-standard) 0.35s both;
-}
-.tapHintIcon {
-  position: relative;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tapHintIcon::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.55);
-  animation: hintPulse 1.5s ease-out 0.8s 4 both;
-}
-.tapHintIcon svg {
-  position: relative;
-}
-.tapHintText {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  max-width: 170px;
-  padding: 0 8px 0 6px;
-  animation: hintCollapse 0.45s var(--v2-ease-standard) 5.2s forwards;
-}
-@keyframes hintIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes hintPulse {
-  0% { transform: scale(0.6); opacity: 0.9; }
-  100% { transform: scale(2.1); opacity: 0; }
-}
-@keyframes hintCollapse {
-  to { max-width: 0; padding: 0; opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tapHint { animation: none; }
-  .tapHintIcon::before { animation: none; opacity: 0; }
-}
-
-.heroOverlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom, transparent 55%, rgba(15, 23, 42, 0.45) 100%);
-  pointer-events: none;
-}
-
-/* New: close button lives on top of the hero image per Figma (node
-   7:949, "Close Button") instead of in the header — a placement change
-   only, same onClose handler as .close below. Only rendered when a hero
-   photo exists (see PlaceCard.jsx); .close (header) remains the fallback
-   for photo-less waypoints so closing is always reachable. */
-.closeOnHero {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: var(--r-full);
-  background: color-mix(in srgb, var(--v2-surface) 80%, transparent);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  color: var(--v2-text);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
-    background var(--v2-duration-quick) var(--v2-ease-standard);
-}
-.closeOnHero:hover {
-  background: var(--v2-surface);
-}
-.closeOnHero:active {
-  transform: scale(0.94);
-}
-
-.photoCount {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(15, 23, 42, 0.55);
-  color: #fff;
-  border-radius: var(--r-full);
-  padding: 3px 9px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
 .photoNav {
   position: absolute;
   top: 50%;
+  z-index: 2;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
   transform: translateY(-50%);
-  background: rgba(15, 23, 42, 0.5);
   border: none;
-  color: #fff;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  font-size: 22px;
-  line-height: 1;
+  background: transparent;
+  color: var(--v2-on-primary);
+  filter: drop-shadow(0 1px 3px rgba(15, 23, 42, 0.55));
+  cursor: pointer;
+  transition: opacity var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.photoNav:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+.photoNav:focus-visible {
+  outline: 2px solid var(--v2-on-primary);
+  outline-offset: -4px;
+  border-radius: var(--r-full);
+}
+.prev { left: 6px; }
+.next { right: 6px; }
+.photoCount {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--v2-neutral) 72%, transparent);
+  color: var(--v2-on-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* ── Details ── */
+.body {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 24px 24px;
+}
+.card.mobile .body {
+  padding: 18px 20px calc(24px + var(--mob-safe-bottom));
+}
+.noHero {
+  padding-top: 16px;
+}
+.noHero .name {
+  padding-right: 48px; /* room for the floating close button */
+}
+.name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--v2-neutral);
+  overflow-wrap: anywhere;
+}
+/* "★ 5.0 (1) · Shop" — separators come from CSS so any item can be absent. */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--v2-text);
+}
+.meta > * + *::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--v2-text-muted);
+}
+.rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.star {
+  color: var(--v2-star);
+}
+.ratingValue {
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.ratingCount {
+  color: var(--v2-text-muted);
+}
+.desc {
+  margin: 12px 0 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--v2-text);
+  overflow-wrap: anywhere;
+}
+
+.primaryBtn {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.14px;
+  box-shadow: 0 12px 24px -10px var(--v2-primary-glow-strong);
   cursor: pointer;
   transition: background var(--v2-duration-quick) var(--v2-ease-standard),
     transform var(--v2-duration-quick) var(--v2-ease-standard);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
 }
-.photoNav:active {
-  background: rgba(15, 23, 42, 0.75);
-  transform: translateY(-50%) scale(0.92);
+.primaryBtn:hover {
+  background: var(--v2-primary-hover);
 }
-.photoNav.prev { left: 10px; }
-.photoNav.next { right: 10px; }
-
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 16px 4px;
-  flex-shrink: 0;
-}
-.titleWrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-/* Font-mapping note: legacy's literal CSS was `font-family:'Geist',sans-serif;
-   font-weight:800`. This redesign pass instead follows Figma node 7:955
-   exactly — Bricolage Grotesque SemiBold (var(--font-display), already
-   bundled/tokenized for the Loading Screen) at 16px/24px, matching the
-   "Lumina Campus Utility" headline treatment other v2 screens use. Flag
-   if the original 20px/700-weight Geist sizing was actually wanted back. */
-.name {
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--v2-text);
-  line-height: 24px;
-  margin: 0;
-  word-break: break-word;
-}
-
-/* Row for the type badge + rating, side by side per Figma's "Container"
-   (node 7:956) instead of the legacy stacked layout. */
-.metaRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* Figma's badge is a translucent violet pill (node 7:957/7:958), not
-   plain colored text — restyled as a chip while keeping the same class
-   name/consumer (`data?.badge` in PlaceCard.jsx). */
-.badge {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--v2-primary);
-  background: var(--v2-primary-tag-fill);
-  border: 1px solid var(--v2-primary-outline);
-  border-radius: var(--r-full);
-  padding: 4px 12px;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-
-.rating {
-  display: inline-flex;
-}
-.ratingEmpty {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--v2-text-variant);
-}
-
-/* Slice 8: legacy's literal `#FFC857` (style.css ~4081, ~2626) — a star
-   gold that isn't one of the documented tokens (closest v1 token was
-   --tertiary at #ffb95f, a visibly different amber; v2's --v2-tertiary
-   is #a15100, further still). Kept as a literal here rather than
-   substituting the nearest token, same call this file's earlier
-   .name font-mapping note made for undocumented legacy values — flag if
-   a --v2-star token should be added instead. */
-.ratingFilled {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 600;
-  color: #ffc857;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.ratingCount {
-  color: var(--v2-text-variant);
-  font-weight: 500;
-  font-size: 12px;
-}
-
-/* Header-row close button — fallback for waypoints with no hero photo
-   (see .closeOnHero above and PlaceCard.jsx). Same onClose handler,
-   restyled to the v2 light surface. */
-.close {
-  background: var(--v2-primary-tag-fill);
-  border: 1px solid var(--v2-primary-outline);
-  color: var(--v2-primary);
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
-    background var(--v2-duration-quick) var(--v2-ease-standard);
-}
-.close:hover {
-  background: color-mix(in srgb, var(--v2-primary) 20%, transparent);
-}
-.close:active {
-  transform: scale(0.94);
-}
-
-.coords {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--v2-text-variant);
-  letter-spacing: 0.02em;
-  padding: 4px 16px 10px;
-  flex-shrink: 0;
-}
-
-/* Font-mapping note: same situation as .name — legacy literal was 'Geist',
-   which the brand docs don't cover for body/description text. Using
-   --font-ui here (Inter, the v2 body font per tokens-v2.css's comment)
-   as the closest documented equivalent. Flag if a different token was
-   intended. */
-.desc {
-  font-family: var(--font-ui);
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--v2-text-variant);
-  padding: 12px 16px 12px;
-  flex-shrink: 0;
-  border-top: 1px solid color-mix(in srgb, var(--v2-text) 10%, transparent);
-}
-
-.strip {
-  padding: 0 16px 14px;
-  flex-shrink: 0;
-}
-.stripInner {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-}
-.stripInner img {
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-  border-radius: var(--r-md);
-  cursor: pointer;
-  flex-shrink: 0;
-  border: 2px solid transparent;
-  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard),
-    transform var(--v2-duration-quick) var(--v2-ease-standard);
-}
-.stripInner img.active {
-  border-color: var(--v2-primary);
-}
-.stripInner img:hover {
-  transform: scale(1.05);
-}
-/* Same footprint as a strip photo, shown when that photo can't be fetched. */
-.stripFallback {
-  width: 56px;
-  height: 56px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--r-md);
-  border: 2px solid transparent;
-  background: var(--v2-thumb-bg, var(--v2-surface));
-  color: var(--v2-primary);
-  cursor: pointer;
-}
-.stripFallback.active {
-  border-color: var(--v2-primary);
-}
-
-.actions {
-  padding: 16px 16px 24px;
-  flex-shrink: 0;
-}
-.navBtn {
-  width: 100%;
-  background: var(--v2-primary);
-  color: var(--v2-on-primary);
-  border: none;
-  border-radius: var(--r-md);
-  box-shadow: 0 4px 7px 0 var(--v2-primary-glow-strong);
-  font-family: var(--font-ui);
-  font-size: 16px;
-  font-weight: 500;
-  padding: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
-    opacity var(--v2-duration-quick) var(--v2-ease-standard);
-}
-.navBtn:active {
+.primaryBtn:active {
   transform: scale(0.98);
-  opacity: 0.92;
 }
-.navBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.primaryBtn:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 3px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.mobile,
+  .card.desktop {
+    transition: none;
+  }
 }

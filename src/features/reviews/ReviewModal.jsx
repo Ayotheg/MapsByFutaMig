@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Star, CheckCircle2, TriangleAlert, X } from 'lucide-react';
+import { Star, TriangleAlert, X } from 'lucide-react';
 import styles from './ReviewModal.module.css';
 import { submitReview } from './submitReview';
 import { track } from '../../lib/analytics';
@@ -99,9 +99,10 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
 
     try {
       await submitReview({ waypointId: dest.id, rating, comment, userId: user?.id });
-      setStatus({ kind: 'success', text: 'Thanks for helping fellow students!' });
+      // Shows the "Thanks for your review" screen; Done closes it.
+      setStatus({ kind: 'success' });
+      setSubmitting(false);
       await onSubmitted?.();
-      setTimeout(onClose, 1200);
     } catch (err) {
       setStatus({ kind: 'error', text: 'Failed to save review. Try again.' });
       setSubmitting(false);
@@ -129,10 +130,33 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
         onClick={handleSubmit}
         disabled={rating < 1 || submitting}
       >
-        {submitting ? 'Saving…' : status?.kind === 'success' ? 'Submitted' : 'Submit Review'}
+        {submitting ? 'Saving…' : 'Submit Review'}
       </button>
     </>
   );
+
+  if (status?.kind === 'success') {
+    return (
+      <div
+        className={styles.overlay}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <div className={`${styles.sheet} ${styles.thanks}`} role="status">
+          <span className={styles.checkRing} aria-hidden="true">
+            <svg className={styles.check} viewBox="0 0 64 64" width="64" height="64">
+              <circle className={styles.checkCircle} cx="32" cy="32" r="29" />
+              <path className={styles.checkMark} d="M21 33l7.5 7.5L44 25" />
+            </svg>
+          </span>
+          <h2 className={styles.thanksTitle}>Thanks for your review</h2>
+          <p className={styles.thanksSub}>You&apos;re helping other FUTARIANs find great places.</p>
+          <button type="button" className={styles.doneBtn} onClick={onClose} autoFocus>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -175,11 +199,15 @@ export default function ReviewModal({ dest, onClose, onSubmitted, user }) {
             onChange={(e) => setComment(e.target.value)}
             placeholder="How was the service, quality, price...?"
           />
+          {/* Reviews are public on the place card (supabase/reviews_read.sql). */}
+          <p className={styles.note}>
+            {user ? 'Your first name will be shown with your review.' : 'Your review will be posted as Anonymous.'}
+          </p>
         </div>
 
         {status && (
           <div className={`${styles.status} ${styles[status.kind]}`}>
-            {status.kind === 'success' ? <CheckCircle2 size={13} /> : <TriangleAlert size={13} />} {status.text}
+            <TriangleAlert size={13} /> {status.text}
           </div>
         )}
 

@@ -6,7 +6,7 @@
 - Machine-readable copy: [`design-system/tokens.json`](design-system/tokens.json)
 - In code, the colours are CSS variables in `src/styles/tokens-v2.css`.
 
-## Colour — 16 brand colours
+## Colour — 17 brand colours
 
 Violet `#7c3aed` is the brand. Never invent a hex; if a Figma frame shows a colour close to one of these, use the token.
 
@@ -28,6 +28,7 @@ Violet `#7c3aed` is the brand. Never invent a hex; if a Figma frame shows a colo
 | `secondary-tint` | `#e6f6f4` | `--v2-secondary-tint` | Pale teal fill |
 | `error` | `#ba1a1a` | `--v2-error-text` | Destructive buttons, error text/icons |
 | `error-tint` | `#fff8f7` | `--v2-error-tint` | Destructive hover, error banners |
+| `star` | `#ffc857` | `--v2-star` | Rating star icons (filled). Icon fill only, never text |
 
 Rules:
 

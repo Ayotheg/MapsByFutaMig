@@ -74,6 +74,18 @@ async function blockedWriteError(action) {
   return new Error(`Could not ${action}. ${reason}`);
 }
 
+// PostgREST's missing-column message is "Could not find the 'x' column of
+// 'waypoints' in the schema cache" (PGRST204); Postgres' own is "column ...
+// does not exist" (42703).
+function isMissingColumn(error) {
+  return (
+    !!error &&
+    (error.code === 'PGRST204' ||
+      error.code === '42703' ||
+      /column .* does not exist|could not find the .* column/i.test(error.message || ''))
+  );
+}
+
 // ── Images ───────────────────────────────────────────────────────────────
 
 /** Raw image rows (with row id + storage_path, not just a resolved URL) —
@@ -138,7 +150,7 @@ export async function deleteImageRows(table, ids) {
 // patch fields, not required ones: AdminEditModal.jsx always passes them
 // now, but this stays backward-compatible with any other caller passing
 // only name/description/type.
-export async function updateWaypoint(id, { name, description, type, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel, channelLink, channelPlatform, businessLink, businessPlatform }) {
+export async function updateWaypoint(id, { name, description, type, area, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel, channelLink, channelPlatform, businessLink, businessPlatform }) {
   // Never write a type the map/legend can't render (see wpTypeMeta.js).
   const patch = { name, description };
   if (type !== undefined) patch.type = normalizeWaypointType(type);
@@ -156,23 +168,31 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
   // Business entries (supabase/business_entries.sql) — same shape again.
   if (businessLink !== undefined) explorePatch.business_link = businessLink || null;
   if (businessPlatform !== undefined) explorePatch.business_platform = businessPlatform || null;
+  // Place area (supabase/waypoint_area.sql) — optional for the same reason.
+  if (area !== undefined) explorePatch.area = area.trim() || null;
 
   const hasExploreFields = Object.keys(explorePatch).length > 0;
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('waypoints')
     .update(hasExploreFields ? { ...patch, ...explorePatch } : patch)
     .eq('id', id)
     .select('id');
 
-  // PostgREST's missing-column message is "Could not find the 'x' column of
-  // 'waypoints' in the schema cache" (code PGRST204); Postgres' own is
-  // "column ... does not exist" (42703). The old check only matched the
-  // second form, so a not-yet-migrated Explore column blocked the whole save.
-  const missingColumn =
-    error &&
-    (error.code === 'PGRST204' ||
-      error.code === '42703' ||
-      /column .* does not exist|could not find the .* column/i.test(error.message || ''));
+  // The area column is the newest; if it's the missing one, keep every other
+  // field rather than falling back to name/description/type only.
+  let areaSkipped = false;
+  if (error && 'area' in explorePatch && isMissingColumn(error)) {
+    const withoutArea = { ...explorePatch };
+    delete withoutArea.area;
+    ({ data, error } = await supabase
+      .from('waypoints')
+      .update({ ...patch, ...withoutArea })
+      .eq('id', id)
+      .select('id'));
+    areaSkipped = !error;
+  }
+
+  const missingColumn = isMissingColumn(error);
 
   if (missingColumn && hasExploreFields) {
     // supabase/explore_fields.sql hasn't been run yet — don't let that
@@ -185,13 +205,16 @@ export async function updateWaypoint(id, { name, description, type, isExplore, e
     if (baseError) throw baseError;
     if (!baseData?.length) throw await blockedWriteError('save this waypoint');
     throw new Error(
-      'Saved name/description/type, but some fields need a migration run first — supabase/explore_fields.sql for the Explore toggle/tags/priority, supabase/channel_entries.sql for the channel link, and/or supabase/business_entries.sql for the business link — those were not saved.'
+      'Saved name/description/type, but some fields need a migration run first — supabase/explore_fields.sql for the Explore toggle/tags/priority, supabase/channel_entries.sql for the channel link, supabase/business_entries.sql for the business link, and/or supabase/waypoint_area.sql for the area — those were not saved.'
     );
   }
   if (error) throw error;
   if (!data?.length) throw await blockedWriteError('save this waypoint');
   // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
   track('admin_action', { action: 'update', entity: 'waypoint' });
+  if (areaSkipped) {
+    throw new Error('Saved everything except the area — run supabase/waypoint_area.sql in the Supabase SQL editor first.');
+  }
 }
 
 // Legacy: `adminDeleteBtn`'s waypoint branch (app.js ~4283–4300). Only
@@ -232,6 +255,7 @@ export async function insertWaypoint({
   type,
   lat,
   lng,
+  area,
   isPerson,
   isChannel,
   channelLink,
@@ -279,20 +303,31 @@ export async function insertWaypoint({
   if (isPromoted !== undefined) explorePatch.is_promoted = !!isPromoted;
   if (sponsorName !== undefined) explorePatch.sponsor_name = sponsorName || null;
   if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
+  // In explorePatch so it's also dropped by the full retry further down.
+  if (area !== undefined && !noLocation) explorePatch.area = area.trim() || null;
   Object.assign(row, explorePatch);
 
-  const { data, error } = await supabase.from('waypoints').insert(row).select('id').single();
+  let { data, error } = await supabase.from('waypoints').insert(row).select('id').single();
+
+  // Area is the newest column: if waypoint_area.sql hasn't run, insert
+  // everything else rather than losing the Explore/link fields too.
+  if (isMissingColumn(error) && 'area' in row) {
+    const withoutArea = { ...row };
+    delete withoutArea.area;
+    delete explorePatch.area;
+    ({ data, error } = await supabase.from('waypoints').insert(withoutArea).select('id').single());
+    if (!error) {
+      track('admin_action', { action: 'insert', entity: 'waypoint' });
+      return data.id;
+    }
+  }
 
   // supabase/people_entries.sql / channel_entries.sql haven't been run
   // yet — `is_person`/`is_channel`/`channel_*` don't exist as columns.
   // Don't let that block adding a Person or Channel entirely; retry
   // without them (behaves like an ordinary waypoint with no coordinates
   // until the relevant migration runs).
-  const missingColumn =
-    error &&
-    (error.code === 'PGRST204' ||
-      error.code === '42703' ||
-      /column .* does not exist|could not find the .* column/i.test(error.message || ''));
+  const missingColumn = isMissingColumn(error);
   if (missingColumn && (isPerson || isChannel || isBusiness || Object.keys(explorePatch).length > 0)) {
     const withoutNewCols = { ...row };
     delete withoutNewCols.is_person;
@@ -303,6 +338,7 @@ export async function insertWaypoint({
     delete withoutNewCols.business_link;
     delete withoutNewCols.business_platform;
     for (const field of Object.keys(explorePatch)) delete withoutNewCols[field];
+    delete withoutNewCols.area;
     const { data: retryData, error: retryError } = await supabase
       .from('waypoints')
       .insert(withoutNewCols)

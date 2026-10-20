@@ -87,6 +87,8 @@ export function useWaypoints() {
     const BASE_COLS = 'id, name, description, type, lat, lng, source_type, segment_id, avg_rating, review_count';
     // Paid-ad ranking fields (supabase/promotions_dedupe_ranking.sql).
     const PROMO_COLS = 'promo_days, promo_paid_at';
+    // Place area, e.g. "South Gate" (supabase/waypoint_area.sql).
+    const AREA_COLS = 'area';
 
     // ── Two-phase load ────────────────────────────────────────────────────
     // DATA SCALE — read before optimizing anything here: as of Sept 2026
@@ -129,7 +131,11 @@ export function useWaypoints() {
     // (explore_fields.sql). Falls all the way back to BASE_COLS so the map
     // still works on a project where none of these have been run yet.
     const COL_TIERS = [
-      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}, ${PROMO_COLS}`, missingMsg: null },
+      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}, ${PROMO_COLS}, ${AREA_COLS}`, missingMsg: null },
+      {
+        cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}, ${PROMO_COLS}`,
+        missingMsg: '[waypoints] Area field not found — run supabase/waypoint_area.sql to show place areas.',
+      },
       {
         cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}`,
         missingMsg: '[waypoints] Promotion ranking fields not found — run supabase/promotions_dedupe_ranking.sql to rank paid ads in Explore.',
@@ -253,6 +259,7 @@ export function useWaypoints() {
             isBusiness,
             businessLink: wp.business_link || '',
             businessPlatform: wp.business_platform || '',
+            area: wp.area || '',
           });
           continue;
         }
@@ -308,6 +315,7 @@ export function useWaypoints() {
           isPerson: false,
           isChannel: false,
           isBusiness: false,
+          area: wp.area || '',
         });
       }
       return out;

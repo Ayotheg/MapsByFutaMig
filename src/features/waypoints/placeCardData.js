@@ -18,6 +18,7 @@ export function waypointCardData(wp, snap, merge) {
     // Slice 8: rating badge data — see PlaceCard.jsx's RatingBadge.
     avgRating: wp.avgRating,
     reviewCount: wp.reviewCount,
+    area: wp.area || '',
   };
   if (merge) {
     data.osmBadge = merge.osmBadge;

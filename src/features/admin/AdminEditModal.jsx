@@ -92,6 +92,8 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  // Place area, e.g. "South Gate" (supabase/waypoint_area.sql) — places only.
+  const [area, setArea] = useState('');
   const [wpType, setWpType] = useState('landmark');
   const [category, setCategory] = useState('other');
   // People entries (supabase/people_entries.sql) — same edit form as a
@@ -144,6 +146,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       const wp = editContext.data;
       setName(wp.name || '');
       setDescription(wp.description || '');
+      setArea(wp.area || '');
       // Was `wp.type || 'landmark'` — if the stored type wasn't one of
       // this dropdown's real options (a lot of imported data isn't:
       // "yes", "off_campus_lodge", "arts_centre"…), the <select> silently
@@ -260,6 +263,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
         const businessFields = isBusiness
           ? { isBusiness: true, businessLink: businessLink.trim(), businessPlatform }
           : {};
+        const isPlace = !isPerson && !isChannel && !isBusiness;
         if (isNew) {
           const newId = await insertWaypoint({
             name: name.trim(),
@@ -270,7 +274,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             ...channelFields,
             ...businessFields,
             ...exploreFields,
-            ...(!isPerson && !isChannel && !isBusiness && { type: wpType }),
+            ...(isPlace && { type: wpType, area }),
           });
           await reconcileImages('waypoint_images', 'waypoint_id', newId, 'waypoints');
           setStatus({
@@ -282,7 +286,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           await updateWaypoint(editContext.id, {
             name: name.trim(),
             description: description.trim(),
-            ...(!isPerson && !isChannel && !isBusiness && { type: wpType }),
+            ...(isPlace && { type: wpType, area }),
             ...channelFields,
             ...businessFields,
             ...exploreFields,
@@ -425,6 +429,27 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                 </span>
               </div>
             </div>
+
+            {/* Area (supabase/waypoint_area.sql): shown on the place card
+                as "… · Shop · South Gate". Places only — people, channels
+                and online businesses have no location. */}
+            {!isPerson && !isChannel && !isBusiness && (
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Area</span>
+                  <span className={styles.wpHint}>Optional · e.g. South Gate</span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <input
+                    className={styles.wpInput}
+                    value={area}
+                    maxLength={60}
+                    onChange={(e) => setArea(e.target.value)}
+                    placeholder="e.g. South Gate, West Gate, SUB"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Channel entries (supabase/channel_entries.sql) keep the
                 edit form to exactly what the admin needs to fill in: name,

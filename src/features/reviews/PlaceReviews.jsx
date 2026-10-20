@@ -1,16 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Star } from 'lucide-react';
 import { fetchPlaceReviews, REVIEWS_PAGE_SIZE } from './fetchPlaceReviews';
 import styles from './PlaceReviews.module.css';
 
-// "Reviews" section at the bottom of PlaceCard for rateable places.
-// Newest first, REVIEWS_PAGE_SIZE at a time with "Show more". Signed-in
-// reviewers show their first name, guests show "Anonymous".
-// `version` changes when a review is submitted, so the list reloads and
-// the new review shows straight away.
-// If the read RPC isn't available (supabase/reviews_read.sql not run yet,
-// or offline) the section just doesn't render — the card's rating badge
-// still shows.
+// "Reviews" section of PlaceCard for rateable places (design: "Auth
+// Redesign" place card). Newest first, REVIEWS_PAGE_SIZE at a time.
+// Signed-in reviewers show their first name, guests "Anonymous".
+// PlaceCard keys this by place id, so switching places starts fresh.
+// `version` changes when a review is submitted, so the new one shows.
+// If the read RPC (supabase/reviews_read.sql) fails, the section hides —
+// the card's rating line still shows.
 
 const RTF = typeof Intl !== 'undefined' && Intl.RelativeTimeFormat ? new Intl.RelativeTimeFormat('en', { numeric: 'auto' }) : null;
 const UNITS = [
@@ -31,97 +30,98 @@ function timeAgo(iso) {
   return 'just now';
 }
 
-function Stars({ rating }) {
-  return (
-    <span className={styles.stars} aria-label={`${rating} out of 5 stars`}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <Star key={n} size={13} className={n <= rating ? styles.starOn : styles.starOff} fill={n <= rating ? 'currentColor' : 'none'} />
-      ))}
-    </span>
-  );
-}
-
-export default function PlaceReviews({ waypointId, reviewCount, avgRating, version }) {
+export default function PlaceReviews({ waypointId, reviewCount, version, onWriteReview }) {
   const [reviews, setReviews] = useState([]);
   const [status, setStatus] = useState('loading'); // loading | ready | unavailable
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  // Ignores a "Show more" answer that arrives after the list was reloaded.
+  const requestRef = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
-    setStatus('loading');
-    setReviews([]);
+    const request = ++requestRef.current;
+    setLoadingMore(false);
     fetchPlaceReviews(waypointId, 0)
       .then((rows) => {
-        if (cancelled) return;
+        if (request !== requestRef.current) return;
         setReviews(rows);
-        setHasMore(rows.length === REVIEWS_PAGE_SIZE);
         setStatus('ready');
       })
       .catch(() => {
-        if (!cancelled) setStatus('unavailable');
+        if (request === requestRef.current) setStatus('unavailable');
       });
-    return () => {
-      cancelled = true;
-    };
   }, [waypointId, version]);
 
   async function showMore() {
+    const request = requestRef.current;
     setLoadingMore(true);
     try {
       const rows = await fetchPlaceReviews(waypointId, reviews.length);
+      if (request !== requestRef.current) return;
       setReviews((prev) => [...prev, ...rows.filter((r) => !prev.some((p) => p.id === r.id))]);
-      setHasMore(rows.length === REVIEWS_PAGE_SIZE);
     } catch {
-      setHasMore(false);
+      /* keep what's shown */
     } finally {
-      setLoadingMore(false);
+      if (request === requestRef.current) setLoadingMore(false);
     }
   }
 
   if (status === 'unavailable') return null;
 
-  const count = Math.max(reviewCount || 0, reviews.length);
+  const total = Math.max(reviewCount || 0, reviews.length);
+  const hasMore = status === 'ready' && reviews.length < total && reviews.length >= REVIEWS_PAGE_SIZE;
+  const empty = status === 'ready' && reviews.length === 0;
 
   return (
     <section className={styles.section} aria-label="Reviews">
       <div className={styles.head}>
         <h3 className={styles.title}>Reviews</h3>
-        {count > 0 && (
-          <span className={styles.summary}>
-            {avgRating != null && (
-              <>
-                <Star size={13} className={styles.starOn} fill="currentColor" />
-                <span className={styles.mono}>{avgRating.toFixed(1)}</span>
-                <span>·</span>
-              </>
-            )}
-            <span>
-              <span className={styles.mono}>{count}</span> review{count === 1 ? '' : 's'}
-            </span>
-          </span>
+        {!empty && onWriteReview && (
+          <button type="button" className={styles.writeLink} onClick={onWriteReview}>
+            Write a review
+          </button>
         )}
       </div>
 
-      {status === 'loading' && <p className={styles.muted}>Loading reviews…</p>}
+      {status === 'loading' && <p className={styles.loading}>Loading reviews…</p>}
 
-      {status === 'ready' && reviews.length === 0 && (
-        <p className={styles.muted}>No reviews yet — be the first after your visit.</p>
+      {empty && (
+        <div className={styles.empty}>
+          <span className={styles.emptyIcon} aria-hidden="true">
+            <Star size={20} />
+          </span>
+          <p className={styles.emptyTitle}>No reviews yet</p>
+          <p className={styles.emptySub}>Been here? Help other students know what to expect.</p>
+          {onWriteReview && (
+            <button type="button" className={styles.emptyBtn} onClick={onWriteReview}>
+              Write the first review
+            </button>
+          )}
+        </div>
       )}
 
       {reviews.length > 0 && (
         <ul className={styles.list}>
-          {reviews.map((r) => (
-            <li key={r.id} className={styles.item}>
-              <div className={styles.itemHead}>
-                <Stars rating={r.rating} />
-                <span className={styles.meta}>
-                  {r.reviewer_name || 'Anonymous'} · {timeAgo(r.created_at)}
-                </span>
-              </div>
-              {r.comment && <p className={styles.comment}>{r.comment}</p>}
-            </li>
-          ))}
+          {reviews.map((r) => {
+            const name = r.reviewer_name || 'Anonymous';
+            return (
+              <li key={r.id} className={styles.item}>
+                <div className={styles.itemHead}>
+                  <span className={styles.avatar} aria-hidden="true">
+                    {name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className={styles.who}>
+                    <span className={styles.name}>{name}</span>
+                    <span className={styles.when}>{timeAgo(r.created_at)}</span>
+                  </span>
+                  <span className={styles.score} role="img" aria-label={`${r.rating} out of 5 stars`}>
+                    <Star size={15} className={styles.star} fill="currentColor" aria-hidden="true" />
+                    <span aria-hidden="true">{r.rating}</span>
+                  </span>
+                </div>
+                {r.comment && <p className={styles.comment}>{r.comment}</p>}
+              </li>
+            );
+          })}
         </ul>
       )}
 

@@ -184,6 +184,7 @@
   --v2-text-muted:      #6b6478; /* captions/placeholders — 5.4:1 on surface, replaces --v2-text-variant for new work */
   --v2-secondary-tint:  #e6f6f4; /* pale teal fill behind teal content */
   --v2-error-tint:      #fff8f7; /* pale red fill: destructive hover, error banners */
+  --v2-star:            #ffc857; /* rating star gold — icon fill only, never text */
 
   /* Not yet defined — add only when a screen actually needs it:
      --v2-secondary-container (lighter tint variant, e.g. for the
