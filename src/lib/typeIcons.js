@@ -1,67 +1,59 @@
 /**
  * typeIcons.js
  *
- * One shared "waypoint/place type -> icon" lookup, replacing the emoji
- * maps that used to be duplicated across `wpTypeMeta.js` (TYPE_EMOJI),
- * `features/search/chipConfig.js` (TYPE_EMOJI/typeEmoji),
- * `features/search/useSearchIndex.js` (TYPE_ICONS), and
- * `features/osm-annotations/osmAnnotationUtils.js` (OSM_BADGE) — all
- * four kept their own copy of "what emoji represents a lecture hall",
- * so they could (and did) drift. This is the one place that answer
- * lives now; each of those files imports `getTypeIcon` instead.
+ * The one "place type -> icon" lookup. Used wherever a place has no photo
+ * (place card, Explore cards, chip results, Nearby places, admin list)
+ * and for search result icons, so every fallback agrees.
  *
- * Keys are the raw `type`/`subtype` strings used across the app (same
- * ones `CATEGORY_ICON_KEYS` in `shared/placeCategories.js` uses for the
- * 16 Quick Chip *categories* — this map is the superset, covering every
- * individual waypoint type, not just the grouped chip categories).
- * Values look up `LEGACY_ICON_MAP`.
+ * Keys are the raw `type`/`subtype` strings used across the app (the 24
+ * waypoint types plus older/OSM subtypes that still appear in data).
+ * Values are keys into `LEGACY_ICON_MAP` (lucide icons + the custom
+ * mosque/football/gate icons drawn to the same spec).
  */
 import { LEGACY_ICON_MAP } from './legacyIconMap';
 
 export const TYPE_ICON_KEYS = {
   // Academic
-  lecture_hall: 'graduation-cap',
-  faculty: 'building-fill',
+  lecture_hall: 'presentation',
+  faculty: 'school',
   laboratory: 'flask-conical',
-  workshop: 'wrench',
-  library: 'book-open',
-  auditorium: 'presentation',
+  workshop: 'hammer',
+  library: 'library-big',
+  auditorium: 'theater',
   hall: 'theater',
 
   // Admin
   senate: 'bank2',
-  admin: 'briefcase',
+  admin: 'building-fill',
+  administrative: 'building-fill',
   bursary: 'banknote',
-  student_affairs: 'person-fill',
+  student_affairs: 'users',
+  office: 'briefcase',
 
   // Residential
+  // Same house as the "Hostel / Lodges" quick chip.
   hostel: 'house-door-fill',
-  staff_quarters: 'house-door-fill',
   dormitory: 'house-door-fill',
   hall_of_residence: 'house-door-fill',
+  staff_quarters: 'house-door-fill',
 
-  // Commerce / services
-  // `food` and `shop` are the Sept 2026 consolidated broad types (see
-  // adminTypeOptions.js header) — the raw pre-merge keys below (shopping,
-  // furniture, cafe, restaurant, pharmacy, barber, laundry, fast_food) are
-  // kept too since KML/OSM annotation data can still carry those as a
-  // `subtype` string independent of the waypoints table's `type` column.
+  // Commerce / services. `food` and `shop` are the broad types; the rest
+  // are older or OSM subtypes that still arrive in KML/OSM data.
   food: 'restaurant-fill',
-  shop: 'shop',
-  shopping: 'shop',
-  furniture: 'armchair',
-  kiosk: 'shop',
-  printing_shop: 'printer-fill',
-  cafe: 'coffee',
   restaurant: 'restaurant-fill',
-  fast_food: 'restaurant-fill',
+  fast_food: 'sandwich',
+  cafe: 'coffee',
+  shop: 'shop',
+  kiosk: 'shop',
+  shopping: 'shopping-bag',
+  furniture: 'armchair',
+  printing_shop: 'printer-fill',
   pharmacy: 'pill',
   barber: 'scissors',
-  laundry: 'shirt',
+  laundry: 'washing-machine',
   fuel: 'fuel',
-  bank: 'bank2',
-  atm: 'bank2',
-  office: 'briefcase',
+  bank: 'banknote',
+  atm: 'credit-card',
 
   // Sports / worship
   sports: 'football',
@@ -71,31 +63,31 @@ export const TYPE_ICON_KEYS = {
   chapel: 'church',
   place_of_worship: 'church',
 
+  // Health
+  clinic: 'stethoscope',
+  hospital: 'hospital-fill',
+
   // Transport / infrastructure
-  garage: 'car-front',
-  parking: 'car-front',
   bus_stop: 'bus-front-fill',
-  infrastructure: 'zap', // Sept 2026 consolidated type (utility + security_post)
+  garage: 'car-front',
+  parking: 'square-parking',
+  infrastructure: 'zap',
   utility: 'zap',
-  security_post: 'shield',
+  security_post: 'shield-check',
   gate: 'gate-barrier',
   entrance: 'door-open',
   junction: 'signpost',
   hazard: 'triangle-alert',
 
-  // Health
-  clinic: 'hospital-fill',
-  hospital: 'hospital-fill',
-
-  // Misc / catch-alls
+  // Misc
   toilet: 'toilet',
   landmark: 'bank2',
-  administrative: 'building-fill',
   university: 'graduation-cap',
   college: 'graduation-cap',
-  school: 'building-fill',
+  school: 'school',
 
-  // Search-index / KML source types
+  // Search-index / OSM / KML source types
+  poi: 'geo-alt-fill',
   waypoint: 'geo-alt-fill',
   segment: 'route',
   osm: 'globe',

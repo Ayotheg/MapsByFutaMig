@@ -109,6 +109,18 @@ import {
   Store,          // shop
   Toilet,         // toilet — person-requested addition, not from legacy (no bi-* toilet class existed)
   X,              // x-lg
+  // Place-type fallback icons (lib/typeIcons.js, Oct 2026 refresh)
+  CreditCard,     // atm
+  Hammer,         // workshop
+  LibraryBig,     // library
+  Sandwich,       // fast food
+  School,         // faculty / school
+  ShieldCheck,    // security post
+  ShoppingBag,    // shopping
+  SquareParking,  // parking
+  Stethoscope,    // clinic
+  Users,          // student affairs
+  WashingMachine, // laundry
 } from 'lucide-react';
 import MosqueIcon from './MosqueIcon';
 import FootballIcon from './FootballIcon';
@@ -183,6 +195,17 @@ export const LEGACY_ICON_MAP = {
   'football': FootballIcon,
   'mosque': MosqueIcon,
   'gate-barrier': GateIcon,
+  'credit-card': CreditCard,
+  'hammer': Hammer,
+  'library-big': LibraryBig,
+  'sandwich': Sandwich,
+  'school': School,
+  'shield-check': ShieldCheck,
+  'shopping-bag': ShoppingBag,
+  'square-parking': SquareParking,
+  'stethoscope': Stethoscope,
+  'users': Users,
+  'washing-machine': WashingMachine,
 };
 
 /**

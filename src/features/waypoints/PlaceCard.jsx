@@ -139,6 +139,14 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
           </button>
         </div>
 
+        {/* No photos yet: a soft panel with the place type's icon, so every
+            card keeps the same shape (lib/typeIcons.js). */}
+        {!hasPhotos && (
+          <div className={`${styles.hero} ${styles.heroEmpty}`} aria-hidden="true">
+            <TypeIcon className={styles.heroEmptyIcon} size={44} strokeWidth={1.5} />
+          </div>
+        )}
+
         {hasPhotos && (
           <div className={styles.hero}>
             {/* Type icon underneath: shows while the photo downloads, and
@@ -186,7 +194,7 @@ export default function PlaceCard({ data, onClose, onNavigate, onWriteReview, co
           </div>
         )}
 
-        <div className={`${styles.body} ${hasPhotos ? '' : styles.noHero}`}>
+        <div className={styles.body}>
           <h2 className={styles.name}>{data?.name || 'Location'}</h2>
 
           <div className={styles.meta}>

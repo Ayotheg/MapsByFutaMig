@@ -162,8 +162,10 @@
   place-items: center;
   border: none;
   border-radius: var(--r-full);
-  background: var(--v2-primary-tint);
-  color: var(--v2-primary-hover);
+  /* White on the pale no-photo panel. */
+  background: var(--v2-on-primary);
+  color: var(--v2-neutral);
+  box-shadow: 0 2px 6px -2px rgba(15, 23, 42, 0.18);
   cursor: pointer;
   transition: transform var(--v2-duration-quick) var(--v2-ease-standard);
 }
@@ -204,6 +206,28 @@
   object-fit: cover;
   display: block;
 }
+/* No photos yet: shorter tinted panel with the type icon sitting flat on it. */
+.heroEmpty {
+  height: 150px;
+  display: grid;
+  place-items: center;
+  background: var(--v2-primary-tint);
+}
+.card.mobile .heroEmpty {
+  height: 140px;
+}
+.card.navMode .heroEmpty {
+  height: 96px;
+}
+.heroEmptyIcon {
+  color: var(--v2-primary);
+  opacity: 0.55;
+}
+.card.navMode .heroEmptyIcon {
+  width: 34px;
+  height: 34px;
+}
+
 /* Type icon behind the photo: visible while it loads, and if it fails. */
 .heroFallback {
   position: absolute;
@@ -281,12 +305,6 @@
 }
 .card.mobile .body {
   padding: 18px 20px calc(24px + var(--mob-safe-bottom));
-}
-.noHero {
-  padding-top: 16px;
-}
-.noHero .name {
-  padding-right: 48px; /* room for the floating close button */
 }
 .name {
   margin: 0;
