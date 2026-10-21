@@ -93,6 +93,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Name/desc/meta keep their full height — with `overflow: hidden` the flex
+   column would otherwise squash them and clip the text mid-line. The row
+   grows instead. */
+.info > * {
+  flex-shrink: 0;
+}
+
 /* Phones: long place names get two lines instead of an ellipsis. */
 @media (max-width: 768px) {
   .name {
