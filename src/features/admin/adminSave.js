@@ -306,7 +306,9 @@ export async function insertWaypoint({
   if (sponsorName !== undefined) explorePatch.sponsor_name = sponsorName || null;
   if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
   // In explorePatch so it's also dropped by the full retry further down.
-  if (area !== undefined && !noLocation) explorePatch.area = area.trim() || null;
+  // A Person has no location, but reuses this column for their title
+  // ("300L · Electrical & Electronics") — see AdminEditModal.jsx.
+  if (area !== undefined && !isChannel && !isBusiness) explorePatch.area = area.trim() || null;
   Object.assign(row, explorePatch);
 
   let { data, error } = await supabase.from('waypoints').insert(row).select('id').single();

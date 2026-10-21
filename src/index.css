@@ -34,6 +34,9 @@
 @import "@fontsource/dm-mono/400.css";
 @import "@fontsource/dm-mono/500.css";
 
+/* Explore panel title (approved alternate, DESIGN_SYSTEM.md). */
+@import "@fontsource-variable/plus-jakarta-sans";
+
 /* ── Icons: lucide-react (see src/lib/legacyIconMap.js). No CSS import
    needed — icons are React components, tree-shaken per usage. ────── */
 

@@ -522,17 +522,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rowType {
-  color: var(--v2-primary);
-}
-.rowRating {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-.star {
-  fill: var(--v2-star);
-  color: var(--v2-star);
+.rowDist {
+  font-variant-numeric: tabular-nums;
 }
 .chevron {
   flex-shrink: 0;

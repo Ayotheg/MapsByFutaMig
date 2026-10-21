@@ -1,6 +1,6 @@
-import { BadgeCheck, ChevronRight, Sparkle, Star } from 'lucide-react';
+import { BadgeCheck, ChevronRight, Sparkle } from 'lucide-react';
 import { getTypeIcon } from '../../lib/typeIcons';
-import { dotColor } from '../search/chipConfig';
+import { dotColor, fmtMeters } from '../search/chipConfig';
 import { haversine } from '../../lib/geoUtils';
 import { channelPlatformMeta } from '../../lib/channelMeta';
 import { track } from '../../lib/analytics';
@@ -21,9 +21,6 @@ import styles from './ExploreSections.module.css';
  * same `onSelect(pick.waypoint)` / channel-link tracking the old cards
  * used.
  */
-
-// Rough campus walking pace for the "N min walk" label.
-const WALK_METERS_PER_MIN = 80;
 
 // With no paid placements, the first few picks fill the Featured rail so
 // the section is never empty.
@@ -59,11 +56,17 @@ export function moreTitle(category) {
   return 'Popular on campus';
 }
 
-function walkMins(pick, userCoords) {
-  if (pick.distanceMins != null) return pick.distanceMins;
+function distanceMeters(pick, userCoords) {
+  if (pick.distanceMeters != null) return pick.distanceMeters;
   if (!userCoords || pick.lat == null || pick.lng == null) return null;
-  const meters = haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng);
-  return Math.max(1, Math.round(meters / WALK_METERS_PER_MIN));
+  return haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng);
+}
+
+// A person's title ("300L · Electrical & Electronics", set in admin);
+// people without one fall back to their Explore tags.
+function personTitleParts(pick) {
+  if (pick.area) return pick.area.split('·').map((s) => s.trim()).filter(Boolean);
+  return (pick.tags || []).slice(0, 2);
 }
 
 function typeLabel(pick) {
@@ -188,6 +191,7 @@ function PlaceFeaturedCard({ pick, onSelect }) {
 
 function PersonFeaturedCard({ pick, onSelect }) {
   const about = bio(pick);
+  const titleParts = personTitleParts(pick);
   return (
     <button type="button" className={`${styles.featured} ${styles.personCard}`} onClick={() => onSelect?.(pick.waypoint)}>
       <span className={styles.personTop}>
@@ -205,7 +209,7 @@ function PersonFeaturedCard({ pick, onSelect }) {
         )}
         <span className={styles.featuredText}>
           <span className={styles.featuredName}>{pick.name}</span>
-          {pick.tags?.length > 0 && <span className={styles.featuredMeta}>{pick.tags.slice(0, 2).join(' · ')}</span>}
+          {titleParts.length > 0 && <span className={styles.featuredMeta}>{titleParts.join(' · ')}</span>}
         </span>
       </span>
       {about && <span className={styles.personBio}>{about}</span>}
@@ -246,9 +250,14 @@ export function ListRow({ pick, ...props }) {
   return <PlaceRow pick={pick} {...props} />;
 }
 
+// Second line, same "area · distance" as the Quick Chips results
+// (ChipResultRow.jsx): the place's area, or its description when no area
+// is set yet, then the distance from the person.
 function PlaceRow({ pick, userCoords, onSelect, verified, size }) {
   const Icon = getTypeIcon(pick.type);
-  const mins = walkMins(pick, userCoords);
+  const area = pick.area || bio(pick);
+  const meters = distanceMeters(pick, userCoords);
+  const dist = meters != null ? fmtMeters(meters) : '';
   return (
     <button type="button" className={`${styles.row} ${size === 'sm' ? styles.rowSm : ''}`} onClick={() => onSelect?.(pick.waypoint)}>
       <AvatarBox
@@ -263,17 +272,13 @@ function PlaceRow({ pick, userCoords, onSelect, verified, size }) {
           <span className={styles.rowName}>{pick.name}</span>
           {verified && <BadgeCheck className={styles.verified} size={13} aria-label="Verified campus spot" />}
         </span>
-        <span className={styles.rowMeta}>
-          <span className={styles.rowType}>{typeLabel(pick)}</span>
-          {mins != null && ` · ${mins} min walk`}
-          {pick.avgRating != null && (
-            <span className={styles.rowRating}>
-              {' · '}
-              <Star size={10} className={styles.star} aria-hidden="true" />
-              {Number(pick.avgRating).toFixed(1)}
-            </span>
-          )}
-        </span>
+        {(area || dist) && (
+          <span className={styles.rowMeta}>
+            {area}
+            {area && dist && ' · '}
+            {dist && <span className={styles.rowDist}>{dist}</span>}
+          </span>
+        )}
       </span>
       {pick.isPromoted && <PromoBadge pick={pick} />}
       <ChevronRight className={styles.chevron} size={18} aria-hidden="true" />
@@ -283,6 +288,7 @@ function PlaceRow({ pick, userCoords, onSelect, verified, size }) {
 
 function PersonRow({ pick, onSelect, size }) {
   const about = bio(pick);
+  const titleParts = personTitleParts(pick);
   return (
     <button
       type="button"
@@ -296,9 +302,9 @@ function PersonRow({ pick, onSelect, size }) {
       />
       <span className={styles.rowBody}>
         <span className={styles.rowName}>{pick.name}</span>
-        {pick.tags?.length > 0 && (
+        {titleParts.length > 0 && (
           <span className={styles.tagChips}>
-            {pick.tags.slice(0, 2).map((tag) => (
+            {titleParts.map((tag) => (
               <span key={tag} className={styles.tagChip}>
                 {tag}
               </span>

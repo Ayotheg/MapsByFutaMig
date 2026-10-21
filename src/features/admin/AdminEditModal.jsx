@@ -92,7 +92,9 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  // Place area, e.g. "South Gate" (supabase/waypoint_area.sql) — places only.
+  // Place area, e.g. "South Gate" (supabase/waypoint_area.sql). A Person
+  // has no location, so the same column holds their title instead
+  // ("300L · Electrical & Electronics"), shown under their name in Explore.
   const [area, setArea] = useState('');
   const [wpType, setWpType] = useState('landmark');
   const [category, setCategory] = useState('other');
@@ -279,6 +281,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
               ...businessFields,
               ...exploreFields,
               ...(isPlace && { type: wpType, area }),
+              ...(isPerson && { area }),
             },
             { onWarning: (w) => (warning = w) }
           );
@@ -293,6 +296,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             name: name.trim(),
             description: description.trim(),
             ...(isPlace && { type: wpType, area }),
+            ...(isPerson && { area }),
             ...channelFields,
             ...businessFields,
             ...exploreFields,
@@ -300,7 +304,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           warning = result?.warning || null;
           await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
           setStatus({
-            text: warning || (isChannel ? 'Channel updated!' : isBusiness ? 'Business updated!' : 'Waypoint updated!'),
+            text: warning || (isPerson ? 'Person updated!' : isChannel ? 'Channel updated!' : isBusiness ? 'Business updated!' : 'Waypoint updated!'),
             error: Boolean(warning),
             icon: true,
           });
@@ -457,6 +461,27 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                     maxLength={60}
                     onChange={(e) => setArea(e.target.value)}
                     placeholder="e.g. South Gate, West Gate, SUB"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Person title — stored in the same `area` column (a person
+                has no location). Shown under their name on the Explore
+                card; each "·"-separated part becomes a chip in the list. */}
+            {isPerson && (
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Title</span>
+                  <span className={styles.wpHint}>Optional · level and department</span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <input
+                    className={styles.wpInput}
+                    value={area}
+                    maxLength={60}
+                    onChange={(e) => setArea(e.target.value)}
+                    placeholder="e.g. 300L · Electrical & Electronics"
                   />
                 </div>
               </div>

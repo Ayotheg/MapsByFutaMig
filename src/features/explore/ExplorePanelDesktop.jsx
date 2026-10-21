@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, CirclePlus } from 'lucide-react';
 import { GROUP_META, groupOfType } from '../legend/placeTypeGroups';
 import { haversine } from '../../lib/geoUtils';
-import ExplorePromoteCard from './ExplorePromoteCard';
 import { CategorySegment, FeaturedRail, ListRow, SectionHeader, featuredTitle, moreTitle, splitFeatured } from './ExploreSections';
 import { comparePicks } from './useExplorePicks';
 import styles from './ExplorePanelDesktop.module.css';
@@ -211,9 +210,6 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
             <div className={category === 'places' ? styles.rows : styles.cardRows}>{rest.map(renderRow)}</div>
           </section>
         )}
-        {/* Nearest / Top Rated have no Featured rail, so the promote card
-            sits under the list instead. */}
-        {category === 'places' && featured.length === 0 && <ExplorePromoteCard source="explore_desktop" size="sm" />}
       </div>
 
       {onSuggestPlace && (

@@ -32,6 +32,9 @@ function toPick(wp, overridePriority) {
     avgRating: wp.avgRating ?? null,
     reviewCount: wp.reviewCount ?? 0,
     tags: wp.exploreTags || [],
+    // Place area ("West Gate") — or, for a Person, their title ("300L ·
+    // Electrical & Electronics"); both live in the `area` column.
+    area: (wp.area || '').trim(),
     isPromoted: !!wp.isPromoted,
     sponsorName: wp.sponsorName || '',
     promoLabel: wp.promoLabel || 'Promoted',

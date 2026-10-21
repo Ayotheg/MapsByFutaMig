@@ -186,6 +186,9 @@
   --v2-error-tint:      #fff8f7; /* pale red fill: destructive hover, error banners */
   --v2-star:            #ffc857; /* rating star gold — icon fill only, never text */
 
+  /* Plus Jakarta Sans (approved alternate) — the Explore panel title. */
+  --v2-font-jakarta: 'Plus Jakarta Sans Variable', var(--font-ui);
+
   /* Not yet defined — add only when a screen actually needs it:
      --v2-secondary-container (lighter tint variant, e.g. for the
      "Secondary" button's light fill — --v2-tertiary-container was this
