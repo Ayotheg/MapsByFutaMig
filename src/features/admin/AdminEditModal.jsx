@@ -468,12 +468,12 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
             {/* Person title — stored in the same `area` column (a person
                 has no location). Shown under their name on the Explore
-                card; each "·"-separated part becomes a chip in the list. */}
+                card; each comma-separated part becomes a chip in the list. */}
             {isPerson && (
               <div className={styles.wpField}>
                 <div className={styles.wpFieldHead}>
                   <span className={styles.wpLabel}>Title</span>
-                  <span className={styles.wpHint}>Optional · level and department</span>
+                  <span className={styles.wpHint}>Optional · separate parts with a comma</span>
                 </div>
                 <div className={styles.wpInputWrap}>
                   <input
@@ -481,7 +481,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                     value={area}
                     maxLength={60}
                     onChange={(e) => setArea(e.target.value)}
-                    placeholder="e.g. 300L · Electrical & Electronics"
+                    placeholder="e.g. 300L, Electrical & Electronics"
                   />
                 </div>
               </div>

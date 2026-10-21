@@ -6,7 +6,8 @@ import AllPlacesPanel from './AllPlacesPanel';
 import styles from './QuickChips.module.css';
 
 // Desktop always shows at least this many chips (the row scrolls if they
-// don't fit). Mobile has no floor, so "All places" is never pushed off-screen.
+// don't fit). Mobile isn't trimmed at all: every pinned chip shows in a
+// swipeable row with "All places" at the end.
 const MIN_VISIBLE = 4;
 // `.scroll`'s flex gap.
 const GAP = 6;
@@ -53,7 +54,9 @@ export default function QuickChips({ chips, activeChip, onChipClick, onAllPlaces
   useLayoutEffect(() => {
     const container = rowRef.current;
     const measure = measureRef.current;
-    if (!container || !measure || !rest.length) {
+    // Mobile: the row scrolls sideways, so show every pinned chip instead
+    // of cutting it down to what fits the screen width.
+    if (isMobile || !container || !measure || !rest.length) {
       setVisibleCount(rest.length);
       return undefined;
     }
@@ -72,11 +75,10 @@ export default function QuickChips({ chips, activeChip, onChipClick, onAllPlaces
       }
       // "All places" and the active chip are always in the row — reserve them first.
       let used = allPlacesW + (activeInAll ? widths.get(chipKey(activeInAll)) || 0 : 0);
-      const floor = isMobile ? 0 : MIN_VISIBLE;
       let count = 0;
       for (const chip of rest) {
         const w = widths.get(chipKey(chip)) || 0;
-        if (count >= floor && used + w > available) break;
+        if (count >= MIN_VISIBLE && used + w > available) break;
         used += w;
         count++;
       }

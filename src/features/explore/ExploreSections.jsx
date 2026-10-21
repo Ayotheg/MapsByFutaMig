@@ -62,10 +62,12 @@ function distanceMeters(pick, userCoords) {
   return haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng);
 }
 
-// A person's title ("300L · Electrical & Electronics", set in admin);
-// people without one fall back to their Explore tags.
+// A person's title, set in admin as "300L, Electrical & Electronics" (a
+// "·" works too). Each comma-separated part is shown "·"-joined on the
+// card and as its own chip in the list. People without a title fall back
+// to their Explore tags.
 function personTitleParts(pick) {
-  if (pick.area) return pick.area.split('·').map((s) => s.trim()).filter(Boolean);
+  if (pick.area) return pick.area.split(/[,·]/).map((s) => s.trim()).filter(Boolean);
   return (pick.tags || []).slice(0, 2);
 }
 
