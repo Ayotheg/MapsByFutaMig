@@ -42,9 +42,12 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   // `isPerson`/`isChannel`. Defaults to Places so every existing flow
   // (rotation, "View All", the desktop panel below) behaves exactly as
   // before until someone actually taps one of the new pills.
-  const [category, setCategory] = useState('places');
-  // The half-open sheet has no switcher, so it always shows Places —
-  // going back to it after browsing People/Channels resets the pick.
+  const [selectedCategory, setCategory] = useState('places');
+  // The half-open sheet has no switcher, so it always shows Places.
+  // Derived (not only reset in the effect below) so the first compact
+  // render after People/Channels doesn't flash the wrong category.
+  const category = variant === 'compact' ? 'places' : selectedCategory;
+  // …and going back to it resets the pick, so "See all" reopens on Places.
   useEffect(() => {
     if (variant === 'compact') setCategory('places');
   }, [variant]);
@@ -87,7 +90,8 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
 
   const compactItems = useMemo(() => {
     if (!rotatingPool.length) return promoted.slice(0, COMPACT_SLOTS);
-    const need = promoted.length ? COMPACT_SLOTS - 1 : COMPACT_SLOTS;
+    // Capped at the pool size so a single pick isn't shown twice.
+    const need = Math.min(promoted.length ? COMPACT_SLOTS - 1 : COMPACT_SLOTS, rotatingPool.length);
     const items = [];
     for (let i = 0; i < need; i++) {
       items.push(rotatingPool[(rotationIndex + i) % rotatingPool.length]);
@@ -141,9 +145,12 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
 
   if (variant === 'full') {
     // People/Channels with more picks than slots: the rail rotates (pinned
-    // promoted pick + cycling organic ones) and the list shows every
-    // organic pick, so nobody is only ever visible mid-rotation.
-    const { featured, rest } = rotating ? { featured: compactItems, rest: organic } : splitFeatured(fullItems);
+    // promoted pick + cycling organic ones) and the list shows every other
+    // pick — remaining promoted ones first, then all organic — so nobody is
+    // only ever visible mid-rotation.
+    const { featured, rest } = rotating
+      ? { featured: compactItems, rest: [...promoted.slice(1), ...organic] }
+      : splitFeatured(fullItems);
     return (
       <div className={styles.panel}>
         {header}

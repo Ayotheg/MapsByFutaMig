@@ -81,6 +81,17 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
   const availableSortOptions = SORT_OPTIONS.filter((o) => !o.needsLocation || userCoords);
   const currentSortLabel = availableSortOptions.find((o) => o.key === sortMode)?.label || 'Featured';
 
+  // People/Channels have no place type and no sort control, so a group
+  // filter or sort picked on Places would empty or reshape their list with
+  // no way to undo it there. Start each category from a clean slate.
+  function handleCategoryChange(next) {
+    if (next === category) return;
+    setActiveGroup(null);
+    setSortMode('featured');
+    setSortOpen(false);
+    onCategoryChange?.(next);
+  }
+
   function handleSortSelect(key) {
     setSortMode(key);
     setSortOpen(false);
@@ -97,7 +108,11 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
   const { featured, rest } = !isFeaturedOrder
     ? { featured: [], rest: sorted }
     : rotatingFeatured && category !== 'places'
-    ? { featured: rotatingFeatured, rest: sorted.filter((p) => !p.isPromoted) }
+    ? {
+        featured: rotatingFeatured,
+        // Every pick not pinned in the rail: extra promoted ones + all organic.
+        rest: sorted.filter((p) => !p.isPromoted || !rotatingFeatured.some((f) => f.id === p.id)),
+      }
     : splitFeatured(sorted);
   const restTitle = isFeaturedOrder ? moreTitle(category) : currentSortLabel;
   const noun = NOUNS[category] || NOUNS.places;
@@ -130,7 +145,7 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
 
         {/* PLACES / PEOPLE / CHANNELS (supabase/people_entries.sql,
             supabase/channel_entries.sql). */}
-        <CategorySegment category={category} onChange={onCategoryChange} size="sm" />
+        <CategorySegment category={category} onChange={handleCategoryChange} size="sm" />
 
         {availableGroups.length > 0 && (
           <div className={styles.chipRow}>

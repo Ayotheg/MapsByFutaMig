@@ -306,8 +306,8 @@ function PersonRow({ pick, onSelect, size }) {
         <span className={styles.rowName}>{pick.name}</span>
         {titleParts.length > 0 && (
           <span className={styles.tagChips}>
-            {titleParts.map((tag) => (
-              <span key={tag} className={styles.tagChip}>
+            {titleParts.map((tag, i) => (
+              <span key={`${i}-${tag}`} className={styles.tagChip}>
                 {tag}
               </span>
             ))}
