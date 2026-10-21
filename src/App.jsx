@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import './index.css'
 import LoadingScreen from './pages/LoadingScreen'
 import HomeRoute from './pages/HomeRoute'
@@ -39,6 +39,11 @@ function TawkChat() {
 // other route (landing page, legal pages…) unmounts the map as before.
 const KEEP_MAP_ALIVE = new Set(["/map", "/promote"]);
 
+// `npm run build:app` (vite --mode app) builds the Android app, which has no
+// landing page: "/" goes straight to the map. Build-time constant, so the
+// web build is unchanged.
+const IS_APP_BUILD = import.meta.env.MODE === "app";
+
 // The map lives outside <Routes> so leaving /map for a keep-alive page
 // hides it (display: none) instead of unmounting it.
 function PersistentMap() {
@@ -65,7 +70,7 @@ function App() {
       <ScrollToTop />
       <TawkChat />
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={IS_APP_BUILD ? <Navigate to="/map" replace /> : <LandingPage />} />
         {/* Rendered by <PersistentMap /> below; this entry just keeps
             /map out of the catch-all 404. */}
         <Route path="/map" element={null} />

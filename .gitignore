@@ -10,7 +10,14 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-app
 *.local
+
+# Android (android/.gitignore covers build output and copied web assets)
+android/local.properties
+*.jks
+*.keystore
+keystore.properties
 
 # Editor directories and files
 .vscode/*

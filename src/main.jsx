@@ -3,6 +3,7 @@ import { createRoot, hydrateRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { installLoadingMusicPrimer } from './lib/loadingMusic'
+import { isNativeApp } from './lib/platform'
 
 const rootEl = document.getElementById('root')
 
@@ -37,7 +38,9 @@ installLoadingMusicPrimer()
 // in `vite dev` caches stale modules and makes local changes look broken.
 // Registered after `load` so it never competes with the first paint, and a
 // failure is silently ignored: the app works exactly as before without it.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+// Not in the Android app: service workers are unreliable in Capacitor's
+// WebView, and tile caching moves to native storage there in a later step.
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isNativeApp()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   })
