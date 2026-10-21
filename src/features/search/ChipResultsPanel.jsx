@@ -116,6 +116,7 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
         name: r.name,
         badge: (r.type || 'poi').replace(/_/g, ' ').toUpperCase(),
         description: r.desc || '',
+        area: r.area || '',
         lat: r.lat,
         lng: r.lng,
         imageUrls: r.imageUrls || [],

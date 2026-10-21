@@ -169,6 +169,7 @@ export function gatherResults(chip, { waypoints, searchIndex, user = null }) {
       lat: isBusiness ? null : wp.lat,
       lng: isBusiness ? null : wp.lng,
       desc: wp.description || '',
+      area: wp.area || '',
       imageUrls: wp.imageUrls || [],
       dist,
       isBusiness,

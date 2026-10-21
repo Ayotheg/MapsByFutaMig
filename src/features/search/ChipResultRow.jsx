@@ -28,8 +28,9 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
   const firstImage = imageCount ? result.imageUrls[0] : null;
   const img = useImageStatus(firstImage);
 
-  // Second line: where it is, then how far — either can be missing.
-  const area = (result.desc || '').trim();
+  // Second line: "area · distance". The place's `area` ("West Gate");
+  // a place with no area set yet falls back to its description.
+  const area = (result.area || result.desc || '').trim();
   const dist = result.dist !== null && result.dist !== undefined ? fmtMeters(result.dist) : '';
 
   return (
