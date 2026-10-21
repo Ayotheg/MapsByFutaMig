@@ -1,0 +1,337 @@
+/* Explore redesign — shared pieces (see ExploreSections.jsx). Sizes are the
+   mobile frame's; the `Sm` modifiers scale them down for the 240px desktop
+   sidebar panel. Colours are brand tokens only (DESIGN_SYSTEM.md). */
+
+/* ── Places / People / Channels segmented control ─────────────────── */
+.segment {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--v2-hud-upnext-bg);
+}
+.segmentBtn {
+  flex: 1 1 0;
+  min-height: 38px;
+  border: none;
+  border-radius: var(--r-full);
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--v2-text);
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.segmentBtn:hover {
+  color: var(--v2-neutral);
+}
+.segmentBtnActive {
+  background: var(--v2-on-primary);
+  color: var(--v2-neutral);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+.segmentSm {
+  padding: 3px;
+}
+.segmentSm .segmentBtn {
+  min-height: 30px;
+  font-size: 12px;
+}
+
+/* ── Section header ("Featured" / "Popular on campus" + See all) ──── */
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.seeAll {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v2-primary);
+  cursor: pointer;
+}
+.seeAll:hover {
+  color: var(--v2-primary-hover);
+}
+.sectionHeadSm {
+  margin-bottom: 9px;
+}
+.sectionHeadSm .sectionTitle {
+  font-size: 14px;
+}
+.sectionHeadSm .seeAll {
+  font-size: 12px;
+}
+
+/* ── Featured rail ────────────────────────────────────────────────── */
+.rail {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* Bleed to the panel edge so the next card peeks out, like the design. */
+  margin: 0 calc(-1 * var(--explore-gutter, 20px));
+  padding: 0 var(--explore-gutter, 20px) 2px;
+  scroll-padding: 0 var(--explore-gutter, 20px);
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+.featured {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(272px, 78vw);
+  height: 176px;
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+  scroll-snap-align: start;
+  text-align: left;
+  font-family: var(--font-ui);
+  animation: featuredIn var(--v2-duration-standard) var(--v2-ease-standard);
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.featured:active {
+  transform: scale(0.98);
+}
+/* Rotating compact cards are re-keyed on each swap, so this doubles as
+   the rotation's crossfade. */
+@keyframes featuredIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.featuredImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.featuredIcon {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.55;
+}
+.featuredShade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0) 35%, rgba(15, 23, 42, 0.82) 100%);
+}
+.featuredBadge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+}
+.featuredText {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.featuredName {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--v2-on-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.featuredMeta {
+  font-size: 13px;
+  color: var(--v2-on-primary);
+  opacity: 0.88;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.railSm {
+  gap: 8px;
+}
+.railSm .featured {
+  width: 176px;
+  height: 128px;
+  border-radius: 14px;
+}
+.railSm .featuredBadge {
+  top: 8px;
+  left: 8px;
+}
+.railSm .featuredText {
+  left: 10px;
+  right: 10px;
+  bottom: 9px;
+}
+.railSm .featuredName {
+  font-size: 14px;
+}
+.railSm .featuredMeta {
+  font-size: 11px;
+}
+.railSm .promoBadge {
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+/* ── Promoted badge ──────────────────────────────────────────────── */
+.promoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2-tertiary);
+  white-space: nowrap;
+}
+
+/* ── Popular list row ─────────────────────────────────────────────── */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  border-radius: var(--r-md);
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.row:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.row:active {
+  transform: scale(0.99);
+}
+.thumb {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rowBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rowNameLine {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.rowName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.verified {
+  flex-shrink: 0;
+  color: var(--v2-primary);
+}
+.rowMeta {
+  font-size: 13px;
+  color: var(--v2-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rowRating {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.star {
+  fill: var(--v2-star);
+  color: var(--v2-star);
+}
+.rowJoin {
+  font-weight: 600;
+  color: var(--v2-primary);
+}
+.chevron {
+  flex-shrink: 0;
+  color: var(--v2-text-muted);
+}
+.row .promoBadge {
+  background: var(--v2-tertiary-container);
+  font-size: 10px;
+  padding: 3px 7px;
+}
+
+.rowSm {
+  gap: 10px;
+  padding: 6px 4px;
+}
+.rowSm .thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+.rowSm .rowName {
+  font-size: 12.5px;
+}
+.rowSm .rowMeta {
+  font-size: 11px;
+}
+.rowSm .chevron {
+  width: 14px;
+  height: 14px;
+}
+.rowSm .promoBadge {
+  font-size: 9px;
+  padding: 2px 6px;
+}

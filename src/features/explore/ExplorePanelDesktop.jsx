@@ -1,19 +1,14 @@
 import { useMemo, useState } from 'react';
-import { BadgeCheck, ChevronDown, Footprints, Plus, Star, ArrowUpRight } from 'lucide-react';
-import { getTypeIcon } from '../../lib/typeIcons';
-import { dotColor } from '../search/chipConfig';
+import { ChevronDown, CirclePlus } from 'lucide-react';
 import { GROUP_META, groupOfType } from '../legend/placeTypeGroups';
 import { haversine } from '../../lib/geoUtils';
-import { channelPlatformMeta } from '../../lib/channelMeta';
-import { track } from '../../lib/analytics';
 import ExploreChannelLink from './ExploreChannelLink';
-import AvatarBox from './AvatarBox';
+import { CategorySegment, FeaturedRail, PlaceRow, SectionHeader, moreTitle, splitFeatured } from './ExploreSections';
 import { comparePicks } from './useExplorePicks';
 import styles from './ExplorePanelDesktop.module.css';
 
-// Rough campus walking pace — same constant ExploreCard.jsx (the mobile
-// card) already uses for its own "X mins away" label, kept in sync
-// rather than imported cross-file since it's a single primitive number.
+// Rough campus walking pace — same constant ExploreSections.jsx uses for
+// its "N min walk" label.
 const WALK_METERS_PER_MIN = 80;
 
 const SORT_OPTIONS = [
@@ -23,20 +18,14 @@ const SORT_OPTIONS = [
 ];
 
 /**
- * Desktop-only "Explore Campus" panel redesign (Figma: MAPSBYFUTA /
- * Section - Comprehensive, High-Fidelity Desktop Redesign of the
- * Explore Campus Panel, node 111:57). Rendered by `ExplorePanel.jsx`
- * only when `variant === 'full' && desktop` — the mobile bottom-sheet
- * "full" view and the "compact" preview both keep using the original
- * markup below, untouched.
+ * Desktop sidebar Explore panel, rebuilt to the Explore redesign
+ * (public/Maps By FUTA — explore Redesign-png.zip, desktop frame).
+ * Rendered by `ExplorePanel.jsx` only when `variant === 'full' && desktop`.
  *
- * Every number/label on this screen is real, derived data — no
- * fabricated hours/pricing/phone numbers. Fields the Figma reference
- * shows that this app genuinely has no source for (opening hours,
- * per-item pricing, a phone number to call) are left out rather than
- * faked; the category chips, sort modes, rating, tags, and the
- * "Verified" mark are all backed by fields already on the waypoint
- * (`avgRating`/`reviewCount`/`exploreTags`/`isExplore`/`type`).
+ * Behaviour is unchanged from the previous version: Places/People/
+ * Channels, the place-group filter chips, the Featured/Nearest/Top Rated
+ * sort, Suggest a Place and the promote link. The cards themselves are
+ * the shared ones in ExploreSections.jsx.
  */
 export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSuggestPlace, category = 'places', onCategoryChange }) {
   const [activeGroup, setActiveGroup] = useState(null); // null = "All Spots"
@@ -90,7 +79,6 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
     return list.sort(comparePicks);
   }, [filtered, sortMode, userCoords]);
 
-  const featuredPartnerCount = filtered.filter((p) => p.isPromoted).length;
   const availableSortOptions = SORT_OPTIONS.filter((o) => !o.needsLocation || userCoords);
   const currentSortLabel = availableSortOptions.find((o) => o.key === sortMode)?.label || 'Featured';
 
@@ -99,54 +87,44 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
     setSortOpen(false);
   }
 
+  // Featured rail + list only makes sense in the default ordering; the
+  // other sorts show one plain list under the sort's own name so the order
+  // the person picked is exactly what they read.
+  // ("Nearest First" with no location yet falls back to the featured order.)
+  const isFeaturedOrder = !availableSortOptions.some((o) => o.key === sortMode && o.key !== 'featured');
+  const { featured, rest } = isFeaturedOrder ? splitFeatured(sorted) : { featured: [], rest: sorted };
+  const restTitle = isFeaturedOrder ? moreTitle(category) : currentSortLabel;
+  const noun = NOUNS[category] || NOUNS.places;
+
+  function renderRow(pick) {
+    // Only admin-curated picks (explicitly ticked "Feature this place in
+    // Explore" in AdminEditModal) get the verified mark — the
+    // auto-generated top-rated fallback list (`isFallback`, see
+    // useExplorePicks.js) hasn't actually been reviewed by anyone, so it
+    // doesn't earn the same claim.
+    return (
+      <PlaceRow
+        key={pick.id}
+        pick={pick}
+        size="sm"
+        verified={!pick.isChannel && !pick.isFallback}
+        channelSource="explore_desktop_card"
+        onSelect={onSelect}
+      />
+    );
+  }
+
   return (
     <div className={styles.root}>
       <div className={styles.head}>
-        <div className={styles.headTop}>
-          <div className={styles.headTitleBlock}>
-            <div className={styles.headTitleRow}>
-              <span className={styles.headTitle}>Explore Campus</span>
-              <span className={styles.livePill}>Live</span>
-            </div>
-            <div className={styles.headSubtitle}>Discover verified campus services, student amenities &amp; hubs around FUTA</div>
-          </div>
-          <div className={styles.countBadge}>
-            <span className={styles.countBadgeNumber}>{picks.length}</span>
-            <span className={styles.countBadgeLabel}>
-              {category === 'people'
-                ? picks.length === 1 ? 'Person' : 'People'
-                : category === 'channels'
-                ? picks.length === 1 ? 'Channel' : 'Channels'
-                : picks.length === 1 ? 'Place' : 'Places'}
-            </span>
-          </div>
+        <div>
+          <h2 className={styles.headTitle}>Explore</h2>
+          <p className={styles.headSubtitle}>Campus spots, people and updates.</p>
         </div>
 
-        {/* PLACES / PEOPLE / CHANNELS pill switcher (supabase/
-            people_entries.sql, supabase/channel_entries.sql). */}
-        <div className={styles.chipRow}>
-          <button
-            type="button"
-            className={`${styles.chip} ${category === 'places' ? styles.chipActive : ''}`}
-            onClick={() => onCategoryChange?.('places')}
-          >
-            Places
-          </button>
-          <button
-            type="button"
-            className={`${styles.chip} ${category === 'people' ? styles.chipActive : ''}`}
-            onClick={() => onCategoryChange?.('people')}
-          >
-            People
-          </button>
-          <button
-            type="button"
-            className={`${styles.chip} ${category === 'channels' ? styles.chipActive : ''}`}
-            onClick={() => onCategoryChange?.('channels')}
-          >
-            Channels
-          </button>
-        </div>
+        {/* PLACES / PEOPLE / CHANNELS (supabase/people_entries.sql,
+            supabase/channel_entries.sql). */}
+        <CategorySegment category={category} onChange={onCategoryChange} size="sm" />
 
         {availableGroups.length > 0 && (
           <div className={styles.chipRow}>
@@ -155,7 +133,7 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
               className={`${styles.chip} ${activeGroup === null ? styles.chipActive : ''}`}
               onClick={() => setActiveGroup(null)}
             >
-              All Spots
+              All spots
             </button>
             {availableGroups.map((g) => (
               <button
@@ -164,19 +142,20 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
                 className={`${styles.chip} ${activeGroup === g.key ? styles.chipActive : ''}`}
                 onClick={() => setActiveGroup(g.key)}
               >
-                <span className={styles.chipDot} style={{ background: g.swatch }} />
-                {g.name} ({groupCounts[g.key]})
+                {g.name}
               </button>
             ))}
           </div>
         )}
 
-        {category === 'places' && (
-          <div className={styles.controlsRow}>
+        <div className={styles.controlsRow}>
+          <span className={styles.count}>
+            {sorted.length} {sorted.length === 1 ? noun[0] : noun[1]}
+          </span>
+          {category === 'places' && (
             <div className={styles.sortWrap}>
-              <span className={styles.sortLabel}>Sort:</span>
               <button type="button" className={styles.sortBtn} onClick={() => setSortOpen((v) => !v)}>
-                {currentSortLabel} <ChevronDown size={11} />
+                Sort: {currentSortLabel} <ChevronDown size={13} />
               </button>
               {sortOpen && (
                 <div className={styles.sortMenu}>
@@ -193,14 +172,8 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
                 </div>
               )}
             </div>
-            {featuredPartnerCount > 0 && (
-              <div className={styles.featuredPill}>
-                <span className={styles.featuredDot} />
-                {featuredPartnerCount} Featured Partner{featuredPartnerCount === 1 ? '' : 's'}
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className={styles.list}>
@@ -210,160 +183,43 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
               ? 'No people featured yet.'
               : category === 'channels'
               ? 'No channels featured yet.'
-              : 'No spots in this category yet — try "All Spots".'}
+              : 'No spots in this category yet — try "All spots".'}
           </div>
         )}
-        {sorted.map((pick) =>
-          pick.isChannel ? (
-            <ChannelCardDesktop key={pick.id} pick={pick} />
-          ) : (
-            <ExploreCardDesktop key={pick.id} pick={pick} onSelect={onSelect} />
-          )
+        {featured.length > 0 && (
+          <section className={styles.section}>
+            <SectionHeader title="Featured" size="sm" />
+            <FeaturedRail picks={featured} size="sm" channelSource="explore_desktop_card" onSelect={onSelect} />
+          </section>
+        )}
+        {rest.length > 0 && (
+          <section className={styles.section}>
+            <SectionHeader title={restTitle} size="sm" />
+            <div className={styles.rows}>{rest.map(renderRow)}</div>
+          </section>
         )}
       </div>
 
-      {/* WhatsApp channel link — pinned between the list and the footer so
-          it's visible without scrolling, and outside the list so it can't
-          be mistaken for a Featured Partner slot or counted as a vendor. */}
+      {/* Promote link — pinned between the list and the footer so it's
+          visible without scrolling, and outside the list so it can't be
+          mistaken for a Featured slot. */}
       <ExploreChannelLink variant="row" source="explore_desktop" />
 
-      <div className={styles.footer}>
-        <div className={styles.footerLeft}>
-          <span className={styles.footerDot} />
-          Showing {sorted.length} verified vendor{sorted.length === 1 ? '' : 's'}
-        </div>
-        {onSuggestPlace && (
+      {onSuggestPlace && (
+        <div className={styles.footer}>
+          <CirclePlus size={16} className={styles.footerIcon} aria-hidden="true" />
+          Missing a place?
           <button type="button" className={styles.footerAction} onClick={onSuggestPlace}>
-            <Plus size={11} /> Suggest a Place
+            Suggest it
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ExploreCardDesktop({ pick, onSelect }) {
-  const Icon = getTypeIcon(pick.type);
-  const color = dotColor(pick.type);
-  const image = pick.images && pick.images[0];
-  const group = GROUP_META.find((g) => g.key === groupOfType(pick.type));
-  const description = pick.waypoint?.description?.trim();
-  // Only admin-curated picks (explicitly ticked "Feature this place in
-  // Explore" in AdminEditModal) get the verified mark — the
-  // auto-generated top-rated fallback list (`isFallback`, see
-  // useExplorePicks.js) hasn't actually been reviewed by anyone, so it
-  // doesn't earn the same claim.
-  const isVerified = !pick.isFallback;
-
-  return (
-    <article className={styles.card}>
-      <div className={styles.cardTop}>
-        <div className={styles.cardIdentity}>
-          <AvatarBox className={styles.avatar} image={image} Icon={Icon} iconSize={15} color={color}>
-            {isVerified && (
-              <span className={styles.verifiedBadge} title="Verified campus spot">
-                <BadgeCheck size={10} />
-              </span>
-            )}
-          </AvatarBox>
-          <div className={styles.cardIdentityText}>
-            <div className={styles.cardName}>{pick.name}</div>
-            <div className={styles.cardMetaRow}>
-              {pick.distanceMins != null ? (
-                <span className={styles.cardDistance}>
-                  <Footprints size={9} /> {pick.distanceMins} min{pick.distanceMins === 1 ? '' : 's'} walk
-                </span>
-              ) : group ? (
-                <span className={styles.cardCategory} style={{ color: group.swatch }}>
-                  {group.name}
-                </span>
-              ) : null}
-            </div>
-          </div>
-        </div>
-        {pick.isPromoted && (
-          <span className={styles.promoBadge}>
-            <Star size={9} fill="currentColor" /> {pick.promoLabel || 'Promoted'}
-          </span>
-        )}
-      </div>
-
-      {description && <p className={styles.cardDescription}>{description}</p>}
-
-      {!!(pick.tags && pick.tags.length) && (
-        <div className={styles.cardTags}>
-          {pick.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className={styles.cardTag}>
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className={styles.cardFooter}>
-        <div className={styles.cardFooterMeta}>
-          {pick.avgRating != null && (
-            <span className={styles.cardRating}>
-              {Number(pick.avgRating).toFixed(1)} <Star size={9} fill="currentColor" />
-              {pick.reviewCount ? <span className={styles.cardReviewCount}>({pick.reviewCount})</span> : null}
-            </span>
-          )}
-          {group && (
-            <span className={styles.cardCategoryChip}>
-              <span className={styles.chipDot} style={{ background: group.swatch }} />
-              {group.name}
-            </span>
-          )}
-        </div>
-        <button type="button" className={styles.cardAction} onClick={() => onSelect?.(pick.waypoint)}>
-          {pick.isPerson || pick.isBusiness ? 'View Details' : 'View on Map'}
-        </button>
-      </div>
-    </article>
-  );
-}
-
-/**
- * Channel entries (supabase/channel_entries.sql) — a much simpler card
- * than a Place/Person: no distance, rating, tags, or "View on Map" (a
- * channel has nowhere on the map to show). The whole card links straight
- * out to the invite link; the footer button re-states that as an
- * explicit "Join the Channel" CTA per the card's own action-row pattern.
- */
-function ChannelCardDesktop({ pick }) {
-  const platform = channelPlatformMeta(pick.channelPlatform);
-  const Icon = platform.icon;
-  const image = pick.images && pick.images[0];
-
-  function handleJoin() {
-    track('explore_channel_click', { source: 'explore_desktop_card', platform: pick.channelPlatform });
-    window.open(pick.channelLink, '_blank', 'noopener,noreferrer');
-  }
-
-  return (
-    <article className={styles.card}>
-      <div className={styles.cardTop}>
-        <div className={styles.cardIdentity}>
-          <AvatarBox className={styles.avatar} image={image} Icon={Icon} iconSize={15} color={platform.color} />
-          <div className={styles.cardIdentityText}>
-            <div className={styles.cardName}>{pick.name}</div>
-            <div className={styles.cardMetaRow}>
-              <span className={styles.cardCategory}>{platform.label}</span>
-            </div>
-          </div>
-        </div>
-        {pick.isPromoted && (
-          <span className={styles.promoBadge}>
-            <Star size={9} fill="currentColor" /> {pick.promoLabel || 'Promoted'}
-          </span>
-        )}
-      </div>
-
-      <div className={styles.cardFooter}>
-        <button type="button" className={styles.cardAction} onClick={handleJoin}>
-          Join the Channel <ArrowUpRight size={11} />
-        </button>
-      </div>
-    </article>
-  );
-}
+const NOUNS = {
+  places: ['place', 'places'],
+  people: ['person', 'people'],
+  channels: ['channel', 'channels'],
+};

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
-import ExploreCard from './ExploreCard';
 import { comparePicks } from './useExplorePicks';
+import { CategorySegment, FeaturedRail, PlaceRow, SectionHeader, moreTitle, splitFeatured } from './ExploreSections';
 import ExploreChannelLink from './ExploreChannelLink';
 import ExplorePanelDesktop from './ExplorePanelDesktop';
 import { useOneShotLocation } from './useOneShotLocation';
@@ -121,24 +120,36 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
     );
   }
 
+  const header = (
+    <div className={styles.header}>
+      <h2 className={styles.title}>Explore</h2>
+      <p className={styles.subtitle}>Campus spots, people and updates.</p>
+    </div>
+  );
+
   if (variant === 'full') {
+    const { featured, rest } = splitFeatured(fullItems);
     return (
       <div className={styles.panel}>
-        <div className={styles.headerFull}>
-          <div className={styles.title}>Explore Campus</div>
-          <div className={styles.subtitle}>Find campus spots, people, and updates.</div>
-        </div>
-        <CategoryPills category={category} onChange={setCategory} />
-        <div className={styles.grid}>
-          {fullItems.length === 0 && (
-            <div className={styles.empty}>
-              {emptyLabel(category)}
+        {header}
+        <CategorySegment category={category} onChange={setCategory} />
+        {fullItems.length === 0 && <div className={styles.empty}>{emptyLabel(category)}</div>}
+        {featured.length > 0 && (
+          <section className={styles.section}>
+            <SectionHeader title="Featured" />
+            <FeaturedRail picks={featured} channelSource="explore_card" onSelect={onSelect} />
+          </section>
+        )}
+        {rest.length > 0 && (
+          <section className={styles.section}>
+            <SectionHeader title={moreTitle(category)} />
+            <div className={styles.list}>
+              {rest.map((pick) => (
+                <PlaceRow key={pick.id} pick={pick} userCoords={userCoords} channelSource="explore_card" onSelect={onSelect} />
+              ))}
             </div>
-          )}
-          {fullItems.map((pick) => (
-            <ExploreCard key={pick.id} pick={pick} userCoords={userCoords} onSelect={onSelect} />
-          ))}
-        </div>
+          </section>
+        )}
         <ExploreChannelLink source="explore_mobile" />
       </div>
     );
@@ -146,64 +157,21 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
 
   return (
     <div className={styles.panel}>
-      <div className={styles.header}>
-        <div>
-          <div className={styles.title}>Explore Campus</div>
-          <div className={styles.subtitle}>Find campus spots, people, and updates.</div>
-        </div>
-        <button type="button" className={styles.viewAll} onClick={onViewAll}>
-          View All <ChevronRight size={13} />
-        </button>
-      </div>
-      <CategoryPills category={category} onChange={setCategory} />
-      <div className={styles.grid}>
-        {compactItems.length === 0 && (
+      {header}
+      <CategorySegment category={category} onChange={setCategory} />
+      <section className={styles.section}>
+        <SectionHeader title="Featured" onSeeAll={onViewAll} />
+        {compactItems.length === 0 ? (
           <div className={styles.empty}>{emptyLabel(category)}</div>
+        ) : (
+          <FeaturedRail picks={compactItems} channelSource="explore_card" onSelect={onSelect} />
         )}
-        {compactItems.map((pick) => (
-          <ExploreCard key={pick.id} pick={pick} userCoords={userCoords} onSelect={onSelect} />
-        ))}
-      </div>
+      </section>
       {/* Below the cards (not above) so that on a short phone, where the
           half-height sheet has little spare room, the cards stay intact
           and this line is what scrolls out of view — the sheet panel is
           overflow-y: auto. */}
       <ExploreChannelLink source="explore_mobile" />
-    </div>
-  );
-}
-
-/**
- * PLACES / PEOPLE / CHANNELS pill switcher (supabase/people_entries.sql,
- * supabase/channel_entries.sql). People/Channels only show a count once
- * there's at least one featured/fallback pick in that category, same
- * restraint the rest of this panel already uses (empty sections say so
- * in words instead of showing a "0").
- */
-function CategoryPills({ category, onChange }) {
-  return (
-    <div className={styles.categoryTabs}>
-      <button
-        type="button"
-        className={`${styles.categoryTab} ${category === 'places' ? styles.categoryTabActive : ''}`}
-        onClick={() => onChange('places')}
-      >
-        Places
-      </button>
-      <button
-        type="button"
-        className={`${styles.categoryTab} ${category === 'people' ? styles.categoryTabActive : ''}`}
-        onClick={() => onChange('people')}
-      >
-        People
-      </button>
-      <button
-        type="button"
-        className={`${styles.categoryTab} ${category === 'channels' ? styles.categoryTabActive : ''}`}
-        onClick={() => onChange('channels')}
-      >
-        Channels
-      </button>
     </div>
   );
 }
