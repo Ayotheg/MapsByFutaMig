@@ -139,20 +139,10 @@
   align-items: center;
   justify-content: center;
 }
-/* Every Explore photo: sits on top of its fallback (icon / initials) and
-   fades in only once loaded — see Photo in ExploreSections.jsx. */
-.photoImg {
-  position: absolute;
-  inset: 0;
+.featuredPhoto img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
-  opacity: 0;
-  transition: opacity var(--v2-duration-standard) var(--v2-ease-standard);
-}
-.photoImgLoaded {
-  opacity: 1;
 }
 .featuredIcon {
   margin-top: -40px;
@@ -258,7 +248,6 @@
   cursor: pointer;
 }
 .channelLogo {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -269,6 +258,11 @@
   border: 2px solid var(--v2-nav-active-accent);
   background: var(--v2-neutral);
   overflow: hidden;
+}
+.channelLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .channelInitials {
   font-family: var(--font-display);
@@ -482,7 +476,6 @@
   background: var(--v2-hud-upnext-bg);
 }
 .thumb {
-  position: relative;
   flex-shrink: 0;
   width: 56px;
   height: 56px;
@@ -491,6 +484,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .rowBody {
   flex: 1;
@@ -560,7 +558,6 @@
 }
 .personAvatar,
 .channelAvatar {
-  position: relative;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -578,6 +575,12 @@
 }
 .channelAvatar {
   border-radius: 12px;
+}
+.personAvatar img,
+.channelAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .tagChips {
   display: flex;
