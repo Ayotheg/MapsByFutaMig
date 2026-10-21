@@ -1,4 +1,7 @@
-/* ── Desktop floating panel (.desk-chip-results) ─────────────── */
+/* Chip results (Oct 2026 Quick Chips revamp) — desktop card in the
+   search column, mobile bottom sheet under the chip row. */
+
+/* ── Desktop ─────────────────────────────────────────────────────────── */
 .panel {
   display: none;
 }
@@ -7,20 +10,15 @@
     display: flex;
     flex-direction: column;
     position: fixed;
+    top: calc(16px + var(--search-h) + 10px);
     left: calc(var(--sidebar-total-w) + 16px);
-    right: 16px;
-    max-width: 580px;
-    margin-left: auto;
-    margin-right: auto;
-    top: 118px;
-    max-height: calc(100vh - 148px);
+    width: var(--search-col-w);
+    max-height: calc(100vh - var(--search-h) - 58px);
     z-index: 1095;
-    background: var(--v2-surface);
-    border: 1px solid var(--v2-border);
-    border-radius: var(--r-xl);
-    box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    background: var(--v2-on-primary);
+    border: 1px solid var(--v2-divider);
+    border-radius: var(--r-2xl);
+    box-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.22);
     overflow: hidden;
     transition: left 0.3s var(--v2-ease-standard);
   }
@@ -41,29 +39,53 @@
   }
 }
 
-/* ── Header — shared shape for both platforms (Figma node 4:323's
-   "MainHeader"): icon badge, title, count badge + status line, close/back.
-   Desktop keeps its existing back-arrow affordance (ArrowLeft, unchanged
-   in ChipResultsPanel.jsx) restyled to match this same light circular
-   button, per the pairing rule (no separate desktop Figma reference was
-   given here, so this reuses the mobile node's decisions). ────────────── */
+/* ── Mobile: floating card under the chip row that stops above the
+   bottom navbar (MobileSheet's peek) — same footprint as the old card,
+   never edge-to-edge or full height. ─────────────────────────────────── */
+.sheet {
+  display: none;
+}
+@media (max-width: 768px) {
+  .sheet {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: calc(14px + var(--search-h) + 56px + var(--mob-safe-top));
+    left: 12px;
+    right: 12px;
+    bottom: calc(var(--mob-sheet-peek) + var(--mob-safe-bottom) + 12px);
+    z-index: 1160;
+    background: var(--v2-on-primary);
+    border: 1px solid var(--v2-divider);
+    border-radius: var(--r-2xl);
+    box-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.25);
+    overflow: hidden;
+    transform-origin: top center;
+  }
+}
+@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .sheet {
+    animation: slideDown var(--v2-duration-standard) var(--v2-ease-standard) both;
+  }
+}
+
+/* ── Header: back arrow, title, "108 places · nearest first" ────────── */
 .header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px;
-  border-bottom: 1px solid var(--v2-border);
+  padding: 16px 20px 14px 12px;
+  border-bottom: 1px solid var(--v2-divider);
   flex-shrink: 0;
-  background: var(--v2-surface);
 }
 .back {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  background: var(--v2-primary-glow);
+  width: 44px;
+  height: 44px;
+  background: none;
   border: none;
   border-radius: var(--r-full);
-  color: var(--v2-primary);
+  color: var(--v2-neutral);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -71,18 +93,7 @@
   transition: background var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .back:hover {
-  background: color-mix(in srgb, var(--v2-primary) 20%, transparent);
-}
-.icon {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-full);
-  background: var(--v2-primary-glow);
-  color: var(--v2-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--v2-hud-upnext-bg);
 }
 .titles {
   flex: 1;
@@ -92,36 +103,20 @@
   gap: 2px;
 }
 .title {
+  margin: 0;
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 22px;
+  line-height: 1.2;
   font-weight: 700;
-  color: var(--v2-text);
-  line-height: 1.25;
+  color: var(--v2-neutral);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.metaRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.badge {
-  flex-shrink: 0;
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--v2-primary-glow);
-  color: var(--v2-text);
-  border-radius: var(--r-full);
-  padding: 2px 8px;
-  white-space: nowrap;
-}
 .subtitle {
   font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--v2-text-variant);
+  font-size: 14px;
+  color: var(--v2-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -136,21 +131,58 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  background: var(--v2-surface);
   scrollbar-width: thin;
   scrollbar-color: var(--v2-primary-outline) transparent;
+}
+
+/* ── "Nothing near you" / "location off" notice ─────────────────────── */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--v2-primary-tint);
+  border-radius: var(--r-xl);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--v2-text);
+}
+.notice strong {
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.noticeIcon {
+  flex-shrink: 0;
+  display: flex;
+  padding-top: 1px;
+  color: var(--v2-primary);
+}
+.noticeDist {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--v2-primary-hover);
+  white-space: nowrap;
+}
+.noticeMuted {
+  background: var(--v2-hud-upnext-bg);
+}
+.noticeMuted .noticeIcon {
+  color: var(--v2-text-muted);
 }
 
 .empty {
   text-align: center;
   padding: 40px 16px;
   font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--v2-text-variant);
+  font-size: 13px;
+  color: var(--v2-text-muted);
   line-height: 1.8;
 }
 .empty strong {
   font-family: var(--font-display);
-  color: var(--v2-text);
+  color: var(--v2-neutral);
   font-weight: 700;
 }
 .emptyIcon {
@@ -194,70 +226,9 @@
   }
 }
 
-/* ── Mobile card + scrim (.cat-card / .cat-card-scrim) ───────── */
-.scrim {
-  display: none;
-}
-.card {
-  display: none;
-}
-@media (max-width: 768px) {
-  .scrim {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.35);
-    z-index: 1140;
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .back {
+    transition: none;
   }
-  .card {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    position: fixed;
-    top: calc(12px + var(--mob-safe-top));
-    bottom: calc(96px + var(--mob-safe-bottom));
-    left: 12px;
-    right: 12px;
-    max-height: calc(100vh - 128px);
-    z-index: 1160;
-    background: var(--v2-surface);
-    border: 1px solid var(--v2-border);
-    border-radius: var(--r-xl);
-    box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  }
-}
-@media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
-  .card {
-    animation: cardIn var(--v2-duration-standard) var(--v2-ease-standard) both;
-  }
-}
-@keyframes cardIn {
-  from {
-    opacity: 0;
-    transform: scale(0.96) translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-.close {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--r-full);
-  background: var(--v2-primary-glow);
-  border: none;
-  color: var(--v2-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
-}
-.close:hover {
-  background: color-mix(in srgb, var(--v2-primary) 20%, transparent);
 }

@@ -4,6 +4,9 @@ import {
   CATEGORY_KEYWORDS,
   CATEGORY_LABELS,
   CATEGORY_ICON_KEYS,
+  CATEGORY_SHORT_LABELS,
+  DEFAULT_BAR_CHIPS,
+  DEFAULT_CHIP_GROUP,
   nameOrTypeMatches,
 } from '../shared/placeCategories';
 
@@ -67,14 +70,18 @@ export function fmtDist(m) {
   return (m / 1000).toFixed(1) + 'km away';
 }
 
-// No GPS tracking exists yet (that's Slice 9's territory — the
-// `navigator.geolocation.watchPosition` call that populates legacy's
-// `window.lastKnownPos`). Always returning null here reproduces exactly
-// how legacy itself behaves before GPS starts: results sort alphabetically
-// instead of by distance. Revisit once Slice 9 exposes a live position.
-function getUserLatLng() {
-  return null;
+/** Plain distance for the chip results ("120 m", "2.4 km"). Metres are
+ * rounded to the nearest 10 so the label doesn't flicker on GPS jitter. */
+export function fmtMeters(m) {
+  if (m < 1000) return Math.max(10, Math.round(m / 10) * 10) + ' m';
+  return (m / 1000).toFixed(m < 10000 ? 1 : 0) + ' km';
 }
+
+// A chip's results count as "near you" within this distance. When the
+// closest match is further than this, ChipResultsPanel says so and shows
+// how far the closest one is.
+export const NEARBY_RADIUS_M = 1000;
+
 function distanceTo(uLat, uLng, lat, lng) {
   return L.latLng(uLat, uLng).distanceTo(L.latLng(lat, lng));
 }
@@ -95,7 +102,10 @@ export const DEFAULT_CHIPS = CHIP_DISPLAY_ORDER.map((key) => ({
   id: key,
   label: CATEGORY_LABELS[key],
   iconKey: CATEGORY_ICON_KEYS[key],
+  shortLabel: CATEGORY_SHORT_LABELS[key] || null,
+  barOrder: DEFAULT_BAR_CHIPS.includes(key) ? DEFAULT_BAR_CHIPS.indexOf(key) : null,
   keywords: CATEGORY_KEYWORDS[key],
+  category: DEFAULT_CHIP_GROUP[key] || 'other',
   pinnedIds: [],
   excludedIds: [],
   isCustom: false,
@@ -114,13 +124,17 @@ export const DEFAULT_CHIPS = CHIP_DISPLAY_ORDER.map((key) => ({
  * `searchIndex.query()` — still requiring the exact same name/type
  * keyword match as Pass 1 rather than any fuzzy scoring: a chip's
  * results should mean one consistent thing.
+ *
+ * `user` is the person's live `{ lat, lng }` (useLiveLocation.js) or null.
+ * With it, every result carries `dist` in metres and the list is nearest
+ * first; ChipResultsPanel re-runs this whenever the person moves, so the
+ * order follows them. Without it, results fall back to A–Z.
  */
-export function gatherResults(chip, { waypoints, searchIndex }) {
+export function gatherResults(chip, { waypoints, searchIndex, user = null }) {
   if (!chip) return [];
   const keywords = chip.keywords || [];
   const pinned = new Set(chip.pinnedIds || []);
   const excluded = new Set(chip.excludedIds || []);
-  const user = getUserLatLng();
   const seen = new Set();
   const out = [];
 

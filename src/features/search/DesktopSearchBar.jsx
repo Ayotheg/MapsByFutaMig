@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, X, Navigation, Menu } from 'lucide-react';
+import { Search, X, Navigation } from 'lucide-react';
 import { fetchNominatim } from './nominatimSearch';
 import { useSelectResult } from './useSelectResult';
 import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
@@ -45,12 +45,17 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
  * ChipResultsPanel's desktop panel treatment, since no separate desktop
  * Figma frame exists for it — same pairing-rule reuse as the pill above.
  */
+// Oct 2026 Quick Chips revamp (public/Maps By FUTA — Quick-chips-png.zip):
+// the pill matches the redesign — a 400px column on the left of the map
+// (Quick Chips run in the same row to its right), search icon + input
+// only. The sidebar-toggle menu button is gone (the sidebar rail already
+// opens/closes its own panels); the Navigate button stays, per the
+// person's instruction.
 export default function DesktopSearchBar({
   map,
   searchIndex,
   onSelect,
   collapsed,
-  onToggleCollapsed,
   onManualType,
   activeChipLabel,
   onNavigateClick,
@@ -194,11 +199,6 @@ export default function DesktopSearchBar({
     inputRef.current?.focus();
   }
 
-  function handleLogoClick() {
-    onToggleCollapsed?.(!collapsed);
-    setTimeout(() => map?.invalidateSize({ animate: false }), 0);
-  }
-
   function handleNavClick() {
     // Was a no-op stub left over from before Slice 9's navigation feature
     // was built (comment said "inert until Slice 9" — Slice 9 is done now,
@@ -215,15 +215,11 @@ export default function DesktopSearchBar({
   return (
     <div ref={barRef} className={styles.bar} style={collapsed ? { left: 'calc(var(--sidebar-rail-w) + 16px)' } : undefined}>
       <div className={styles.pill}>
-        <button className={styles.logoBtn} onClick={handleLogoClick} title="Toggle sidebar" type="button">
-          <Menu size={16} />
-        </button>
-        <div className={styles.divider} />
-        <Search size={15} className={styles.searchIcon} />
+        <Search size={22} className={styles.searchIcon} />
         <input
           ref={inputRef}
           className={styles.input}
-          placeholder="Search FUTA campus…"
+          placeholder="Search FUTA campus..."
           value={query}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
@@ -236,7 +232,7 @@ export default function DesktopSearchBar({
         )}
         <div className={styles.actionDivider} />
         <button className={styles.navBtn} onClick={handleNavClick} title="Navigate" type="button">
-          <Navigation size={15} />
+          <Navigation size={18} />
         </button>
       </div>
 

@@ -18,6 +18,7 @@ export const MAX_FIX_AGE_MS = 30000;
 const subscribers = new Set();
 let watchId = null;
 let lastStaleTimestamp = null;
+let lastFix = null;
 
 function log(...args) {
   if (import.meta.env?.DEV) console.debug('[gps]', ...args);
@@ -43,6 +44,7 @@ function start() {
         log('dropped stale fix,', Math.round((Date.now() - pos.timestamp) / 1000), 's old');
         return;
       }
+      lastFix = pos;
       subscribers.forEach((s) => s.onFix(pos));
     },
     (err) => {
@@ -69,6 +71,14 @@ export function subscribeGps(onFix, onError) {
     subscribers.delete(sub);
     if (subscribers.size === 0) stop();
   };
+}
+
+/** The newest fix the watch delivered, or null if it's older than
+ * `maxAgeMs` — lets a late subscriber start from where the person is now
+ * instead of waiting for them to move. */
+export function getLastFix(maxAgeMs = MAX_FIX_AGE_MS) {
+  if (!lastFix || Date.now() - lastFix.timestamp > maxAgeMs) return null;
+  return lastFix;
 }
 
 /** Throw away the current watch and begin a fresh acquisition. */

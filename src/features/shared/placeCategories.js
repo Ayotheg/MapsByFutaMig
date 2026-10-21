@@ -71,32 +71,42 @@ export const CHIP_CATEGORY_KEYS = [
 // overlaps between categories, this one's just "what order do the chips
 // appear in"). New chips appended at the end rather than interleaved, so
 // the original 16 stay where admins already expect them.
+//
+// Oct 2026 (Quick Chips revamp): this is now the order the "All places"
+// screen lists them in, group by group. The top bar has its own order
+// (DEFAULT_BAR_CHIPS below).
 export const CHIP_DISPLAY_ORDER = [
-  'toilet',
-  'hostel',
-  'printing_shop',
-  'garage',
+  // Study
+  'lecture_hall',
+  'faculty',
   'library',
+  'printing_shop',
+  // Food & chops
+  'restaurant',
   'kiosk',
+  'shawarma',
+  // Daily essentials
   'bank',
-  'chapel',
+  'toilet',
   'bus_stop',
   'gate',
   'clinic',
-  'restaurant',
-  'mosque',
-  'sports',
-  'lecture_hall',
-  'faculty',
-  'shawarma',
-  'car_wash',
+  // Hostel life
+  'hostel',
+  'laundry',
+  'gas',
+  'furniture',
+  // Fix & style
+  'barber',
   'footwear',
   'clothing',
-  'gas',
+  'car_wash',
+  'garage',
   'fuel',
-  'furniture',
-  'barber',
-  'laundry',
+  // Faith & fun
+  'chapel',
+  'mosque',
+  'sports',
 ];
 
 // Keyword lists ported directly from the person's spec (original 16),
@@ -150,33 +160,48 @@ export const CATEGORY_KEYWORDS = {
 // Display metadata for the Quick Chips (label/icon). `iconKey` looks up
 // `lib/legacyIconMap.js`; every category has one, so there's no emoji
 // fallback to fall back to anymore.
+//
+// Oct 2026 Quick Chips revamp: wording follows the "All places" screen
+// (plural, sentence case — "Toilets", "Gates & entrances").
 export const CATEGORY_LABELS = {
-  toilet: 'Toilet',
-  hostel: 'Hostel / Lodges',
+  toilet: 'Toilets',
+  hostel: 'Hostels & lodges',
   printing_shop: 'Printing',
   garage: 'Garage',
   library: 'Library',
-  kiosk: 'Kiosk',
+  kiosk: 'Kiosks',
   bank: 'POS / ATM',
-  chapel: 'Church',
-  bus_stop: 'Bus Stop',
-  gate: 'Gates / Entrance',
+  chapel: 'Churches',
+  bus_stop: 'Bus stops',
+  gate: 'Gates & entrances',
   clinic: 'Clinic',
-  restaurant: 'Canteen',
-  mosque: 'Mosque',
+  restaurant: 'Canteens',
+  mosque: 'Mosques',
   sports: 'Sports',
-  lecture_hall: 'Lecture Halls',
-  faculty: 'Faculty',
+  lecture_hall: 'Lecture halls',
+  faculty: 'Faculties',
   shawarma: 'Shawarma',
-  car_wash: 'Car Wash',
+  car_wash: 'Car wash',
   footwear: 'Footwear',
   clothing: 'Clothing',
-  gas: 'Gas',
-  fuel: 'Fuel Station',
+  gas: 'Gas shops',
+  fuel: 'Filling stations',
   furniture: 'Furniture',
-  barber: 'Barber / Salon',
-  laundry: 'Laundry',
+  barber: 'Salons',
+  laundry: 'Laundry & dry cleaners',
 };
+
+// Shorter names the top chip bar uses where the screen shortens them
+// ("Food", "Hostels"); the All places panel always shows the full label.
+export const CATEGORY_SHORT_LABELS = {
+  restaurant: 'Food',
+  hostel: 'Hostels',
+};
+
+// The chips the top bar shows, in order (the screen's "Lecture halls ·
+// Food · Printing · POS / ATM · Hostels · All places"). Admins can change
+// this from the Chips tab — it's `quick_chips.bar_order`.
+export const DEFAULT_BAR_CHIPS = ['lecture_hall', 'restaurant', 'printing_shop', 'bank', 'hostel'];
 
 // Kept in step with lib/typeIcons.js so a chip and its results' fallback
 // icons match.
@@ -209,6 +234,64 @@ export const CATEGORY_ICON_KEYS = {
   barber: 'scissors',
   laundry: 'washing-machine',
 };
+
+// ── Chip categories (Oct 2026 Quick Chips revamp) ────────────────────────
+// The "All places" panel groups every chip under one of these headings,
+// in this order, and the admin "Chips" tab picks one when creating a chip
+// (stored as `quick_chips.category` — see supabase/quick_chip_categories.sql).
+// Exactly the six headings on the "All places" screen. `other` isn't one
+// of them: it only catches a chip with no category yet, renders last, and
+// isn't offered in the admin picker.
+export const CHIP_GROUPS = [
+  { key: 'study', label: 'Study' },
+  { key: 'food', label: 'Food & chops' },
+  { key: 'essentials', label: 'Daily essentials' },
+  { key: 'hostel_life', label: 'Hostel life' },
+  { key: 'fix_style', label: 'Fix & style' },
+  { key: 'faith_fun', label: 'Faith & fun' },
+  { key: 'other', label: 'Other' },
+];
+export const PICKABLE_CHIP_GROUPS = CHIP_GROUPS.filter((g) => g.key !== 'other');
+
+const GROUP_KEYS = new Set(CHIP_GROUPS.map((g) => g.key));
+
+// Category for each built-in chip — used by DEFAULT_CHIPS and as the
+// fallback for a `quick_chips` row whose `category` column is still empty
+// (or doesn't exist yet, before the migration is run).
+export const DEFAULT_CHIP_GROUP = {
+  lecture_hall: 'study',
+  faculty: 'study',
+  library: 'study',
+  printing_shop: 'study',
+  restaurant: 'food',
+  kiosk: 'food',
+  shawarma: 'food',
+  bank: 'essentials',
+  toilet: 'essentials',
+  bus_stop: 'essentials',
+  gate: 'essentials',
+  clinic: 'essentials',
+  hostel: 'hostel_life',
+  laundry: 'hostel_life',
+  gas: 'hostel_life',
+  furniture: 'hostel_life',
+  barber: 'fix_style',
+  footwear: 'fix_style',
+  clothing: 'fix_style',
+  car_wash: 'fix_style',
+  garage: 'fix_style',
+  fuel: 'fix_style',
+  chapel: 'faith_fun',
+  mosque: 'faith_fun',
+  sports: 'faith_fun',
+};
+
+/** A chip's category key — its own `category` if it's a known one,
+ * else the built-in default for its id, else `other`. */
+export function chipGroupOf(chip) {
+  if (chip?.category && GROUP_KEYS.has(chip.category)) return chip.category;
+  return DEFAULT_CHIP_GROUP[chip?.id] || 'other';
+}
 
 function norm(s) {
   return (s || '')

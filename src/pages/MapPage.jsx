@@ -819,7 +819,6 @@ export default function MapPage({ onReadinessChange }) {
               setMobileSearchOpen(true);
               presence.updatePresence('searching');
             }}
-            onToggleSheet={() => handleSheetStateChange(sheetState === 'peek' ? 'half' : 'peek')}
             onNavigate={handleNavLaunch}
             activeChipLabel={activeChip?.label}
           />
@@ -837,7 +836,6 @@ export default function MapPage({ onReadinessChange }) {
           searchIndex={searchIndex}
           onSelect={handleSelectPlace}
           collapsed={collapsed}
-          onToggleCollapsed={handleCollapsedChange}
           dismissKey={searchDismissKey}
           onDropdownOpen={() => closeOtherOverlays('search')}
           onManualType={() => setActiveChip(null)}

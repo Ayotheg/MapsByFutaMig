@@ -1,52 +1,54 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { MapPin, MoreHorizontal } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { MapPin, LayoutGrid } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
-import QuickChipsOverflowPanel from './QuickChipsOverflowPanel';
+import AllPlacesPanel from './AllPlacesPanel';
 import styles from './QuickChips.module.css';
 
-// Always show at least this many chips before folding the rest into
-// "Others", even on a viewport too narrow to fit them without a nudge —
-// same floor the person asked for ("first few 4").
+// Always show at least this many chips before the rest live only in
+// "All places", even on a viewport too narrow to fit them without a
+// nudge (the mobile row scrolls sideways).
 const MIN_VISIBLE = 4;
+// Lucide's default 2px stroke reads heavy next to the chip text at this
+// size; the redesign's chip icons are drawn lighter.
+const ICON_STROKE = 1.25;
 
 /**
  * Ported from index.html's `.qc-bar`/`.qc-chip` markup (~1047–1062) and
  * the click-wiring half of `initQuickChips` (app.js ~6862–6924). The
  * results-gathering/panel half lives in ChipResultsPanel.jsx.
  *
- * `chips` now comes from `useQuickChips()` (MapPage owns the hook) rather
- * than a static `CHIPS` import, so admin edits (add/remove/rename a chip)
- * show up here without a rebuild.
+ * `chips` comes from `useQuickChips()` (MapPage owns the hook), so admin
+ * edits (add/remove/rename/re-categorise a chip) show up here without a
+ * rebuild. "Same chip again → close", clearing on manual desktop typing,
+ * and the mobile placeholder swap are all handled by MapPage, which owns
+ * `activeChip` — this component only renders the row and reports clicks.
  *
- * "Same chip again → close", clearing on manual desktop typing, and the
- * mobile placeholder swap are all handled by MapPage, which owns
- * `activeChip` and threads it to DesktopSearchBar/MobileSearchBar too —
- * this component only renders the row and reports clicks upward.
+ * The row shows as many chips as fit its own width (floor of
+ * MIN_VISIBLE), measured off an identical hidden row (`.measureRow`) so it
+ * never flashes full-then-clipped, and re-measures on resize / sidebar
+ * collapse / admin edits.
  *
- * v2 redesign: restyled to v2 tokens per Figma node 29:23's
- * Category Chips row — white/bordered by default, teal-green
- * (`--v2-chip-active-*`) when active. Structure/props/handlers unchanged.
- *
- * This session (on explicit instruction): the row was growing without
- * bound as more chips get added, so it now only shows as many chips as
- * actually fit the bar's own width (floor of MIN_VISIBLE) and folds
- * everything else behind a trailing "Others" chip. Others opens
- * QuickChipsOverflowPanel — a small searchable grid of every category —
- * per Figma node 89:2 ("Categories", MAPSBYFUTA file). Fit is measured
- * off an identical hidden row (`.measureRow`) so the visible row never
- * flashes full-then-clipped, and re-measures on resize / sidebar
- * collapse / whenever admin edits change the chip list. Selecting any
- * chip — visible or from the Others panel — still goes through the same
- * `onChipClick` prop MapPage already owns; only the bar's own display
- * logic changed here.
+ * Oct 2026 Quick Chips revamp (public/Maps By FUTA — Quick-chips-png.zip):
+ * the trailing "Others" chip is now an always-present "All places" chip
+ * that opens AllPlacesPanel — every chip, grouped under its category
+ * (Study, Food & chops, …) with a "Find a category" filter. On desktop
+ * the row sits beside the search bar instead of under it.
  */
 export default function QuickChips({ chips, activeChip, onChipClick, collapsed, isMobile }) {
-  const list = chips || [];
+  const allChips = useMemo(() => chips || [], [chips]);
+  // The bar shows only the chips pinned to it (`barOrder`, set from the
+  // admin Chips tab), in that order; everything else is in All places.
+  // If nothing is pinned, fall back to the full list in its usual order.
+  const list = useMemo(() => {
+    const pinned = allChips.filter((c) => c.barOrder != null).sort((a, b) => a.barOrder - b.barOrder);
+    return pinned.length ? pinned : allChips;
+  }, [allChips]);
   const barRef = useRef(null);
   const rowRef = useRef(null);
   const measureRef = useRef(null);
+  const allPanelRef = useRef(null);
   const [visibleCount, setVisibleCount] = useState(list.length);
-  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [allOpen, setAllOpen] = useState(false);
 
   const isActive = useCallback(
     (chip) => (activeChip?.id ? activeChip.id === chip.id : activeChip?.label === chip.label),
@@ -68,14 +70,13 @@ export default function QuickChips({ chips, activeChip, onChipClick, collapsed, 
         setVisibleCount(list.length);
         return;
       }
-      // Last measured child is the "Others" chip itself — reserve its
-      // width up front so the real row never renders a set of chips
-      // that then has no room left for the trailing Others button.
-      const othersWidth = items[items.length - 1].offsetWidth + 6;
-      let used = othersWidth;
+      // Last measured child is the "All places" chip itself — reserve its
+      // width up front so the real row always has room for it.
+      const allWidth = items[items.length - 1].offsetWidth + 8;
+      let used = allWidth;
       let count = 0;
       for (let i = 0; i < list.length; i++) {
-        const w = items[i].offsetWidth + 6;
+        const w = items[i].offsetWidth + 8;
         if (count >= MIN_VISIBLE && used + w > available) break;
         used += w;
         count++;
@@ -90,39 +91,29 @@ export default function QuickChips({ chips, activeChip, onChipClick, collapsed, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, collapsed, isMobile]);
 
-  // If the fit calculation lands on showing everything, there's nothing
-  // left to browse in the Others panel — keep it closed.
+  // Desktop: dismiss All places on an outside click, same convention
+  // MapPage uses to close the chip results panel on a map click. (Mobile
+  // has its own scrim.)
   useEffect(() => {
-    if (visibleCount >= list.length && overflowOpen) setOverflowOpen(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleCount, list.length]);
-
-  // Dismiss the Others panel on an outside click/tap, same convention
-  // MapPage uses to close the chip results panel on a map click.
-  useEffect(() => {
-    if (!overflowOpen) return undefined;
+    if (!allOpen || isMobile) return undefined;
     function handlePointerDown(e) {
-      if (barRef.current && !barRef.current.contains(e.target)) setOverflowOpen(false);
+      // The panel is portalled to <body>, so it isn't inside barRef.
+      if (barRef.current?.contains(e.target) || allPanelRef.current?.contains(e.target)) return;
+      setAllOpen(false);
     }
     document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('touchstart', handlePointerDown);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('touchstart', handlePointerDown);
-    };
-  }, [overflowOpen]);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [allOpen, isMobile]);
 
-  if (!list.length) return null;
+  if (!allChips.length) return null;
 
-  const hiddenCount = Math.max(list.length - visibleCount, 0);
-
-  // Keep the currently active chip visible in the row even if it would
-  // otherwise have overflowed, so picking one from the Others panel
-  // doesn't make it disappear from the bar the moment it's selected.
+  // Keep the currently active chip visible in the row even if it isn't
+  // pinned to the bar or would otherwise have overflowed, so picking one
+  // from All places doesn't leave the bar showing nothing selected.
   let shown = list.slice(0, visibleCount);
-  if (hiddenCount > 0 && activeChip && !shown.some(isActive)) {
-    const activeInList = list.find(isActive);
-    if (activeInList) shown = [...shown.slice(0, -1), activeInList];
+  if (activeChip && !shown.some(isActive)) {
+    const activeChipInList = allChips.find(isActive);
+    if (activeChipInList) shown = visibleCount < list.length ? [...shown.slice(0, -1), activeChipInList] : [...shown, activeChipInList];
   }
 
   function renderChip(chip, { measuring = false } = {}) {
@@ -136,9 +127,26 @@ export default function QuickChips({ chips, activeChip, onChipClick, collapsed, 
         type="button"
         tabIndex={measuring ? -1 : 0}
         aria-hidden={measuring || undefined}
+        aria-pressed={measuring ? undefined : active}
       >
-        <Icon size={13} />
-        <span className={styles.label}>{chip.label}</span>
+        <Icon size={16} strokeWidth={ICON_STROKE} />
+        <span className={styles.label}>{chip.shortLabel || chip.label}</span>
+      </button>
+    );
+  }
+
+  function renderAllChip({ measuring = false } = {}) {
+    return (
+      <button
+        className={`${styles.chip} ${styles.allChip}`}
+        onClick={measuring ? undefined : () => setAllOpen((open) => !open)}
+        type="button"
+        tabIndex={measuring ? -1 : 0}
+        aria-hidden={measuring || undefined}
+        aria-expanded={measuring ? undefined : allOpen}
+      >
+        <LayoutGrid size={16} strokeWidth={ICON_STROKE} />
+        <span className={styles.label}>All places</span>
       </button>
     );
   }
@@ -147,49 +155,36 @@ export default function QuickChips({ chips, activeChip, onChipClick, collapsed, 
     <div
       ref={barRef}
       className={styles.bar}
-      style={!isMobile && collapsed ? { left: 'calc(var(--sidebar-rail-w) + 16px)' } : undefined}
+      style={!isMobile && collapsed ? { left: 'calc(var(--sidebar-rail-w) + 32px + var(--search-col-w))' } : undefined}
     >
       <div ref={rowRef} className={styles.scroll}>
         {shown.map((chip) => renderChip(chip))}
-        {hiddenCount > 0 && (
-          <button
-            className={`${styles.chip} ${styles.othersChip} ${overflowOpen ? styles.active : ''}`}
-            onClick={() => setOverflowOpen((open) => !open)}
-            type="button"
-            aria-expanded={overflowOpen}
-            aria-label={`${hiddenCount} more categories`}
-          >
-            <MoreHorizontal size={13} />
-            <span className={styles.label}>Others</span>
-            <span className={styles.othersBadge}>{hiddenCount}</span>
-          </button>
-        )}
+        {renderAllChip()}
       </div>
 
       {/* Off-screen measuring row — identical markup to the real row (plus
-          one trailing Others chip) so offsetWidth reflects true rendered
-          sizes; used only to decide how many chips fit above. Never
-          visible, never interactive. */}
+          the trailing All places chip) so offsetWidth reflects true
+          rendered sizes; used only to decide how many chips fit above.
+          Never visible, never interactive. */}
       <div ref={measureRef} className={styles.measureRow} aria-hidden="true">
         {list.map((chip) => renderChip(chip, { measuring: true }))}
-        <button className={`${styles.chip} ${styles.othersChip}`} type="button" tabIndex={-1}>
-          <MoreHorizontal size={13} />
-          <span className={styles.label}>Others</span>
-          <span className={styles.othersBadge}>{list.length}</span>
-        </button>
+        {renderAllChip({ measuring: true })}
       </div>
 
-      {overflowOpen && (
-        <QuickChipsOverflowPanel
-          chips={list}
+      {allOpen && (
+        <AllPlacesPanel
+          chips={allChips}
           activeChip={activeChip}
           onChipClick={(chip) => {
-            onChipClick(chip);
-            setOverflowOpen(false);
+            // Picking from the panel always opens that chip's results,
+            // even if it's the one already active.
+            if (!isActive(chip)) onChipClick(chip);
+            setAllOpen(false);
           }}
-          onClose={() => setOverflowOpen(false)}
+          onClose={() => setAllOpen(false)}
           isMobile={isMobile}
           collapsed={collapsed}
+          panelRef={allPanelRef}
         />
       )}
     </div>

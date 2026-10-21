@@ -71,6 +71,11 @@
   --sidebar-rail-w:    64px;
   --sidebar-panel-w:   240px;
   --sidebar-total-w:   304px;
+  /* Desktop search column: search pill, chip panels and PlaceCard share
+     this width; the Quick Chips row starts just right of it. */
+  --search-col-w:      480px;
+  /* Search pill height; the Quick Chips row centres on it. */
+  --search-h:          56px;
 
   /* Mobile-specific layout tokens */
   --mob-search-h:      56px;

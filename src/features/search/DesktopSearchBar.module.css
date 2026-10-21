@@ -7,13 +7,14 @@
     display: flex;
     align-items: center;
     position: fixed;
-    top: 14px;
+    top: 16px;
     left: calc(var(--sidebar-total-w) + 16px);
-    right: 16px;
-    max-width: 580px;
-    margin-left: auto;
-    margin-right: auto;
+    /* Quick Chips revamp: a fixed left column (same 400px as PlaceCard /
+       the chip panels below it) instead of a centred 580px pill, so the
+       chip row can sit beside it — see QuickChips.module.css. */
+    width: var(--search-col-w);
     z-index: 1100;
+    transition: left 0.3s var(--v2-ease-standard);
   }
   /* NOTE: legacy shifts this with `body.sidebar-collapsed .desk-search-bar
      { left: calc(--sidebar-rail-w + 16px) }`. Sidebar.jsx's `collapsed`
@@ -25,11 +26,11 @@
   display: flex;
   align-items: center;
   width: 100%;
-  height: 52px;
-  background: #ffffff;
-  border: 1px solid var(--v2-border);
+  height: var(--search-h);
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
   border-radius: var(--r-full);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 24px -6px rgba(15, 23, 42, 0.18);
   transition:
     box-shadow var(--v2-duration-standard) var(--v2-ease-standard),
     border-color var(--v2-duration-standard) var(--v2-ease-standard);
@@ -38,40 +39,14 @@
 .pill:focus-within {
   border-color: var(--v2-primary-outline);
   box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1),
+    0 8px 24px -6px rgba(15, 23, 42, 0.18),
     0 0 0 2.5px var(--v2-primary-outline);
-}
-
-.logoBtn {
-  flex-shrink: 0;
-  width: 52px;
-  height: 100%;
-  background: none;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  border-radius: var(--r-full) 0 0 var(--r-full);
-  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
-  color: var(--v2-text);
-}
-.logoBtn:hover {
-  background: var(--v2-primary-glow);
-}
-
-.divider {
-  width: 1px;
-  height: 24px;
-  flex-shrink: 0;
-  background: var(--v2-primary-outline);
 }
 
 .searchIcon {
   position: absolute;
-  left: 66px;
-  color: var(--v2-text-variant);
+  left: 22px;
+  color: var(--v2-neutral);
   pointer-events: none;
   transition: color var(--v2-duration-standard) var(--v2-ease-standard);
   z-index: 1;
@@ -87,15 +62,15 @@
   background: transparent;
   border: none;
   outline: none;
-  color: var(--v2-text);
+  color: var(--v2-neutral);
   font-family: var(--font-ui);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 400;
-  padding: 0 8px 0 40px;
+  padding: 0 8px 0 56px;
   caret-color: var(--v2-primary);
 }
 .input::placeholder {
-  color: var(--v2-text-variant);
+  color: var(--v2-text-muted);
 }
 
 .clearBtn {
@@ -126,9 +101,9 @@
 
 .navBtn {
   flex-shrink: 0;
-  width: 42px;
-  height: 38px;
-  margin: 0 7px;
+  width: 44px;
+  height: 44px;
+  margin: 0 6px;
   background: var(--v2-primary);
   border: none;
   border-radius: var(--r-full);
@@ -154,8 +129,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .bar,
   .pill,
-  .logoBtn,
   .searchIcon,
   .clearBtn,
   .navBtn {

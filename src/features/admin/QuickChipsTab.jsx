@@ -3,7 +3,7 @@ import { X, MapPin, ChevronRight } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import styles from './AdminPanel.module.css';
 import chipStyles from './QuickChipsTab.module.css';
-import { nameOrTypeMatches } from '../shared/placeCategories';
+import { nameOrTypeMatches, CHIP_GROUPS, PICKABLE_CHIP_GROUPS, chipGroupOf } from '../shared/placeCategories';
 import {
   createChip,
   updateChip,
@@ -55,18 +55,42 @@ import {
  * points to pin turned up nothing while imported waypoints (which trace
  * back to an OSM import) did. Both are merged into `allPlaces` below,
  * each tagged with `source` so the UI can show which is which.
+ *
+ * Oct 2026 revamp: every chip belongs to a category (CHIP_GROUPS in
+ * shared/placeCategories.js) — the heading it's listed under in the
+ * map's "All places" panel. A new chip must be given one, an existing
+ * chip's can be changed from its expanded row, and the list below is
+ * grouped the same way the panel is.
  */
 export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, onChipsChanged }) {
   const [expandedId, setExpandedId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newLabel, setNewLabel] = useState('');
+  const [newCategory, setNewCategory] = useState('');
   const [newKeywords, setNewKeywords] = useState('');
   const [newPinned, setNewPinned] = useState([]); // [{id, name}]
   const [pinSearch, setPinSearch] = useState('');
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
 
-  const list = chips || [];
+  const list = useMemo(() => chips || [], [chips]);
+
+  const grouped = useMemo(
+    () =>
+      CHIP_GROUPS.map((g) => ({ ...g, chips: list.filter((c) => chipGroupOf(c) === g.key) })).filter(
+        (g) => g.chips.length
+      ),
+    [list]
+  );
+
+  // Chips pinned to the map's top bar, in bar order — for the "position N"
+  // hint, and so a newly pinned chip goes on the end.
+  const barChips = useMemo(
+    () => list.filter((c) => c.barOrder != null).sort((a, b) => a.barOrder - b.barOrder),
+    [list]
+  );
+  const barChipIds = barChips.map((c) => c.id);
+  const nextBarOrder = barChips.length ? barChips[barChips.length - 1].barOrder + 1 : 0;
 
   const allPlaces = useMemo(
     () => [
@@ -95,6 +119,10 @@ export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, 
       setError('Give the chip a name, and either a keyword or at least one hand-picked place.');
       return;
     }
+    if (!newCategory) {
+      setError('Pick the category this chip goes under.');
+      return;
+    }
     setError('');
     setBusyId('__new__');
     try {
@@ -103,8 +131,10 @@ export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, 
         keywordsText: newKeywords,
         pinnedIds: newPinned.map((p) => p.id),
         sortOrder: list.length,
+        category: newCategory,
       });
       setNewLabel('');
+      setNewCategory('');
       setNewKeywords('');
       setNewPinned([]);
       setPinSearch('');
@@ -152,6 +182,20 @@ export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, 
           <div className={styles.fieldGroup}>
             <label>Name</label>
             <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Barber Shops" />
+          </div>
+
+          <div className={styles.fieldGroup}>
+            <label>Category (the heading it's listed under in All places)</label>
+            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+              <option value="" disabled>
+                Choose a category…
+              </option>
+              {PICKABLE_CHIP_GROUPS.map((g) => (
+                <option key={g.key} value={g.key}>
+                  {g.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className={styles.fieldGroup}>
@@ -220,26 +264,36 @@ export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, 
 
       {!list.length && <div className={styles.empty}>No chips yet — add one above.</div>}
 
-      <div className={styles.list}>
-        {list.map((chip) => (
-          <ChipRow
-            key={chip.id}
-            user={user}
-            chip={chip}
-            places={allPlaces}
-            expanded={expandedId === chip.id}
-            onToggleExpand={() => setExpandedId((id) => (id === chip.id ? null : chip.id))}
-            onDelete={() => handleDelete(chip)}
-            busy={busyId === chip.id}
-            onChanged={onChipsChanged}
-          />
-        ))}
-      </div>
+      {grouped.map((group) => (
+        <div key={group.key} className={chipStyles.group}>
+          <div className={chipStyles.groupLabel}>
+            {group.label} <span>{group.chips.length}</span>
+          </div>
+          <div className={styles.list}>
+            {group.chips.map((chip) => (
+              <ChipRow
+                key={chip.id}
+                user={user}
+                chip={chip}
+                places={allPlaces}
+                expanded={expandedId === chip.id}
+                onToggleExpand={() => setExpandedId((id) => (id === chip.id ? null : chip.id))}
+                onDelete={() => handleDelete(chip)}
+                busy={busyId === chip.id}
+                onChanged={onChipsChanged}
+                barChipIds={barChipIds}
+                nextBarOrder={nextBarOrder}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy, onChanged }) {
+function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy, onChanged, barChipIds, nextBarOrder }) {
+  const [shortLabel, setShortLabel] = useState(chip.shortLabel || '');
   const [editingKeywords, setEditingKeywords] = useState(false);
   const [keywordsText, setKeywordsText] = useState(joinKeywords(chip.keywords));
   const [pinQuery, setPinQuery] = useState('');
@@ -281,6 +335,43 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
       setRowError(describeError(e));
     } finally {
       setSavingKeywords(false);
+    }
+  }
+
+  const inBar = chip.barOrder != null;
+  const barPosition = inBar ? barChipIds.indexOf(chip.id) + 1 : null;
+
+  async function saveBar(patch) {
+    if (!user) {
+      setRowError('You must be signed in to change the top bar.');
+      return;
+    }
+    setRowBusy('bar');
+    setRowError('');
+    try {
+      await updateChip(chip.id, patch);
+      await onChanged?.();
+    } catch (e) {
+      setRowError(describeError(e));
+    } finally {
+      setRowBusy(null);
+    }
+  }
+
+  async function saveCategory(category) {
+    if (!user) {
+      setRowError('You must be signed in to change a category.');
+      return;
+    }
+    setRowBusy('category');
+    setRowError('');
+    try {
+      await updateChip(chip.id, { category });
+      await onChanged?.();
+    } catch (e) {
+      setRowError(describeError(e));
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -358,6 +449,61 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
       {expanded && (
         <div className={chipStyles.detail}>
           {rowError && <div className={`${styles.saveStatus} ${styles.saveStatusError}`}>{rowError}</div>}
+
+          <div className={chipStyles.detailSection}>
+            <div className={chipStyles.detailLabel}>Category</div>
+            <div className={styles.fieldGroup}>
+              <select
+                value={chipGroupOf(chip)}
+                disabled={rowBusy === 'category'}
+                onChange={(e) => saveCategory(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {chipGroupOf(chip) === 'other' && (
+                  <option value="other" disabled>
+                    Choose a category…
+                  </option>
+                )}
+                {PICKABLE_CHIP_GROUPS.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className={chipStyles.detailSection}>
+            <div className={chipStyles.detailLabel}>Top chip bar</div>
+            <label className={chipStyles.checkRow}>
+              <input
+                type="checkbox"
+                checked={inBar}
+                disabled={rowBusy === 'bar'}
+                onChange={(e) => saveBar({ barOrder: e.target.checked ? nextBarOrder : null })}
+              />
+              Show in the top bar {inBar ? `(position ${barPosition})` : '(otherwise only in All places)'}
+            </label>
+            {inBar && (
+              <div className={chipStyles.editRow}>
+                <input
+                  className={styles.searchInput}
+                  value={shortLabel}
+                  onChange={(e) => setShortLabel(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder={`Shorter name for the bar (optional) — e.g. "${chip.label.split(/[ &/]/)[0]}"`}
+                />
+                <button
+                  type="button"
+                  className={styles.formSave}
+                  disabled={rowBusy === 'bar' || shortLabel === (chip.shortLabel || '')}
+                  onClick={() => saveBar({ shortLabel })}
+                >
+                  {rowBusy === 'bar' ? '…' : 'Save'}
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className={chipStyles.detailSection}>
             <div className={chipStyles.detailLabel}>Keywords</div>

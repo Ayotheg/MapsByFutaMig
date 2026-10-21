@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase';
 import { DEFAULT_CHIPS } from '../search/chipConfig';
+import { chipGroupOf, DEFAULT_BAR_CHIPS } from '../shared/placeCategories';
 
 // ── Quick Chips — Supabase CRUD ─────────────────────────────────────────
 //
@@ -29,6 +30,19 @@ function rowToChip(row) {
     label: row.label,
     iconKey: row.icon_key || null,
     keywords: row.keywords || [],
+    // Empty until supabase/quick_chip_categories.sql has been run — then
+    // chipGroupOf() falls back to the built-in default for the chip's id.
+    category: chipGroupOf({ id: row.id, category: row.category }),
+    // Top-bar position (null = only in All places) and the bar's optional
+    // shorter name. Before the migration neither column exists, so the
+    // built-in bar set is used instead.
+    barOrder:
+      row.bar_order !== undefined
+        ? row.bar_order
+        : DEFAULT_BAR_CHIPS.includes(row.id)
+          ? DEFAULT_BAR_CHIPS.indexOf(row.id)
+          : null,
+    shortLabel: row.short_label || null,
     pinnedIds: row.pinned_ids || [],
     excludedIds: row.excluded_ids || [],
     isCustom: !!row.is_custom,
@@ -65,13 +79,15 @@ function slugify(label) {
  * component doesn't need to know the storage shape. `pinnedIds` lets a
  * chip be created purely from hand-picked places, with no keywords at
  * all — useful when every candidate keyword would clash with another
- * chip's places. */
-export async function createChip({ label, keywordsText, pinnedIds, sortOrder }) {
+ * chip's places. `category` is one of CHIP_GROUPS' keys — the heading the
+ * chip sits under in the "All places" panel. */
+export async function createChip({ label, keywordsText, pinnedIds, sortOrder, category }) {
   const keywords = splitKeywords(keywordsText);
   const row = {
     id: slugify(label),
     label: label.trim(),
     icon_key: null,
+    category: category || 'other',
     keywords,
     pinned_ids: pinnedIds || [],
     excluded_ids: [],
@@ -97,6 +113,9 @@ export async function updateChip(id, patch) {
   if (patch.pinnedIds !== undefined) update.pinned_ids = patch.pinnedIds;
   if (patch.excludedIds !== undefined) update.excluded_ids = patch.excludedIds;
   if (patch.sortOrder !== undefined) update.sort_order = patch.sortOrder;
+  if (patch.category !== undefined) update.category = patch.category;
+  if (patch.barOrder !== undefined) update.bar_order = patch.barOrder;
+  if (patch.shortLabel !== undefined) update.short_label = patch.shortLabel?.trim() || null;
 
   const { error } = await supabase.from('quick_chips').update(update).eq('id', id);
   if (error) throw error;
@@ -154,6 +173,9 @@ export function describeError(e) {
   const raw = e?.message || String(e || 'Something went wrong.');
   if (/networkerror|failed to fetch|cors/i.test(raw)) {
     return `Couldn't reach the database (${raw}). Check that supabase/quick_chips.sql has been run, and that no browser extension or privacy setting is blocking requests to Supabase.`;
+  }
+  if (/category|bar_order|short_label/i.test(raw) && /column/i.test(raw)) {
+    return `The chips table is missing the new category / top-bar columns. Run supabase/quick_chip_categories.sql in the Supabase SQL editor, then try again.`;
   }
   if (/violates row-level security policy/i.test(raw)) {
     return `Permission denied. Make sure you're signed in as an admin and supabase/quick_chips.sql has been run.`;
