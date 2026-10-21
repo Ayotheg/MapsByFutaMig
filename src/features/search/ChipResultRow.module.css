@@ -1,7 +1,9 @@
+/* Fixed 84px row: thumb · text (title, "area · distance") · Navigate. */
 .row {
   display: flex;
   align-items: stretch;
-  min-height: 96px;
+  flex-shrink: 0;
+  height: 84px;
   background: var(--v2-primary-glow);
   border: 1px solid var(--v2-border);
   border-radius: var(--r-lg);
@@ -10,8 +12,7 @@
   transition:
     background var(--v2-duration-quick) var(--v2-ease-standard),
     border-color var(--v2-duration-quick) var(--v2-ease-standard),
-    box-shadow var(--v2-duration-quick) var(--v2-ease-standard),
-    transform var(--v2-duration-quick) var(--v2-ease-standard);
+    box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
 }
 @media (prefers-reduced-motion: no-preference) {
   .row {
@@ -22,11 +23,6 @@
   background: var(--v2-primary-outline);
   border-color: var(--v2-primary-outline);
   box-shadow: 0 4px 12px var(--v2-primary-glow);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .row:hover {
-    transform: translateX(2px);
-  }
 }
 @keyframes rowIn {
   from {
@@ -39,18 +35,23 @@
   }
 }
 
-/* Thumbnail — either the place's photo, or (Figma node 4:342/4:418) a
-   flat icon tile in the same light-lavender fill used for a place with
-   no photo yet, matching ChipResultsPanel's icon-badge treatment. */
+/* Thumbnail — the place's photo, or its type icon on a lavender tile. */
 .thumb {
   flex-shrink: 0;
-  width: 96px;
-  min-height: 96px;
+  width: 84px;
   background: var(--v2-thumb-bg);
   position: relative;
   overflow: hidden;
 }
-/* Photo sits on top of .thumbPh (the type icon) and fades in once loaded. */
+.thumbPh {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--v2-primary);
+}
+/* Photo sits on top of .thumbPh and fades in once loaded. */
 .thumbImg {
   position: absolute;
   inset: 0;
@@ -64,97 +65,58 @@
 .thumbImgLoaded {
   opacity: 1;
 }
-.thumbPh {
-  width: 100%;
-  height: 100%;
-  min-height: 96px;
-  display: flex;
+.photoCount {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  color: var(--v2-primary);
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--v2-neutral) 70%, transparent);
+  color: var(--v2-on-primary);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
 }
 
+/* min-width: 0 lets long text shrink (and ellipsise) instead of widening
+   the card; the two lines sit vertically centred in the 84px row. */
 .info {
   flex: 1;
   min-width: 0;
-  padding: 12px;
+  padding: 0 12px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
 }
-.name {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--v2-text);
-  line-height: 1.3;
+.name,
+.sub {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Name/desc/meta keep their full height — with `overflow: hidden` the flex
-   column would otherwise squash them and clip the text mid-line. The row
-   grows instead. */
-.info > * {
-  flex-shrink: 0;
+.name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--v2-text);
 }
-
-/* Phones: long place names get two lines instead of an ellipsis. */
-@media (max-width: 768px) {
-  .name {
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-  }
-}
-.desc {
+.sub {
   font-family: var(--font-ui);
   font-size: 12px;
-  color: var(--v2-text-variant);
   line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: var(--v2-text-muted);
 }
-.meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-/* Type tag — filled per-type fill (dotColor()) with white text, matching
-   the majority "HOSTEL"-style tag in Figma node 4:323. The one outlined
-   exception in that reference ("TOWNHALL") wasn't replicated — no rule
-   was given for when a tag should be outlined vs filled, so every type
-   gets the one consistent filled treatment here; flagged in handoff
-   notes rather than guessed at. */
-.type {
-  font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  padding: 4px 8px;
-  border-radius: var(--r-full);
-  color: #fff;
-  white-space: nowrap;
+.dot {
+  color: var(--v2-text-muted);
 }
 .dist {
-  font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--v2-text-variant);
-  white-space: nowrap;
-}
-.photos {
-  font-family: var(--font-ui);
-  font-size: 11px;
-  color: var(--v2-secondary);
-  display: flex;
-  align-items: center;
-  gap: 3px;
+  font-variant-numeric: tabular-nums;
 }
 
 .navBtn {
@@ -172,4 +134,13 @@
 }
 .navBtn:hover {
   background: var(--v2-primary-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .thumbImg,
+  .navBtn {
+    transition: none;
+    animation: none;
+  }
 }
