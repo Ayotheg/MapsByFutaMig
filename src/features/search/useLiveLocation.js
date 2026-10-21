@@ -20,11 +20,17 @@ const SEED_MAX_AGE_MS = 2 * 60 * 1000;
  */
 export function useLiveLocation(enabled) {
   const [coords, setCoords] = useState(() => toCoords(getLastFix(SEED_MAX_AGE_MS)));
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+
+  // Re-seed during render on each open, so the first frame never ranks
+  // from where the person was last time (null if there's no fresh fix).
+  if (enabled !== wasEnabled) {
+    setWasEnabled(enabled);
+    if (enabled) setCoords(toCoords(getLastFix(SEED_MAX_AGE_MS)));
+  }
 
   useEffect(() => {
     if (!enabled) return undefined;
-    const seed = toCoords(getLastFix(SEED_MAX_AGE_MS));
-    if (seed) setCoords((prev) => (prev && !movedEnough(prev, seed) ? prev : seed));
     return subscribeGps((pos) => {
       const next = toCoords(pos);
       setCoords((prev) => (prev && !movedEnough(prev, next) ? prev : next));

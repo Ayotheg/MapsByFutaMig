@@ -9,8 +9,7 @@ import styles from './AllPlacesPanel.module.css';
  * Quick Chip, grouped under its category (CHIP_GROUPS: Study, Food &
  * chops, Daily essentials, …) with a "Find a category" filter, per the
  * Oct 2026 redesign (public/Maps By FUTA — Quick-chips-png.zip, "All
- * places · desktop" / "All places · mobile"). Replaces the old "Others"
- * icon-grid dropdown.
+ * places · desktop" / "All places · mobile").
  *
  * Built 1:1 to the zip's screens: on mobile a full-width bottom sheet
  * (handle, rounded top) from right under the search bar to the bottom
@@ -36,13 +35,23 @@ export default function AllPlacesPanel({ chips, activeChip, onChipClick, onClose
     return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const groups = useMemo(() => {
+  // Matches the bar's short name and the chip's keywords too, so "food"
+  // finds Canteens and "atm" finds POS / ATM.
+  const matching = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const matching = q ? chips.filter((chip) => chip.label.toLowerCase().includes(q)) : chips;
-    return CHIP_GROUPS.map((g) => ({ ...g, chips: matching.filter((c) => chipGroupOf(c) === g.key) })).filter(
-      (g) => g.chips.length
+    if (!q) return chips;
+    return chips.filter((chip) =>
+      [chip.label, chip.shortLabel, ...(chip.keywords || [])].some((s) => s && s.toLowerCase().includes(q))
     );
   }, [chips, query]);
+
+  const groups = useMemo(
+    () =>
+      CHIP_GROUPS.map((g) => ({ ...g, chips: matching.filter((c) => chipGroupOf(c) === g.key) })).filter(
+        (g) => g.chips.length
+      ),
+    [matching]
+  );
 
   function isActive(chip) {
     return activeChip?.id ? activeChip.id === chip.id : activeChip?.label === chip.label;
@@ -65,7 +74,7 @@ export default function AllPlacesPanel({ chips, activeChip, onChipClick, onClose
       <div className={styles.deskTitles}>
         <h2 className={styles.deskTitle}>All places</h2>
         <div className={styles.deskMetaRow}>
-          <span className={styles.deskBadge}>{chips.length}</span>
+          <span className={styles.deskBadge}>{matching.length}</span>
           <span className={styles.deskSubtitle}>Pick a category</span>
         </div>
       </div>

@@ -104,40 +104,14 @@
   }
 }
 
-.emojiIcon {
-  font-size: 13px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-/* ── "Others" chip — trailing entry that opens QuickChipsOverflowPanel
-   once the row can't fit every category. Dashed border sets it apart
-   from a normal category chip at a glance; the count badge tells you
-   how many are tucked away before you even open it. */
+/* ── "All places" chip — trailing entry that opens AllPlacesPanel. Dashed
+   border sets it apart from a normal category chip at a glance. */
 .othersChip {
   border-style: dashed;
   color: var(--v2-text-variant);
 }
 .othersChip.active {
   border-style: solid;
-}
-.othersBadge {
-  flex-shrink: 0;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  border-radius: var(--r-full);
-  background: var(--v2-primary-glow);
-  color: var(--v2-primary);
-  font-family: var(--font-ui);
-  font-size: 9.5px;
-  font-weight: 700;
-  line-height: 15px;
-  text-align: center;
-}
-.othersChip.active .othersBadge {
-  background: var(--v2-chip-active-text);
-  color: var(--v2-chip-active-bg);
 }
 
 /* ── Hidden measuring row — same chip markup as `.scroll`, rendered

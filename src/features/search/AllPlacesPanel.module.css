@@ -27,9 +27,10 @@
     background: var(--v2-surface);
     border: 1px solid var(--v2-border);
     border-radius: var(--r-xl);
+    /* Same shadow as the chip results panel, in ink instead of black. */
     box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -2px rgba(0, 0, 0, 0.1);
+      0 4px 6px -1px color-mix(in srgb, var(--v2-neutral) 10%, transparent),
+      0 2px 4px -2px color-mix(in srgb, var(--v2-neutral) 10%, transparent);
     overflow: hidden;
     transition: left 0.3s var(--v2-ease-standard);
     pointer-events: auto;
@@ -201,7 +202,8 @@
     z-index: 1210;
     background: var(--v2-on-primary);
     border-radius: 24px 24px 0 0;
-    box-shadow: 0 -8px 30px -12px rgba(15, 23, 42, 0.2);
+    /* Half-strength scrim colour. */
+    box-shadow: 0 -8px 30px -12px color-mix(in srgb, var(--v2-scrim) 50%, transparent);
     overflow: hidden;
     pointer-events: auto;
     padding-bottom: var(--mob-safe-bottom);

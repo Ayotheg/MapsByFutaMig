@@ -37,7 +37,7 @@
 // "FUTA Car Wash" still resolves to the `car_wash` chip correctly. New
 // keys added below this line: shawarma, footwear, clothing, gas, fuel,
 // furniture, barber, laundry, car_wash.
-export const CHIP_CATEGORY_KEYS = [
+const CHIP_CATEGORY_KEYS = [
   'toilet',
   'mosque',
   'chapel',
@@ -291,6 +291,24 @@ export const DEFAULT_CHIP_GROUP = {
 export function chipGroupOf(chip) {
   if (chip?.category && GROUP_KEYS.has(chip.category)) return chip.category;
   return DEFAULT_CHIP_GROUP[chip?.id] || 'other';
+}
+
+// Icon for a chip saved without one (admin-created chips have no
+// icon_key), so it reads as its category instead of a bare pin.
+const CHIP_GROUP_ICON_KEYS = {
+  study: 'book-open',
+  food: 'utensils',
+  essentials: 'shop',
+  hostel_life: 'house-door-fill',
+  fix_style: 'wrench',
+  faith_fun: 'star',
+  other: 'geo-alt-fill',
+};
+
+/** A chip's `legacyIconMap` key: its stored one, else its built-in
+ * category's, else its group's. */
+export function chipIconKey(chip) {
+  return chip?.iconKey || CATEGORY_ICON_KEYS[chip?.id] || CHIP_GROUP_ICON_KEYS[chipGroupOf(chip)];
 }
 
 function norm(s) {

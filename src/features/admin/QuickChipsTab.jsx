@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react';
-import { X, MapPin, ChevronRight } from 'lucide-react';
+import { X, MapPin, ChevronRight, Search } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import styles from './AdminPanel.module.css';
 import chipStyles from './QuickChipsTab.module.css';
-import { nameOrTypeMatches, CHIP_GROUPS, PICKABLE_CHIP_GROUPS, chipGroupOf } from '../shared/placeCategories';
+import {
+  nameOrTypeMatches,
+  CHIP_GROUPS,
+  PICKABLE_CHIP_GROUPS,
+  chipGroupOf,
+  chipIconKey,
+} from '../shared/placeCategories';
 import {
   createChip,
   updateChip,
@@ -73,14 +79,24 @@ export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, 
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
 
+  const [search, setSearch] = useState('');
+
   const list = useMemo(() => chips || [], [chips]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((c) =>
+      [c.label, c.shortLabel, ...(c.keywords || [])].some((s) => s && s.toLowerCase().includes(q))
+    );
+  }, [list, search]);
 
   const grouped = useMemo(
     () =>
-      CHIP_GROUPS.map((g) => ({ ...g, chips: list.filter((c) => chipGroupOf(c) === g.key) })).filter(
+      CHIP_GROUPS.map((g) => ({ ...g, chips: filtered.filter((c) => chipGroupOf(c) === g.key) })).filter(
         (g) => g.chips.length
       ),
-    [list]
+    [filtered]
   );
 
   // Chips pinned to the map's top bar, in bar order — for the "position N"
@@ -169,107 +185,125 @@ export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, 
   return (
     <div className={styles.tabContent}>
       <div className={styles.toolbar}>
-        <span className={styles.countBadge}>{list.length} of {list.length} chips</span>
-        <input className={styles.searchInput} placeholder="Search chips…" disabled style={{ visibility: 'hidden' }} />
+        <div className={styles.countBadge}>
+          <span className={styles.countBadgeDot} />
+          {filtered.length} <span className={styles.countBadgeMuted}>of {list.length} chips</span>
+        </div>
+        <div className={styles.searchWrap}>
+          <span className={styles.searchIcon}>
+            <Search size={16} />
+          </span>
+          <input
+            className={styles.searchInput}
+            placeholder="Search chips or keywords…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         <button type="button" className={styles.addBtn} onClick={() => setShowAddForm((v) => !v)}>
           {showAddForm ? 'Cancel' : '+ Add Chip'}
         </button>
       </div>
 
-      {showAddForm && (
-        <div className={styles.inlineForm}>
-          <div className={styles.formTitle}>New chip</div>
-          <div className={styles.fieldGroup}>
-            <label>Name</label>
-            <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Barber Shops" />
-          </div>
-
-          <div className={styles.fieldGroup}>
-            <label>Category (the heading it's listed under in All places)</label>
-            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
-              <option value="" disabled>
-                Choose a category…
-              </option>
-              {PICKABLE_CHIP_GROUPS.map((g) => (
-                <option key={g.key} value={g.key}>
-                  {g.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className={styles.fieldGroup}>
-            <label>Keywords (optional — matched against every place's name or tag)</label>
-            <input
-              value={newKeywords}
-              onChange={(e) => setNewKeywords(e.target.value)}
-              placeholder="e.g. barber, barbing salon"
-            />
-          </div>
-
-          <div className={styles.fieldGroup}>
-            <label>Or pick specific places by name (skip this if a keyword above already clashes with another chip)</label>
-            <input
-              className={styles.searchInput}
-              placeholder="Search places to add…"
-              value={pinSearch}
-              onChange={(e) => setPinSearch(e.target.value)}
-            />
-            {pinSearchResults.map((wp) => (
-              <div key={wp.id} className={chipStyles.placeRow}>
-                <span className={chipStyles.placeName}>
-                  {wp.name}
-                  {wp.source === 'kml' && <span className={chipStyles.pinnedTag}>kml</span>}
-                </span>
-                <button
-                  type="button"
-                  className={styles.formCancel}
-                  onClick={() => {
-                    setNewPinned((prev) => [...prev, { id: wp.id, name: wp.name }]);
-                    setPinSearch('');
-                  }}
-                >
-                  + Add
-                </button>
-              </div>
-            ))}
-            {!!newPinned.length && (
-              <div className={chipStyles.keywordPills} style={{ marginTop: 4 }}>
-                {newPinned.map((p) => (
-                  <span key={p.id} className={chipStyles.pill}>
-                    {p.name}
-                    <button
-                      type="button"
-                      className={chipStyles.pillRemove}
-                      onClick={() => setNewPinned((prev) => prev.filter((x) => x.id !== p.id))}
-                    >
-                      <X size={11} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {error && <div className={`${styles.saveStatus} ${styles.saveStatusError}`}>{error}</div>}
-          <div className={styles.formActions}>
-            <button type="button" className={styles.formSave} disabled={busyId === '__new__'} onClick={handleCreate}>
-              {busyId === '__new__' ? 'Saving…' : 'Save Changes'}
-            </button>
-          </div>
-        </div>
+      {!showAddForm && error && (
+        <div className={`${styles.saveStatus} ${styles.saveStatusError} ${chipStyles.tabError}`}>{error}</div>
       )}
 
-      {!showAddForm && error && <div className={`${styles.saveStatus} ${styles.saveStatusError}`}>{error}</div>}
+      {/* One scroll area for every category. Each group is a header row
+          (name + count) followed by its chips, in All places order. */}
+      <div className={styles.list}>
+        {showAddForm && (
+          <div className={`${styles.inlineForm} ${chipStyles.addForm}`}>
+            <div className={styles.formTitle}>New chip</div>
+            <div className={styles.fieldGroup}>
+              <label>Name</label>
+              <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="e.g. Barber Shops" />
+            </div>
 
-      {!list.length && <div className={styles.empty}>No chips yet — add one above.</div>}
+            <div className={styles.fieldGroup}>
+              <label>Category (the heading it's listed under in All places)</label>
+              <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}>
+                <option value="" disabled>
+                  Choose a category…
+                </option>
+                {PICKABLE_CHIP_GROUPS.map((g) => (
+                  <option key={g.key} value={g.key}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      {grouped.map((group) => (
-        <div key={group.key} className={chipStyles.group}>
-          <div className={chipStyles.groupLabel}>
-            {group.label} <span>{group.chips.length}</span>
+            <div className={styles.fieldGroup}>
+              <label>Keywords (optional — matched against every place's name or tag)</label>
+              <input
+                value={newKeywords}
+                onChange={(e) => setNewKeywords(e.target.value)}
+                placeholder="e.g. barber, barbing salon"
+              />
+            </div>
+
+            <div className={styles.fieldGroup}>
+              <label>Or pick specific places by name (skip this if a keyword above already clashes with another chip)</label>
+              <input
+                placeholder="Search places to add…"
+                value={pinSearch}
+                onChange={(e) => setPinSearch(e.target.value)}
+              />
+              {pinSearchResults.map((wp) => (
+                <div key={wp.id} className={chipStyles.placeRow}>
+                  <span className={chipStyles.placeName}>
+                    <span className={chipStyles.placeText}>{wp.name}</span>
+                    {wp.source === 'kml' && <span className={chipStyles.tag}>kml</span>}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.formCancel}
+                    onClick={() => {
+                      setNewPinned((prev) => [...prev, { id: wp.id, name: wp.name }]);
+                      setPinSearch('');
+                    }}
+                  >
+                    + Add
+                  </button>
+                </div>
+              ))}
+              {!!newPinned.length && (
+                <div className={chipStyles.keywordPills}>
+                  {newPinned.map((p) => (
+                    <span key={p.id} className={chipStyles.pill}>
+                      {p.name}
+                      <button
+                        type="button"
+                        className={chipStyles.pillRemove}
+                        onClick={() => setNewPinned((prev) => prev.filter((x) => x.id !== p.id))}
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {error && <div className={`${styles.saveStatus} ${styles.saveStatusError}`}>{error}</div>}
+            <div className={styles.formActions}>
+              <button type="button" className={styles.formSave} disabled={busyId === '__new__'} onClick={handleCreate}>
+                {busyId === '__new__' ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
           </div>
-          <div className={styles.list}>
+        )}
+
+        {!list.length && <div className={styles.empty}>No chips yet — add one above.</div>}
+        {!!list.length && !filtered.length && <div className={styles.empty}>No chips match "{search}".</div>}
+
+        {grouped.map((group) => (
+          <section key={group.key} className={chipStyles.group}>
+            <div className={chipStyles.groupHeader}>
+              <span className={chipStyles.groupLabel}>{group.label}</span>
+              <span className={chipStyles.groupCount}>{group.chips.length}</span>
+            </div>
             {group.chips.map((chip) => (
               <ChipRow
                 key={chip.id}
@@ -285,9 +319,9 @@ export default function QuickChipsTab({ user, chips, waypoints, kmlAnnotations, 
                 nextBarOrder={nextBarOrder}
               />
             ))}
-          </div>
-        </div>
-      ))}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
@@ -340,6 +374,7 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
 
   const inBar = chip.barOrder != null;
   const barPosition = inBar ? barChipIds.indexOf(chip.id) + 1 : null;
+  const ChipIcon = LEGACY_ICON_MAP[chipIconKey(chip)] || MapPin;
 
   async function saveBar(patch) {
     if (!user) {
@@ -428,16 +463,16 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
   }
 
   return (
-    <div className={chipStyles.row}>
-      <div className={styles.item} onClick={onToggleExpand} style={{ cursor: 'pointer' }}>
+    <div className={`${chipStyles.row} ${expanded ? chipStyles.rowExpanded : ''}`}>
+      <div className={styles.item} onClick={onToggleExpand}>
         <div className={styles.itemIcon}>
-          {(() => {
-            const Icon = LEGACY_ICON_MAP[chip.iconKey] || MapPin;
-            return <Icon size={16} />;
-          })()}
+          <ChipIcon size={16} />
         </div>
         <div className={styles.itemBody}>
-          <div className={styles.itemName}>{chip.label}</div>
+          <div className={chipStyles.nameRow}>
+            <span className={styles.itemName}>{chip.label}</span>
+            {inBar && <span className={chipStyles.barTag}>Top bar {barPosition}</span>}
+          </div>
           <div className={styles.itemMeta}>{joinKeywords(chip.keywords) || 'no keywords — hand-picked only'}</div>
         </div>
         <span className={chipStyles.matchCount}>{matched.length} places</span>
@@ -457,7 +492,6 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
                 value={chipGroupOf(chip)}
                 disabled={rowBusy === 'category'}
                 onChange={(e) => saveCategory(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
               >
                 {chipGroupOf(chip) === 'other' && (
                   <option value="other" disabled>
@@ -487,10 +521,9 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
             {inBar && (
               <div className={chipStyles.editRow}>
                 <input
-                  className={styles.searchInput}
+                  className={chipStyles.input}
                   value={shortLabel}
                   onChange={(e) => setShortLabel(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
                   placeholder={`Shorter name for the bar (optional) — e.g. "${chip.label.split(/[ &/]/)[0]}"`}
                 />
                 <button
@@ -510,10 +543,9 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
             {editingKeywords ? (
               <div className={chipStyles.editRow}>
                 <input
-                  className={styles.searchInput}
+                  className={chipStyles.input}
                   value={keywordsText}
                   onChange={(e) => setKeywordsText(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
                   placeholder="leave blank for a hand-picked-only chip"
                 />
                 <button type="button" className={styles.formSave} disabled={savingKeywords} onClick={saveKeywords}>
@@ -533,14 +565,7 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
                     <span className={chipStyles.emptySmall}>none — this chip is hand-picked places only</span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  className={styles.formCancel}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingKeywords(true);
-                  }}
-                >
+                <button type="button" className={styles.formCancel} onClick={() => setEditingKeywords(true)}>
                   Edit
                 </button>
               </div>
@@ -549,41 +574,46 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
 
           <div className={chipStyles.detailSection}>
             <div className={chipStyles.detailLabel}>Places in this chip ({matched.length})</div>
-            {!matched.length && <div className={chipStyles.emptySmall}>Nothing matches yet.</div>}
-            {matched.map((wp) => (
-              <div key={wp.id} className={chipStyles.placeRow}>
-                <span className={chipStyles.placeName}>
-                  {wp.name}
-                  {pinnedIds.has(wp.id) && <span className={chipStyles.pinnedTag}>pinned</span>}
-                  {wp.source === 'kml' && <span className={chipStyles.pinnedTag}>kml</span>}
-                </span>
-                <button
-                  type="button"
-                  className={chipStyles.removeBtn}
-                  title="Remove from this chip"
-                  disabled={rowBusy === wp.id}
-                  onClick={() => excludePlace(wp.id)}
-                >
-                  {rowBusy === wp.id ? '…' : <X size={12} />}
-                </button>
+            {!matched.length ? (
+              <div className={chipStyles.emptySmall}>Nothing matches yet.</div>
+            ) : (
+              <div className={chipStyles.placeList}>
+                {matched.map((wp) => (
+                  <div key={wp.id} className={chipStyles.placeRow}>
+                    <span className={chipStyles.placeName}>
+                      <span className={chipStyles.placeText}>{wp.name}</span>
+                      {pinnedIds.has(wp.id) && <span className={`${chipStyles.tag} ${chipStyles.tagPinned}`}>pinned</span>}
+                      {wp.source === 'kml' && <span className={chipStyles.tag}>kml</span>}
+                    </span>
+                    <button
+                      type="button"
+                      className={chipStyles.removeBtn}
+                      title="Remove from this chip"
+                      aria-label={`Remove ${wp.name} from this chip`}
+                      disabled={rowBusy === wp.id}
+                      onClick={() => excludePlace(wp.id)}
+                    >
+                      {rowBusy === wp.id ? '…' : <X size={12} />}
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
 
           <div className={chipStyles.detailSection}>
             <div className={chipStyles.detailLabel}>Add a place by name (even if no keyword matches it)</div>
             <input
-              className={styles.searchInput}
+              className={chipStyles.input}
               placeholder="Search places to add…"
               value={pinQuery}
               onChange={(e) => setPinQuery(e.target.value)}
-              onClick={(e) => e.stopPropagation()}
             />
             {pinCandidates.map((wp) => (
               <div key={wp.id} className={chipStyles.placeRow}>
                 <span className={chipStyles.placeName}>
-                  {wp.name}
-                  {wp.source === 'kml' && <span className={chipStyles.pinnedTag}>kml</span>}
+                  <span className={chipStyles.placeText}>{wp.name}</span>
+                  {wp.source === 'kml' && <span className={chipStyles.tag}>kml</span>}
                 </span>
                 <button
                   type="button"
@@ -605,7 +635,9 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
                 if (!wp) return null;
                 return (
                   <div key={id} className={chipStyles.placeRow}>
-                    <span className={chipStyles.placeName}>{wp.name}</span>
+                    <span className={chipStyles.placeName}>
+                      <span className={chipStyles.placeText}>{wp.name}</span>
+                    </span>
                     <button
                       type="button"
                       className={styles.formCancel}
@@ -620,7 +652,7 @@ function ChipRow({ user, chip, places, expanded, onToggleExpand, onDelete, busy,
             </div>
           )}
 
-          <div className={chipStyles.detailSection}>
+          <div className={`${chipStyles.detailSection} ${chipStyles.detailFooter}`}>
             <button type="button" className={chipStyles.deleteChipBtn} disabled={busy} onClick={onDelete}>
               {busy ? 'Removing…' : 'Remove this chip'}
             </button>

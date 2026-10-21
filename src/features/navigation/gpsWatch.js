@@ -13,7 +13,7 @@
  * Nothing here is persisted — a reload starts with no position at all.
  */
 const WATCH_OPTIONS = { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 };
-export const MAX_FIX_AGE_MS = 30000;
+const MAX_FIX_AGE_MS = 30000;
 
 const subscribers = new Set();
 let watchId = null;

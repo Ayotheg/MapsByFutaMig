@@ -1,10 +1,14 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, X, MapPin } from 'lucide-react';
 import { gatherResults, fmtMeters, NEARBY_RADIUS_M } from './chipConfig';
 import { useLiveLocation } from './useLiveLocation';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
+import { chipIconKey } from '../shared/placeCategories';
 import ChipResultRow from './ChipResultRow';
 import styles from './ChipResultsPanel.module.css';
+
+// Longest row stagger (0.4s) plus the slide itself, with some slack.
+const ROW_ENTRANCE_MS = 800;
 
 /**
  * Ports the results-display half of `initQuickChips` (app.js ~6545–6799,
@@ -54,10 +58,25 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChip, waypoints, searchIndex, kmlAnnotations, user]);
 
+  const loading = !waypointsLoaded;
+
+  // Rows slide in once per opened chip. A move re-sorts them, which
+  // re-inserts the DOM nodes and would replay the slide on every 10 m.
+  const chipKey = activeChip ? activeChip.id || activeChip.label : null;
+  const [settledFor, setSettledFor] = useState(null);
+  if (!chipKey && settledFor !== null) setSettledFor(null);
+  const rowsShown = !!chipKey && !loading && results.length > 0;
+  useEffect(() => {
+    if (!rowsShown || settledFor === chipKey) return undefined;
+    const t = setTimeout(() => setSettledFor(chipKey), ROW_ENTRANCE_MS);
+    return () => clearTimeout(t);
+  }, [rowsShown, chipKey, settledFor]);
+  const animateRows = settledFor !== chipKey;
+
   if (!activeChip) return null;
 
-  const ChipIcon = LEGACY_ICON_MAP[activeChip.iconKey] || MapPin;
-  const loading = !waypointsLoaded;
+  const chipIcon = chipIconKey(activeChip);
+  const ChipIcon = LEGACY_ICON_MAP[chipIcon] || MapPin;
   const badge = loading ? '…' : String(results.length || 0);
   // Consolidated status line — Figma node 4:323's header shows one line
   // under the title ("Showing 63 places") instead of the two separate
@@ -74,14 +93,18 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
   // being cut off on narrow screens. Nothing within NEARBY_RADIUS_M → say
   // how far the closest one is.
   const nearest = user ? results.find((r) => r.dist !== null) : null;
+  // With location on but nothing measurable (e.g. only online stores),
+  // asking to turn location on would be wrong.
   const sortNote =
     loading || !results.length
       ? null
-      : !nearest
+      : !user
         ? 'Sorted A–Z · turn on location for nearest first'
-        : nearest.dist > NEARBY_RADIUS_M
-          ? `None nearby · closest is ${fmtMeters(nearest.dist)} away`
-          : 'Nearest first';
+        : !nearest
+          ? 'Sorted A–Z'
+          : nearest.dist > NEARBY_RADIUS_M
+            ? `None nearby · closest is ${fmtMeters(nearest.dist)} away`
+            : 'Nearest first';
   const sortLine = sortNote && (
     <div className={`${styles.sortNote} ${nearest && nearest.dist > NEARBY_RADIUS_M ? styles.sortNoteFar : ''}`}>
       {sortNote}
@@ -152,10 +175,11 @@ export default function ChipResultsPanel({ activeChip, waypoints, kmlAnnotations
       <ChipResultRow
         key={r.id || r.name + i}
         result={r}
-        fallbackIconKey={activeChip.iconKey}
+        fallbackIconKey={chipIcon}
         onOpen={handleOpen}
         onNavigate={handleNavigate}
-        style={{ animationDelay: Math.min(i * 0.035, 0.4) + 's' }}
+        animate={animateRows}
+        style={animateRows ? { animationDelay: Math.min(i * 0.035, 0.4) + 's' } : undefined}
       />
     ))
   );

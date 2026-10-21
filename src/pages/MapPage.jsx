@@ -858,7 +858,14 @@ export default function MapPage({ onReadinessChange }) {
         />
       )}
       {!navActive && (
-        <QuickChips chips={quickChips.chips} activeChip={activeChip} onChipClick={handleChipClick} collapsed={collapsed} isMobile={isMobile} />
+        <QuickChips
+          chips={quickChips.chips}
+          activeChip={activeChip}
+          onChipClick={handleChipClick}
+          onAllPlacesOpen={() => setActiveChip(null)}
+          collapsed={collapsed}
+          isMobile={isMobile}
+        />
       )}
       <ChipResultsPanel
         activeChip={activeChip}

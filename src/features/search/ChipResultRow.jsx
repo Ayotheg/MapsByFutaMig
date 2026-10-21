@@ -12,7 +12,7 @@ import styles from './ChipResultRow.module.css';
  * `handlePlaceCardNavigate`, same "Where to?" seeding the place card's
  * own Navigate button uses.
  */
-export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavigate, style }) {
+export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavigate, animate, style }) {
   const handleRowClick = (e) => {
     if (e.target.closest('[data-nav-btn]')) return;
     onOpen(result);
@@ -34,7 +34,7 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
   const dist = result.dist !== null && result.dist !== undefined ? fmtMeters(result.dist) : '';
 
   return (
-    <div className={styles.row} style={style} onClick={handleRowClick}>
+    <div className={`${styles.row} ${animate ? styles.enter : ''}`} style={style} onClick={handleRowClick}>
       <div className={styles.thumb}>
         {/* The type icon is always underneath: it's what shows while the
             photo downloads, and what stays if it never loads. */}

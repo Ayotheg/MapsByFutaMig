@@ -45,7 +45,7 @@ import {
 // security_post, entrance, junction, poi) kept alongside the new ones —
 // KML/OSM annotation data can still carry these as a raw `subtype`
 // independent of the waypoints table's now-consolidated `type` column.
-export const TYPE_COLORS = {
+const TYPE_COLORS = {
   food: '#F97316', shop: '#D85A30',
   kiosk: '#F59E0B', shopping: '#F59E0B', bank: '#10B981',
   printing_shop: '#6366F1', cafe: '#F97316', restaurant: '#EF4444',

@@ -14,8 +14,10 @@
     border-color var(--v2-duration-quick) var(--v2-ease-standard),
     box-shadow var(--v2-duration-quick) var(--v2-ease-standard);
 }
+/* Only while the list first appears (ChipResultsPanel's `animateRows`):
+   re-sorting moves rows in the DOM, which would replay it. */
 @media (prefers-reduced-motion: no-preference) {
-  .row {
+  .enter {
     animation: rowIn var(--v2-duration-standard) var(--v2-ease-standard) both;
   }
 }
@@ -138,6 +140,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .row,
+  .enter,
   .thumbImg,
   .navBtn {
     transition: none;
