@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, CirclePlus } from 'lucide-react';
 import { GROUP_META, groupOfType } from '../legend/placeTypeGroups';
 import { haversine } from '../../lib/geoUtils';
-import ExploreChannelLink from './ExploreChannelLink';
-import { CategorySegment, FeaturedRail, PlaceRow, SectionHeader, moreTitle, splitFeatured } from './ExploreSections';
+import ExplorePromoteCard from './ExplorePromoteCard';
+import { CategorySegment, FeaturedRail, ListRow, SectionHeader, featuredTitle, moreTitle, splitFeatured } from './ExploreSections';
 import { comparePicks } from './useExplorePicks';
 import styles from './ExplorePanelDesktop.module.css';
 
@@ -27,7 +27,7 @@ const SORT_OPTIONS = [
  * sort, Suggest a Place and the promote link. The cards themselves are
  * the shared ones in ExploreSections.jsx.
  */
-export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSuggestPlace, category = 'places', onCategoryChange }) {
+export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSuggestPlace, category = 'places', onCategoryChange, rotatingFeatured }) {
   const [activeGroup, setActiveGroup] = useState(null); // null = "All Spots"
   const [sortMode, setSortMode] = useState('featured');
   const [sortOpen, setSortOpen] = useState(false);
@@ -92,7 +92,14 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
   // the person picked is exactly what they read.
   // ("Nearest First" with no location yet falls back to the featured order.)
   const isFeaturedOrder = !availableSortOptions.some((o) => o.key === sortMode && o.key !== 'featured');
-  const { featured, rest } = isFeaturedOrder ? splitFeatured(sorted) : { featured: [], rest: sorted };
+  // People/Channels with more picks than slots get the same rotating rail
+  // as mobile (`rotatingFeatured`, from ExplorePanel); the list below then
+  // carries every organic pick.
+  const { featured, rest } = !isFeaturedOrder
+    ? { featured: [], rest: sorted }
+    : rotatingFeatured && category !== 'places'
+    ? { featured: rotatingFeatured, rest: sorted.filter((p) => !p.isPromoted) }
+    : splitFeatured(sorted);
   const restTitle = isFeaturedOrder ? moreTitle(category) : currentSortLabel;
   const noun = NOUNS[category] || NOUNS.places;
 
@@ -103,11 +110,11 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
     // useExplorePicks.js) hasn't actually been reviewed by anyone, so it
     // doesn't earn the same claim.
     return (
-      <PlaceRow
+      <ListRow
         key={pick.id}
         pick={pick}
         size="sm"
-        verified={!pick.isChannel && !pick.isFallback}
+        verified={!pick.isFallback}
         channelSource="explore_desktop_card"
         onSelect={onSelect}
       />
@@ -188,22 +195,26 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
         )}
         {featured.length > 0 && (
           <section className={styles.section}>
-            <SectionHeader title="Featured" size="sm" />
-            <FeaturedRail picks={featured} size="sm" channelSource="explore_desktop_card" onSelect={onSelect} />
+            <SectionHeader title={featuredTitle(category)} size="sm" />
+            <FeaturedRail
+              picks={featured}
+              size="sm"
+              channelSource="explore_desktop_card"
+              promoteSource={category === 'places' ? 'explore_desktop' : null}
+              onSelect={onSelect}
+            />
           </section>
         )}
         {rest.length > 0 && (
           <section className={styles.section}>
             <SectionHeader title={restTitle} size="sm" />
-            <div className={styles.rows}>{rest.map(renderRow)}</div>
+            <div className={category === 'places' ? styles.rows : styles.cardRows}>{rest.map(renderRow)}</div>
           </section>
         )}
+        {/* Nearest / Top Rated have no Featured rail, so the promote card
+            sits under the list instead. */}
+        {category === 'places' && featured.length === 0 && <ExplorePromoteCard source="explore_desktop" size="sm" />}
       </div>
-
-      {/* Promote link — pinned between the list and the footer so it's
-          visible without scrolling, and outside the list so it can't be
-          mistaken for a Featured slot. */}
-      <ExploreChannelLink variant="row" source="explore_desktop" />
 
       {onSuggestPlace && (
         <div className={styles.footer}>

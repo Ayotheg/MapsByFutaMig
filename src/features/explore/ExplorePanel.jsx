@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { comparePicks } from './useExplorePicks';
-import { CategorySegment, FeaturedRail, PlaceRow, SectionHeader, moreTitle, splitFeatured } from './ExploreSections';
-import ExploreChannelLink from './ExploreChannelLink';
+import { CategorySegment, FeaturedRail, ListRow, SectionHeader, featuredTitle, moreTitle, splitFeatured } from './ExploreSections';
 import ExplorePanelDesktop from './ExplorePanelDesktop';
 import { useOneShotLocation } from './useOneShotLocation';
 import styles from './ExplorePanel.module.css';
@@ -44,6 +43,11 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   // (rotation, "View All", the desktop panel below) behaves exactly as
   // before until someone actually taps one of the new pills.
   const [category, setCategory] = useState('places');
+  // The half-open sheet has no switcher, so it always shows Places —
+  // going back to it after browsing People/Channels resets the pick.
+  useEffect(() => {
+    if (variant === 'compact') setCategory('places');
+  }, [variant]);
   const categorizedPicks = useMemo(
     () =>
       picks.filter((p) => {
@@ -66,13 +70,20 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   const rotatingPool = promoted.length ? organic : organic; // organic pool always rotates; promoted just stays pinned
   const rotateStep = promoted.length ? 1 : COMPACT_SLOTS;
 
+  // Rotates only once there are more picks than Featured slots. Places
+  // rotate in the half-open sheet; People and Channels rotate their
+  // Featured rail in the full view too (that's the only place they show).
+  const hasMoreThanSlots = rotatingPool.length > (promoted.length ? 1 : COMPACT_SLOTS);
+  const rotatesHere = variant === 'compact' || category !== 'places';
+  const rotating = hasMoreThanSlots && rotatesHere;
+
   useEffect(() => {
-    if (variant !== 'compact' || rotatingPool.length <= (promoted.length ? 1 : COMPACT_SLOTS)) return undefined;
+    if (!rotating) return undefined;
     const id = setInterval(() => {
       setRotationIndex((i) => i + rotateStep);
     }, ROTATE_MS);
     return () => clearInterval(id);
-  }, [variant, rotatingPool.length, rotateStep, promoted.length]);
+  }, [rotating, rotateStep]);
 
   const compactItems = useMemo(() => {
     if (!rotatingPool.length) return promoted.slice(0, COMPACT_SLOTS);
@@ -116,6 +127,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
         onSuggestPlace={onSuggestPlace}
         category={category}
         onCategoryChange={setCategory}
+        rotatingFeatured={rotating ? compactItems : null}
       />
     );
   }
@@ -128,7 +140,10 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   );
 
   if (variant === 'full') {
-    const { featured, rest } = splitFeatured(fullItems);
+    // People/Channels with more picks than slots: the rail rotates (pinned
+    // promoted pick + cycling organic ones) and the list shows every
+    // organic pick, so nobody is only ever visible mid-rotation.
+    const { featured, rest } = rotating ? { featured: compactItems, rest: organic } : splitFeatured(fullItems);
     return (
       <div className={styles.panel}>
         {header}
@@ -136,42 +151,48 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
         {fullItems.length === 0 && <div className={styles.empty}>{emptyLabel(category)}</div>}
         {featured.length > 0 && (
           <section className={styles.section}>
-            <SectionHeader title="Featured" />
-            <FeaturedRail picks={featured} channelSource="explore_card" onSelect={onSelect} />
+            <SectionHeader title={featuredTitle(category)} />
+            <FeaturedRail
+              picks={featured}
+              channelSource="explore_card"
+              promoteSource={category === 'places' ? 'explore_mobile' : null}
+              onSelect={onSelect}
+            />
           </section>
         )}
         {rest.length > 0 && (
           <section className={styles.section}>
             <SectionHeader title={moreTitle(category)} />
-            <div className={styles.list}>
+            <div className={category === 'places' ? styles.list : styles.cardList}>
               {rest.map((pick) => (
-                <PlaceRow key={pick.id} pick={pick} userCoords={userCoords} channelSource="explore_card" onSelect={onSelect} />
+                <ListRow key={pick.id} pick={pick} userCoords={userCoords} channelSource="explore_card" onSelect={onSelect} />
               ))}
             </div>
           </section>
         )}
-        <ExploreChannelLink source="explore_mobile" />
       </div>
     );
   }
 
+  // Half-open sheet: just the Featured photos (still rotating). The
+  // Places/People/Channels switcher only appears once "See all" opens the
+  // full sheet.
   return (
     <div className={styles.panel}>
       {header}
-      <CategorySegment category={category} onChange={setCategory} />
       <section className={styles.section}>
-        <SectionHeader title="Featured" onSeeAll={onViewAll} />
+        <SectionHeader title={featuredTitle(category)} onSeeAll={onViewAll} />
         {compactItems.length === 0 ? (
           <div className={styles.empty}>{emptyLabel(category)}</div>
         ) : (
-          <FeaturedRail picks={compactItems} channelSource="explore_card" onSelect={onSelect} />
+          <FeaturedRail
+            picks={compactItems}
+            channelSource="explore_card"
+            promoteSource={category === 'places' ? 'explore_mobile' : null}
+            onSelect={onSelect}
+          />
         )}
       </section>
-      {/* Below the cards (not above) so that on a short phone, where the
-          half-height sheet has little spare room, the cards stay intact
-          and this line is what scrolls out of view — the sheet panel is
-          overflow-y: auto. */}
-      <ExploreChannelLink source="explore_mobile" />
     </div>
   );
 }

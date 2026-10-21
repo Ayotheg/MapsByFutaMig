@@ -192,6 +192,11 @@
   background: var(--v2-surface);
   box-shadow: 0 -4px 32px rgba(74, 68, 85, 0.14), 0 -1px 0 rgba(74, 68, 85, 0.05);
 }
+/* Explore is a plain white sheet edge to edge — on the lavender
+   --v2-surface its white content left a purple rim around the cards. */
+.panelExplore {
+  background: var(--v2-on-primary);
+}
 .panelClosed {
   height: 0;
   box-shadow: none;

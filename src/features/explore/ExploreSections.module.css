@@ -44,7 +44,7 @@
 /* ── Section header ("Featured" / "Popular on campus" + See all) ──── */
 .sectionHead {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
@@ -57,6 +57,9 @@
   color: var(--v2-neutral);
 }
 .seeAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
   flex-shrink: 0;
   background: none;
   border: none;
@@ -83,7 +86,8 @@
 /* ── Featured rail ────────────────────────────────────────────────── */
 .rail {
   display: flex;
-  gap: 10px;
+  align-items: stretch;
+  gap: 12px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
@@ -96,15 +100,18 @@
   display: none;
 }
 
+/* Place card: full-bleed photo with the name over a dark fade. */
 .featured {
   position: relative;
   flex: 0 0 auto;
-  width: min(272px, 78vw);
-  height: 176px;
+  display: block;
+  width: min(272px, 74vw);
+  height: 188px;
   border: none;
   border-radius: 20px;
   overflow: hidden;
   padding: 0;
+  background: var(--v2-neutral);
   cursor: pointer;
   scroll-snap-align: start;
   text-align: left;
@@ -125,27 +132,30 @@
     opacity: 1;
   }
 }
-.featuredImg {
+.featuredPhoto {
   position: absolute;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.featuredPhoto img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 .featuredIcon {
-  position: absolute;
-  top: 38%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  margin-top: -40px;
   opacity: 0.55;
 }
 .featuredShade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0) 35%, rgba(15, 23, 42, 0.82) 100%);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0) 35%, rgba(15, 23, 42, 0.85) 100%);
 }
 .featuredBadge {
   position: absolute;
+  z-index: 1;
   top: 12px;
   left: 12px;
 }
@@ -171,12 +181,185 @@
 .featuredMeta {
   font-size: 13px;
   color: var(--v2-on-primary);
-  opacity: 0.88;
+  opacity: 0.9;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Person card: portrait on top, bio underneath on white. */
+.personCard {
+  display: flex;
+  flex-direction: column;
+  width: min(236px, 66vw);
+  height: auto;
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
+}
+.personTop {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  height: 160px;
+  background: var(--v2-neutral);
+}
+.personInitials {
+  margin-top: -36px;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--v2-on-primary);
+  opacity: 0.5;
+}
+.personBio {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  padding: 10px 14px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--v2-text);
+}
+
+/* Channel card: logo on a dark band, name + kind + Join button below. */
+.channelCard {
+  display: flex;
+  flex-direction: column;
+  width: min(236px, 66vw);
+  height: auto;
+  cursor: default;
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
+}
+.channelCard:active {
+  transform: none;
+}
+.channelTop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 128px;
+  border: none;
+  padding: 0;
+  background: var(--v2-neutral);
+  cursor: pointer;
+}
+.channelLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  margin-top: 14px;
+  border-radius: 18px;
+  border: 2px solid var(--v2-nav-active-accent);
+  background: var(--v2-neutral);
+  overflow: hidden;
+}
+.channelLogo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.channelInitials {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--v2-on-primary);
+}
+.channelBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px 14px;
+  min-width: 0;
+}
+.channelName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.channelKind {
+  font-size: 12.5px;
+  color: var(--v2-text-muted);
+}
+.joinBtn {
+  margin-top: 12px;
+  min-height: 40px;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.joinBtn:hover {
+  background: var(--v2-primary-hover);
+}
+
+/* "Get your spot featured" — last card in the Places rail. */
+.promoteCard {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 168px;
+  padding: 16px;
+  border: 1.5px dashed var(--v2-primary-border-soft);
+  border-radius: 20px;
+  background: var(--v2-on-primary);
+  text-decoration: none;
+  scroll-snap-align: start;
+  font-family: var(--font-ui);
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.promoteCard:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.promoteCard:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+.promoteIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary);
+}
+.promoteText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.promoteTitle {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--v2-neutral);
+}
+.promotePrice {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--v2-primary);
+}
+
+/* Desktop (240px) rail. */
 .railSm {
   gap: 8px;
 }
@@ -184,6 +367,43 @@
   width: 176px;
   height: 128px;
   border-radius: 14px;
+}
+.railSm .personCard,
+.railSm .channelCard {
+  height: auto;
+}
+.railSm .personTop {
+  height: 112px;
+}
+.railSm .personBio {
+  padding: 8px 10px 10px;
+  font-size: 11px;
+}
+.railSm .channelTop {
+  height: 92px;
+}
+.railSm .channelLogo {
+  width: 54px;
+  height: 54px;
+  margin-top: 10px;
+  border-radius: 13px;
+}
+.railSm .channelInitials {
+  font-size: 18px;
+}
+.railSm .channelBody {
+  padding: 9px 10px 10px;
+}
+.railSm .channelName {
+  font-size: 12.5px;
+}
+.railSm .channelKind {
+  font-size: 11px;
+}
+.railSm .joinBtn {
+  margin-top: 8px;
+  min-height: 30px;
+  font-size: 12px;
 }
 .railSm .featuredBadge {
   top: 8px;
@@ -204,6 +424,22 @@
   font-size: 10px;
   padding: 3px 8px;
 }
+.promoteCardSm {
+  width: 132px;
+  padding: 12px;
+  border-radius: 14px;
+}
+.promoteCardSm .promoteIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+.promoteCardSm .promoteTitle {
+  font-size: 12.5px;
+}
+.promoteCardSm .promotePrice {
+  font-size: 11px;
+}
 
 /* ── Promoted badge ──────────────────────────────────────────────── */
 .promoBadge {
@@ -221,7 +457,7 @@
   white-space: nowrap;
 }
 
-/* ── Popular list row ─────────────────────────────────────────────── */
+/* ── Places list row: plain, thumb + name + type ─────────────────── */
 .row {
   display: flex;
   align-items: center;
@@ -238,9 +474,6 @@
 }
 .row:hover {
   background: var(--v2-hud-upnext-bg);
-}
-.row:active {
-  transform: scale(0.99);
 }
 .thumb {
   flex-shrink: 0;
@@ -262,7 +495,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 .rowNameLine {
   display: flex;
@@ -289,6 +522,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.rowType {
+  color: var(--v2-primary);
+}
 .rowRating {
   display: inline-flex;
   align-items: center;
@@ -297,10 +533,6 @@
 .star {
   fill: var(--v2-star);
   color: var(--v2-star);
-}
-.rowJoin {
-  font-weight: 600;
-  color: var(--v2-primary);
 }
 .chevron {
   flex-shrink: 0;
@@ -312,6 +544,86 @@
   padding: 3px 7px;
 }
 
+/* ── People / Channels list row: bordered card ───────────────────── */
+.cardRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--v2-divider);
+  border-radius: 16px;
+  background: var(--v2-on-primary);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.cardRow:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.cardRowCenter {
+  align-items: center;
+}
+.personAvatar,
+.channelAvatar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+  font-size: 16px;
+  font-weight: 700;
+}
+.personAvatar {
+  border-radius: 50%;
+}
+.channelAvatar {
+  border-radius: 12px;
+}
+.personAvatar img,
+.channelAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tagChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tagChip {
+  padding: 2px 8px;
+  border-radius: var(--r-sm);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.rowBio {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--v2-text);
+}
+.joinPill {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Desktop (240px) rows. */
 .rowSm {
   gap: 10px;
   padding: 6px 4px;
@@ -321,10 +633,12 @@
   height: 40px;
   border-radius: 10px;
 }
-.rowSm .rowName {
+.rowSm .rowName,
+.cardRowSm .rowName {
   font-size: 12.5px;
 }
-.rowSm .rowMeta {
+.rowSm .rowMeta,
+.cardRowSm .rowMeta {
   font-size: 11px;
 }
 .rowSm .chevron {
@@ -334,4 +648,26 @@
 .rowSm .promoBadge {
   font-size: 9px;
   padding: 2px 6px;
+}
+.cardRowSm {
+  gap: 9px;
+  padding: 10px;
+  border-radius: 12px;
+}
+.cardRowSm .personAvatar,
+.cardRowSm .channelAvatar {
+  width: 34px;
+  height: 34px;
+  font-size: 13px;
+}
+.cardRowSm .tagChip {
+  font-size: 10px;
+  padding: 1px 6px;
+}
+.cardRowSm .rowBio {
+  font-size: 11px;
+}
+.cardRowSm .joinPill {
+  padding: 4px 10px;
+  font-size: 11px;
 }

@@ -25,7 +25,8 @@
   font-size: 28px;
   font-weight: 700;
   line-height: 1.15;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
   color: var(--v2-neutral);
 }
 
@@ -44,6 +45,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* People / Channels rows are bordered cards, so they get more air. */
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .empty {
