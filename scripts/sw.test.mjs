@@ -52,7 +52,7 @@ assert.equal(r.status, 200);
 assert.equal(fetchCalls.length, 1);
 assert.equal(fetchCalls[0][1].mode, 'cors');
 assert.equal(fetchCalls[0][1].credentials, 'omit');
-assert.equal(cacheSize('mbf-tiles-v2'), 1);
+assert.equal(cacheSize('mbf-tiles-v3'), 1);
 fetchCalls = [];
 r = await req(TILE);
 assert.equal(fetchCalls.length, 0, 'second load served from cache');
@@ -61,7 +61,7 @@ console.log('ok 1: tile miss stores, hit served offline');
 
 // 2. past default TTL (7d) + network dead → stale copy still served instantly
 const age = (url, days) => {
-  const m = store.get('mbf-tiles-v2'); const o = m.get(url);
+  const m = store.get('mbf-tiles-v3'); const o = m.get(url);
   const h = new Headers(o.headers); h.set('x-sw-cached-at', String(Date.now() - days * 864e5));
   return o.blob().then((b) => m.set(url, new Response(b, { headers: h })));
 };
@@ -76,7 +76,7 @@ await age(TILE, 8);
 fetchImpl = async () => ok(png(50));
 r = await req(TILE);
 assert.equal((await r.arrayBuffer()).byteLength, 100, 'stale copy returned immediately');
-const after = store.get('mbf-tiles-v2').get(TILE);
+const after = store.get('mbf-tiles-v3').get(TILE);
 assert.equal((await after.clone().arrayBuffer()).byteLength, 50, 'background refresh stored new tile');
 assert.ok(Date.now() - Number(after.headers.get('x-sw-cached-at')) < 5000);
 console.log('ok 3: stale-while-revalidate');
@@ -92,7 +92,7 @@ console.log('ok 3b: >30d old tile requires network');
 const T3 = 'https://tile.openstreetmap.org/16/5/5.png';
 fetchImpl = async () => ok(png(), { 'cache-control': 'public, max-age=3600' });
 await req(T3);
-assert.equal(store.get('mbf-tiles-v2').get(T3).headers.get('x-sw-ttl-ms'), '3600000');
+assert.equal(store.get('mbf-tiles-v3').get(T3).headers.get('x-sw-ttl-ms'), '3600000');
 fetchCalls = []; await req(T3);
 assert.equal(fetchCalls.length, 0, 'fresh within max-age: no network');
 await age(T3, 0.1); // 2.4h old > 1h max-age → background revalidate
@@ -108,39 +108,39 @@ console.log('ok 3c: Cache-Control max-age honoured (incl. 0)');
 // 4. cap + oldest-first eviction
 fetchImpl = async () => ok(png());
 for (let i = 0; i < 650; i++) await req(`https://tile.openstreetmap.org/17/${i}/0.png`);
-assert.ok(cacheSize('mbf-tiles-v2') <= 600, 'cap respected: ' + cacheSize('mbf-tiles-v2'));
-assert.ok(!store.get('mbf-tiles-v2').has('https://tile.openstreetmap.org/17/0/0.png'), 'oldest evicted');
-assert.ok(store.get('mbf-tiles-v2').has('https://tile.openstreetmap.org/17/649/0.png'), 'newest kept');
-console.log('ok 4: tile cap =', cacheSize('mbf-tiles-v2'), '(oldest evicted)');
+assert.ok(cacheSize('mbf-tiles-v3') <= 300, 'cap respected: ' + cacheSize('mbf-tiles-v3'));
+assert.ok(!store.get('mbf-tiles-v3').has('https://tile.openstreetmap.org/17/0/0.png'), 'oldest evicted');
+assert.ok(store.get('mbf-tiles-v3').has('https://tile.openstreetmap.org/17/649/0.png'), 'newest kept');
+console.log('ok 4: tile cap =', cacheSize('mbf-tiles-v3'), '(oldest evicted)');
 
 // 5. CORS refused, no cache → falls back to plain browser fetch, nothing stored
 const T2 = 'https://server.arcgisonline.com/x/1/2/3';
 let n = 0;
 fetchImpl = async (a, o) => { n++; if (o && o.mode === 'cors') throw new TypeError('cors'); return ok(png()); };
-const before = cacheSize('mbf-tiles-v2');
+const before = cacheSize('mbf-tiles-v3');
 r = await req(T2);
 assert.equal(r.status, 200); assert.equal(n, 2);
-assert.equal(cacheSize('mbf-tiles-v2'), before);
+assert.equal(cacheSize('mbf-tiles-v3'), before);
 console.log('ok 5: no-CORS host falls back, not cached');
 
 // 6. 403 block tile passes through, never cached
 fetchImpl = async () => new Response(png(), { status: 403, headers: { 'content-type': 'image/png' } });
 r = await req('https://tile.openstreetmap.org/18/9/9.png');
 assert.equal(r.status, 403);
-assert.ok(!store.get('mbf-tiles-v2').has('https://tile.openstreetmap.org/18/9/9.png'));
+assert.ok(!store.get('mbf-tiles-v3').has('https://tile.openstreetmap.org/18/9/9.png'));
 console.log('ok 6: 403 not cached');
 
 // 7. photos: small cached, big / unknown-size not
 const P = (f) => `https://abc.supabase.co/storage/v1/object/public/place-images/waypoint/1/${f}.jpg`;
 fetchImpl = async () => ok(png(200_000));
 await req(P('small'));
-assert.ok(store.get('mbf-photos-v2').has(P('small')));
+assert.ok(store.get('mbf-photos-v3').has(P('small')));
 fetchImpl = async () => ok(png(3_000_000));
 await req(P('big'));
-assert.ok(!store.get('mbf-photos-v2').has(P('big')));
+assert.ok(!store.get('mbf-photos-v3').has(P('big')));
 fetchImpl = async () => new Response(png(1000), { status: 200, headers: { 'content-type': 'image/jpeg' } });
 await req(P('nolen'));
-assert.ok(!store.get('mbf-photos-v2').has(P('nolen')));
+assert.ok(!store.get('mbf-photos-v3').has(P('nolen')));
 fetchCalls = [];
 fetchImpl = async () => { throw new Error('should not hit network'); };
 r = await req(P('small')); assert.equal(r.status, 200);
@@ -149,8 +149,8 @@ console.log('ok 7: photo size rules + cache hit');
 // 8. photo cap
 fetchImpl = async () => ok(png(1000));
 for (let i = 0; i < 60; i++) await req(P('p' + i));
-assert.ok(cacheSize('mbf-photos-v2') <= 40);
-console.log('ok 8: photo cap =', cacheSize('mbf-photos-v2'));
+assert.ok(cacheSize('mbf-photos-v3') <= 25);
+console.log('ok 8: photo cap =', cacheSize('mbf-photos-v3'));
 
 // 9. things it must NOT touch
 assert.equal(await req('https://abc.supabase.co/rest/v1/waypoints', { destination: 'empty' }), null);
@@ -163,5 +163,5 @@ console.log('ok 9: API calls, POST, range, other hosts/buckets untouched');
 // 10. activate drops old-version caches only
 store.set('mbf-tiles-v0', new Map()); store.set('other-app', new Map());
 let w; await handlers.activate({ waitUntil: (p) => (w = p) }); await w;
-assert.ok(!store.has('mbf-tiles-v0')); assert.ok(store.has('other-app')); assert.ok(store.has('mbf-tiles-v2'));
+assert.ok(!store.has('mbf-tiles-v0')); assert.ok(store.has('other-app')); assert.ok(store.has('mbf-tiles-v3'));
 console.log('ok 10: activate cleans old mbf-* caches only');

@@ -21,16 +21,18 @@
  * browser's normal request and simply don't cache it.
  */
 
-const VERSION = 'v2'; // bump to drop every previously cached tile/photo (v1 may hold CARTO "API KEY REQUIRED" tiles)
+const VERSION = 'v3'; // bump to drop every previously cached tile/photo (v3: caps lowered, frees the old v2 caches on every device)
 const TILE_CACHE = `mbf-tiles-${VERSION}`;
 const PHOTO_CACHE = `mbf-photos-${VERSION}`;
 
-const MAX_TILES = 600; // ~10–25 KB each → a few MB (estimate, not measured)
-const MAX_PHOTOS = 40;
+// Kept small on purpose: 600 tiles + 40 full-size photos added up to ~17 MB
+// on a phone (seen in Safari's Website Data). These caps hold it to a few MB.
+const MAX_TILES = 300; // ~10–25 KB each → ~3–7 MB
+const MAX_PHOTOS = 25;
 // Photos above this are passed through uncached. Full-size iPhone originals
 // (multi-MB) would eat the quota; once the backend serves resized variants
 // they fit under this and start being cached automatically.
-const MAX_PHOTO_BYTES = 1.5 * 1024 * 1024;
+const MAX_PHOTO_BYTES = 800 * 1024;
 // Tile freshness follows the server's Cache-Control max-age (OSM's tile
 // policy asks clients to honour caching headers for re-visits), falling
 // back to 7 days when none is readable. Past that, a stale tile is still

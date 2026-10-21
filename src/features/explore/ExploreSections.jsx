@@ -5,7 +5,6 @@ import { haversine } from '../../lib/geoUtils';
 import { channelPlatformMeta } from '../../lib/channelMeta';
 import { track } from '../../lib/analytics';
 import { useImageStatus } from '../../lib/useImageStatus';
-import AvatarBox from './AvatarBox';
 import ExplorePromoteCard from './ExplorePromoteCard';
 import styles from './ExploreSections.module.css';
 
@@ -135,16 +134,31 @@ function PromoBadge({ pick }) {
   );
 }
 
-/** Photo (or the given fallback when there's none / it fails to load). */
+/**
+ * Photo with its fallback (type icon / initials on a coloured fill)
+ * always drawn underneath; the photo fades in on top only once it has
+ * actually loaded. So a photo that is missing, fails, or never finishes
+ * loading (slow network, iOS WebKit quirks) still leaves a proper card,
+ * never a blank one — same layering as Quick Chips' ChipResultRow.
+ *
+ * Not `loading="lazy"`: Explore shows only a handful of photos, and
+ * WebKit (Safari, and every iOS browser) can leave lazy images inside a
+ * sideways-scrolling row in a sliding sheet unloaded indefinitely.
+ */
 function Photo({ image, className, fallback, fallbackStyle }) {
   const img = useImageStatus(image);
-  const showImage = Boolean(image) && !img.failed;
   return (
-    <span className={className} style={showImage ? undefined : fallbackStyle}>
-      {showImage ? (
-        <img src={image} alt="" loading="lazy" decoding="async" onLoad={img.onLoad} onError={img.onError} />
-      ) : (
-        fallback
+    <span className={className} style={fallbackStyle}>
+      {fallback}
+      {image && !img.failed && (
+        <img
+          className={`${styles.photoImg} ${img.loaded ? styles.photoImgLoaded : ''}`}
+          src={image}
+          alt=""
+          decoding="async"
+          onLoad={img.onLoad}
+          onError={img.onError}
+        />
       )}
     </span>
   );
@@ -191,12 +205,28 @@ function PlaceFeaturedCard({ pick, onSelect }) {
   );
 }
 
+// A <div role="button">, not a <button>: iOS WebKit (Safari and every
+// iPhone browser) doesn't lay out a <button> as a flex column with a
+// nested positioned box reliably — the portrait half kept its space but
+// painted nothing (no photo, background, name or fade).
 function PersonFeaturedCard({ pick, onSelect }) {
   const about = bio(pick);
   const titleParts = personTitleParts(pick);
+  const open = () => onSelect?.(pick.waypoint);
   return (
-    <button type="button" className={`${styles.featured} ${styles.personCard}`} onClick={() => onSelect?.(pick.waypoint)}>
-      <span className={styles.personTop}>
+    <div
+      role="button"
+      tabIndex={0}
+      className={`${styles.featured} ${styles.personCard}`}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      }}
+    >
+      <div className={styles.personTop}>
         <Photo
           image={pick.images && pick.images[0]}
           className={styles.featuredPhoto}
@@ -213,9 +243,9 @@ function PersonFeaturedCard({ pick, onSelect }) {
           <span className={styles.featuredName}>{pick.name}</span>
           {titleParts.length > 0 && <span className={styles.featuredMeta}>{titleParts.join(' · ')}</span>}
         </span>
-      </span>
-      {about && <span className={styles.personBio}>{about}</span>}
-    </button>
+      </div>
+      {about && <p className={styles.personBio}>{about}</p>}
+    </div>
   );
 }
 
@@ -262,12 +292,11 @@ function PlaceRow({ pick, userCoords, onSelect, verified, size }) {
   const dist = meters != null ? fmtMeters(meters) : '';
   return (
     <button type="button" className={`${styles.row} ${size === 'sm' ? styles.rowSm : ''}`} onClick={() => onSelect?.(pick.waypoint)}>
-      <AvatarBox
+      <Photo
         className={styles.thumb}
         image={pick.images && pick.images[0]}
-        Icon={Icon}
-        iconSize={size === 'sm' ? 16 : 20}
-        color={dotColor(pick.type)}
+        fallbackStyle={{ background: dotColor(pick.type) }}
+        fallback={<Icon size={size === 'sm' ? 16 : 20} color="#fff" strokeWidth={2} aria-hidden="true" />}
       />
       <span className={styles.rowBody}>
         <span className={styles.rowNameLine}>
