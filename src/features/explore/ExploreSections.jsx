@@ -205,12 +205,28 @@ function PlaceFeaturedCard({ pick, onSelect }) {
   );
 }
 
+// A <div role="button">, not a <button>: iOS WebKit (Safari and every
+// iPhone browser) doesn't lay out a <button> as a flex column with a
+// nested positioned box reliably — the portrait half kept its space but
+// painted nothing (no photo, background, name or fade).
 function PersonFeaturedCard({ pick, onSelect }) {
   const about = bio(pick);
   const titleParts = personTitleParts(pick);
+  const open = () => onSelect?.(pick.waypoint);
   return (
-    <button type="button" className={`${styles.featured} ${styles.personCard}`} onClick={() => onSelect?.(pick.waypoint)}>
-      <span className={styles.personTop}>
+    <div
+      role="button"
+      tabIndex={0}
+      className={`${styles.featured} ${styles.personCard}`}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      }}
+    >
+      <div className={styles.personTop}>
         <Photo
           image={pick.images && pick.images[0]}
           className={styles.featuredPhoto}
@@ -227,9 +243,9 @@ function PersonFeaturedCard({ pick, onSelect }) {
           <span className={styles.featuredName}>{pick.name}</span>
           {titleParts.length > 0 && <span className={styles.featuredMeta}>{titleParts.join(' · ')}</span>}
         </span>
-      </span>
-      {about && <span className={styles.personBio}>{about}</span>}
-    </button>
+      </div>
+      {about && <p className={styles.personBio}>{about}</p>}
+    </div>
   );
 }
 
