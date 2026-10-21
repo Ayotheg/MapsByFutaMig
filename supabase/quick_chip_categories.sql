@@ -76,14 +76,15 @@ where q.id = v.id;
 -- shows under "Other" until an admin picks its category.
 update quick_chips set category = 'other' where category is null;
 
--- Top bar: Lecture halls · Food · Printing · POS / ATM · Hostels
+-- Top bar: Lecture halls · Food · Printing · POS / ATM · Hostels, with
+-- the icons the screen shows (src/lib/legacyIconMap.js keys).
 update quick_chips set bar_order = null, short_label = null;
-update quick_chips q set bar_order = v.bar_order, short_label = v.short_label
+update quick_chips q set bar_order = v.bar_order, short_label = v.short_label, icon_key = v.icon_key
 from (values
-  ('lecture_hall',  0, null),
-  ('restaurant',    1, 'Food'),
-  ('printing_shop', 2, null),
-  ('bank',          3, null),
-  ('hostel',        4, 'Hostels')
-) as v(id, bar_order, short_label)
+  ('lecture_hall',  0, null,      'graduation-cap'),
+  ('restaurant',    1, 'Food',    'utensils'),
+  ('printing_shop', 2, null,      'printer-fill'),
+  ('bank',          3, null,      'credit-card'),
+  ('hostel',        4, 'Hostels', 'house-door-fill')
+) as v(id, bar_order, short_label, icon_key)
 where q.id = v.id;

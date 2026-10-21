@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, X } from 'lucide-react';
+import { LayoutGrid, Search, X } from 'lucide-react';
 import { CHIP_GROUPS, chipGroupOf } from '../shared/placeCategories';
 import styles from './AllPlacesPanel.module.css';
 
@@ -12,9 +12,10 @@ import styles from './AllPlacesPanel.module.css';
  * places · desktop" / "All places · mobile"). Replaces the old "Others"
  * icon-grid dropdown.
  *
- * A compact dropdown card at the top of the map, never full-screen (the
- * person preferred the old "Others" dropdown's footprint): under the
- * search bar on desktop, under the chip row on mobile over a scrim. Selecting a chip calls the same
+ * Built 1:1 to the zip's screens: on mobile a full-width bottom sheet
+ * (handle, rounded top) from right under the search bar to the bottom
+ * of the screen, over a scrim; on desktop a rounded card in the search
+ * column. Spacing is measured from the PNGs — see the .module.css. Selecting a chip calls the same
  * `onChipClick` the bar uses, so active-chip state stays in MapPage.
  */
 export default function AllPlacesPanel({ chips, activeChip, onChipClick, onClose, isMobile, collapsed, panelRef }) {
@@ -47,16 +48,38 @@ export default function AllPlacesPanel({ chips, activeChip, onChipClick, onClose
     return activeChip?.id ? activeChip.id === chip.id : activeChip?.label === chip.label;
   }
 
+  // Desktop takes the chip results panel's header (icon badge, title,
+  // count badge, round close); mobile keeps the flat sheet header.
+  const header = isMobile ? (
+    <div className={styles.header}>
+      <h2 className={styles.title}>All places</h2>
+      <button className={styles.close} onClick={onClose} aria-label="Close" type="button">
+        <X size={22} />
+      </button>
+    </div>
+  ) : (
+    <div className={styles.deskHeader}>
+      <span className={styles.deskIcon}>
+        <LayoutGrid size={17} />
+      </span>
+      <div className={styles.deskTitles}>
+        <h2 className={styles.deskTitle}>All places</h2>
+        <div className={styles.deskMetaRow}>
+          <span className={styles.deskBadge}>{chips.length}</span>
+          <span className={styles.deskSubtitle}>Pick a category</span>
+        </div>
+      </div>
+      <button className={styles.deskClose} onClick={onClose} aria-label="Close" type="button">
+        <X size={14} />
+      </button>
+    </div>
+  );
+
   const body = (
     <>
-      <div className={styles.header}>
-        <h2 className={styles.title}>All places</h2>
-        <button className={styles.close} onClick={onClose} aria-label="Close" type="button">
-          <X size={18} />
-        </button>
-      </div>
+      {header}
       <div className={styles.searchWrap}>
-        <Search size={16} className={styles.searchIcon} />
+        <Search size={isMobile ? 20 : 16} className={styles.searchIcon} />
         <input
           ref={inputRef}
           className={styles.search}
@@ -100,7 +123,8 @@ export default function AllPlacesPanel({ chips, activeChip, onChipClick, onClose
     return createPortal(
       <>
         <div className={styles.scrim} onClick={onClose} />
-        <div className={styles.sheet} role="dialog" aria-label="All places">
+        <div ref={panelRef} className={styles.sheet} role="dialog" aria-label="All places">
+          <div className={styles.handle} />
           {body}
         </div>
       </>,

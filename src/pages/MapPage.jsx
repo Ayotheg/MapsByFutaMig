@@ -135,6 +135,8 @@ export default function MapPage({ onReadinessChange }) {
   const [collapsed, setCollapsed] = useState(() => readPersistentState('sidebar-collapsed', false));
   const [sheetState, setSheetState] = useState(() => readPersistentState('mobile-sheet-state', 'peek'));
   const [sheetActiveTab, setSheetActiveTab] = useState(() => readPersistentState('mobile-sheet-tab', 'layers'));
+  // Desktop search bar's menu button → Sidebar opens/closes Explore.
+  const [exploreRequest, setExploreRequest] = useState(0);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(() => readPersistentState('mobile-search-open', false));
   const [activeChip, setActiveChip] = useState(() => readPersistentState('active-chip', null));
   const [mapView, setMapView] = useState(() => readPersistentState('map-view', null));
@@ -805,6 +807,7 @@ export default function MapPage({ onReadinessChange }) {
           explorePicks={explorePicksState.picks}
           explorePicksLoading={waypointsLoading}
           onExploreSelect={handleSelectPlace}
+          exploreRequest={exploreRequest}
         />
         </div>
       )}
@@ -818,6 +821,16 @@ export default function MapPage({ onReadinessChange }) {
               closeOtherOverlays('search');
               setMobileSearchOpen(true);
               presence.updatePresence('searching');
+            }}
+            onToggleSheet={() => {
+              // Menu button opens the sheet on Explore (the 'layers' tab);
+              // pressed again while Explore is showing, it closes the sheet.
+              if (sheetActiveTab === 'layers' && sheetState !== 'peek') {
+                handleSheetStateChange('peek');
+                return;
+              }
+              setSheetActiveTab('layers');
+              if (sheetState === 'peek') handleSheetStateChange('half');
             }}
             onNavigate={handleNavLaunch}
             activeChipLabel={activeChip?.label}
@@ -836,6 +849,7 @@ export default function MapPage({ onReadinessChange }) {
           searchIndex={searchIndex}
           onSelect={handleSelectPlace}
           collapsed={collapsed}
+          onToggleCollapsed={() => setExploreRequest((n) => n + 1)}
           dismissKey={searchDismissKey}
           onDropdownOpen={() => closeOtherOverlays('search')}
           onManualType={() => setActiveChip(null)}

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Compass, Rss, Navigation, CirclePlus, CircleUser, Shield, Sparkles } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
@@ -73,8 +73,18 @@ export default function Sidebar({
   explorePicks,
   explorePicksLoading,
   onExploreSelect,
+  // Bumped by the search bar's menu button: acts like clicking the rail's
+  // Explore item (opens Explore, or closes it if it's already open).
+  exploreRequest = 0,
 }) {
   const [activeKey, setActiveKey] = useState(() => readPersistentState('sidebar-active-panel', 'layers'));
+  const lastExploreRequest = useRef(exploreRequest);
+  useEffect(() => {
+    if (exploreRequest === lastExploreRequest.current) return;
+    lastExploreRequest.current = exploreRequest;
+    handleRailClick(RAIL_ITEMS.find((item) => item.key === 'explore'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exploreRequest]);
 
   useEffect(() => writePersistentState('sidebar-active-panel', activeKey), [activeKey]);
 

@@ -219,10 +219,10 @@ export const CATEGORY_ICON_KEYS = {
                          // gate (Fence/DoorOpen don't fit) — custom SVG,
                          // see lib/GateIcon.jsx
   clinic: 'stethoscope',
-  restaurant: 'restaurant-fill',
+  restaurant: 'utensils',
   mosque: 'mosque',
   sports: 'football',
-  lecture_hall: 'presentation',
+  lecture_hall: 'graduation-cap',
   faculty: 'school',
   shawarma: 'restaurant-fill', // no dedicated shawarma icon in the inventory
   car_wash: 'car-front',

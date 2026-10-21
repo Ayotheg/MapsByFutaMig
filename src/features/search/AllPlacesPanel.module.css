@@ -1,12 +1,13 @@
-/* All places (Oct 2026 Quick Chips revamp). A floating card just under
-   the search bar — inset from the screen edges, as tall as its content
-   and never reaching the bottom navbar (scrolls inside instead). Title +
-   close, "Find a category", then compact category pills per group.
+/* All places (Oct 2026 Quick Chips revamp) — measured 1:1 from
+   public/Maps By FUTA — Quick-chips-png.zip ("All places · mobile",
+   "All places · desktop"; PNGs are @2x, values below are CSS px).
    Portalled to <body> (see AllPlacesPanel.jsx); every surface sets
    `pointer-events: auto` in case it ever renders inside QuickChips'
    pointer-events:none `.bar`. */
 
-/* ── Desktop: card in the search column, under the search bar ───────── */
+/* ── Desktop: same form and colours as the chip results panel
+   (ChipResultsPanel.module.css `.panel`) — lavender surface, header with
+   icon badge + count, lavender pills — in the same spot under the chips. */
 .panel {
   display: none;
 }
@@ -16,27 +17,166 @@
     flex-direction: column;
     position: fixed;
     z-index: 1092;
-    top: calc(16px + var(--search-h) + 10px);
+    top: 118px;
     left: calc(var(--sidebar-total-w) + 16px);
-    width: var(--search-col-w);
-    max-height: calc(100vh - var(--search-h) - 58px);
-    background: var(--v2-on-primary);
-    border: 1px solid var(--v2-divider);
-    border-radius: var(--r-2xl);
-    box-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.22);
+    right: 16px;
+    max-width: 580px;
+    margin-left: auto;
+    margin-right: auto;
+    max-height: calc(100vh - 148px);
+    background: var(--v2-surface);
+    border: 1px solid var(--v2-border);
+    border-radius: var(--r-xl);
+    box-shadow:
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -2px rgba(0, 0, 0, 0.1);
     overflow: hidden;
     transition: left 0.3s var(--v2-ease-standard);
     pointer-events: auto;
-    transform-origin: top center;
   }
+  .panel .searchWrap {
+    margin: 0;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--v2-border);
+  }
+  .panel .searchIcon {
+    left: 30px;
+  }
+  .panel .search {
+    height: 40px;
+    padding-left: 40px;
+    font-size: 14px;
+    background: var(--v2-on-primary);
+    border-color: var(--v2-border);
+  }
+  .panel .body {
+    padding: 0 16px 16px;
+  }
+  .panel .group {
+    margin-top: 16px;
+  }
+  .panel .groupLabel {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--v2-text-muted);
+  }
+  .panel .pills {
+    gap: 8px;
+  }
+  .panel .pill {
+    height: 34px;
+    padding: 0 14px;
+    background: var(--v2-primary-glow);
+    border-color: var(--v2-border);
+    color: var(--v2-text);
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .panel .pill:hover {
+    background: var(--v2-primary-outline);
+    border-color: var(--v2-primary-outline);
+  }
+  .panel .pill.active {
+    background: var(--v2-primary);
+    border-color: var(--v2-primary);
+    color: var(--v2-on-primary);
+  }
+}
+
+/* Desktop header — mirrors ChipResultsPanel's `.header`/`.icon`/`.badge`. */
+.deskHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--v2-border);
+  flex-shrink: 0;
+}
+.deskIcon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.deskTitles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.deskTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--v2-text);
+}
+.deskMetaRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.deskBadge {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--v2-primary-glow);
+  color: var(--v2-text);
+  border-radius: var(--r-full);
+  padding: 2px 8px;
+}
+.deskSubtitle {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--v2-text-muted);
+}
+.deskClose {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-glow);
+  border: none;
+  color: var(--v2-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.deskClose:hover {
+  background: var(--v2-primary-outline);
 }
 @media (min-width: 769px) and (prefers-reduced-motion: no-preference) {
   .panel {
     animation: dropIn var(--v2-duration-standard) var(--v2-ease-standard) both;
   }
 }
+@keyframes dropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-/* ── Mobile: floating card under the search bar, over a scrim ───────── */
+/* ── Mobile: bottom sheet from right under the search bar to the bottom
+   of the screen — full width, 24px top corners, square bottom, over a
+   scrim that also dims the search bar. Sits above the bottom navbar
+   (MobileSheet, z 1201), as on the screen. ───────────────────────────── */
 .scrim,
 .sheet {
   display: none;
@@ -47,44 +187,49 @@
     position: fixed;
     inset: 0;
     background: var(--v2-scrim);
-    z-index: 1150;
+    z-index: 1205;
     pointer-events: auto;
   }
   .sheet {
     display: flex;
     flex-direction: column;
     position: fixed;
-    top: calc(14px + var(--search-h) + 8px + var(--mob-safe-top));
-    left: 12px;
-    right: 12px;
-    /* Content height, but stop above the bottom navbar. */
-    max-height: calc(
-      100vh - 14px - var(--search-h) - 8px - var(--mob-safe-top) - var(--mob-sheet-peek) - var(--mob-safe-bottom) - 12px
-    );
-    z-index: 1160;
+    top: calc(14px + var(--mob-search-h) + var(--mob-safe-top));
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1210;
     background: var(--v2-on-primary);
-    border: 1px solid var(--v2-divider);
-    border-radius: var(--r-2xl);
-    box-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.25);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -8px 30px -12px rgba(15, 23, 42, 0.2);
     overflow: hidden;
     pointer-events: auto;
-    transform-origin: top center;
+    padding-bottom: var(--mob-safe-bottom);
   }
 }
 @media (max-width: 768px) and (prefers-reduced-motion: no-preference) {
   .sheet {
-    animation: dropIn var(--v2-duration-standard) var(--v2-ease-standard) both;
+    animation: sheetUp var(--v2-duration-standard) var(--v2-ease-standard) both;
   }
 }
-@keyframes dropIn {
+@keyframes sheetUp {
   from {
     opacity: 0;
-    transform: translateY(-6px) scale(0.98);
+    transform: translateY(32px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
+}
+
+.handle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 4px;
+  margin: 9px auto 0;
+  border-radius: var(--r-full);
+  background: var(--v2-divider);
 }
 
 /* ── Shared content ─────────────────────────────────────────────────── */
@@ -93,22 +238,22 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 16px 0 18px;
+  padding: 17px 12px 0 20px; /* title centred 46px below the sheet top */
   flex-shrink: 0;
 }
 .title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 20px;
-  line-height: 1.2;
+  font-size: 26px;
+  line-height: 32px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--v2-neutral);
 }
 .close {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  margin-right: -4px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--r-full);
   background: none;
   border: none;
@@ -127,11 +272,11 @@
 .searchWrap {
   position: relative;
   flex-shrink: 0;
-  margin: 12px 16px 2px 18px;
+  margin: 18px 20px 0;
 }
 .searchIcon {
   position: absolute;
-  left: 12px;
+  left: 15px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--v2-text-muted);
@@ -139,13 +284,13 @@
 }
 .search {
   width: 100%;
-  height: 40px;
-  padding: 0 12px 0 36px;
+  height: 48px;
+  padding: 0 14px 0 43px;
   background: var(--v2-hud-upnext-bg);
   border: 1px solid var(--v2-divider);
-  border-radius: var(--r-lg);
+  border-radius: 12px;
   font-family: var(--font-ui);
-  font-size: 16px; /* 16px keeps iOS from zooming in on focus */
+  font-size: 17px;
   color: var(--v2-neutral);
 }
 .search::placeholder {
@@ -161,34 +306,35 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 16px 16px 18px;
+  padding: 0 20px 28px;
   scrollbar-width: thin;
   scrollbar-color: var(--v2-primary-outline) transparent;
 }
 
 .group {
-  margin-top: 16px;
+  margin-top: 22px;
 }
 .groupLabel {
   margin: 0 0 8px;
   font-family: var(--font-ui);
-  font-size: 12.5px;
+  font-size: 14px;
+  line-height: 20px;
   font-weight: 600;
   color: var(--v2-text);
 }
 .pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 9px;
 }
 .pill {
-  height: 30px;
-  padding: 0 12px;
+  height: 37px;
+  padding: 0 15px;
   background: var(--v2-on-primary);
   border: 1px solid var(--v2-divider);
   border-radius: var(--r-full);
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 16px;
   color: var(--v2-neutral);
   cursor: pointer;
   white-space: nowrap;
@@ -213,10 +359,10 @@
 }
 
 .empty {
-  padding: 24px 0;
+  padding: 32px 0;
   text-align: center;
   font-family: var(--font-ui);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--v2-text-muted);
 }
 

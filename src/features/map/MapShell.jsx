@@ -85,9 +85,6 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
 
     // ── Hide +/- zoom buttons on mobile (pinch-to-zoom is the native gesture)
     if (window.innerWidth <= 768) map.zoomControl.remove();
-    // Desktop: the search bar now sits in the top-left corner (Quick Chips
-    // revamp), right where Leaflet puts +/- by default.
-    else map.zoomControl.setPosition('bottomright');
 
     // Tile retry + "map isn't loading" alert — see tileHealth.js.
     const tileWatchers = tileWatchersRef.current;

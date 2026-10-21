@@ -1,20 +1,19 @@
-import { Navigation } from 'lucide-react';
-import { fmtMeters } from './chipConfig';
+import { Navigation, Images } from 'lucide-react';
+import { dotColor, fmtDist } from './chipConfig';
 import { getTypeIcon } from '../../lib/typeIcons';
 import { useImageStatus } from '../../lib/useImageStatus';
 import styles from './ChipResultRow.module.css';
 
 /**
  * Ports `_buildResultRow` (app.js ~6589–6692) — one row shared by both the
- * desktop panel and the mobile sheet.
+ * desktop floating panel and the mobile card (legacy literally reuses the
+ * same `.dcr-row` markup/class for both, built once, not two functions).
  *
- * `onNavigate` bubbles up through ChipResultsPanel to MapPage's
+ * `onNavigate` was left as a no-op stub with a comment ("Slice 9's
+ * territory") — Slice 9 (navigation) is built now, so this wires it up
+ * for real: bubbles the click up through ChipResultsPanel to MapPage's
  * `handlePlaceCardNavigate`, same "Where to?" seeding the place card's
- * own Navigate button uses.
- *
- * Oct 2026 Quick Chips revamp ("Category results · mobile"): white card,
- * photo or type-icon tile, name, a violet type pill and the live distance
- * from the person ("120 m" / "2.4 km"), round Navigate button.
+ * own Navigate button already uses.
  */
 export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavigate, style }) {
   const handleRowClick = (e) => {
@@ -30,7 +29,6 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
   const ThumbIcon = getTypeIcon(result.type, fallbackIconKey);
   const firstImage = result.imageUrls && result.imageUrls[0];
   const img = useImageStatus(firstImage);
-  const typeLabel = (result.type || '').replace(/_/g, ' ');
 
   return (
     <div className={styles.row} style={style} onClick={handleRowClick}>
@@ -40,7 +38,7 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
             The photo fades in on top once it has actually arrived, and is
             lazy so a long list only fetches the rows near the viewport. */}
         <div className={styles.thumbPh}>
-          <ThumbIcon size={26} />
+          <ThumbIcon size={22} />
         </div>
         {firstImage && !img.failed && (
           <img
@@ -59,9 +57,17 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
         <div className={styles.name} title={result.name}>
           {result.name}
         </div>
+        {result.desc && <div className={styles.desc}>{result.desc}</div>}
         <div className={styles.meta}>
-          {typeLabel && <span className={styles.type}>{typeLabel}</span>}
-          {result.dist !== null && <span className={styles.dist}>{fmtMeters(result.dist)}</span>}
+          <span className={styles.type} style={{ background: dotColor(result.type) }}>
+            {(result.type || '').replace(/_/g, ' ')}
+          </span>
+          {result.dist !== null && <span className={styles.dist}>{fmtDist(result.dist)}</span>}
+          {result.imageUrls && result.imageUrls.length > 1 && (
+            <span className={styles.photos}>
+              <Images size={9} /> {result.imageUrls.length}
+            </span>
+          )}
         </div>
       </div>
 
@@ -80,7 +86,7 @@ export default function ChipResultRow({ result, fallbackIconKey, onOpen, onNavig
           onClick={handleNavClick}
           type="button"
         >
-          <Navigation size={18} />
+          <Navigation size={14} />
         </button>
       )}
     </div>

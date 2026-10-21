@@ -103,6 +103,7 @@ import {
   Zap,            // utility
   SignalHigh,     // reception-4
   UtensilsCrossed,// restaurant-fill
+  Utensils,       // utensils (Quick Chips "Food")
   Scooter,
   Search,
   Send,           // send-fill
@@ -171,6 +172,7 @@ export const LEGACY_ICON_MAP = {
   'printer-fill': Printer,
   'reception-4': SignalHigh,
   'restaurant-fill': UtensilsCrossed,
+  'utensils': Utensils,
   'rocket': Rocket,
   'rotate-cw': RotateCw,
   'rotate-ccw': RotateCcw,

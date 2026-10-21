@@ -5,62 +5,70 @@
   pointer-events: none;
 }
 
-/* Oct 2026 Quick Chips revamp: on desktop the row sits in the same line
-   as the search bar, starting just right of its 400px column. */
 @media (min-width: 769px) {
   .bar {
     display: block;
-    top: 16px;
-    left: calc(var(--sidebar-total-w) + 32px + var(--search-col-w));
+    top: 80px;
+    left: calc(var(--sidebar-total-w) + 16px);
     right: 16px;
-    transition: left 0.3s var(--v2-ease-standard);
-  }
-  /* Same height as the search pill, so the chips centre on its line. */
-  .scroll {
-    height: var(--search-h);
-    padding: 0 4px;
+    max-width: 580px;
+    margin-left: auto;
+    margin-right: auto;
+    transition: left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 }
 
 @media (max-width: 768px) {
   .bar {
     display: block;
-    top: calc(14px + var(--search-h) + 6px + var(--mob-safe-top));
+    top: 68px;
     left: 0;
     right: 0;
     transition:
       opacity 0.2s ease,
       transform 0.2s ease;
   }
-  .scroll {
-    padding: 4px 16px 8px;
-  }
 }
+/* NOTE: legacy also hides the outer chip bar on mobile while results are
+   showing (`body.mob-chip-active .qc-bar`) since the results replace it
+   in-place. Not reproduced — ChipResultsPanel's mobile card already
+   overlays on top with its own scrim, so the chip bar being visible
+   underneath doesn't conflict; a minor, flagged simplification. */
 
 .scroll {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
   overflow-y: hidden;
+  padding: 4px 16px 6px;
   scrollbar-width: none;
   pointer-events: all;
 }
 .scroll::-webkit-scrollbar {
   display: none;
 }
+/* Desktop: centre the row under the search bar. `safe` falls back to
+   start-aligned if it ever overflows, so no chip gets clipped. */
+@media (min-width: 769px) {
+  .scroll {
+    justify-content: safe center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex-shrink: 0;
-  height: 36px;
-  padding: 0 13px 0 11px;
-  background: var(--v2-on-primary);
-  border: 1px solid var(--v2-divider);
+  height: 30px;
+  padding: 0 12px 0 9px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
   border-radius: var(--r-full);
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
   color: var(--v2-text);
   cursor: pointer;
   white-space: nowrap;
@@ -74,35 +82,19 @@
   animation: chipIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .chip:hover {
-  border-color: var(--v2-primary-outline);
+  border-color: var(--v2-chip-active-border);
   transform: translateY(-1px);
 }
 .chip:active {
   transform: translateY(0) scale(0.96);
 }
-.chip:focus-visible {
-  outline: 2px solid var(--v2-primary);
-  outline-offset: 2px;
-}
 .chip.active {
-  background: var(--v2-primary-tint);
-  border-color: var(--v2-primary);
-  color: var(--v2-primary-hover);
-}
-
-/* "All places" — always last, always tinted violet so it reads as the
-   way into every category rather than one more category. */
-.allChip {
-  background: var(--v2-primary-tint);
-  border-color: var(--v2-primary-border-soft);
-  color: var(--v2-primary-hover);
-}
-.allChip[aria-expanded='true'] {
-  border-color: var(--v2-primary);
+  background: var(--v2-chip-active-bg);
+  border-color: var(--v2-chip-active-border);
+  color: var(--v2-chip-active-text);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bar,
   .chip {
     transition: none;
     animation: none;
@@ -110,6 +102,42 @@
   .chip:hover {
     transform: none;
   }
+}
+
+.emojiIcon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ── "Others" chip — trailing entry that opens QuickChipsOverflowPanel
+   once the row can't fit every category. Dashed border sets it apart
+   from a normal category chip at a glance; the count badge tells you
+   how many are tucked away before you even open it. */
+.othersChip {
+  border-style: dashed;
+  color: var(--v2-text-variant);
+}
+.othersChip.active {
+  border-style: solid;
+}
+.othersBadge {
+  flex-shrink: 0;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-glow);
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+.othersChip.active .othersBadge {
+  background: var(--v2-chip-active-text);
+  color: var(--v2-chip-active-bg);
 }
 
 /* ── Hidden measuring row — same chip markup as `.scroll`, rendered
@@ -122,7 +150,7 @@
   left: -9999px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   visibility: hidden;
   pointer-events: none;
   height: 0;
@@ -131,8 +159,9 @@
 
 .label {
   font-family: var(--font-ui);
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: inherit;
 }
 
@@ -156,3 +185,5 @@
 .chip:nth-child(8) { animation-delay: 0.26s; }
 .chip:nth-child(9) { animation-delay: 0.29s; }
 .chip:nth-child(10) { animation-delay: 0.32s; }
+.chip:nth-child(11) { animation-delay: 0.35s; }
+.chip:nth-child(12) { animation-delay: 0.38s; }

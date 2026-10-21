@@ -109,13 +109,13 @@
   }
 }
 
-/* ── Desktop: floating card under the search bar (same top as the chip
-   results panel; the chips now sit beside the search bar, not under it) ── */
+/* ── Desktop: floating card under the search bar + chips (same top as
+   the chip results panel, so it never covers them) ── */
 .card.desktop {
   left: calc(var(--sidebar-total-w) + 16px);
-  top: calc(16px + var(--search-h) + 10px);
-  width: var(--search-col-w);
-  max-height: calc(100vh - var(--search-h) - 58px);
+  top: 118px;
+  width: 400px;
+  max-height: calc(100vh - 134px);
   border-radius: var(--r-2xl);
   transform: translateX(calc(-1 * (var(--sidebar-total-w) + 100% + 40px)));
   transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), left 0.3s var(--v2-ease-standard);
