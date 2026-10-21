@@ -9,7 +9,7 @@
   ],
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
-    { "source": "/(.*)", "destination": "/app.html" }
+    { "source": "/((?!assets/).*)", "destination": "/app.html" }
   ],
   "headers": [
     {
