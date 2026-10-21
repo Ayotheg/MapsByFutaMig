@@ -127,6 +127,17 @@
   text-overflow: ellipsis;
 }
 
+/* Phones: a long category name wraps to two lines instead of being cut. */
+@media (max-width: 768px) {
+  .title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+  }
+}
+
 /* List order ("Nearest first" / "None nearby · closest is 2.4 km away"),
    under the count — wraps rather than truncating on narrow screens. */
 .sortNote {
