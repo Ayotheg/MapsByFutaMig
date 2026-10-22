@@ -102,12 +102,13 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
   // the person picked is exactly what they read.
   // ("Nearest First" with no location yet falls back to the featured order.)
   const isFeaturedOrder = !availableSortOptions.some((o) => o.key === sortMode && o.key !== 'featured');
-  // People/Channels with more picks than slots get the same rotating rail
-  // as mobile (`rotatingFeatured`, from ExplorePanel); the list below then
-  // carries every organic pick.
+  // More picks than slots → the same rotating rail as mobile
+  // (`rotatingFeatured`, from ExplorePanel); the list below then carries
+  // every other pick. Not while a place-group chip is active: the rotation
+  // pool isn't filtered, so the rail would show places outside the group.
   const { featured, rest } = !isFeaturedOrder
     ? { featured: [], rest: sorted }
-    : rotatingFeatured && category !== 'places'
+    : rotatingFeatured && !activeGroup
     ? {
         featured: rotatingFeatured,
         // Every pick not pinned in the rail: extra promoted ones + all organic.

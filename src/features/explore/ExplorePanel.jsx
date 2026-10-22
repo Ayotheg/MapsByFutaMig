@@ -73,12 +73,10 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   const rotatingPool = promoted.length ? organic : organic; // organic pool always rotates; promoted just stays pinned
   const rotateStep = promoted.length ? 1 : COMPACT_SLOTS;
 
-  // Rotates only once there are more picks than Featured slots. Places
-  // rotate in the half-open sheet; People and Channels rotate their
-  // Featured rail in the full view too (that's the only place they show).
-  const hasMoreThanSlots = rotatingPool.length > (promoted.length ? 1 : COMPACT_SLOTS);
-  const rotatesHere = variant === 'compact' || category !== 'places';
-  const rotating = hasMoreThanSlots && rotatesHere;
+  // Rotates only once there are more picks than Featured slots — in the
+  // half-open sheet and in the full view's Featured rail alike, for every
+  // category.
+  const rotating = rotatingPool.length > (promoted.length ? 1 : COMPACT_SLOTS);
 
   useEffect(() => {
     if (!rotating) return undefined;
@@ -144,10 +142,10 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   );
 
   if (variant === 'full') {
-    // People/Channels with more picks than slots: the rail rotates (pinned
-    // promoted pick + cycling organic ones) and the list shows every other
-    // pick — remaining promoted ones first, then all organic — so nobody is
-    // only ever visible mid-rotation.
+    // More picks than slots: the rail rotates (pinned promoted pick +
+    // cycling organic ones) and the list shows every other pick —
+    // remaining promoted ones first, then all organic — so nobody is only
+    // ever visible mid-rotation.
     const { featured, rest } = rotating
       ? { featured: compactItems, rest: [...promoted.slice(1), ...organic] }
       : splitFeatured(fullItems);
