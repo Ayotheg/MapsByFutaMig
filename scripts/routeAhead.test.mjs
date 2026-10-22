@@ -79,9 +79,9 @@ const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a}
     { key: 'offRoute', name: 'Far Hall', lat: 7.2985, lng: 5.1395, own: true }, // ~165 m off the route
   ];
   const prefer = (p) => p.own;
-  assert.equal(startLandmark(north, cum, 0, 150, places)?.name, 'Shop', 'nearest named place at least 20 m ahead');
-  assert.equal(startLandmark(north, cum, 0, 150, places, { prefer })?.name, 'Library', 'own places beat nearer ones');
-  assert.equal(startLandmark(north, cum, 0, 150, places.slice(0, 3), { prefer })?.name, 'Shop', 'falls back to any place');
+  assert.equal(startLandmark(north, cum, 0, 150, places)?.place.name, 'Shop', 'nearest named place at least 20 m ahead');
+  assert.equal(startLandmark(north, cum, 0, 150, places, { prefer })?.place.name, 'Library', 'own places beat nearer ones');
+  assert.equal(startLandmark(north, cum, 0, 150, places.slice(0, 3), { prefer })?.place.name, 'Shop', 'falls back to any place');
   assert.equal(startLandmark(north, cum, 0, 100, [places[4]], { prefer }), null, 'nothing past the first turn');
   assert.equal(startLandmark(north, cum, 0, 150, [places[0], places[5]], { prefer }), null, 'nothing suitable');
   console.log('ok: startLandmark');

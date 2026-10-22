@@ -1,4 +1,4 @@
-import { routePosition, simplifyPath } from '../../lib/geoUtils.js';
+import { haversine, routePosition, simplifyPath } from '../../lib/geoUtils.js';
 import { bearingBetween, cumulativeDistances } from './routeAhead.js';
 import { stepInstruction, turnAngle } from './turnHelpers.js';
 
@@ -11,9 +11,13 @@ import { stepInstruction, turnAngle } from './turnHelpers.js';
 const ROUTABLE_CATEGORIES = new Set(['footpath', 'shortcut']);
 
 export const MAX_ENTRY_M = 150; // how far a path's end may be from the route
-export const MIN_SAVING_M = 30; // smaller gains aren't worth the extra requests
+export const MIN_SAVING_M = 50; // same rule as learning one (shortcutDetect.js)
 export const MAX_SHORTCUTS = 2; // each one costs two more OSRM requests
 export const ON_PATH_M = 25;
+// OSRM snaps each leg to the nearest road; if that's further than this
+// from the path's end, the "join" would be a line across whatever's in
+// between, so the shortcut isn't used.
+export const MAX_JOIN_GAP_M = 25;
 
 const DEG_PER_M = 1 / 111000;
 // Walked GPS lines wobble; smooth them before looking for turns, and only
@@ -117,13 +121,22 @@ function lastBearing(coords) {
 }
 
 /**
- * One route out of: OSRM to the path's start, the path, OSRM from its end.
+ * One route out of: OSRM to the path's start, the path, OSRM from its end,
+ * or null when OSRM's legs end too far from the path (MAX_JOIN_GAP_M).
  * Turns onto, along and off the path are worked out from its shape, so
  * the HUD says "Turn right" there just as it does on OSRM's own roads.
  * The path's walking time uses the base route's pace (`secondsPerMetre`).
  */
 export function stitchRoute(legA, shortcut, legB, secondsPerMetre) {
-  const pts = simplifyPath(shortcut.coords.map(([lat, lng]) => ({ lat, lng })), PATH_SIMPLIFY_M).map((p) => [p.lat, p.lng]);
+  const entry = shortcut.coords[0];
+  const exit = shortcut.coords[shortcut.coords.length - 1];
+  const aEnd = legA.coords[legA.coords.length - 1];
+  const bStart = legB.coords[0];
+  const gapIn = haversine(aEnd[0], aEnd[1], entry[0], entry[1]);
+  const gapOut = haversine(exit[0], exit[1], bStart[0], bStart[1]);
+  if (gapIn > MAX_JOIN_GAP_M || gapOut > MAX_JOIN_GAP_M) return null;
+  const joinGaps = gapIn + gapOut;
+  const pts =simplifyPath(shortcut.coords.map(([lat, lng]) => ({ lat, lng })), PATH_SIMPLIFY_M).map((p) => [p.lat, p.lng]);
   const cum = cumulativeDistances(pts);
   const pathLength = cum[cum.length - 1];
 
@@ -161,26 +174,31 @@ export function stitchRoute(legA, shortcut, legB, secondsPerMetre) {
         ]
       : legB.steps;
 
-  const pathDuration = pathLength * secondsPerMetre;
+  const pathDuration = (pathLength + joinGaps) * secondsPerMetre;
   return {
     // Which path this route goes through (walkablePaths id).
     via: shortcut.id,
     coords: [...legA.coords, ...shortcut.coords, ...legB.coords],
-    distance: legA.distance + pathLength + legB.distance,
+    distance: legA.distance + pathLength + joinGaps + legB.distance,
     duration: legA.duration + pathDuration + legB.duration,
     steps: [...legA.steps.filter((s) => s.type !== 'arrive'), ...pathSteps, ...rejoin],
   };
 }
 
-/** True when (lat, lng) is within `tolerance` metres of any path. */
-export function isOnPath(paths, lat, lng, tolerance = ON_PATH_M) {
+/**
+ * True when (lat, lng) is within `tolerance` metres of a path that leads
+ * towards `dest` (one of its ends is closer to the destination than the
+ * user is) — someone taking a shortcut they know, not someone heading the
+ * wrong way along a footpath.
+ */
+export function isOnPathTowards(paths, lat, lng, dest, tolerance = ON_PATH_M) {
   const margin = tolerance * DEG_PER_M;
-  return (paths || []).some(
-    ({ bbox: [minLat, minLng, maxLat, maxLng], coords }) =>
-      lat >= minLat - margin &&
-      lat <= maxLat + margin &&
-      lng >= minLng - margin &&
-      lng <= maxLng + margin &&
-      routePosition(coords, lat, lng).offRouteMeters <= tolerance
-  );
+  const userToDest = haversine(lat, lng, dest.lat, dest.lng);
+  return (paths || []).some(({ bbox: [minLat, minLng, maxLat, maxLng], coords }) => {
+    if (lat < minLat - margin || lat > maxLat + margin || lng < minLng - margin || lng > maxLng + margin) return false;
+    if (routePosition(coords, lat, lng).offRouteMeters > tolerance) return false;
+    const a = coords[0];
+    const b = coords[coords.length - 1];
+    return Math.min(haversine(a[0], a[1], dest.lat, dest.lng), haversine(b[0], b[1], dest.lat, dest.lng)) < userToDest;
+  });
 }

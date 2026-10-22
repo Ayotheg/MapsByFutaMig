@@ -4,7 +4,7 @@ import { haversine, routePosition } from '../../lib/geoUtils';
 import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
-import { isOnPath, walkablePaths } from './shortcutRoute';
+import { isOnPathTowards, ON_PATH_M, walkablePaths } from './shortcutRoute';
 import { createTripTrace, findShortcuts, walkedPath } from './shortcutDetect';
 import { flushPendingShortcuts, reportShortcutOutcomes, setShortcutConsent, shareShortcuts, shortcutConsent } from './learnedShortcutsClient';
 import { useLearnedShortcuts } from './useLearnedShortcuts';
@@ -104,9 +104,12 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  * (useLearnedShortcuts.js) are used the same way. Each trip's walk is
  * traced so that, on arrival, any shorter way this user took can be
  * shared (shortcutDetect.js → learnedShortcutsClient.js).
+ *
+ * `userId` (signed-in user's id, or null): only signed-in users share
+ * shortcuts or report on learned ones; guests just get routed through them.
  */
 const NavigationController = forwardRef(function NavigationController(
-  { map, gps, searchIndex, segments, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
+  { map, gps, searchIndex, segments, userId, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
   ref
 ) {
   // startNavigation() awaits GPS + routing; if this controller unmounts in
@@ -584,16 +587,31 @@ const NavigationController = forwardRef(function NavigationController(
   // on arrival. Not kept across a reload (a restored trip isn't traced).
   const tripTraceRef = useRef(null);
   const tripRouteRef = useRef(null);
-  // Learned shortcuts any of this trip's routes went through — on arrival
-  // we report whether each was really walked (learnedShortcuts.js).
+  const tripOriginRef = useRef(null);
+  // The learned shortcut the live route goes through, and the ones this
+  // trip actually reached (got within ON_PATH_M of an end of) while its
+  // route went through them. Only those are reported on arrival as taken
+  // or gone around (learnedShortcuts.js) — not one a reroute dropped
+  // before they got there.
+  const liveViaRef = useRef(null);
   const tripViaRef = useRef(null);
   const noteVia = useCallback((route) => {
-    if (typeof route?.via === 'string' && route.via.startsWith('learned:')) tripViaRef.current?.add(route.via);
+    liveViaRef.current = typeof route?.via === 'string' && route.via.startsWith('learned:') ? route.via : null;
+  }, []);
+  const noteViaReached = useCallback((lat, lng) => {
+    const via = liveViaRef.current;
+    if (!via || !tripViaRef.current || tripViaRef.current.has(via)) return;
+    const coords = shortcutPathsRef.current.find((p) => p.id === via)?.coords;
+    if (coords && [coords[0], coords[coords.length - 1]].some(([a, b]) => haversine(lat, lng, a, b) <= ON_PATH_M)) {
+      tripViaRef.current.add(via);
+    }
   }, []);
   const [shortcutOffer, setShortcutOffer] = useState(null);
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
   useEffect(() => {
-    flushPendingShortcuts();
-  }, []);
+    if (userId) flushPendingShortcuts(userId);
+  }, [userId]);
   const shortcutPathsRef = useRef(shortcutPaths);
   shortcutPathsRef.current = shortcutPaths;
 
@@ -615,6 +633,7 @@ const NavigationController = forwardRef(function NavigationController(
           navStepIndexRef.current = 0;
           lastSpokenStepRef.current = -1;
           spokenTurnNowRef.current = false;
+          spokenStartRef.current = null;
           drawRoute(fresh.coords, 0, true);
           persistNavigation();
           track('nav_rerouted', { to: dest.name });
@@ -637,8 +656,9 @@ const NavigationController = forwardRef(function NavigationController(
     (lat, lng, offRouteMeters) => {
       if (!navDestRef.current || rerouteInFlightRef.current) return;
 
-      // Someone on a known path is taking a shortcut, not getting lost.
-      if (offRouteMeters < OFF_ROUTE_THRESHOLD_M || isOnPath(shortcutPathsRef.current, lat, lng)) {
+      // Someone on a known path that leads towards the destination is
+      // taking a shortcut, not getting lost.
+      if (offRouteMeters < OFF_ROUTE_THRESHOLD_M || isOnPathTowards(shortcutPathsRef.current, lat, lng, navDestRef.current)) {
         offRouteTicksRef.current = 0;
         return;
       }
@@ -687,57 +707,72 @@ const NavigationController = forwardRef(function NavigationController(
 
     // Did they find a shorter way than the route? Shared straight away if
     // they've agreed before, otherwise the arrived banner asks.
-    const trace = tripTraceRef.current;
-    const found = trace ? findShortcuts(tripRouteRef.current, trace.points) : [];
-    // Learned shortcuts we routed them through: walked, or went around?
-    // No location is sent for this, so it needs no consent.
+    // Signed-in users only (see the header comment).
+    const uid = userIdRef.current;
+    const trace = uid ? tripTraceRef.current : null;
+    const found = trace ? findShortcuts(tripRouteRef.current, trace.points, { origin: tripOriginRef.current }) : [];
+    // Learned shortcuts we routed them through and they reached: taken, or
+    // went around? No location is sent for this, so it needs no consent.
     if (trace && tripViaRef.current?.size) {
-      const outcomes = [...tripViaRef.current].map((via) => ({
-        shortcutId: Number(via.slice('learned:'.length)),
-        used: walkedPath(shortcutPathsRef.current.find((p) => p.id === via)?.coords, trace.points),
-      }));
-      reportShortcutOutcomes(tripRef.current.tripId, outcomes);
+      const outcomes = [...tripViaRef.current]
+        .map((via) => ({ via, coords: shortcutPathsRef.current.find((p) => p.id === via)?.coords }))
+        .filter(({ coords }) => coords)
+        .map(({ via, coords }) => ({ shortcutId: Number(via.slice('learned:'.length)), used: walkedPath(coords, trace.points) }));
+      reportShortcutOutcomes(uid, tripRef.current.tripId, outcomes);
     }
     tripTraceRef.current = null;
     tripViaRef.current = null;
+    liveViaRef.current = null;
     if (found.length) {
       const tripId = tripRef.current.tripId;
       const saved = found.reduce((sum, s) => sum + s.saved, 0);
       track('shortcut_found', { count: found.length, saved_m: saved });
-      if (shortcutConsent() === true) {
-        shareShortcuts(tripId, found);
+      if (shortcutConsent(uid) === true) {
+        shareShortcuts(uid, tripId, found);
         setShortcutOffer({ state: 'shared', saved });
       } else {
-        setShortcutOffer({ state: 'ask', saved, tripId, shortcuts: found });
+        setShortcutOffer({ state: 'ask', saved, userId: uid, tripId, shortcuts: found });
       }
     }
   }, [speak, onNavigationSuccess, persistNavigation]);
 
+  // 'share' / 'skip' answer the question; 'stop' (offered after an
+  // automatic share) stops sharing automatically — they'll be asked again.
   const answerShortcutOffer = useCallback(
-    (share) => {
+    (answer) => {
       const offer = shortcutOffer;
+      if (answer === 'stop') {
+        setShortcutConsent(userIdRef.current, false);
+        track('shortcut_sharing_stopped');
+        setShortcutOffer({ state: 'stopped', saved: offer?.saved ?? 0 });
+        return;
+      }
       if (offer?.state !== 'ask') return;
-      if (!share) {
+      if (answer !== 'share') {
         setShortcutOffer(null);
         return;
       }
-      setShortcutConsent(true);
-      shareShortcuts(offer.tripId, offer.shortcuts);
+      setShortcutConsent(offer.userId, true);
+      shareShortcuts(offer.userId, offer.tripId, offer.shortcuts);
       track('shortcut_shared', { count: offer.shortcuts.length });
       setShortcutOffer({ state: 'shared', saved: offer.saved });
     },
     [shortcutOffer]
   );
 
+  // Stable, so the arrived banner's auto-close timer isn't restarted every
+  // time MapPage re-renders with a new inline `onArrival`.
+  const onArrivalRef = useRef(onArrival);
+  onArrivalRef.current = onArrival;
   const dismissArrivedBanner = useCallback(() => {
     const dest = navDestRef.current;
     setArrivedBannerDest(null);
     setShortcutOffer(null);
     stopNavigationRef.current?.();
     if (dest && dest.id && isRateablePOI(dest.type)) {
-      onArrival?.(dest);
+      onArrivalRef.current?.(dest);
     }
-  }, [onArrival]);
+  }, []);
 
   // ── HUD update — ported from `updateHUD()` (app.js ~4800–4927) ────────
   const updateHUD = useCallback(() => {
@@ -828,14 +863,18 @@ const NavigationController = forwardRef(function NavigationController(
 
       // At the start: a place to walk towards while their direction is
       // unknown, then which way to turn once they're walking.
-      if (currentStep.type === 'depart' && landmark) nextHud.turnInstruction = `Walk towards ${landmark.name}`;
+      // Only while the landmark is still ahead of them.
+      if (currentStep.type === 'depart' && landmark && landmark.along > along + 10) {
+        nextHud.turnInstruction = `Walk towards ${landmark.place.name}`;
+      }
       if (currentStep.type === 'depart' && userPos.heading != null && lastHeadingRef.current != null) {
         const start = startDirection(userPos.heading, lastHeadingRef.current);
         nextHud.turnIcon = start.icon;
         nextHud.turnInstruction = start.instruction;
-        if (start.instruction !== spokenStartRef.current) {
+        // Spoken once per route, so GPS wobble can't repeat it.
+        if (start.icon !== TURN_ICONS.straight && !spokenStartRef.current) {
           spokenStartRef.current = start.instruction;
-          if (start.icon !== TURN_ICONS.straight) speak(start.instruction);
+          speak(start.instruction);
         }
       }
 
@@ -930,6 +969,7 @@ const NavigationController = forwardRef(function NavigationController(
       navGpsTicksRef.current++;
       tripTraceRef.current?.add({ lat: latitude, lng: longitude, accuracy, t: p.timestamp || Date.now() });
       const ride = rideRef.current.update(speed);
+      noteViaReached(latitude, longitude);
 
       clearTimeout(navGpsStaleTimerRef.current);
       navGpsStaleTimerRef.current = setTimeout(() => {
@@ -953,7 +993,7 @@ const NavigationController = forwardRef(function NavigationController(
       // updateHUD() has just moved the map and route to this fix.
       endResume();
     },
-    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume, rerouteFrom]
+    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume, rerouteFrom, noteViaReached]
   );
 
   const startWatch = useCallback(() => {
@@ -1156,6 +1196,7 @@ const NavigationController = forwardRef(function NavigationController(
       tripRef.current = { tripId: createTripId(), completionReported: false };
       tripRouteRef.current = routeData.coords;
       tripTraceRef.current = createTripTrace();
+      tripOriginRef.current = { lat, lng };
       tripViaRef.current = new Set();
       noteVia(routeData);
       tripTraceRef.current.add({ lat, lng, accuracy: pos.coords.accuracy, t: pos.timestamp || Date.now() });
@@ -1181,7 +1222,7 @@ const NavigationController = forwardRef(function NavigationController(
       // After updateHUD(), which picks the start landmark for this route.
       const { landmark } = routeCumRef.current;
       const firstInstruction = landmark
-        ? `Walk towards ${landmark.name}`
+        ? `Walk towards ${landmark.place.name}`
         : routeData.steps[0]?.instruction || 'Head towards your destination';
       speak(`Starting navigation to ${dest.name}. ${firstInstruction}.`);
       persistNavigation();
@@ -1217,6 +1258,7 @@ const NavigationController = forwardRef(function NavigationController(
     navGpsUnsubRef.current = null;
     tripTraceRef.current = null;
     tripViaRef.current = null;
+    liveViaRef.current = null;
     rideRef.current = createRideDetector();
     alightSpokenRef.current = '';
     alightStopRef.current = null;

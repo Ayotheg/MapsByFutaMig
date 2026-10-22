@@ -9,10 +9,13 @@ import { createRideDetector, alightStop, alightPrompt } from '../src/features/na
   assert.equal(ride.update(8).riding, false, 'one fast fix is not a ride');
   assert.equal(ride.update(8).riding, true, 'two in a row is');
   assert.equal(ride.update(null).riding, true, 'no speed reading changes nothing');
-  assert.equal(ride.update(0).riding, true, 'stopped in traffic');
-  assert.equal(ride.update(0.5).riding, true);
-  const off = ride.update(1);
-  assert.deepEqual(off, { riding: false, alighted: true }, 'three slow fixes: got off');
+  for (let i = 0; i < 10; i++) assert.equal(ride.update(0).riding, true, 'waiting at a stop, still on board');
+  assert.equal(ride.update(1.2).riding, true);
+  assert.equal(ride.update(1.3).riding, true);
+  assert.equal(ride.update(0).riding, true, 'a pause while walking off');
+  assert.equal(ride.update(1.2).riding, true);
+  const off = ride.update(1.1);
+  assert.deepEqual(off, { riding: false, alighted: true }, 'four walking-pace fixes: got off');
   assert.deepEqual(ride.update(1), { riding: false, alighted: false }, 'alighted is reported once');
   console.log('ok: ride detector');
 }

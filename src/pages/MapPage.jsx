@@ -920,6 +920,7 @@ export default function MapPage({ onReadinessChange }) {
           gps={gps}
           searchIndex={searchIndex}
           segments={segments}
+          userId={auth.user?.id ?? null}
           initialDest={navSeedDest}
           explorePicks={explorePicksState.picks}
           onRequestClose={() => {

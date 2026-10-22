@@ -9,7 +9,8 @@ import { track } from '../../lib/analytics';
  * (supabase/learned_shortcuts.sql). An admin can see each one on the map,
  * how often people routed through it actually walked it, and switch it
  * on or off. Shortcuts people keep avoiding are switched off
- * automatically ("Off · auto"); switching one back on resets its counts.
+ * automatically ("Off · auto"). Switching one on here resets its counts
+ * and locks it on ("On · locked"), so only an admin can switch it off.
  */
 const FILTERS = [
   { key: 'all', label: 'All' },
@@ -19,7 +20,7 @@ const FILTERS = [
 ];
 
 function statusLabel(s) {
-  if (s.status === 'active') return 'On';
+  if (s.status === 'active') return s.locked ? 'On · locked' : 'On';
   if (s.status === 'learning') return 'Learning';
   return s.hidden_by === 'auto' ? 'Off · auto' : 'Off';
 }
@@ -45,7 +46,7 @@ export default function ShortcutsTab({ onShowOnMap }) {
     setError(null);
     const { data, error: err } = await supabase
       .from('learned_shortcuts')
-      .select('id, path, length_m, walker_count, status, hidden_by, used_count, avoided_count, created_at, updated_at')
+      .select('id, path, length_m, walker_count, status, hidden_by, locked, by_vehicle, used_count, avoided_count, created_at, updated_at')
       .order('updated_at', { ascending: false })
       .limit(500);
     if (err) setError(err.message);
@@ -97,7 +98,7 @@ export default function ShortcutsTab({ onShowOnMap }) {
       {autoOff > 0 && (
         <div className={styles.shortcutNote}>
           {autoOff} switched off automatically because people routed through {autoOff === 1 ? 'it' : 'them'} kept going
-          around. Check on the map before switching back on.
+          around. Check on the map before switching back on: one you switch on stays on until you switch it off.
         </div>
       )}
       <div className={styles.list}>
@@ -124,7 +125,8 @@ export default function ShortcutsTab({ onShowOnMap }) {
                   </span>
                 </div>
                 <div className={styles.itemDesc}>
-                  {Math.round(Number(s.length_m))} m · shared by {people(s.walker_count)} · added {fmtDate(s.created_at)}
+                  {Math.round(Number(s.length_m))} m · found {s.by_vehicle ? 'by vehicle' : 'walking'} · shared by{' '}
+                  {people(s.walker_count)} · added {fmtDate(s.created_at)}
                 </div>
                 {s.status !== 'learning' && (
                   <div className={styles.itemMeta}>

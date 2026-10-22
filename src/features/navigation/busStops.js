@@ -7,9 +7,12 @@ import { VEHICLE_SPEED_KMH } from './gpsConstants.js';
 // as normal.
 
 const RIDING_MPS = VEHICLE_SPEED_KMH / 3.6;
-const WALKING_MPS = 2;
+// Walking pace. Standing still doesn't count: a shuttle waiting at a stop
+// with the rider still on board reads as ~0.
+const WALKING_MIN_MPS = 0.5;
+const WALKING_MAX_MPS = 2;
 const RIDE_TICKS = 2; // fast fixes in a row before we call it a ride
-const WALK_TICKS = 3; // slow fixes in a row before we call it walking again
+const WALK_TICKS = 4; // walking-pace fixes in a row before we call the ride over
 export const MAX_STOP_TO_DEST_M = 500;
 export const ANNOUNCE_AHEAD_M = 250;
 export const GET_OFF_NOW_M = 40;
@@ -30,7 +33,8 @@ export function createRideDetector() {
     update(speed) {
       if (!Number.isFinite(speed)) return { riding, alighted: false };
       fast = speed >= RIDING_MPS ? fast + 1 : 0;
-      slow = speed <= WALKING_MPS ? slow + 1 : 0;
+      // Stopped fixes neither end a ride nor break a run of walking ones.
+      if (speed >= WALKING_MIN_MPS) slow = speed <= WALKING_MAX_MPS ? slow + 1 : 0;
       if (!riding && fast >= RIDE_TICKS) riding = true;
       else if (riding && slow >= WALK_TICKS) {
         riding = false;

@@ -36,8 +36,9 @@ export async function fetchRoute(fromLat, fromLng, toLat, toLng, mode, paths = [
       return stitchRoute(legA, s, legB, secondsPerMetre);
     })
   );
+  // A null stitch: OSRM's legs don't reach the path's ends.
   return stitched
-    .filter((r) => r.status === 'fulfilled')
+    .filter((r) => r.status === 'fulfilled' && r.value)
     .reduce((best, { value }) => (value.distance < best.distance ? value : best), base);
 }
 

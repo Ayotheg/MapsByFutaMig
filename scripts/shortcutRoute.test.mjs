@@ -1,7 +1,7 @@
 // Tests for src/features/navigation/shortcutRoute.js (routing through
 // approved footpaths). Run: node scripts/shortcutRoute.test.mjs
 import assert from 'node:assert/strict';
-import { walkablePaths, pickShortcuts, stitchRoute, isOnPath } from '../src/features/navigation/shortcutRoute.js';
+import { walkablePaths, pickShortcuts, stitchRoute, isOnPathTowards } from '../src/features/navigation/shortcutRoute.js';
 import { startDirection, stepInstruction } from '../src/features/navigation/turnHelpers.js';
 
 // ~110 m per 0.001° near FUTA (7.3°N). Base route: ~330 m east, then ~330 m north.
@@ -107,12 +107,27 @@ const far = [[7.31, 5.15], [7.311, 5.151]];
   console.log('ok: start directions');
 }
 
-// ── on a path
+// ── legs that don't reach the path: no shortcut
+{
+  const [shortcut] = pickShortcuts(base, walkablePaths([seg(1, 'shortcut', diagonal)]));
+  const leg = (coords) => ({ coords, distance: 15, duration: 11, steps: [] });
+  const farA = leg([[7.2975, 5.1371], [7.2975, 5.1381]]); // ends ~66 m from the path's start
+  assert.equal(stitchRoute(farA, shortcut, leg([[7.3009, 5.1409], [7.3019, 5.1409]]), 1 / 1.4), null);
+  const nearA = leg([[7.2980, 5.1371], [7.2980, 5.1381]]); // ~11 m short of it: allowed, and counted
+  const near = stitchRoute(nearA, shortcut, leg([[7.3009, 5.1409], [7.3019, 5.1409]]), 1 / 1.4);
+  const exact = stitchRoute(leg([[7.2981, 5.1371], [7.2981, 5.1381]]), shortcut, leg([[7.3009, 5.1409], [7.3019, 5.1409]]), 1 / 1.4);
+  assert.ok(near.distance - exact.distance > 10, 'the gap to the path is part of the distance');
+  console.log('ok: join gaps');
+}
+
+// ── on a path heading the right way
 {
   const paths = walkablePaths([seg(1, 'shortcut', diagonal)]);
-  assert.equal(isOnPath(paths, 7.2995, 5.1395), true, 'on the path');
-  assert.equal(isOnPath(paths, 7.2996, 5.1394), true, '~15 m off still counts');
-  assert.equal(isOnPath(paths, 7.2985, 5.1405), false, 'well off it');
-  assert.equal(isOnPath([], 7.2995, 5.1395), false, 'no paths');
-  console.log('ok: isOnPath');
+  const dest = { lat: 7.3015, lng: 5.1415 }; // past the north-east end
+  assert.equal(isOnPathTowards(paths, 7.2995, 5.1395, dest), true, 'on the path');
+  assert.equal(isOnPathTowards(paths, 7.2996, 5.1394, dest), true, '~15 m off still counts');
+  assert.equal(isOnPathTowards(paths, 7.2985, 5.1405, dest), false, 'well off it');
+  assert.equal(isOnPathTowards(paths, 7.2995, 5.1395, { lat: 7.29, lng: 5.15 }), false, 'leads away from the destination');
+  assert.equal(isOnPathTowards([], 7.2995, 5.1395, dest), false, 'no paths');
+  console.log('ok: isOnPathTowards');
 }

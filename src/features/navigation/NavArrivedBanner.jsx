@@ -40,18 +40,21 @@ const CROWDR_CAMPAIGN_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
  * page, doesn't touch `onDismiss` or any existing handler.
  */
 /*
- * `shortcut` (optional): the user walked a shorter way than the route.
- *   { state: 'ask', saved } → ask whether to share it (onShortcutAnswer(bool));
- *   { state: 'shared', saved } → thank them. The banner doesn't auto-close
- *   while it's asking.
+ * `shortcut` (optional): the user took a shorter way than the route.
+ *   { state: 'ask' } → ask whether to share it (onShortcutAnswer('share' | 'skip'));
+ *   { state: 'shared' } → thank them, with a way to stop automatic sharing
+ *     (onShortcutAnswer('stop'));
+ *   { state: 'stopped' } → confirm sharing is off.
+ * Each also has `saved` (metres). The banner doesn't auto-close while
+ * there's a choice on it.
  */
 export default function NavArrivedBanner({ destName, onDismiss, shortcut, onShortcutAnswer }) {
-  const asking = shortcut?.state === 'ask';
+  const hasChoice = shortcut?.state === 'ask' || shortcut?.state === 'shared';
   useEffect(() => {
-    if (asking) return undefined;
+    if (hasChoice) return undefined;
     const t = setTimeout(onDismiss, 8000);
     return () => clearTimeout(t);
-  }, [onDismiss, asking]);
+  }, [onDismiss, hasChoice]);
 
   return (
     <div className={styles.overlay}>
@@ -69,23 +72,34 @@ export default function NavArrivedBanner({ destName, onDismiss, shortcut, onShor
               <Footprints size={16} />
               You found a shorter way{shortcut.saved >= 10 ? ` (about ${Math.round(shortcut.saved / 10) * 10} m shorter)` : ''}
             </p>
-            {asking ? (
+            {shortcut.state === 'ask' && (
               <>
                 <p className={styles.shortcutText}>
                   Share it so the app can guide other students this way too? Only the shorter stretch is shared, never
-                  where you started.
+                  where you started or ended.
                 </p>
                 <div className={styles.shortcutActions}>
-                  <button type="button" className={styles.shareBtn} onClick={() => onShortcutAnswer(true)}>
+                  <button type="button" className={styles.shareBtn} onClick={() => onShortcutAnswer('share')}>
                     Share it
                   </button>
-                  <button type="button" className={styles.skipBtn} onClick={() => onShortcutAnswer(false)}>
+                  <button type="button" className={styles.skipBtn} onClick={() => onShortcutAnswer('skip')}>
                     No thanks
                   </button>
                 </div>
               </>
-            ) : (
-              <p className={styles.shortcutText}>Shared. Thanks for helping other students!</p>
+            )}
+            {shortcut.state === 'shared' && (
+              <>
+                <p className={styles.shortcutText}>Shared. Thanks for helping other students!</p>
+                <div className={styles.shortcutActions}>
+                  <button type="button" className={styles.skipBtn} onClick={() => onShortcutAnswer('stop')}>
+                    Stop sharing automatically
+                  </button>
+                </div>
+              </>
+            )}
+            {shortcut.state === 'stopped' && (
+              <p className={styles.shortcutText}>Automatic sharing is off. We&apos;ll ask you next time.</p>
             )}
           </div>
         )}
