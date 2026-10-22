@@ -37,6 +37,8 @@ const END_NEAR_DEST_M = 50;
 // The "Please wait" cover after a resume gives up waiting for a usable fix
 // after this long; the HUD keeps updating once one arrives.
 const RESUME_MAX_WAIT_MS = 15000;
+// This trip's trace for shortcut detection, kept with the navigation session.
+const TRACE_KEY = 'navigation-trace';
 
 const SVG_FLAG = (size, color = 'currentColor') =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg>`;
@@ -585,27 +587,53 @@ const NavigationController = forwardRef(function NavigationController(
   const shortcutPaths = useMemo(() => walkablePaths([...(segments || []), ...learnedShortcuts]), [segments, learnedShortcuts]);
   // This trip's walk and the route it started with, for finding shortcuts
   // on arrival. Not kept across a reload (a restored trip isn't traced).
-  const tripTraceRef = useRef(null);
-  const tripRouteRef = useRef(null);
-  const tripOriginRef = useRef(null);
+  //
+  // Saved alongside the navigation session (TRACE_KEY) so a page reload —
+  // common on phones after switching apps mid-trip — doesn't lose it.
+  const [restoredTrace] = useState(() => {
+    const saved = persistedNavigation?.active ? readPersistentState(TRACE_KEY, null) : null;
+    return saved && saved.tripId === tripRef.current.tripId && Array.isArray(saved.points) ? saved : null;
+  });
+  const tripTraceRef = useRef(restoredTrace ? createTripTrace(restoredTrace.points) : null);
+  const tripRouteRef = useRef(restoredTrace?.route || null);
+  const tripOriginRef = useRef(restoredTrace?.origin || null);
   // The learned shortcut the live route goes through, and the ones this
   // trip actually reached (got within ON_PATH_M of an end of) while its
   // route went through them. Only those are reported on arrival as taken
   // or gone around (learnedShortcuts.js) — not one a reroute dropped
   // before they got there.
-  const liveViaRef = useRef(null);
-  const tripViaRef = useRef(null);
-  const noteVia = useCallback((route) => {
-    liveViaRef.current = typeof route?.via === 'string' && route.via.startsWith('learned:') ? route.via : null;
+  const liveViaRef = useRef(restoredTrace?.liveVia || null);
+  const tripViaRef = useRef(restoredTrace ? new Set(restoredTrace.via || []) : null);
+  const saveTrace = useCallback(() => {
+    if (!tripTraceRef.current) return;
+    writePersistentState(TRACE_KEY, {
+      tripId: tripRef.current.tripId,
+      route: tripRouteRef.current,
+      origin: tripOriginRef.current,
+      points: tripTraceRef.current.points,
+      via: [...(tripViaRef.current || [])],
+      liveVia: liveViaRef.current,
+    });
   }, []);
-  const noteViaReached = useCallback((lat, lng) => {
-    const via = liveViaRef.current;
-    if (!via || !tripViaRef.current || tripViaRef.current.has(via)) return;
-    const coords = shortcutPathsRef.current.find((p) => p.id === via)?.coords;
-    if (coords && [coords[0], coords[coords.length - 1]].some(([a, b]) => haversine(lat, lng, a, b) <= ON_PATH_M)) {
-      tripViaRef.current.add(via);
-    }
-  }, []);
+  const noteVia = useCallback(
+    (route) => {
+      liveViaRef.current = typeof route?.via === 'string' && route.via.startsWith('learned:') ? route.via : null;
+      saveTrace();
+    },
+    [saveTrace]
+  );
+  const noteViaReached = useCallback(
+    (lat, lng) => {
+      const via = liveViaRef.current;
+      if (!via || !tripViaRef.current || tripViaRef.current.has(via)) return;
+      const coords = shortcutPathsRef.current.find((p) => p.id === via)?.coords;
+      if (coords && [coords[0], coords[coords.length - 1]].some(([a, b]) => haversine(lat, lng, a, b) <= ON_PATH_M)) {
+        tripViaRef.current.add(via);
+        saveTrace();
+      }
+    },
+    [saveTrace]
+  );
   const [shortcutOffer, setShortcutOffer] = useState(null);
   const userIdRef = useRef(userId);
   userIdRef.current = userId;
@@ -710,7 +738,11 @@ const NavigationController = forwardRef(function NavigationController(
     // Signed-in users only (see the header comment).
     const uid = userIdRef.current;
     const trace = uid ? tripTraceRef.current : null;
-    const found = trace ? findShortcuts(tripRouteRef.current, trace.points, { origin: tripOriginRef.current }) : [];
+    const stats = {};
+    const found = trace ? findShortcuts(tripRouteRef.current, trace.points, { origin: tripOriginRef.current, stats }) : [];
+    // Counts only, no locations: why a trip did or didn't yield a shortcut.
+    if (uid) track('shortcut_check', { traced: Boolean(trace), found: found.length, ...stats });
+    removePersistentState(TRACE_KEY);
     // Learned shortcuts we routed them through and they reached: taken, or
     // went around? No location is sent for this, so it needs no consent.
     if (trace && tripViaRef.current?.size) {
@@ -967,7 +999,7 @@ const NavigationController = forwardRef(function NavigationController(
       const walkingBearing = Number.isFinite(heading) && speed > 0.5 ? heading : null;
       navUserPosRef.current = { lat: latitude, lng: longitude, heading: walkingBearing };
       navGpsTicksRef.current++;
-      tripTraceRef.current?.add({ lat: latitude, lng: longitude, accuracy, t: p.timestamp || Date.now() });
+      if (tripTraceRef.current?.add({ lat: latitude, lng: longitude, accuracy, t: p.timestamp || Date.now() })) saveTrace();
       const ride = rideRef.current.update(speed);
       noteViaReached(latitude, longitude);
 
@@ -993,7 +1025,7 @@ const NavigationController = forwardRef(function NavigationController(
       // updateHUD() has just moved the map and route to this fix.
       endResume();
     },
-    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume, rerouteFrom, noteViaReached]
+    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume, rerouteFrom, noteViaReached, saveTrace]
   );
 
   const startWatch = useCallback(() => {
@@ -1259,6 +1291,7 @@ const NavigationController = forwardRef(function NavigationController(
     tripTraceRef.current = null;
     tripViaRef.current = null;
     liveViaRef.current = null;
+    removePersistentState(TRACE_KEY);
     rideRef.current = createRideDetector();
     alightSpokenRef.current = '';
     alightStopRef.current = null;

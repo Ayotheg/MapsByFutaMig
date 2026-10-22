@@ -107,7 +107,7 @@ function trip(...legs) {
   assert.deepEqual(findShortcuts(route, trip([A, [7.298, 5.139]], [[7.298, 5.139], out], [out, [7.298, 5.1405]], [[7.298, 5.1405], B], [B, C])), [], 'a detour that was longer');
 
   const corner = [7.298, 5.1386];
-  assert.deepEqual(findShortcuts(route, trip([A, corner], [corner, C, { stepM: 80 }])), [], 'walking with GPS gaps too big to trust');
+  assert.deepEqual(findShortcuts(route, trip([A, corner], [corner, C, { stepM: 120 }])), [], 'walking with GPS gaps too big to trust');
   assert.deepEqual(findShortcuts(route, trip([A, corner], [corner, C, { stepM: 250, speed: 10 }])), [], 'even in a vehicle, gaps over 200 m');
   assert.deepEqual(findShortcuts(route, [{ lat: A[0], lng: A[1], t: 0 }]), [], 'too few points');
   assert.deepEqual(findShortcuts(null, trip([A, B])), [], 'no route');

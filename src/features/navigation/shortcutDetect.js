@@ -12,26 +12,31 @@ export const OFF_ROUTE_M = 40; // same threshold NavigationController reroutes a
 export const MIN_SAVING_M = 50;
 // A bigger jump between fixes means we don't know where they went. A
 // moving vehicle covers more ground between fixes, so it's allowed more.
-export const MAX_GAP_WALKING_M = 50;
+export const MAX_GAP_WALKING_M = 80;
 export const MAX_GAP_VEHICLE_M = 200; // the server rejects anything larger
 export const WALKING_MAX_MPS = 2.5; // faster than this is a ride, not a walk
 export const PRIVACY_TRIM_M = 30; // never share where a trip started or ended
 const MIN_POINT_SPACING_M = 5;
 export const MAX_POINTS = 300;
 
+const MAX_TRACE_POINTS = 3000;
+
 /**
- * Records walked fixes for one trip: keeps a point every few metres and
- * only fixes accurate enough to trace a path.
+ * Records fixes for one trip: keeps a point every few metres, and only
+ * fixes accurate enough to trace a path (the same limit navigation uses).
+ * `points` lets a trip restored after a reload carry on its trace.
+ * `add` returns true when it kept the point.
  */
-export function createTripTrace(maxAccuracy = 25) {
-  const points = [];
+export function createTripTrace(points = [], maxAccuracy = 35) {
   return {
     points,
     add({ lat, lng, accuracy, t }) {
-      if (typeof accuracy === 'number' && accuracy > maxAccuracy) return;
+      if (typeof accuracy === 'number' && accuracy > maxAccuracy) return false;
+      if (points.length >= MAX_TRACE_POINTS) return false;
       const last = points[points.length - 1];
-      if (last && haversine(last.lat, last.lng, lat, lng) < MIN_POINT_SPACING_M) return;
+      if (last && haversine(last.lat, last.lng, lat, lng) < MIN_POINT_SPACING_M) return false;
       points.push({ lat, lng, t });
+      return true;
     },
   };
 }
@@ -71,8 +76,12 @@ function pathLength(points) {
  * A detour that never rejoins the route counts as ending at the
  * destination (the route's end), since the trip arrived. Nothing within
  * PRIVACY_TRIM_M of the start or of the arrival point is included.
+ *
+ * `stats`, if given, is filled with why each off-route stretch was or
+ * wasn't kept — counts only, no locations — for diagnosing field tests.
  */
-export function findShortcuts(route, points, { origin } = {}) {
+export function findShortcuts(route, points, { origin, stats = {} } = {}) {
+  Object.assign(stats, { points: points.length, offRuns: 0, notShorter: 0, gaps: 0, tooShort: 0, bestSavingM: null });
   if (!route || route.length < 2 || points.length < 3) return [];
   const start = origin || points[0];
   const end = points[points.length - 1];
@@ -100,7 +109,12 @@ export function findShortcuts(route, points, { origin } = {}) {
     const exitAlong = rejoined ? placed[exit].along : placed[exit].total;
     const skipped = exitAlong - placed[entry].along;
     const walked = pathLength(stretch);
-    if (skipped - walked < MIN_SAVING_M) continue;
+    stats.offRuns++;
+    stats.bestSavingM = Math.max(stats.bestSavingM ?? -Infinity, Math.round(skipped - walked));
+    if (skipped - walked < MIN_SAVING_M) {
+      stats.notShorter++;
+      continue;
+    }
 
     // Each hop's allowed gap depends on how fast that hop was travelled.
     let gap = false;
@@ -110,7 +124,10 @@ export function findShortcuts(route, points, { origin } = {}) {
       const fast = s > 0 && d / s > WALKING_MAX_MPS;
       if (d > (fast ? MAX_GAP_VEHICLE_M : MAX_GAP_WALKING_M)) gap = true;
     }
-    if (gap) continue;
+    if (gap) {
+      stats.gaps++;
+      continue;
+    }
     const seconds = (stretch[stretch.length - 1].t - stretch[0].t) / 1000;
 
     // Trim from the two ends only: dropping points from the middle would
@@ -121,7 +138,10 @@ export function findShortcuts(route, points, { origin } = {}) {
     while (from < to && nearEnds(stretch[from])) from++;
     while (to > from && nearEnds(stretch[to - 1])) to--;
     const shared = stretch.slice(from, to);
-    if (shared.length < 3) continue;
+    if (shared.length < 3) {
+      stats.tooShort++;
+      continue;
+    }
     found.push({
       path: thin(shared, MAX_POINTS).map((p) => [Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))]),
       length: Math.round(pathLength(shared)),
