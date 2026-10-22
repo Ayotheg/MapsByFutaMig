@@ -14,7 +14,8 @@ import NavHud from './NavHud';
 import NavArrivedBanner from './NavArrivedBanner';
 import './navMapLayers.css';
 import { track } from '../../lib/analytics';
-import { readPersistentState, removePersistentState, storageKey, writePersistentState } from '../../lib/persistentState';
+import { readPersistentState, removePersistentState, writePersistentState } from '../../lib/persistentState';
+import { markMapActive } from './mapSession';
 import { escapeHtml } from '../../lib/escapeHtml';
 import { claimCompletion, createTripId, restoreTrip } from './navTrip';
 import { cumulativeDistances, headingAhead, placesAlong } from './routeAhead';
@@ -131,9 +132,6 @@ const NavigationController = forwardRef(function NavigationController(
     Boolean(persistedNavigation?.active && persistedNavigation.routeData && persistedNavigation.dest && persistedNavigation.userPos)
   );
   const resumeTimerRef = useRef(null);
-  // Identifies this browser tab for the one-tab-navigates rule below.
-  const tabIdRef = useRef(null);
-  if (!tabIdRef.current) tabIdRef.current = createTripId();
   const [hud, setHud] = useState({
     arriving: false,
     arrived: false,
@@ -286,6 +284,9 @@ const NavigationController = forwardRef(function NavigationController(
       tripId: tripRef.current.tripId,
       completionReported: tripRef.current.completionReported,
     });
+    // A trip still getting GPS fixes (even with the screen off) isn't
+    // abandoned, so it mustn't trip the idle reset (mapSession.js).
+    markMapActive();
   }, []);
 
   // The wait timer only starts once the page is visible again — timers
@@ -299,14 +300,6 @@ const NavigationController = forwardRef(function NavigationController(
   const endResume = useCallback(() => {
     clearTimeout(resumeTimerRef.current);
     setResuming(false);
-  }, []);
-
-  // Every open tab restores the saved trip, so a second tab of the map
-  // would run its own GPS watch and voice alongside the first. The tab that
-  // starts, restores or returns to a trip claims it; the others let go
-  // (see the storage listener further down).
-  const claimNavigation = useCallback(() => {
-    writePersistentState('navigation-owner', { tabId: tabIdRef.current, at: Date.now() });
   }, []);
 
   // ── Voice (Web Speech API) — ported from app.js ~4433–4442 ────────────
@@ -796,6 +789,9 @@ const NavigationController = forwardRef(function NavigationController(
     (p) => {
       const { latitude, longitude, accuracy } = p.coords;
       gps.lastKnownPosRef.current = p;
+      // A one-off resume fix can land after the trip ended (or this
+      // unmounted) and would re-add a nav dot nothing removes.
+      if (!navActiveRef.current || !mountedRef.current) return;
 
       if (typeof accuracy === 'number' && accuracy > MAX_USEFUL_ACCURACY_M) return;
 
@@ -840,7 +836,6 @@ const NavigationController = forwardRef(function NavigationController(
     updateNavUserDot(navUserPosRef.current.lat, navUserPosRef.current.lng);
     updateHUD();
 
-    claimNavigation();
     beginResume();
     startWatch();
 
@@ -868,7 +863,6 @@ const NavigationController = forwardRef(function NavigationController(
         return;
       }
       if (!navActiveRef.current) return;
-      claimNavigation();
       beginResume();
       navigator.geolocation.getCurrentPosition(
         handleGpsFix,
@@ -883,16 +877,20 @@ const NavigationController = forwardRef(function NavigationController(
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', persistNavigation);
     };
-  }, [persistNavigation, handleGpsFix, startWatch, claimNavigation, beginResume]);
+  }, [persistNavigation, handleGpsFix, startWatch, beginResume]);
 
   // Keep the screen on for the whole trip. The browser drops the lock
   // whenever the page is hidden, so it's taken again on every return.
   useEffect(() => {
     if (!navActive || !('wakeLock' in navigator)) return undefined;
     let lock = null;
+    let pending = false;
     let cancelled = false;
     const acquire = () => {
-      if (document.visibilityState !== 'visible' || (lock && !lock.released)) return;
+      // `pending`: a quick hide/show mid-request would otherwise take a
+      // second lock and leak the first.
+      if (pending || document.visibilityState !== 'visible' || (lock && !lock.released)) return;
+      pending = true;
       navigator.wakeLock
         .request('screen')
         .then((l) => {
@@ -900,8 +898,10 @@ const NavigationController = forwardRef(function NavigationController(
           else lock = l;
         })
         .catch(() => {
-          // Refused (battery saver, unsupported WebView): the screen just
-          // sleeps as before.
+          // Refused (e.g. battery saver): the screen just sleeps as before.
+        })
+        .finally(() => {
+          pending = false;
         });
     };
     acquire();
@@ -1031,7 +1031,6 @@ const NavigationController = forwardRef(function NavigationController(
 
       updateHUD();
       persistNavigation();
-      claimNavigation();
 
       // Flagged bug fix (explicit user instruction): was `map.fitBounds(L.latLngBounds(routeData.coords),
       // { padding: [80, 80] })`, framing the entire route — usually a wide,
@@ -1047,11 +1046,9 @@ const NavigationController = forwardRef(function NavigationController(
       setGoDisabled(false);
       setGoLabel('Start Navigation');
     }
-  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, claimNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch]);
+  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch]);
 
-  // `keepSession`: another tab took the trip over, so its saved state
-  // stays for that tab.
-  const stopNavigation = useCallback(({ keepSession = false } = {}) => {
+  const stopNavigation = useCallback(() => {
     navActiveRef.current = false;
     setNavActive(false);
     onActiveChange?.(false);
@@ -1100,37 +1097,13 @@ const NavigationController = forwardRef(function NavigationController(
     navStepIndexRef.current = 0;
     navArrivalCountRef.current = 0;
     navGpsTicksRef.current = 0;
-    if (!keepSession) {
-      removePersistentState('navigation-session');
-      removePersistentState('navigation-destination');
-    }
+    removePersistentState('navigation-session');
+    removePersistentState('navigation-destination');
     setDestInputValue('');
     setGoDisabled(true);
   }, [map, clearRouteLayers, onActiveChange, rotateMapTo, endResume]);
 
   stopNavigationRef.current = stopNavigation;
-
-  // Another tab claimed the trip, or ended it: stop here too. `storage`
-  // events only fire in the other tabs, never the one that wrote.
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (!navActiveRef.current) return;
-      if (e.key === storageKey('navigation-session') && e.newValue === null) {
-        stopNavigation({ keepSession: true });
-        return;
-      }
-      if (e.key !== storageKey('navigation-owner') || !e.newValue) return;
-      let owner = null;
-      try {
-        owner = JSON.parse(e.newValue);
-      } catch {
-        return;
-      }
-      if (owner?.tabId && owner.tabId !== tabIdRef.current) stopNavigation({ keepSession: true });
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, [stopNavigation]);
 
   const handleHudClose = useCallback(() => {
     // eslint-disable-next-line no-alert
