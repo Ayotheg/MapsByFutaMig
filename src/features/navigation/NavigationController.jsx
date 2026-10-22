@@ -14,11 +14,12 @@ import NavHud from './NavHud';
 import NavArrivedBanner from './NavArrivedBanner';
 import './navMapLayers.css';
 import { track } from '../../lib/analytics';
-import { readPersistentState, removePersistentState, writePersistentState } from '../../lib/persistentState';
+import { readPersistentState, removePersistentState, storageKey, writePersistentState } from '../../lib/persistentState';
 import { escapeHtml } from '../../lib/escapeHtml';
 import { claimCompletion, createTripId, restoreTrip } from './navTrip';
 import { cumulativeDistances, headingAhead, placesAlong } from './routeAhead';
 import NearbyPlaces from './NearbyPlaces';
+import NavResumeOverlay from './NavResumeOverlay';
 
 // Leaflet marker/popup content is raw HTML (not React), so the "arrived
 // destination" flag glyph below is a hand-built inline SVG matching
@@ -27,6 +28,9 @@ import NearbyPlaces from './NearbyPlaces';
 // Ending a trip this close to a rateable destination counts as a visit
 // (see `onArrival` in the header comment).
 const END_NEAR_DEST_M = 50;
+// The "Please wait" cover after a resume gives up waiting for a usable fix
+// after this long; the HUD keeps updating once one arrives.
+const RESUME_MAX_WAIT_MS = 15000;
 
 const SVG_FLAG = (size, color = 'currentColor') =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg>`;
@@ -121,6 +125,15 @@ const NavigationController = forwardRef(function NavigationController(
   const [goLabel, setGoLabel] = useState('Start Navigation');
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [arrivedBannerDest, setArrivedBannerDest] = useState(null);
+  // "Please wait" cover (NavResumeOverlay) while a restored or resumed
+  // trip waits for a fresh fix. Up from the first frame of a restore.
+  const [resuming, setResuming] = useState(
+    Boolean(persistedNavigation?.active && persistedNavigation.routeData && persistedNavigation.dest && persistedNavigation.userPos)
+  );
+  const resumeTimerRef = useRef(null);
+  // Identifies this browser tab for the one-tab-navigates rule below.
+  const tabIdRef = useRef(null);
+  if (!tabIdRef.current) tabIdRef.current = createTripId();
   const [hud, setHud] = useState({
     arriving: false,
     arrived: false,
@@ -273,6 +286,27 @@ const NavigationController = forwardRef(function NavigationController(
       tripId: tripRef.current.tripId,
       completionReported: tripRef.current.completionReported,
     });
+  }, []);
+
+  // The wait timer only starts once the page is visible again — timers
+  // are frozen while hidden and would fire the moment it returned.
+  const beginResume = useCallback(() => {
+    setResuming(true);
+    clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = setTimeout(() => setResuming(false), RESUME_MAX_WAIT_MS);
+  }, []);
+
+  const endResume = useCallback(() => {
+    clearTimeout(resumeTimerRef.current);
+    setResuming(false);
+  }, []);
+
+  // Every open tab restores the saved trip, so a second tab of the map
+  // would run its own GPS watch and voice alongside the first. The tab that
+  // starts, restores or returns to a trip claims it; the others let go
+  // (see the storage listener further down).
+  const claimNavigation = useCallback(() => {
+    writePersistentState('navigation-owner', { tabId: tabIdRef.current, at: Date.now() });
   }, []);
 
   // ── Voice (Web Speech API) — ported from app.js ~4433–4442 ────────────
@@ -776,8 +810,10 @@ const NavigationController = forwardRef(function NavigationController(
       updateNavUserDot(latitude, longitude);
       updateHUD();
       persistNavigation();
+      // updateHUD() has just moved the map and route to this fix.
+      endResume();
     },
-    [gps, updateNavUserDot, updateHUD, persistNavigation]
+    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume]
   );
 
   const startWatch = useCallback(() => {
@@ -804,6 +840,8 @@ const NavigationController = forwardRef(function NavigationController(
     updateNavUserDot(navUserPosRef.current.lat, navUserPosRef.current.lng);
     updateHUD();
 
+    claimNavigation();
+    beginResume();
     startWatch();
 
     return () => {
@@ -820,13 +858,18 @@ const NavigationController = forwardRef(function NavigationController(
   // just persists state (unchanged); coming back to a still-active session
   // grabs one fresh fix immediately — rather than waiting on whatever's left
   // of the old watch — and restarts the watch in case it died while hidden.
+  // The "Please wait" cover goes up as the page hides, so it's already
+  // there on return instead of the stale map flashing first.
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState !== 'visible') {
         persistNavigation();
+        if (navActiveRef.current) setResuming(true);
         return;
       }
       if (!navActiveRef.current) return;
+      claimNavigation();
+      beginResume();
       navigator.geolocation.getCurrentPosition(
         handleGpsFix,
         (err) => console.warn('Nav GPS resume err:', err.message),
@@ -840,7 +883,35 @@ const NavigationController = forwardRef(function NavigationController(
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', persistNavigation);
     };
-  }, [persistNavigation, handleGpsFix, startWatch]);
+  }, [persistNavigation, handleGpsFix, startWatch, claimNavigation, beginResume]);
+
+  // Keep the screen on for the whole trip. The browser drops the lock
+  // whenever the page is hidden, so it's taken again on every return.
+  useEffect(() => {
+    if (!navActive || !('wakeLock' in navigator)) return undefined;
+    let lock = null;
+    let cancelled = false;
+    const acquire = () => {
+      if (document.visibilityState !== 'visible' || (lock && !lock.released)) return;
+      navigator.wakeLock
+        .request('screen')
+        .then((l) => {
+          if (cancelled) l.release().catch(() => {});
+          else lock = l;
+        })
+        .catch(() => {
+          // Refused (battery saver, unsupported WebView): the screen just
+          // sleeps as before.
+        });
+    };
+    acquire();
+    document.addEventListener('visibilitychange', acquire);
+    return () => {
+      cancelled = true;
+      document.removeEventListener('visibilitychange', acquire);
+      lock?.release().catch(() => {});
+    };
+  }, [navActive]);
 
   // ── Start / stop navigation ────────────────────────────────────────
   const startNavigation = useCallback(async () => {
@@ -960,6 +1031,7 @@ const NavigationController = forwardRef(function NavigationController(
 
       updateHUD();
       persistNavigation();
+      claimNavigation();
 
       // Flagged bug fix (explicit user instruction): was `map.fitBounds(L.latLngBounds(routeData.coords),
       // { padding: [80, 80] })`, framing the entire route — usually a wide,
@@ -975,12 +1047,15 @@ const NavigationController = forwardRef(function NavigationController(
       setGoDisabled(false);
       setGoLabel('Start Navigation');
     }
-  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch]);
+  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, claimNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch]);
 
-  const stopNavigation = useCallback(() => {
+  // `keepSession`: another tab took the trip over, so its saved state
+  // stays for that tab.
+  const stopNavigation = useCallback(({ keepSession = false } = {}) => {
     navActiveRef.current = false;
     setNavActive(false);
     onActiveChange?.(false);
+    endResume();
 
     if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     lastSpokenStepRef.current = -1;
@@ -1025,13 +1100,37 @@ const NavigationController = forwardRef(function NavigationController(
     navStepIndexRef.current = 0;
     navArrivalCountRef.current = 0;
     navGpsTicksRef.current = 0;
-    removePersistentState('navigation-session');
-    removePersistentState('navigation-destination');
+    if (!keepSession) {
+      removePersistentState('navigation-session');
+      removePersistentState('navigation-destination');
+    }
     setDestInputValue('');
     setGoDisabled(true);
-  }, [map, clearRouteLayers, onActiveChange, rotateMapTo]);
+  }, [map, clearRouteLayers, onActiveChange, rotateMapTo, endResume]);
 
   stopNavigationRef.current = stopNavigation;
+
+  // Another tab claimed the trip, or ended it: stop here too. `storage`
+  // events only fire in the other tabs, never the one that wrote.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!navActiveRef.current) return;
+      if (e.key === storageKey('navigation-session') && e.newValue === null) {
+        stopNavigation({ keepSession: true });
+        return;
+      }
+      if (e.key !== storageKey('navigation-owner') || !e.newValue) return;
+      let owner = null;
+      try {
+        owner = JSON.parse(e.newValue);
+      } catch {
+        return;
+      }
+      if (owner?.tabId && owner.tabId !== tabIdRef.current) stopNavigation({ keepSession: true });
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [stopNavigation]);
 
   const handleHudClose = useCallback(() => {
     // eslint-disable-next-line no-alert
@@ -1153,6 +1252,7 @@ const NavigationController = forwardRef(function NavigationController(
       navGpsUnsubRef.current?.();
       navGpsUnsubRef.current = null;
       clearTimeout(navGpsStaleTimerRef.current);
+      clearTimeout(resumeTimerRef.current);
       clearTimeout(navDropDebounceRef.current);
       if (navClickAbortRef.current) navClickAbortRef.current.abort();
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
@@ -1228,6 +1328,7 @@ const NavigationController = forwardRef(function NavigationController(
         />
       )}
       {arrivedBannerDest && <NavArrivedBanner destName={arrivedBannerDest} onDismiss={dismissArrivedBanner} />}
+      {navActive && resuming && <NavResumeOverlay map={map} />}
     </>
   );
 });

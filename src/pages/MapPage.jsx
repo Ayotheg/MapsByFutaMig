@@ -37,6 +37,7 @@ import OfflineBanner from '../features/offline/OfflineBanner';
 import { usePresenceTracking } from '../features/analytics/usePresenceTracking';
 import { setAnalyticsUser } from '../lib/analytics';
 import { readPersistentState, writePersistentState } from '../lib/persistentState';
+import { markMapActive, reloadIfIdle, resetIdleMapSession } from '../features/navigation/mapSession';
 import DetailModal from '../features/segments/DetailModal';
 import NavigationController from '../features/navigation/NavigationController';
 import ReviewModal from '../features/reviews/ReviewModal';
@@ -86,6 +87,10 @@ const EMPTY_KML_ANNOTATIONS = [];
 const CHAT_SETTLE_MS = 20 * 1000;
 
 export default function MapPage({ onReadinessChange }) {
+  // First, before any state below reads storage: a visit after a long
+  // absence starts fresh (mapSession.js).
+  useState(() => resetIdleMapSession());
+
   // The live map is a real-time interactive tool, not static content —
   // keep it out of the search index (crawling/indexing a constantly
   // moving GPS/route view adds no search value and can look like thin
@@ -133,7 +138,9 @@ export default function MapPage({ onReadinessChange }) {
   // shift/collapse in step with them, matching legacy's body-class-driven
   // CSS coupling without reaching for globals.
   const [collapsed, setCollapsed] = useState(() => readPersistentState('sidebar-collapsed', false));
-  const [sheetState, setSheetState] = useState(() => readPersistentState('mobile-sheet-state', 'peek'));
+  // Not restored: the sheet opens on Explore, so a sheet left open made
+  // Explore pop up by itself on every later visit.
+  const [sheetState, setSheetState] = useState('peek');
   const [sheetActiveTab, setSheetActiveTab] = useState(() => readPersistentState('mobile-sheet-tab', 'layers'));
   // Desktop search bar's menu button → Sidebar opens/closes Explore.
   const [exploreRequest, setExploreRequest] = useState(0);
@@ -250,7 +257,6 @@ export default function MapPage({ onReadinessChange }) {
   }, [waypoints, selected]);
   useEffect(() => writePersistentState('selected-segment', selectedSegmentId), [selectedSegmentId]);
   useEffect(() => writePersistentState('sidebar-collapsed', collapsed), [collapsed]);
-  useEffect(() => writePersistentState('mobile-sheet-state', sheetState), [sheetState]);
   useEffect(() => writePersistentState('mobile-sheet-tab', sheetActiveTab), [sheetActiveTab]);
   useEffect(() => writePersistentState('active-chip', activeChip), [activeChip]);
   useEffect(() => writePersistentState('navigation-open', navOpen), [navOpen]);
@@ -258,6 +264,27 @@ export default function MapPage({ onReadinessChange }) {
   useEffect(() => writePersistentState('mobile-search-open', mobileSearchOpen), [mobileSearchOpen]);
 
   const gps = useGpsTracking(map, { hidden: navActive });
+
+  // Last-active stamp for the idle reset. Refreshed only while visible, so
+  // time spent hidden or with the screen off counts as away; coming back
+  // after too long reloads the page into a fresh map.
+  useEffect(() => {
+    markMapActive();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && reloadIfIdle()) return;
+      markMapActive();
+    };
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') markMapActive();
+    }, 60 * 1000);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', markMapActive);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', markMapActive);
+    };
+  }, []);
 
   // ── Slice 10: Auth ────────────────────────────────────────────────
   // Called once here, same "lift shared state up, pass down as props"

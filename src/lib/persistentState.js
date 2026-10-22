@@ -1,6 +1,7 @@
 const STORAGE_PREFIX = 'maps-by-futa:';
 
-function storageKey(key) {
+// Exported for `storage` event listeners, which see the raw key.
+export function storageKey(key) {
   return `${STORAGE_PREFIX}${key}`;
 }
 
