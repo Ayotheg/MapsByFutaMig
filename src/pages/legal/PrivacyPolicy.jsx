@@ -8,7 +8,7 @@ function PrivacyPolicy() {
   useSeo({ title: 'Privacy Policy – Maps By FUTA', robots: 'index, follow' })
 
   return (
-    <LegalPageLayout title="Privacy Policy" updated="July 2026">
+    <LegalPageLayout title="Privacy Policy" updated="October 2026">
       <p>
         This Privacy Policy explains what information Maps By FUTA
         collects, why, and how it's handled. We built this Service for
@@ -19,9 +19,16 @@ function PrivacyPolicy() {
       <h2>1. Information we collect</h2>
       <p><strong>Location data:</strong> to show your position on the map, give
         you turn-by-turn directions, and find what's nearby, the Service
-        requests access to your device's GPS location. This is only used
-        live, in your browser, to power navigation — it's not something
-        we sell or hand to advertisers.</p>
+        requests access to your device's GPS location. This is used live,
+        in your browser, to power navigation — it's not something we sell
+        or hand to advertisers.</p>
+      <p><strong>Shared shortcuts:</strong> if you take a shorter way than the
+        route we suggested, we ask whether you'd like to share it. Only if
+        you agree, we store that shorter stretch of path (never your whole
+        trip, and never where it started) along with your account, or an
+        anonymous browser identifier if you're not signed in. Once enough
+        people have walked the same way, we use it to guide others. Other
+        users only ever see the path itself, never who walked it.</p>
       <p><strong>Account information:</strong> if you sign in, we store the
         basic profile details needed to attach your reviews and ratings
         to your account.</p>

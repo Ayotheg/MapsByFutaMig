@@ -2,8 +2,8 @@
  * Pure helpers ported verbatim from legacy's Navigation module IIFE
  * (`app.js` ~4408–4654): `TURN_ICONS`, `turnIcon`, `stepInstruction`
  * (OSRM maneuver → human sentence), `bearingToCardinal`, `ordinalSuffix`,
- * `fmtDist`. No behavior changes — same lookup tables, same string
- * templates.
+ * `fmtDist`, except the depart wording (no compass directions), plus
+ * `startDirection` for the first turn once the user is moving.
  */
 
 // Turn icon map (OSRM maneuver types) — values are lib/legacyIconMap.js keys
@@ -46,6 +46,26 @@ export function ordinalSuffix(n) {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
+/** Signed angle from one bearing to another, -180..180, positive = right. */
+export function turnAngle(fromBearing, toBearing) {
+  return ((toBearing - fromBearing + 540) % 360) - 180;
+}
+
+/**
+ * The first instruction once the user's walking direction is known:
+ * which way to turn, relative to where they're going now, to follow the
+ * route. `icon` values are TURN_ICONS values.
+ */
+export function startDirection(walkingBearing, routeBearing) {
+  const angle = turnAngle(walkingBearing, routeBearing);
+  const a = Math.abs(angle);
+  if (a < 45) return { instruction: 'Go straight ahead', icon: TURN_ICONS.straight };
+  if (a > 135) return { instruction: 'Turn around', icon: TURN_ICONS.uturn };
+  return angle > 0
+    ? { instruction: 'Turn right', icon: TURN_ICONS['turn-right'] }
+    : { instruction: 'Turn left', icon: TURN_ICONS['turn-left'] };
+}
+
 export function stepInstruction(step) {
   const t = (step.maneuver?.type || '').toLowerCase();
   const m = (step.maneuver?.modifier || '').toLowerCase();
@@ -59,9 +79,11 @@ export function stepInstruction(step) {
         ? 'Arrive — destination is on the right'
         : 'You have arrived at your destination';
   }
+  // Compass words ("Head north") mean little to most users, and which way
+  // they're facing isn't known until they move — startDirection() takes
+  // over once it is.
   if (t === 'depart') {
-    const heading = bearingToCardinal(step.maneuver?.bearing_after);
-    return heading ? `Head ${heading}${road ? ' ' + road : ''}` : road ? `Head ${road}` : 'Head towards destination';
+    return step.name ? `Follow the route along ${step.name}` : 'Follow the route on the map';
   }
 
   // ── Turns ────────────────────────────────────────────────────

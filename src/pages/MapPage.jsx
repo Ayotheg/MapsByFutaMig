@@ -919,6 +919,7 @@ export default function MapPage({ onReadinessChange }) {
           map={map}
           gps={gps}
           searchIndex={searchIndex}
+          segments={segments}
           initialDest={navSeedDest}
           explorePicks={explorePicksState.picks}
           onRequestClose={() => {

@@ -113,3 +113,17 @@ export function placesAlong(coords, cum, from, to, places, { maxOffset = 35, lim
   found.sort((x, y) => x.ahead - y.ahead);
   return found.slice(0, limit);
 }
+
+/**
+ * A named place to "walk towards" before the user's direction is known:
+ * the nearest one close to the route between `from` and `to` (the first
+ * turn), skipping any under `minAhead` — one right beside the user doesn't
+ * point the way. Places matching `prefer` win over nearer ones that don't.
+ */
+export function startLandmark(coords, cum, from, to, places, { minAhead = 20, maxAhead = 150, prefer = () => false } = {}) {
+  const end = Math.min(to, from + maxAhead, cum[cum.length - 1]);
+  const found = placesAlong(coords, cum, from, end, places, { maxOffset: 30, limit: Infinity }).filter(
+    (f) => f.ahead >= minAhead && f.place.name
+  );
+  return (found.find((f) => prefer(f.place)) ?? found[0])?.place ?? null;
+}

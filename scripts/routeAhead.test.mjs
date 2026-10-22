@@ -7,6 +7,7 @@ import {
   bearingBetween,
   headingAhead,
   placesAlong,
+  startLandmark,
 } from '../src/features/navigation/routeAhead.js';
 
 // ~111 m per 0.001° of latitude near FUTA (7.3°N).
@@ -64,6 +65,26 @@ const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a}
   const [hit] = placesAlong(dup, cum, 0, cum[2], [{ key: 'w', lat: 7.298, lng: 5.1379 }]);
   assert.equal(hit.side, 'left', 'place west of the start, heading north, is on the left');
   console.log('ok: zero-length segments are ignored');
+}
+
+// ── a place to walk towards at the start
+{
+  const cum = cumulativeDistances(north);
+  const places = [
+    { key: 'tooClose', name: 'Kiosk', lat: 7.2981, lng: 5.138, own: true }, // ~11 m ahead
+    { key: 'noName', name: '', lat: 7.2983, lng: 5.138 }, // ~33 m ahead
+    { key: 'osm', name: 'Shop', lat: 7.2985, lng: 5.1381 }, // ~55 m ahead
+    { key: 'own', name: 'Library', lat: 7.2988, lng: 5.1381, own: true }, // ~88 m ahead
+    { key: 'pastTurn', name: 'Senate', lat: 7.2995, lng: 5.138, own: true }, // beyond `to`
+    { key: 'offRoute', name: 'Far Hall', lat: 7.2985, lng: 5.1395, own: true }, // ~165 m off the route
+  ];
+  const prefer = (p) => p.own;
+  assert.equal(startLandmark(north, cum, 0, 150, places)?.name, 'Shop', 'nearest named place at least 20 m ahead');
+  assert.equal(startLandmark(north, cum, 0, 150, places, { prefer })?.name, 'Library', 'own places beat nearer ones');
+  assert.equal(startLandmark(north, cum, 0, 150, places.slice(0, 3), { prefer })?.name, 'Shop', 'falls back to any place');
+  assert.equal(startLandmark(north, cum, 0, 100, [places[4]], { prefer }), null, 'nothing past the first turn');
+  assert.equal(startLandmark(north, cum, 0, 150, [places[0], places[5]], { prefer }), null, 'nothing suitable');
+  console.log('ok: startLandmark');
 }
 
 // ── range limits

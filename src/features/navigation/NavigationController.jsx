@@ -4,7 +4,12 @@ import { haversine, routePosition } from '../../lib/geoUtils';
 import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
-import { turnIcon, fmtDist } from './turnHelpers';
+import { isOnPath, walkablePaths } from './shortcutRoute';
+import { createTripTrace, findShortcuts } from './shortcutDetect';
+import { flushPendingShortcuts, setShortcutConsent, shareShortcuts, shortcutConsent } from './learnedShortcutsClient';
+import { useLearnedShortcuts } from './useLearnedShortcuts';
+import { alightPrompt, alightStop, createRideDetector } from './busStops';
+import { turnIcon, fmtDist, startDirection, TURN_ICONS } from './turnHelpers';
 import { fmtDist as fmtDistAway } from '../search/chipConfig';
 import { NAV_START_ZOOM } from './gpsConstants';
 import { subscribeGps } from './gpsWatch';
@@ -18,7 +23,7 @@ import { readPersistentState, removePersistentState, writePersistentState } from
 import { markMapActive } from './mapSession';
 import { escapeHtml } from '../../lib/escapeHtml';
 import { claimCompletion, createTripId, restoreTrip } from './navTrip';
-import { cumulativeDistances, headingAhead, placesAlong } from './routeAhead';
+import { cumulativeDistances, headingAhead, placesAlong, startLandmark } from './routeAhead';
 import NearbyPlaces from './NearbyPlaces';
 import NavResumeOverlay from './NavResumeOverlay';
 
@@ -92,9 +97,16 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  * what's featured. Distance label uses a one-shot location fix (see
  * `useOneShotLocation` below), same non-blocking approach Explore
  * itself already uses — never gates the panel on a permission prompt.
+ *
+ * `segments` (MapPage's `useSegments()` list): footpath/shortcut segments
+ * are routed through when shorter (shortcutRoute.js), and walking along
+ * one never counts as going off route. Shortcuts other users walked
+ * (useLearnedShortcuts.js) are used the same way. Each trip's walk is
+ * traced so that, on arrival, any shorter way this user took can be
+ * shared (shortcutDetect.js → learnedShortcutsClient.js).
  */
 const NavigationController = forwardRef(function NavigationController(
-  { map, gps, searchIndex, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
+  { map, gps, searchIndex, segments, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
   ref
 ) {
   // startNavigation() awaits GPS + routing; if this controller unmounts in
@@ -173,6 +185,10 @@ const NavigationController = forwardRef(function NavigationController(
   const bearingAnimRef = useRef(null);
   const bearingTargetRef = useRef(0);
   const lastHeadingRef = useRef(null);
+  const spokenStartRef = useRef(null);
+  // Riding a bus? (busStops.js) and which "get off" prompt was last spoken.
+  const rideRef = useRef(createRideDetector());
+  const alightSpokenRef = useRef('');
   const [nearby, setNearby] = useState([]);
   const nearbySigRef = useRef('');
   const candidatesRef = useRef(nearbyCandidates);
@@ -561,31 +577,30 @@ const NavigationController = forwardRef(function NavigationController(
   const rerouteInFlightRef = useRef(false);
   const lastRerouteAtRef = useRef(0);
   const offRouteTicksRef = useRef(0);
+  const learnedShortcuts = useLearnedShortcuts();
+  const shortcutPaths = useMemo(() => walkablePaths([...(segments || []), ...learnedShortcuts]), [segments, learnedShortcuts]);
+  // This trip's walk and the route it started with, for finding shortcuts
+  // on arrival. Not kept across a reload (a restored trip isn't traced).
+  const tripTraceRef = useRef(null);
+  const tripRouteRef = useRef(null);
+  const [shortcutOffer, setShortcutOffer] = useState(null);
+  useEffect(() => {
+    flushPendingShortcuts();
+  }, []);
+  const shortcutPathsRef = useRef(shortcutPaths);
+  shortcutPathsRef.current = shortcutPaths;
 
-  // ── Reroute when the live route drifts too far from reality ───────────
-  // OSRM's foot-routing steps are fixed at fetch time and never update on
-  // their own — if the campus paths don't match OSM's footway data (very
-  // common) or the user just takes a different route, the announced turns
-  // silently go stale. This re-fetches from the user's *current* position
-  // once they've been consistently far enough off the original route.
-  const maybeReroute = useCallback(
-    (lat, lng, offRouteMeters) => {
+  // A fresh route from (lat, lng), e.g. after going off route or getting
+  // off a bus.
+  const rerouteFrom = useCallback(
+    (lat, lng) => {
       const dest = navDestRef.current;
       if (!dest || rerouteInFlightRef.current) return;
-
-      if (offRouteMeters < OFF_ROUTE_THRESHOLD_M) {
-        offRouteTicksRef.current = 0;
-        return;
-      }
-      offRouteTicksRef.current++;
-      if (offRouteTicksRef.current < OFF_ROUTE_TICKS_REQUIRED) return;
-      if (Date.now() - lastRerouteAtRef.current < MIN_REROUTE_INTERVAL_MS) return;
-
       rerouteInFlightRef.current = true;
       offRouteTicksRef.current = 0;
       lastRerouteAtRef.current = Date.now();
 
-      fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current)
+      fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current, shortcutPathsRef.current)
         .then((fresh) => {
           if (!navActiveRef.current || navDestRef.current !== dest) return; // nav ended/changed while fetching
           navRouteDataRef.current = fresh;
@@ -602,6 +617,29 @@ const NavigationController = forwardRef(function NavigationController(
         });
     },
     [drawRoute, persistNavigation]
+  );
+
+  // ── Reroute when the live route drifts too far from reality ───────────
+  // OSRM's foot-routing steps are fixed at fetch time and never update on
+  // their own — if the campus paths don't match OSM's footway data (very
+  // common) or the user just takes a different route, the announced turns
+  // silently go stale. This re-fetches from the user's *current* position
+  // once they've been consistently far enough off the original route.
+  const maybeReroute = useCallback(
+    (lat, lng, offRouteMeters) => {
+      if (!navDestRef.current || rerouteInFlightRef.current) return;
+
+      // Someone on a known path is taking a shortcut, not getting lost.
+      if (offRouteMeters < OFF_ROUTE_THRESHOLD_M || isOnPath(shortcutPathsRef.current, lat, lng)) {
+        offRouteTicksRef.current = 0;
+        return;
+      }
+      offRouteTicksRef.current++;
+      if (offRouteTicksRef.current < OFF_ROUTE_TICKS_REQUIRED) return;
+      if (Date.now() - lastRerouteAtRef.current < MIN_REROUTE_INTERVAL_MS) return;
+      rerouteFrom(lat, lng);
+    },
+    [rerouteFrom]
   );
 
   const arrivedAtDestination = useCallback(() => {
@@ -638,11 +676,44 @@ const NavigationController = forwardRef(function NavigationController(
     // user's Navigations stat regardless of destination type — see this
     // file's header comment.
     onNavigationSuccess?.({ tripId: tripRef.current.tripId });
+
+    // Did they find a shorter way than the route? Shared straight away if
+    // they've agreed before, otherwise the arrived banner asks.
+    const found = tripTraceRef.current ? findShortcuts(tripRouteRef.current, tripTraceRef.current.points) : [];
+    tripTraceRef.current = null;
+    if (found.length) {
+      const tripId = tripRef.current.tripId;
+      const saved = found.reduce((sum, s) => sum + s.saved, 0);
+      track('shortcut_found', { count: found.length, saved_m: saved });
+      if (shortcutConsent() === true) {
+        shareShortcuts(tripId, found);
+        setShortcutOffer({ state: 'shared', saved });
+      } else {
+        setShortcutOffer({ state: 'ask', saved, tripId, shortcuts: found });
+      }
+    }
   }, [speak, onNavigationSuccess, persistNavigation]);
+
+  const answerShortcutOffer = useCallback(
+    (share) => {
+      const offer = shortcutOffer;
+      if (offer?.state !== 'ask') return;
+      if (!share) {
+        setShortcutOffer(null);
+        return;
+      }
+      setShortcutConsent(true);
+      shareShortcuts(offer.tripId, offer.shortcuts);
+      track('shortcut_shared', { count: offer.shortcuts.length });
+      setShortcutOffer({ state: 'shared', saved: offer.saved });
+    },
+    [shortcutOffer]
+  );
 
   const dismissArrivedBanner = useCallback(() => {
     const dest = navDestRef.current;
     setArrivedBannerDest(null);
+    setShortcutOffer(null);
     stopNavigationRef.current?.();
     if (dest && dest.id && isRateablePOI(dest.type)) {
       onArrival?.(dest);
@@ -674,19 +745,28 @@ const NavigationController = forwardRef(function NavigationController(
     if (nearest > navStepIndexRef.current && minD < 20) navStepIndexRef.current = nearest;
 
     // Route geometry for the turning map and the Nearby places list.
+    const along = routePos.distanceTotal - routePos.distanceRemaining;
     if (routeCumRef.current.coords !== routeData.coords) {
+      const cumNew = cumulativeDistances(routeData.coords);
+      const stepAlongNew = steps.map((s) => {
+        if (!s.location) return null;
+        const p = routePosition(routeData.coords, s.location[0], s.location[1]);
+        return p.distanceTotal - p.distanceRemaining;
+      });
+      const firstTurn = stepAlongNew.find((a, i) => i > 0 && a != null && a > along + 20) ?? Infinity;
       routeCumRef.current = {
         coords: routeData.coords,
-        cum: cumulativeDistances(routeData.coords),
-        stepAlong: steps.map((s) => {
-          if (!s.location) return null;
-          const p = routePosition(routeData.coords, s.location[0], s.location[1]);
-          return p.distanceTotal - p.distanceRemaining;
+        cum: cumNew,
+        stepAlong: stepAlongNew,
+        alight: alightStop(routeData.coords, cumNew, candidatesRef.current),
+        // Places the team added (they have an id) use names students know;
+        // OpenStreetMap names are only a fallback.
+        landmark: startLandmark(routeData.coords, cumNew, along, firstTurn, candidatesRef.current || [], {
+          prefer: (p) => p.id != null,
         }),
       };
     }
-    const { cum, stepAlong } = routeCumRef.current;
-    const along = routePos.distanceTotal - routePos.distanceRemaining;
+    const { cum, stepAlong, landmark, alight } = routeCumRef.current;
     lastHeadingRef.current = headingAhead(routeData.coords, cum, along);
     if (routeUpRef.current && !map._userInteracting && !placeCardOpenRef.current) {
       rotateMapTo(-lastHeadingRef.current);
@@ -727,6 +807,19 @@ const NavigationController = forwardRef(function NavigationController(
     if (currentStep) {
       nextHud.turnIcon = turnIcon(currentStep.type, currentStep.modifier);
       nextHud.turnInstruction = currentStep.instruction || 'Continue straight';
+
+      // At the start: a place to walk towards while their direction is
+      // unknown, then which way to turn once they're walking.
+      if (currentStep.type === 'depart' && landmark) nextHud.turnInstruction = `Walk towards ${landmark.name}`;
+      if (currentStep.type === 'depart' && userPos.heading != null && lastHeadingRef.current != null) {
+        const start = startDirection(userPos.heading, lastHeadingRef.current);
+        nextHud.turnIcon = start.icon;
+        nextHud.turnInstruction = start.instruction;
+        if (start.instruction !== spokenStartRef.current) {
+          spokenStartRef.current = start.instruction;
+          if (start.icon !== TURN_ICONS.straight) speak(start.instruction);
+        }
+      }
 
       if (currentStep.location) {
         const dNext = haversine(lat, lng, currentStep.location[0], currentStep.location[1]);
@@ -774,6 +867,24 @@ const NavigationController = forwardRef(function NavigationController(
       nearArrivalSpokenRef.current = false;
     }
 
+    // On a bus nearing the map's bus stop for this route: tell them where
+    // to get off. Not on a bus, or no such stop: nothing changes.
+    if (rideRef.current.riding && alight) {
+      const toStop = alight.along - along;
+      const prompt = alightPrompt(toStop, alight.place.name);
+      if (prompt) {
+        nextHud.turnIcon = 'bus-front-fill';
+        nextHud.turnInstruction = prompt.instruction;
+        nextHud.turnDist = prompt.stage === 'now' ? 'Now' : `In ${fmtDist(toStop)}`;
+        nextHud.nextPreview = '';
+        const key = `${alight.place.key}:${prompt.stage}`;
+        if (alightSpokenRef.current !== key) {
+          alightSpokenRef.current = key;
+          speak(prompt.spoken);
+        }
+      }
+    }
+
     setHud((h) => ({ ...h, ...nextHud }));
 
     // Don't pull the map back to the user while they're looking at a place.
@@ -787,7 +898,7 @@ const NavigationController = forwardRef(function NavigationController(
   // instead of three slightly-different copies of this logic. ──────────
   const handleGpsFix = useCallback(
     (p) => {
-      const { latitude, longitude, accuracy } = p.coords;
+      const { latitude, longitude, accuracy, heading, speed } = p.coords;
       gps.lastKnownPosRef.current = p;
       // A one-off resume fix can land after the trip ended (or this
       // unmounted) and would re-add a nav dot nothing removes.
@@ -795,8 +906,12 @@ const NavigationController = forwardRef(function NavigationController(
 
       if (typeof accuracy === 'number' && accuracy > MAX_USEFUL_ACCURACY_M) return;
 
-      navUserPosRef.current = { lat: latitude, lng: longitude };
+      // GPS heading is only meaningful while moving.
+      const walkingBearing = Number.isFinite(heading) && speed > 0.5 ? heading : null;
+      navUserPosRef.current = { lat: latitude, lng: longitude, heading: walkingBearing };
       navGpsTicksRef.current++;
+      tripTraceRef.current?.add({ lat: latitude, lng: longitude, accuracy, t: p.timestamp || Date.now() });
+      const ride = rideRef.current.update(speed);
 
       clearTimeout(navGpsStaleTimerRef.current);
       navGpsStaleTimerRef.current = setTimeout(() => {
@@ -805,11 +920,21 @@ const NavigationController = forwardRef(function NavigationController(
 
       updateNavUserDot(latitude, longitude);
       updateHUD();
+      // Just got off at the stop we told them about: fresh walking
+      // directions from where they're standing, which start with the
+      // landmark / which-way-to-turn instructions.
+      if (ride.alighted) {
+        const stop = routeCumRef.current.alight?.place;
+        if (alightSpokenRef.current && stop && haversine(latitude, longitude, Number(stop.lat), Number(stop.lng)) < 80) {
+          rerouteFrom(latitude, longitude);
+        }
+        alightSpokenRef.current = '';
+      }
       persistNavigation();
       // updateHUD() has just moved the map and route to this fix.
       endResume();
     },
-    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume]
+    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume, rerouteFrom]
   );
 
   const startWatch = useCallback(() => {
@@ -991,7 +1116,7 @@ const NavigationController = forwardRef(function NavigationController(
 
       let routeData;
       try {
-        routeData = await fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current);
+        routeData = await fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current, shortcutPathsRef.current);
       } catch (e) {
         setGoDisabled(false);
         setGoLabel('Start Navigation');
@@ -1010,6 +1135,9 @@ const NavigationController = forwardRef(function NavigationController(
       navStartTimeRef.current = Date.now();
       // New trip: fresh id, completion not yet reported.
       tripRef.current = { tripId: createTripId(), completionReported: false };
+      tripRouteRef.current = routeData.coords;
+      tripTraceRef.current = createTripTrace();
+      tripTraceRef.current.add({ lat, lng, accuracy: pos.coords.accuracy, t: pos.timestamp || Date.now() });
       // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9). No named
       // origin exists for a live GPS fix, so "from" is a fixed label
       // rather than a guessed place name.
@@ -1026,10 +1154,15 @@ const NavigationController = forwardRef(function NavigationController(
 
       lastSpokenStepRef.current = 0;
       spokenTurnNowRef.current = false;
-      const firstInstruction = routeData.steps[0]?.instruction || 'Head towards your destination';
-      speak(`Starting navigation to ${dest.name}. ${firstInstruction}.`);
+      spokenStartRef.current = null;
 
       updateHUD();
+      // After updateHUD(), which picks the start landmark for this route.
+      const { landmark } = routeCumRef.current;
+      const firstInstruction = landmark
+        ? `Walk towards ${landmark.name}`
+        : routeData.steps[0]?.instruction || 'Head towards your destination';
+      speak(`Starting navigation to ${dest.name}. ${firstInstruction}.`);
       persistNavigation();
 
       // Flagged bug fix (explicit user instruction): was `map.fitBounds(L.latLngBounds(routeData.coords),
@@ -1061,6 +1194,9 @@ const NavigationController = forwardRef(function NavigationController(
 
     navGpsUnsubRef.current?.();
     navGpsUnsubRef.current = null;
+    tripTraceRef.current = null;
+    rideRef.current = createRideDetector();
+    alightSpokenRef.current = '';
 
     clearRouteLayers();
     if (navDestMarkerRef.current) {
@@ -1300,7 +1436,9 @@ const NavigationController = forwardRef(function NavigationController(
           hidden={placeCardOpen && isMobile}
         />
       )}
-      {arrivedBannerDest && <NavArrivedBanner destName={arrivedBannerDest} onDismiss={dismissArrivedBanner} />}
+      {arrivedBannerDest && (
+        <NavArrivedBanner destName={arrivedBannerDest} onDismiss={dismissArrivedBanner} shortcut={shortcutOffer} onShortcutAnswer={answerShortcutOffer} />
+      )}
       {navActive && resuming && <NavResumeOverlay map={map} />}
     </>
   );
