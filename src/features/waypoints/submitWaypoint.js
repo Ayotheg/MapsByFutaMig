@@ -44,29 +44,25 @@ export async function findNearbyApprovedWaypoint(lat, lng, waypoints) {
   );
 }
 
+/** Admins skip the student limits (campus bounds, daily cap). The database
+ * enforces the daily cap via `is_admin()` too; this is the client-side read. */
+export async function fetchIsAdmin(userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return !!data?.is_admin;
+}
+
 /** Whether `userId` still has submission attempts left today. Counts every
  * attempt logged in `waypoint_submission_log` regardless of
  * approve/reject outcome — a user who gets 5 submissions rejected in a
  * row shouldn't get 5 fresh attempts, see waypoint_submissions.sql's
  * schema note.
- *
- * Admins bypass the student cap entirely: the app uses the same server-side
- * `is_admin(auth.uid())` database checks for real enforcement, but the client
- * UX should not block a trusted admin from submitting as many times as they
- * need while they review or curate the map.
  */
 export async function checkRateLimit(userId) {
-  const { data: adminProfile, error: adminError } = await supabase
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (adminError) throw adminError;
-  if (adminProfile?.is_admin) {
-    return true;
-  }
-
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count, error } = await supabase
     .from('waypoint_submission_log')
@@ -85,14 +81,14 @@ export async function checkRateLimit(userId) {
  * fast with a friendly message) on top of that, not a substitute for it.
  */
 export async function submitWaypoint({ userId, name, description, type, lat, lng, files }) {
-  if (!isWithinCampusBounds(lat, lng)) {
-    throw new Error('That location is outside the FUTA campus area.');
-  }
   if (files.length > MAX_IMAGES_PER_SUBMISSION) {
     throw new Error(`Please attach at most ${MAX_IMAGES_PER_SUBMISSION} photos.`);
   }
-  const allowed = await checkRateLimit(userId);
-  if (!allowed) {
+  const isAdmin = await fetchIsAdmin(userId);
+  if (!isAdmin && !isWithinCampusBounds(lat, lng)) {
+    throw new Error('That location is outside the FUTA campus area.');
+  }
+  if (!isAdmin && !(await checkRateLimit(userId))) {
     throw new Error(
       `You've reached today's limit of ${MAX_PENDING_PER_DAY} submissions. Try again tomorrow.`
     );

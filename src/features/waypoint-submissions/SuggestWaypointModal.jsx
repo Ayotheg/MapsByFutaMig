@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { X, ChevronDown, LocateFixed, Map, Plus, Check } from 'lucide-react';
 import styles from './SuggestWaypointModal.module.css';
 import { WP_ALL_TYPES } from '../admin/adminTypeOptions';
-import { submitWaypoint, findNearbyApprovedWaypoint, isWithinCampusBounds } from '../waypoints/submitWaypoint';
+import { submitWaypoint, findNearbyApprovedWaypoint, isWithinCampusBounds, fetchIsAdmin } from '../waypoints/submitWaypoint';
 import { track } from '../../lib/analytics';
 
 const MAX_IMAGES = 5;
@@ -126,9 +126,13 @@ export default function SuggestWaypointModal({
       setError('Set a location — use your location or pick it on the map.');
       return;
     }
+    // Admins can add places off campus; only ask the database when needed.
     if (!isWithinCampusBounds(coord.lat, coord.lng)) {
-      setError('That location looks like it’s outside the FUTA campus area.');
-      return;
+      const isAdmin = await fetchIsAdmin(user.id).catch(() => false);
+      if (!isAdmin) {
+        setError('That location looks like it’s outside the FUTA campus area.');
+        return;
+      }
     }
 
     // Nudge once per location; "Continue as new place" retries with
