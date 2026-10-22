@@ -189,6 +189,7 @@ const NavigationController = forwardRef(function NavigationController(
   // Riding a bus? (busStops.js) and which "get off" prompt was last spoken.
   const rideRef = useRef(createRideDetector());
   const alightSpokenRef = useRef('');
+  const alightStopRef = useRef(null); // the stop we last told them to get off at
   const [nearby, setNearby] = useState([]);
   const nearbySigRef = useRef('');
   const candidatesRef = useRef(nearbyCandidates);
@@ -776,7 +777,6 @@ const NavigationController = forwardRef(function NavigationController(
         coords: routeData.coords,
         cum: cumNew,
         stepAlong: stepAlongNew,
-        alight: alightStop(routeData.coords, cumNew, candidatesRef.current),
         // Places the team added (they have an id) use names students know;
         // OpenStreetMap names are only a fallback.
         landmark: startLandmark(routeData.coords, cumNew, along, firstTurn, candidatesRef.current || [], {
@@ -784,7 +784,7 @@ const NavigationController = forwardRef(function NavigationController(
         }),
       };
     }
-    const { cum, stepAlong, landmark, alight } = routeCumRef.current;
+    const { cum, stepAlong, landmark } = routeCumRef.current;
     lastHeadingRef.current = headingAhead(routeData.coords, cum, along);
     if (routeUpRef.current && !map._userInteracting && !placeCardOpenRef.current) {
       rotateMapTo(-lastHeadingRef.current);
@@ -885,22 +885,21 @@ const NavigationController = forwardRef(function NavigationController(
       nearArrivalSpokenRef.current = false;
     }
 
-    // Riding (shuttle, keke or car: speed can't tell) towards the map's bus
-    // stop for this route: tell shuttle riders where to get off. Not
-    // riding, or no such stop: nothing changes.
-    if (rideRef.current.riding && alight) {
-      const toStop = alight.along - along;
-      const prompt = alightPrompt(toStop, alight.place.name);
-      if (prompt) {
-        nextHud.turnIcon = 'bus-front-fill';
-        nextHud.turnInstruction = prompt.instruction;
-        nextHud.turnDist = prompt.stage === 'now' ? 'Now' : `In ${fmtDist(toStop)}`;
-        nextHud.nextPreview = '';
-        const key = `${alight.place.key}:${prompt.stage}`;
-        if (alightSpokenRef.current !== key) {
-          alightSpokenRef.current = key;
-          speak(prompt.spoken);
-        }
+    // Riding (shuttle, keke or car: speed can't tell) near the recorded
+    // shuttle stop closest to the destination: tell shuttle riders where
+    // to get off. Not riding, or no such stop: nothing changes.
+    const alight = rideRef.current.riding ? alightStop(dest, userPos, candidatesRef.current) : null;
+    const prompt = alight && alightPrompt(alight.toUser, alight.place.name);
+    if (prompt) {
+      nextHud.turnIcon = 'bus-front-fill';
+      nextHud.turnInstruction = prompt.instruction;
+      nextHud.turnDist = prompt.stage === 'now' ? 'Now' : `In ${fmtDist(alight.toUser)}`;
+      nextHud.nextPreview = '';
+      alightStopRef.current = alight.place;
+      const key = `${alight.place.key}:${prompt.stage}`;
+      if (alightSpokenRef.current !== key) {
+        alightSpokenRef.current = key;
+        speak(prompt.spoken);
       }
     }
 
@@ -943,10 +942,11 @@ const NavigationController = forwardRef(function NavigationController(
       // directions from where they're standing, which start with the
       // landmark / which-way-to-turn instructions.
       if (ride.alighted) {
-        const stop = routeCumRef.current.alight?.place;
-        if (alightSpokenRef.current && stop && haversine(latitude, longitude, Number(stop.lat), Number(stop.lng)) < 80) {
+        const stop = alightStopRef.current;
+        if (stop && haversine(latitude, longitude, Number(stop.lat), Number(stop.lng)) < 80) {
           rerouteFrom(latitude, longitude);
         }
+        alightStopRef.current = null;
         alightSpokenRef.current = '';
       }
       persistNavigation();
@@ -1219,6 +1219,7 @@ const NavigationController = forwardRef(function NavigationController(
     tripViaRef.current = null;
     rideRef.current = createRideDetector();
     alightSpokenRef.current = '';
+    alightStopRef.current = null;
 
     clearRouteLayers();
     if (navDestMarkerRef.current) {

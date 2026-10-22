@@ -1,15 +1,16 @@
+import { haversine } from '../../lib/geoUtils.js';
 import { VEHICLE_SPEED_KMH } from './gpsConstants.js';
-import { placesAlong } from './routeAhead.js';
 
 // "On a shuttle? Get off at ..." for users riding the campus shuttle. Only
-// bus stops added to the map (waypoints of type 'bus_stop') count;
-// anywhere else, riding or not, navigation carries on as normal.
+// shuttle stops recorded on the map (waypoints of type 'bus_stop') count;
+// with none near the destination, riding or not, navigation carries on
+// as normal.
 
 const RIDING_MPS = VEHICLE_SPEED_KMH / 3.6;
 const WALKING_MPS = 2;
 const RIDE_TICKS = 2; // fast fixes in a row before we call it a ride
 const WALK_TICKS = 3; // slow fixes in a row before we call it walking again
-export const STOP_ON_ROUTE_M = 40;
+export const MAX_STOP_TO_DEST_M = 500;
 export const ANNOUNCE_AHEAD_M = 250;
 export const GET_OFF_NOW_M = 40;
 
@@ -40,28 +41,40 @@ export function createRideDetector() {
   };
 }
 
+const dist = (a, b) => haversine(Number(a.lat), Number(a.lng), Number(b.lat), Number(b.lng));
+
 /**
- * The bus stop to get off at for this route: of the map's bus stops
- * within STOP_ON_ROUTE_M of the route, the one furthest along it (closest
- * to the destination). Returns { place, along } or null.
+ * The shuttle stop to get off at: of the stops recorded on the map, the
+ * one nearest the destination — if it's within MAX_STOP_TO_DEST_M of it
+ * and not one the rider has already passed (no further from the
+ * destination than they are, give or take GET_OFF_NOW_M). Straight-line
+ * distances: the shuttle's road and the walking route often differ.
+ * Returns { place, toUser } (metres from `user`) or null.
  */
-export function alightStop(coords, cum, places) {
-  const stops = (places || []).filter((p) => p.type === 'bus_stop' && p.name);
-  if (!stops.length || coords.length < 2) return null;
-  const found = placesAlong(coords, cum, 0, cum[cum.length - 1], stops, { maxOffset: STOP_ON_ROUTE_M, limit: Infinity });
-  if (!found.length) return null;
-  const last = found[found.length - 1];
-  return { place: last.place, along: last.ahead };
+export function alightStop(dest, user, places) {
+  let best = null;
+  let bestToDest = Infinity;
+  const userToDest = dist(user, dest);
+  for (const p of places || []) {
+    if (p.type !== 'bus_stop' || !p.name || !Number.isFinite(Number(p.lat)) || !Number.isFinite(Number(p.lng))) continue;
+    const toDest = dist(p, dest);
+    if (toDest > MAX_STOP_TO_DEST_M || toDest > userToDest + GET_OFF_NOW_M) continue;
+    if (toDest < bestToDest) {
+      best = p;
+      bestToDest = toDest;
+    }
+  }
+  return best ? { place: best, toUser: dist(best, user) } : null;
 }
 
 /**
- * What to tell a rider `metresToStop` before their stop, or null when
- * it's still too far to mention. `stage` lets the caller speak each
- * prompt once. Speed can't tell a campus shuttle from a keke or car, so
- * the wording says who it's for and everyone else can ignore it.
+ * What to tell a rider `metresToStop` from their stop, or null when it's
+ * still too far to mention. `stage` lets the caller speak each prompt
+ * once. Speed can't tell a campus shuttle from a keke or car, so the
+ * wording says who it's for and everyone else can ignore it.
  */
 export function alightPrompt(metresToStop, name) {
-  if (metresToStop > ANNOUNCE_AHEAD_M || metresToStop < -GET_OFF_NOW_M) return null;
+  if (metresToStop > ANNOUNCE_AHEAD_M) return null;
   return metresToStop <= GET_OFF_NOW_M
     ? { stage: 'now', instruction: `On a shuttle? Get off here at ${name}`, spoken: `If you're on a shuttle, get off here, at ${name}.` }
     : { stage: 'ahead', instruction: `On a shuttle? Get off at ${name}`, spoken: `If you're on a shuttle, get ready to get off at ${name}.` };

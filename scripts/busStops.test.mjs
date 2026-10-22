@@ -1,6 +1,5 @@
 // Tests for src/features/navigation/busStops.js. Run: node scripts/busStops.test.mjs
 import assert from 'node:assert/strict';
-import { cumulativeDistances } from '../src/features/navigation/routeAhead.js';
 import { createRideDetector, alightStop, alightPrompt } from '../src/features/navigation/busStops.js';
 
 // ── riding vs walking
@@ -18,22 +17,25 @@ import { createRideDetector, alightStop, alightPrompt } from '../src/features/na
   console.log('ok: ride detector');
 }
 
-// ── which stop to get off at
+// ── which stop to get off at (~110 m per 0.001°)
 {
-  // ~440 m north.
-  const route = [[7.298, 5.138], [7.302, 5.138]];
-  const cum = cumulativeDistances(route);
-  const places = [
-    { key: 'a', name: 'Gate', type: 'bus_stop', lat: 7.2985, lng: 5.1381 },
-    { key: 'b', name: 'SOC', type: 'bus_stop', lat: 7.301, lng: 5.1379 },
-    { key: 'far', name: 'Hostel', type: 'bus_stop', lat: 7.301, lng: 5.14 }, // ~220 m off the route
-    { key: 'shop', name: 'Kiosk', type: 'shop', lat: 7.3015, lng: 5.138 },
+  const dest = { lat: 7.302, lng: 5.138 };
+  const user = { lat: 7.296, lng: 5.138 }; // ~660 m south of the destination
+  const stops = [
+    { key: 'gate', name: 'Gate', type: 'bus_stop', lat: 7.2965, lng: 5.1381 }, // ~610 m from dest: too far
+    { key: 'soc', name: 'SOC', type: 'bus_stop', lat: 7.3005, lng: 5.1395 }, // ~230 m from dest
+    { key: 'hall', name: 'Hall', type: 'bus_stop', lat: 7.3, lng: 5.138 }, // ~220 m, on the way
+    { key: 'shop', name: 'Kiosk', type: 'shop', lat: 7.302, lng: 5.1381 }, // not a stop
   ];
-  const stop = alightStop(route, cum, places);
-  assert.equal(stop.place.name, 'SOC', 'the stop on the route closest to the destination');
-  assert.ok(Math.abs(stop.along - 332) < 5, `~332 m along, got ${stop.along}`);
-  assert.equal(alightStop(route, cum, places.slice(2)), null, 'no recorded stop on this route: normal navigation');
-  assert.equal(alightStop(route, cum, []), null);
+  const pick = alightStop(dest, user, stops);
+  assert.equal(pick.place.name, 'Hall', 'the recorded stop nearest the destination');
+  assert.ok(Math.abs(pick.toUser - 442) < 5, `~442 m from the user, got ${pick.toUser}`);
+
+  // Past Hall (closer to the destination than it): never send them back.
+  assert.equal(alightStop(dest, { lat: 7.3012, lng: 5.138 }, stops), null, 'no stop behind them');
+  assert.equal(alightStop(dest, { lat: 7.3, lng: 5.138 }, stops).place.name, 'Hall', 'still Hall while at it');
+  assert.equal(alightStop(dest, user, [stops[0], stops[3]]), null, 'no recorded stop near the destination: normal navigation');
+  assert.equal(alightStop(dest, user, []), null);
   console.log('ok: alightStop');
 }
 
@@ -44,7 +46,6 @@ import { createRideDetector, alightStop, alightPrompt } from '../src/features/na
   assert.equal(alightPrompt(200, 'SOC').spoken, "If you're on a shuttle, get ready to get off at SOC.");
   assert.equal(alightPrompt(200, 'SOC').stage, 'ahead');
   assert.equal(alightPrompt(30, 'SOC').instruction, 'On a shuttle? Get off here at SOC');
-  assert.equal(alightPrompt(-20, 'SOC').stage, 'now', 'just past it still says now');
-  assert.equal(alightPrompt(-100, 'SOC'), null, 'well past it: back to normal');
+  assert.equal(alightPrompt(30, 'SOC').stage, 'now');
   console.log('ok: prompts');
 }
