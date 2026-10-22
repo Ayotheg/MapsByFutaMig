@@ -2,8 +2,8 @@
 // Run: node scripts/learnedShortcuts.test.mjs. rpc/storage are mocks.
 import assert from 'node:assert/strict';
 import { haversine } from '../src/lib/geoUtils.js';
-import { createTripTrace, findShortcuts, PRIVACY_TRIM_M } from '../src/features/navigation/shortcutDetect.js';
-import { createShortcutSharer, PENDING_KEY, CONSENT_KEY } from '../src/features/navigation/learnedShortcuts.js';
+import { createTripTrace, findShortcuts, walkedPath, PRIVACY_TRIM_M } from '../src/features/navigation/shortcutDetect.js';
+import { createShortcutSharer, PENDING_KEY, PENDING_OUTCOMES_KEY, CONSENT_KEY } from '../src/features/navigation/learnedShortcuts.js';
 
 // Route: ~330 m east, then ~330 m north (A → B → C). ~110 m per 0.001°.
 const A = [7.298, 5.138];
@@ -87,12 +87,16 @@ function fakeServer() {
     fail: false,
     errorCode: null,
     rpc(fn, args) {
-      this.calls.push(args);
-      assert.equal(fn, 'submit_shortcut_walk');
-      assert.deepEqual(Object.keys(args), ['p_trip_id', 'p_seq', 'p_path', 'p_saved_m', 'p_anon_id']);
+      this.calls.push({ fn, ...args });
+      assert.deepEqual(
+        Object.keys(args),
+        fn === 'submit_shortcut_walk'
+          ? ['p_trip_id', 'p_seq', 'p_path', 'p_saved_m', 'p_anon_id']
+          : ['p_shortcut_id', 'p_trip_id', 'p_used', 'p_anon_id']
+      );
       if (this.fail) return Promise.resolve({ data: null, error: { message: 'Failed to fetch' } });
       if (this.errorCode) return Promise.resolve({ data: null, error: { code: this.errorCode, message: 'bad' } });
-      const key = `${args.p_anon_id}:${args.p_trip_id}:${args.p_seq}`;
+      const key = `${fn}:${args.p_anon_id}:${args.p_trip_id}:${args.p_seq ?? args.p_shortcut_id}`;
       const dup = seen.has(key);
       seen.add(key);
       return Promise.resolve({ data: { accepted: !dup, reason: dup ? 'duplicate' : null }, error: null });
@@ -136,4 +140,36 @@ const shortcuts = [{ path: [[7.3, 5.14], [7.301, 5.141]], saved: 50 }, { path: [
   assert.equal(await sharer.share('trip-2', shortcuts.slice(0, 1)), 1, 'a permanent rejection is not retried');
   assert.equal(storage._m.has(PENDING_KEY), false);
   console.log('ok: failed shares are retried, rejected ones dropped');
+}
+
+// ── reporting whether learned shortcuts were walked
+{
+  const storage = memoryStorage();
+  const server = fakeServer();
+  const sharer = createShortcutSharer({ rpc: (f, a) => server.rpc(f, a), storage, anonId: () => 'anon-1' });
+  assert.equal(await sharer.reportOutcomes('trip-1', [{ shortcutId: 12, used: false }, { shortcutId: 13, used: true }]), 2);
+  assert.deepEqual(
+    server.calls.map((c) => [c.fn, c.p_shortcut_id, c.p_used]),
+    [['report_shortcut_outcome', 12, false], ['report_shortcut_outcome', 13, true]]
+  );
+  assert.equal(await sharer.reportOutcomes('trip-1', []), 0);
+
+  server.fail = true;
+  await sharer.reportOutcomes('trip-2', [{ shortcutId: 12, used: false }]);
+  assert.equal(storage.read(PENDING_OUTCOMES_KEY, []).length, 1, 'queued for retry');
+  server.fail = false;
+  assert.equal(await sharer.flush(), 1);
+  assert.equal(storage._m.has(PENDING_OUTCOMES_KEY), false);
+  console.log('ok: shortcut outcomes reported and retried');
+}
+
+// ── walked it, or went around it?
+{
+  const shortcut = [[7.2981, 5.1381], [7.2995, 5.1395], [7.3009, 5.1409]];
+  const along = trip([A, [7.2981, 5.1381]], [[7.2981, 5.1381], [7.3009, 5.1409]], [[7.3009, 5.1409], C]);
+  const around = trip([A, B], [B, C]);
+  assert.equal(walkedPath(shortcut, along), true, 'walked along it');
+  assert.equal(walkedPath(shortcut, around), false, 'went round by the road');
+  assert.equal(walkedPath(undefined, along), false, 'unknown shortcut');
+  console.log('ok: walkedPath');
 }

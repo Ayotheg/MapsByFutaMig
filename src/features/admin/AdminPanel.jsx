@@ -6,6 +6,8 @@ import KmlTab from './KmlTab';
 import QuickChipsTab from './QuickChipsTab';
 import PendingTab from './PendingTab';
 import PromotionsTab from './PromotionsTab';
+import ShortcutsTab from './ShortcutsTab';
+import L from 'leaflet';
 import AdminEditModal from './AdminEditModal';
 import { useAdminKml } from './useAdminKml';
 import InsightsErrorBoundary from '../analytics/InsightsErrorBoundary';
@@ -36,6 +38,7 @@ const TABS = [
   { key: 'pending', label: 'Pending' },
   { key: 'promotions', label: 'Promotions' },
   { key: 'insights', label: 'Insights' },
+  { key: 'shortcuts', label: 'Shortcuts' },
 ];
 
 /**
@@ -127,6 +130,29 @@ export default function AdminPanel({
     [map]
   );
 
+  // Shortcuts tab "Show on map": hide the panel, draw the path, come back
+  // from the bar at the bottom.
+  const [previewing, setPreviewing] = useState(false);
+  const previewLayerRef = useRef(null);
+  const endPreview = useCallback(() => {
+    if (previewLayerRef.current) map.removeLayer(previewLayerRef.current);
+    previewLayerRef.current = null;
+    setPreviewing(false);
+  }, [map]);
+  const showPathOnMap = useCallback(
+    (path) => {
+      if (!Array.isArray(path) || path.length < 2) return;
+      if (previewLayerRef.current) map.removeLayer(previewLayerRef.current);
+      // Leaflet needs a real colour, not a CSS variable.
+      const color = getComputedStyle(document.documentElement).getPropertyValue('--v2-secondary').trim() || 'teal';
+      previewLayerRef.current = L.polyline(path, { color, weight: 6, opacity: 0.9 }).addTo(map);
+      map.fitBounds(previewLayerRef.current.getBounds(), { padding: [60, 60], maxZoom: 19 });
+      setPreviewing(true);
+    },
+    [map]
+  );
+  useEffect(() => endPreview, [endPreview]);
+
   function handleRefresh() {
     // Legacy: `#adminRefresh` ("Sync from Firebase") has no listener
     // anywhere in app.js — a confirmed-dead button, not a feature this
@@ -142,7 +168,7 @@ export default function AdminPanel({
     <>
       <div
         className={styles.overlay}
-        style={pickingCoord ? { display: 'none' } : undefined}
+        style={pickingCoord || previewing ? { display: 'none' } : undefined}
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
@@ -275,8 +301,18 @@ export default function AdminPanel({
               </Suspense>
             </InsightsErrorBoundary>
           )}
+          {activeTab === 'shortcuts' && <ShortcutsTab onShowOnMap={showPathOnMap} />}
         </div>
       </div>
+
+      {previewing && (
+        <div className={styles.previewBar}>
+          Learned shortcut (teal line)
+          <button type="button" className={styles.formSave} onClick={endPreview}>
+            Back to admin
+          </button>
+        </div>
+      )}
 
       {editContext && (
         <AdminEditModal

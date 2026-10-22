@@ -20,6 +20,9 @@
 --     "hidden" status at the end of this file is the safety net.
 --   * Hidden shortcuts stay hidden however many people walk them, so a
 --     rejected path can't come back by itself.
+--   * Active shortcuts that people routed through keep avoiding are
+--     hidden automatically (section 5). Admins manage them all in the
+--     admin panel's Shortcuts tab.
 -- ════════════════════════════════════════════════════════════════════════
 
 
@@ -228,6 +231,145 @@ grant update (status) on public.learned_shortcuts to authenticated;
 revoke all on public.shortcut_walks from anon, authenticated;
 
 
+-- ── 5. Switching off shortcuts nobody can actually walk ──────────────────
+--
+-- When someone is routed through an active shortcut and arrives, the app
+-- reports whether they walked it or went around it (no location, just
+-- used / avoided). If the last 3 different people routed through it since
+-- it was last switched on all avoided it, it's hidden automatically
+-- (hidden_by = 'auto'), e.g. a GPS-drift "path" through a building, or a
+-- path that has since been fenced off. The admin panel's Shortcuts tab
+-- shows these counts and can switch any shortcut back on.
+
+alter table public.learned_shortcuts
+  add column if not exists used_count integer not null default 0,
+  add column if not exists avoided_count integer not null default 0,
+  add column if not exists hidden_by text check (hidden_by in ('admin', 'auto')),
+  add column if not exists status_changed_at timestamptz not null default now();
+
+create table if not exists public.shortcut_outcomes (
+  contributor  text not null,
+  user_id      uuid references auth.users(id) on delete cascade,
+  trip_id      uuid not null,
+  shortcut_id  bigint not null references public.learned_shortcuts(id) on delete cascade,
+  used         boolean not null,
+  created_at   timestamptz not null default now(),
+  primary key (contributor, trip_id, shortcut_id)
+);
+
+create index if not exists shortcut_outcomes_shortcut_created_idx
+  on public.shortcut_outcomes (shortcut_id, created_at desc);
+create index if not exists shortcut_outcomes_contributor_created_idx
+  on public.shortcut_outcomes (contributor, created_at desc);
+
+-- Switching a shortcut on restarts its used/avoided count, so one an admin
+-- brings back gets a fresh chance; a hidden one keeps its counts so the
+-- admin can see why. hidden_by records who hid it: the RPC below sets
+-- 'auto'; an admin changing only `status` gets 'admin'.
+create or replace function public.learned_shortcuts_status_change() returns trigger as $$
+begin
+  if new.status is distinct from old.status then
+    new.status_changed_at := now();
+    if new.status = 'hidden' then
+      if new.hidden_by is not distinct from old.hidden_by then new.hidden_by := 'admin'; end if;
+    else
+      new.hidden_by := null;
+    end if;
+    if new.status = 'active' then
+      new.used_count := 0;
+      new.avoided_count := 0;
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists learned_shortcuts_status_change on public.learned_shortcuts;
+create trigger learned_shortcuts_status_change
+  before update of status on public.learned_shortcuts
+  for each row execute function public.learned_shortcuts_status_change();
+
+-- Returns {"recorded": bool, "reason": text|null, "status": text}.
+create or replace function public.report_shortcut_outcome(p_shortcut_id bigint, p_trip_id uuid,
+                                                          p_used boolean, p_anon_id uuid default null)
+  returns jsonb
+  security definer
+  set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  who text;
+  sc learned_shortcuts%rowtype;
+  recent_avoided integer;
+  recent_total integer;
+  st text;
+begin
+  if uid is not null then
+    who := 'u:' || uid;
+  elsif p_anon_id is not null then
+    who := 'a:' || p_anon_id;
+  else
+    raise exception 'anon id is required for guests' using errcode = '22023';
+  end if;
+  if p_shortcut_id is null or p_trip_id is null or p_used is null then
+    raise exception 'shortcut id, trip id and used are required' using errcode = '22023';
+  end if;
+
+  select * into sc from learned_shortcuts where id = p_shortcut_id for update;
+  if not found or sc.status <> 'active' then
+    return jsonb_build_object('recorded', false, 'reason', 'not_active');
+  end if;
+  if exists (select 1 from shortcut_outcomes
+              where contributor = who and trip_id = p_trip_id and shortcut_id = p_shortcut_id) then
+    return jsonb_build_object('recorded', false, 'reason', 'duplicate', 'status', sc.status);
+  end if;
+  if (select count(*) from shortcut_outcomes
+       where contributor = who and created_at > now() - interval '1 day') >= 50 then
+    return jsonb_build_object('recorded', false, 'reason', 'throttled', 'status', sc.status);
+  end if;
+
+  insert into shortcut_outcomes (contributor, user_id, trip_id, shortcut_id, used)
+  values (who, uid, p_trip_id, p_shortcut_id, p_used);
+
+  -- Each person's latest report since the shortcut was last switched on;
+  -- the 3 most recent people decide.
+  select count(*) filter (where not used), count(*)
+    into recent_avoided, recent_total
+    from (select used
+            from (select distinct on (contributor) contributor, used, created_at
+                    from shortcut_outcomes
+                   where shortcut_id = p_shortcut_id and created_at >= sc.status_changed_at
+                   order by contributor, created_at desc) latest
+           order by created_at desc
+           limit 3) last3;
+
+  update learned_shortcuts
+     set used_count = (select count(*) from shortcut_outcomes
+                        where shortcut_id = p_shortcut_id and used and created_at >= sc.status_changed_at),
+         avoided_count = (select count(*) from shortcut_outcomes
+                           where shortcut_id = p_shortcut_id and not used and created_at >= sc.status_changed_at),
+         updated_at = now()
+   where id = p_shortcut_id;
+
+  if recent_total >= 3 and recent_avoided = recent_total then
+    update learned_shortcuts set status = 'hidden', hidden_by = 'auto' where id = p_shortcut_id;
+  end if;
+
+  select status into st from learned_shortcuts where id = p_shortcut_id;
+  return jsonb_build_object('recorded', true, 'reason', null, 'status', st);
+end;
+$$ language plpgsql;
+
+revoke all on function public.report_shortcut_outcome(bigint, uuid, boolean, uuid) from public;
+grant execute on function public.report_shortcut_outcome(bigint, uuid, boolean, uuid) to anon, authenticated;
+
+alter table public.shortcut_outcomes enable row level security;
+revoke all on public.shortcut_outcomes from anon, authenticated;
+
+grant select (used_count, avoided_count, hidden_by, status_changed_at, updated_at)
+  on public.learned_shortcuts to anon, authenticated;
+
+
 -- ════════════════════════════════════════════════════════════════════════
 -- Verification — run AFTER the script
 -- ════════════════════════════════════════════════════════════════════════
@@ -246,6 +388,11 @@ revoke all on public.shortcut_walks from anon, authenticated;
 --      - select from learned_shortcuts with the anon key -> only active rows
 --      - a point outside campus -> error 22023
 --      - select from shortcut_walks with the anon key -> permission denied
+--      - three different anon ids: rpc('report_shortcut_outcome', {p_shortcut_id: <active id>,
+--        p_trip_id: <new uuid>, p_used: false, p_anon_id: <uuid>}) -> after the
+--        third, that shortcut's status is 'hidden' and hidden_by is 'auto'
+--      - update learned_shortcuts set status = 'active' where id = <id> (as admin)
+--        -> hidden_by null, used_count/avoided_count back to 0
 --
 -- ════════════════════════════════════════════════════════════════════════
 -- Admin: reviewing and hiding shortcuts

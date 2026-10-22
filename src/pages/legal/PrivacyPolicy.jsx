@@ -28,7 +28,10 @@ function PrivacyPolicy() {
         trip, and never where it started) along with your account, or an
         anonymous browser identifier if you're not signed in. Once enough
         people have walked the same way, we use it to guide others. Other
-        users only ever see the path itself, never who walked it.</p>
+        users only ever see the path itself, never who walked it. When we
+        guide you through a shared shortcut, we also note whether you
+        walked it or went around it (no location is stored for this), so
+        shortcuts that don't work can be switched off.</p>
       <p><strong>Account information:</strong> if you sign in, we store the
         basic profile details needed to attach your reviews and ratings
         to your account.</p>

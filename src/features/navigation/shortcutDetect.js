@@ -31,6 +31,21 @@ export function createTripTrace(maxAccuracy = 25) {
   };
 }
 
+/**
+ * Did the trip actually walk `path` ([lat, lng]...)? True when at least
+ * `minShare` of its points had a walked fix within `tolerance` metres.
+ * Used to tell whether people routed through a learned shortcut can
+ * really get through it.
+ */
+export function walkedPath(path, points, { tolerance = 25, minShare = 0.7 } = {}) {
+  if (!path?.length || !points?.length) return false;
+  let near = 0;
+  for (const [lat, lng] of path) {
+    if (points.some((p) => haversine(lat, lng, p.lat, p.lng) <= tolerance)) near++;
+  }
+  return near / path.length >= minShare;
+}
+
 function pathLength(points) {
   let d = 0;
   for (let i = 1; i < points.length; i++) d += haversine(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);

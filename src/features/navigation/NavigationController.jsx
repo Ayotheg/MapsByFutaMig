@@ -5,8 +5,8 @@ import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
 import { isOnPath, walkablePaths } from './shortcutRoute';
-import { createTripTrace, findShortcuts } from './shortcutDetect';
-import { flushPendingShortcuts, setShortcutConsent, shareShortcuts, shortcutConsent } from './learnedShortcutsClient';
+import { createTripTrace, findShortcuts, walkedPath } from './shortcutDetect';
+import { flushPendingShortcuts, reportShortcutOutcomes, setShortcutConsent, shareShortcuts, shortcutConsent } from './learnedShortcutsClient';
 import { useLearnedShortcuts } from './useLearnedShortcuts';
 import { alightPrompt, alightStop, createRideDetector } from './busStops';
 import { turnIcon, fmtDist, startDirection, TURN_ICONS } from './turnHelpers';
@@ -583,6 +583,12 @@ const NavigationController = forwardRef(function NavigationController(
   // on arrival. Not kept across a reload (a restored trip isn't traced).
   const tripTraceRef = useRef(null);
   const tripRouteRef = useRef(null);
+  // Learned shortcuts any of this trip's routes went through — on arrival
+  // we report whether each was really walked (learnedShortcuts.js).
+  const tripViaRef = useRef(null);
+  const noteVia = useCallback((route) => {
+    if (typeof route?.via === 'string' && route.via.startsWith('learned:')) tripViaRef.current?.add(route.via);
+  }, []);
   const [shortcutOffer, setShortcutOffer] = useState(null);
   useEffect(() => {
     flushPendingShortcuts();
@@ -604,6 +610,7 @@ const NavigationController = forwardRef(function NavigationController(
         .then((fresh) => {
           if (!navActiveRef.current || navDestRef.current !== dest) return; // nav ended/changed while fetching
           navRouteDataRef.current = fresh;
+          noteVia(fresh);
           navStepIndexRef.current = 0;
           lastSpokenStepRef.current = -1;
           spokenTurnNowRef.current = false;
@@ -616,7 +623,7 @@ const NavigationController = forwardRef(function NavigationController(
           rerouteInFlightRef.current = false;
         });
     },
-    [drawRoute, persistNavigation]
+    [drawRoute, persistNavigation, noteVia]
   );
 
   // ── Reroute when the live route drifts too far from reality ───────────
@@ -679,8 +686,19 @@ const NavigationController = forwardRef(function NavigationController(
 
     // Did they find a shorter way than the route? Shared straight away if
     // they've agreed before, otherwise the arrived banner asks.
-    const found = tripTraceRef.current ? findShortcuts(tripRouteRef.current, tripTraceRef.current.points) : [];
+    const trace = tripTraceRef.current;
+    const found = trace ? findShortcuts(tripRouteRef.current, trace.points) : [];
+    // Learned shortcuts we routed them through: walked, or went around?
+    // No location is sent for this, so it needs no consent.
+    if (trace && tripViaRef.current?.size) {
+      const outcomes = [...tripViaRef.current].map((via) => ({
+        shortcutId: Number(via.slice('learned:'.length)),
+        used: walkedPath(shortcutPathsRef.current.find((p) => p.id === via)?.coords, trace.points),
+      }));
+      reportShortcutOutcomes(tripRef.current.tripId, outcomes);
+    }
     tripTraceRef.current = null;
+    tripViaRef.current = null;
     if (found.length) {
       const tripId = tripRef.current.tripId;
       const saved = found.reduce((sum, s) => sum + s.saved, 0);
@@ -1137,6 +1155,8 @@ const NavigationController = forwardRef(function NavigationController(
       tripRef.current = { tripId: createTripId(), completionReported: false };
       tripRouteRef.current = routeData.coords;
       tripTraceRef.current = createTripTrace();
+      tripViaRef.current = new Set();
+      noteVia(routeData);
       tripTraceRef.current.add({ lat, lng, accuracy: pos.coords.accuracy, t: pos.timestamp || Date.now() });
       // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9). No named
       // origin exists for a live GPS fix, so "from" is a fixed label
@@ -1179,7 +1199,7 @@ const NavigationController = forwardRef(function NavigationController(
       setGoDisabled(false);
       setGoLabel('Start Navigation');
     }
-  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch]);
+  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch, noteVia]);
 
   const stopNavigation = useCallback(() => {
     navActiveRef.current = false;
@@ -1195,6 +1215,7 @@ const NavigationController = forwardRef(function NavigationController(
     navGpsUnsubRef.current?.();
     navGpsUnsubRef.current = null;
     tripTraceRef.current = null;
+    tripViaRef.current = null;
     rideRef.current = createRideDetector();
     alightSpokenRef.current = '';
 

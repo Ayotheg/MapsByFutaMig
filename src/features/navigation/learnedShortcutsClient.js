@@ -16,6 +16,7 @@ const sharer = createShortcutSharer({
 });
 
 export const shareShortcuts = sharer.share;
+export const reportShortcutOutcomes = sharer.reportOutcomes;
 export const flushPendingShortcuts = sharer.flush;
 export const shortcutConsent = sharer.consent;
 export const setShortcutConsent = sharer.setConsent;

@@ -163,6 +163,8 @@ export function stitchRoute(legA, shortcut, legB, secondsPerMetre) {
 
   const pathDuration = pathLength * secondsPerMetre;
   return {
+    // Which path this route goes through (walkablePaths id).
+    via: shortcut.id,
     coords: [...legA.coords, ...shortcut.coords, ...legB.coords],
     distance: legA.distance + pathLength + legB.distance,
     duration: legA.duration + pathDuration + legB.duration,
