@@ -1,7 +1,7 @@
 // Tests for src/features/navigation/busStops.js. Run: node scripts/busStops.test.mjs
 import assert from 'node:assert/strict';
 import { cumulativeDistances } from '../src/features/navigation/routeAhead.js';
-import { createRideDetector, alightStop, stopLabel, alightPrompt } from '../src/features/navigation/busStops.js';
+import { createRideDetector, alightStop, alightPrompt } from '../src/features/navigation/busStops.js';
 
 // ── riding vs walking
 {
@@ -39,14 +39,11 @@ import { createRideDetector, alightStop, stopLabel, alightPrompt } from '../src/
 
 // ── wording
 {
-  assert.equal(stopLabel('SOC'), 'SOC bus stop');
-  assert.equal(stopLabel('Senate Bus Stop'), 'Senate Bus Stop');
-  assert.equal(stopLabel('Main bus park'), 'Main bus park');
-
   assert.equal(alightPrompt(400, 'SOC'), null, 'too far to mention');
-  assert.equal(alightPrompt(200, 'SOC').instruction, 'Get off at SOC bus stop');
+  assert.equal(alightPrompt(200, 'SOC').instruction, 'On a shuttle? Get off at SOC');
+  assert.equal(alightPrompt(200, 'SOC').spoken, "If you're on a shuttle, get ready to get off at SOC.");
   assert.equal(alightPrompt(200, 'SOC').stage, 'ahead');
-  assert.equal(alightPrompt(30, 'SOC').instruction, 'Get off here at SOC bus stop');
+  assert.equal(alightPrompt(30, 'SOC').instruction, 'On a shuttle? Get off here at SOC');
   assert.equal(alightPrompt(-20, 'SOC').stage, 'now', 'just past it still says now');
   assert.equal(alightPrompt(-100, 'SOC'), null, 'well past it: back to normal');
   console.log('ok: prompts');

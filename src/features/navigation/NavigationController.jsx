@@ -885,8 +885,9 @@ const NavigationController = forwardRef(function NavigationController(
       nearArrivalSpokenRef.current = false;
     }
 
-    // On a bus nearing the map's bus stop for this route: tell them where
-    // to get off. Not on a bus, or no such stop: nothing changes.
+    // Riding (shuttle, keke or car: speed can't tell) towards the map's bus
+    // stop for this route: tell shuttle riders where to get off. Not
+    // riding, or no such stop: nothing changes.
     if (rideRef.current.riding && alight) {
       const toStop = alight.along - along;
       const prompt = alightPrompt(toStop, alight.place.name);

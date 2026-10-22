@@ -1,9 +1,9 @@
 import { VEHICLE_SPEED_KMH } from './gpsConstants.js';
 import { placesAlong } from './routeAhead.js';
 
-// "Get off at ... bus stop" for users riding a campus bus. Only bus stops
-// added to the map (waypoints of type 'bus_stop') count; anywhere else,
-// riding or not, navigation carries on as normal.
+// "On a shuttle? Get off at ..." for users riding the campus shuttle. Only
+// bus stops added to the map (waypoints of type 'bus_stop') count;
+// anywhere else, riding or not, navigation carries on as normal.
 
 const RIDING_MPS = VEHICLE_SPEED_KMH / 3.6;
 const WALKING_MPS = 2;
@@ -54,20 +54,15 @@ export function alightStop(coords, cum, places) {
   return { place: last.place, along: last.ahead };
 }
 
-/** "SOC" → "SOC bus stop"; names that already say so are left alone. */
-export function stopLabel(name) {
-  return /bus\s*stop|bus\s*park/i.test(name) ? name : `${name} bus stop`;
-}
-
 /**
  * What to tell a rider `metresToStop` before their stop, or null when
  * it's still too far to mention. `stage` lets the caller speak each
- * prompt once.
+ * prompt once. Speed can't tell a campus shuttle from a keke or car, so
+ * the wording says who it's for and everyone else can ignore it.
  */
 export function alightPrompt(metresToStop, name) {
   if (metresToStop > ANNOUNCE_AHEAD_M || metresToStop < -GET_OFF_NOW_M) return null;
-  const label = stopLabel(name);
   return metresToStop <= GET_OFF_NOW_M
-    ? { stage: 'now', instruction: `Get off here at ${label}`, spoken: `Get off here, at ${label}.` }
-    : { stage: 'ahead', instruction: `Get off at ${label}`, spoken: `Get ready. Get off at ${label}.` };
+    ? { stage: 'now', instruction: `On a shuttle? Get off here at ${name}`, spoken: `If you're on a shuttle, get off here, at ${name}.` }
+    : { stage: 'ahead', instruction: `On a shuttle? Get off at ${name}`, spoken: `If you're on a shuttle, get ready to get off at ${name}.` };
 }
