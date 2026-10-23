@@ -98,11 +98,22 @@ alter table public.shortcut_outcomes drop column if exists ip_hash;
 drop function if exists public.shortcut_request_ip_hash();
 drop function if exists public.shortcut_contributor(uuid);
 
+-- Signed-in rows from a draft without the user_id column: fill it in from
+-- 'u:<id>' before removing the guest ('a:…') rows.
+-- (Accounts deleted since then are left null, and removed below.)
+update public.shortcut_walks w set user_id = u.id
+  from auth.users u
+ where w.user_id is null and w.contributor = 'u:' || u.id;
+update public.shortcut_outcomes o set user_id = u.id
+  from auth.users u
+ where o.user_id is null and o.contributor = 'u:' || u.id;
 delete from public.shortcut_walks where user_id is null;
 delete from public.shortcut_outcomes where user_id is null;
--- Shortcuts that only guests had taken have nothing left behind them.
+-- Shortcuts that only guests had taken have nothing left behind them
+-- (an admin's locked ones stay).
 delete from public.learned_shortcuts s
- where not exists (select 1 from public.shortcut_walks w where w.shortcut_id = s.id);
+ where not s.locked
+   and not exists (select 1 from public.shortcut_walks w where w.shortcut_id = s.id);
 update public.learned_shortcuts s
    set walker_count = (select count(distinct w.contributor) from public.shortcut_walks w where w.shortcut_id = s.id);
 -- Active only because of guests: back to learning (an admin's locked ones stay).

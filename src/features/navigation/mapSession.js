@@ -14,6 +14,7 @@ const LAST_ACTIVE_KEY = 'map-last-active';
 // Preferences (sidebar layout, chosen tab, map position) survive a reset.
 const SESSION_KEYS = [
   'navigation-session',
+  'navigation-trace',
   'navigation-destination',
   'navigation-open',
   'navigation-seeded-destination',

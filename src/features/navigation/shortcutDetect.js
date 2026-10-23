@@ -1,4 +1,5 @@
-import { haversine, routePosition } from '../../lib/geoUtils.js';
+import { haversine, routePosition, simplifyPath } from '../../lib/geoUtils.js';
+import { cumulativeDistances, pointAlong } from './routeAhead.js';
 
 // Finds the stretches of a finished trip where the user left the planned
 // route and still got there by a shorter way — on foot, or in any vehicle
@@ -17,6 +18,8 @@ export const MAX_GAP_VEHICLE_M = 200; // the server rejects anything larger
 export const WALKING_MAX_MPS = 2.5; // faster than this is a ride, not a walk
 export const PRIVACY_TRIM_M = 30; // never share where a trip started or ended
 const MIN_POINT_SPACING_M = 5;
+const SMOOTH_M = 8; // GPS wobble ignored when measuring a detour's length
+const ON_ROAD_M = 10; // this close to the route counts as on it
 export const MAX_POINTS = 300;
 
 const MAX_TRACE_POINTS = 3000;
@@ -62,6 +65,18 @@ function thin(points, max) {
   return Array.from({ length: max }, (_, i) => points[Math.round((i * (points.length - 1)) / (max - 1))]);
 }
 
+// GPS wobble makes a raw trace zig-zag and look longer than it was:
+// average each point with its neighbours, then drop the leftover kinks.
+// Only used to measure length; the shared path keeps the real fixes.
+function smoothed(points, window = 2) {
+  const avg = points.map((p, k) => {
+    if (k === 0 || k === points.length - 1) return p;
+    const near = points.slice(Math.max(0, k - window), k + window + 1);
+    return { lat: near.reduce((s, q) => s + q.lat, 0) / near.length, lng: near.reduce((s, q) => s + q.lng, 0) / near.length };
+  });
+  return simplifyPath(avg, SMOOTH_M);
+}
+
 function pathLength(points) {
   let d = 0;
   for (let i = 1; i < points.length; i++) d += haversine(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
@@ -73,21 +88,32 @@ function pathLength(points) {
  * trace ({lat, lng, t}); `origin` ({lat, lng}) where the trip started —
  * defaults to the first trace point. Returns
  * [{ path: [[lat, lng]...], length, saved, byVehicle }].
- * A detour that never rejoins the route counts as ending at the
- * destination (the route's end), since the trip arrived. Nothing within
- * PRIVACY_TRIM_M of the start or of the arrival point is included.
+ *
+ * Only detours that leave the route and come back to it count. Each
+ * shared path starts and ends on the route itself, so the next person's
+ * route can join it there. Not shared: a detour that never comes back
+ * (it ends at the destination, which may be someone's room, and no route
+ * can join its end), and one starting or ending within PRIVACY_TRIM_M of
+ * where the trip started or arrived.
  *
  * `stats`, if given, is filled with why each off-route stretch was or
  * wasn't kept — counts only, no locations — for diagnosing field tests.
  */
 export function findShortcuts(route, points, { origin, stats = {} } = {}) {
-  Object.assign(stats, { points: points.length, offRuns: 0, notShorter: 0, gaps: 0, tooShort: 0, bestSavingM: null });
+  Object.assign(stats, { points: points.length, offRuns: 0, noRejoin: 0, nearStartOrEnd: 0, gaps: 0, notShorter: 0, bestSavingM: null });
   if (!route || route.length < 2 || points.length < 3) return [];
   const start = origin || points[0];
   const end = points[points.length - 1];
+  const cum = cumulativeDistances(route);
+  const onRoute = (along) => {
+    const [lat, lng] = pointAlong(route, cum, along);
+    return { lat, lng };
+  };
+  const nearStartOrEnd = (p) =>
+    haversine(start.lat, start.lng, p.lat, p.lng) < PRIVACY_TRIM_M || haversine(end.lat, end.lng, p.lat, p.lng) < PRIVACY_TRIM_M;
   const placed = points.map((p) => {
     const r = routePosition(route, p.lat, p.lng);
-    return { ...p, along: r.distanceTotal - r.distanceRemaining, off: r.offRouteMeters, total: r.distanceTotal };
+    return { ...p, along: r.distanceTotal - r.distanceRemaining, off: r.offRouteMeters };
   });
 
   const found = [];
@@ -97,22 +123,24 @@ export function findShortcuts(route, points, { origin, stats = {} } = {}) {
       i++;
       continue;
     }
-    // Off-route run: from the last on-route fix before it to the first one after.
-    const entry = Math.max(0, i - 1);
+    // Off-route run, widened to where they were really on the road (within
+    // ON_ROAD_M) before and after it — the 40 m "off route" line itself is
+    // well into the detour.
+    let entry = Math.max(0, i - 1);
+    while (entry > 0 && placed[entry].off > ON_ROAD_M) entry--;
     let j = i;
     while (j < placed.length && placed[j].off > OFF_ROUTE_M) j++;
-    const rejoined = j < placed.length;
-    const exit = rejoined ? j : placed.length - 1;
-    i = j + 1;
-
-    const stretch = placed.slice(entry, exit + 1);
-    const exitAlong = rejoined ? placed[exit].along : placed[exit].total;
-    const skipped = exitAlong - placed[entry].along;
-    const walked = pathLength(stretch);
     stats.offRuns++;
-    stats.bestSavingM = Math.max(stats.bestSavingM ?? -Infinity, Math.round(skipped - walked));
-    if (skipped - walked < MIN_SAVING_M) {
-      stats.notShorter++;
+    if (j >= placed.length) {
+      stats.noRejoin++;
+      break;
+    }
+    let exit = j;
+    while (exit < placed.length - 1 && placed[exit].off > ON_ROAD_M) exit++;
+    i = exit + 1;
+    const stretch = placed.slice(entry, exit + 1);
+    if (nearStartOrEnd(stretch[0]) || nearStartOrEnd(stretch[stretch.length - 1])) {
+      stats.nearStartOrEnd++;
       continue;
     }
 
@@ -128,24 +156,23 @@ export function findShortcuts(route, points, { origin, stats = {} } = {}) {
       stats.gaps++;
       continue;
     }
-    const seconds = (stretch[stretch.length - 1].t - stretch[0].t) / 1000;
 
-    // Trim from the two ends only: dropping points from the middle would
-    // join what's left with a straight line.
-    const nearEnds = (p) => haversine(start.lat, start.lng, p.lat, p.lng) < PRIVACY_TRIM_M || haversine(end.lat, end.lng, p.lat, p.lng) < PRIVACY_TRIM_M;
-    let from = 0;
-    let to = stretch.length;
-    while (from < to && nearEnds(stretch[from])) from++;
-    while (to > from && nearEnds(stretch[to - 1])) to--;
-    const shared = stretch.slice(from, to);
-    if (shared.length < 3) {
-      stats.tooShort++;
+    // From the route, along the detour, back onto the route.
+    const path = [onRoute(placed[entry].along), ...stretch, onRoute(placed[exit].along)];
+    const walked = pathLength(smoothed(path));
+    const skipped = placed[exit].along - placed[entry].along;
+    const saved = skipped - walked;
+    stats.bestSavingM = Math.max(stats.bestSavingM ?? -Infinity, Math.round(saved));
+    if (saved < MIN_SAVING_M) {
+      stats.notShorter++;
       continue;
     }
+
+    const seconds = (stretch[stretch.length - 1].t - stretch[0].t) / 1000;
     found.push({
-      path: thin(shared, MAX_POINTS).map((p) => [Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))]),
-      length: Math.round(pathLength(shared)),
-      saved: Math.round(skipped - walked),
+      path: thin(path, MAX_POINTS).map((p) => [Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))]),
+      length: Math.round(walked),
+      saved: Math.round(saved),
       byVehicle: seconds > 0 && walked / seconds > WALKING_MAX_MPS,
     });
   }

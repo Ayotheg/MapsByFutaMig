@@ -1,8 +1,8 @@
 // Tests for src/features/navigation/shortcutDetect.js and learnedShortcuts.js.
 // Run: node scripts/learnedShortcuts.test.mjs. rpc/storage are mocks.
 import assert from 'node:assert/strict';
-import { haversine } from '../src/lib/geoUtils.js';
-import { createTripTrace, findShortcuts, walkedPath, PRIVACY_TRIM_M, MAX_POINTS } from '../src/features/navigation/shortcutDetect.js';
+import { haversine, routePosition } from '../src/lib/geoUtils.js';
+import { createTripTrace, findShortcuts, walkedPath, MAX_POINTS } from '../src/features/navigation/shortcutDetect.js';
 import { createShortcutSharer, PENDING_KEY, PENDING_OUTCOMES_KEY, CONSENT_KEY } from '../src/features/navigation/learnedShortcuts.js';
 
 // Route: ~330 m east, then ~330 m north (A → B → C). ~110 m per 0.001°.
@@ -32,86 +32,98 @@ function trip(...legs) {
   return points;
 }
 
-// ── trace keeps accurate fixes a few metres apart
+// ── trace keeps accurate fixes a few metres apart, and can be restored
 {
   const trace = createTripTrace();
-  trace.add({ lat: 7.298, lng: 5.138, accuracy: 5, t: 0 });
-  trace.add({ lat: 7.29801, lng: 5.138, accuracy: 5, t: 1 }); // ~1 m: dropped
-  trace.add({ lat: 7.2981, lng: 5.138, accuracy: 60, t: 2 }); // too inaccurate
-  trace.add({ lat: 7.2981, lng: 5.138, accuracy: 10, t: 3 });
+  assert.equal(trace.add({ lat: 7.298, lng: 5.138, accuracy: 5, t: 0 }), true);
+  assert.equal(trace.add({ lat: 7.29801, lng: 5.138, accuracy: 5, t: 1 }), false, '~1 m: dropped');
+  assert.equal(trace.add({ lat: 7.2981, lng: 5.138, accuracy: 60, t: 2 }), false, 'too inaccurate');
+  assert.equal(trace.add({ lat: 7.2981, lng: 5.138, accuracy: 30, t: 3 }), true, '30 m accuracy is good enough');
   assert.equal(trace.points.length, 2);
+
+  const restored = createTripTrace(trace.points.slice());
+  assert.equal(restored.add({ lat: 7.2982, lng: 5.138, accuracy: 5, t: 4 }), true);
+  assert.equal(restored.points.length, 3, 'a restored trace carries on');
+
+  const full = createTripTrace();
+  for (let k = 0; k < 3005; k++) full.add({ lat: 7.28 + k * 0.0001, lng: 5.13, accuracy: 5, t: k });
+  assert.equal(full.points.length, 3000, 'capped');
   console.log('ok: trip trace');
 }
 
-// ── a real shortcut: along the road a bit, then across the corner to C
+// The side-street case: along the road a bit, cut across to the second
+// road, rejoin it, carry on to the destination.
+const corner = [7.298, 5.1386]; // ~66 m along the first road
+const rejoin = [7.3, 5.141]; // ~220 m up the second road
+const cutAcross = (opts) => trip([A, corner, opts], [corner, rejoin, opts], [rejoin, C, opts]);
+
+// ── a real shortcut: shared from road to road
 {
-  const corner = [7.298, 5.1386];
-  const found = findShortcuts(route, trip([A, corner], [corner, C]));
+  const stats = {};
+  const found = findShortcuts(route, cutAcross(), { stats });
   assert.equal(found.length, 1, 'one shortcut');
-  assert.ok(found[0].saved > 100, `saves ~180 m, got ${found[0].saved}`);
-  assert.ok(found[0].length > 300 && found[0].length < 450, `about 400 m long, got ${found[0].length}`);
+  assert.ok(found[0].saved > 100, `saves ~150 m, got ${found[0].saved}`);
   assert.equal(found[0].byVehicle, false);
-  const [lat, lng] = found[0].path[0];
-  assert.ok(haversine(A[0], A[1], lat, lng) >= PRIVACY_TRIM_M, 'never starts at the trip start');
-  const [eLat, eLng] = found[0].path[found[0].path.length - 1];
-  assert.ok(haversine(C[0], C[1], eLat, eLng) >= PRIVACY_TRIM_M, 'never ends at the destination');
-  console.log('ok: corner shortcut found');
+  for (const end of [found[0].path[0], found[0].path[found[0].path.length - 1]]) {
+    const r = routePosition(route, end[0], end[1]);
+    assert.ok(r.offRouteMeters < 1, `starts and ends on the route itself (off by ${r.offRouteMeters.toFixed(1)} m)`);
+  }
+  assert.deepEqual([stats.offRuns, stats.noRejoin, stats.gaps, stats.notShorter], [1, 0, 0, 0]);
+  console.log('ok: side-street shortcut found, road to road');
 }
 
-// ── the same corner cut by a shuttle or keke: counts, marked as a vehicle
+// ── GPS wobble doesn't hide it
 {
-  const corner = [7.298, 5.1386];
-  const found = findShortcuts(route, trip([A, corner, { speed: 8 }], [corner, C, { stepM: 40, speed: 8 }]));
-  assert.equal(found.length, 1, 'vehicle shortcut found');
+  const wobbly = cutAcross().map((p, k) => ({ ...p, lat: p.lat + (k % 2 ? 0.00006 : -0.00006) })); // ±6–7 m zig-zag
+  const [clean] = findShortcuts(route, cutAcross());
+  const [noisy] = findShortcuts(route, wobbly);
+  assert.ok(noisy, 'still found');
+  assert.ok(Math.abs(noisy.saved - clean.saved) < 30, `similar saving: ${noisy.saved} vs ${clean.saved}`);
+  console.log('ok: GPS wobble');
+}
+
+// ── the same cut in a vehicle: counts, marked as a vehicle
+{
+  const found = findShortcuts(route, cutAcross({ speed: 8, stepM: 40 }));
+  assert.equal(found.length, 1);
   assert.equal(found[0].byVehicle, true);
   console.log('ok: vehicle shortcut found');
 }
 
-// ── trimming starts at the real starting point, not the first accurate fix
+// ── long paths are thinned, still road to road
 {
-  const corner = [7.2981, 5.1381]; // leaves the road right at the start
-  const points = trip([corner, C]);
-  const origin = { lat: 7.2981, lng: 5.1384 }; // ~33 m east: where the trip really began
-  const [first] = findShortcuts(route, points, { origin });
-  assert.ok(haversine(origin.lat, origin.lng, first.path[0][0], first.path[0][1]) >= PRIVACY_TRIM_M);
-  console.log('ok: trims around the real start');
-}
-
-// ── trimming never cuts the middle out of a path, and long paths keep their end
-{
-  const corner = [7.298, 5.1386];
-  const points = trip([A, corner], [corner, C]);
-  // Pretend the trip started beside the middle of the detour.
-  const mid = points[Math.floor(points.length * 0.7)];
-  const [s] = findShortcuts(route, points, { origin: { lat: mid.lat + 0.0001, lng: mid.lng } });
-  for (let i = 1; i < s.path.length; i++) {
-    const hop = haversine(s.path[i - 1][0], s.path[i - 1][1], s.path[i][0], s.path[i][1]);
-    assert.ok(hop < 20, `no spliced jump in the shared path (got ${Math.round(hop)} m)`);
-  }
-
-  const long = trip([A, corner], [corner, C, { stepM: 1 }]); // ~1 m apart: far over MAX_POINTS
-  const [l] = findShortcuts(route, long);
+  const [l] = findShortcuts(route, cutAcross({ stepM: 1 }));
   assert.ok(l.path.length <= MAX_POINTS, 'thinned to the limit');
-  const last = l.path[l.path.length - 1];
-  const [normal] = findShortcuts(route, trip([A, corner], [corner, C]));
-  const normalLast = normal.path[normal.path.length - 1];
-  assert.ok(haversine(normalLast[0], normalLast[1], last[0], last[1]) < 15, 'ends where the same detour ends when not thinned');
-  console.log('ok: trims only the ends, thins long paths');
+  const r = routePosition(route, l.path[l.path.length - 1][0], l.path[l.path.length - 1][1]);
+  assert.ok(r.offRouteMeters < 1, 'still ends on the route');
+  console.log('ok: long paths thinned');
 }
 
-// ── things that are not shortcuts
+// ── things that are not shared
 {
+  const stats = {};
+  assert.deepEqual(findShortcuts(route, trip([A, corner], [corner, C]), { stats }), [], 'cuts straight to the destination');
+  assert.equal(stats.noRejoin + stats.nearStartOrEnd, 1, 'refused: it ends where they arrived');
+  const offRoad = [...trip([A, corner], [corner, [7.3005, 5.1395]])]; // arrives ~120 m from the route's end
+  assert.deepEqual(findShortcuts(route, offRoad, { stats }), [], 'never comes back to the route');
+  assert.equal(stats.noRejoin, 1);
+
+  const fromStart = trip([[7.2981, 5.1381], rejoin], [rejoin, C]);
+  assert.deepEqual(findShortcuts(route, fromStart, { origin: { lat: 7.2981, lng: 5.1381 }, stats }), [], 'leaves the road where the trip started');
+  assert.equal(stats.nearStartOrEnd, 1);
+
   assert.deepEqual(findShortcuts(route, trip([A, B], [B, C])), [], 'followed the route');
 
   const out = [7.2975, 5.1395]; // ~60 m south of the road, then back
-  assert.deepEqual(findShortcuts(route, trip([A, [7.298, 5.139]], [[7.298, 5.139], out], [out, [7.298, 5.1405]], [[7.298, 5.1405], B], [B, C])), [], 'a detour that was longer');
+  assert.deepEqual(findShortcuts(route, trip([A, [7.298, 5.139]], [[7.298, 5.139], out], [out, [7.298, 5.1405]], [[7.298, 5.1405], B], [B, C]), { stats }), [], 'a detour that was longer');
+  assert.equal(stats.notShorter, 1);
 
-  const corner = [7.298, 5.1386];
-  assert.deepEqual(findShortcuts(route, trip([A, corner], [corner, C, { stepM: 120 }])), [], 'walking with GPS gaps too big to trust');
-  assert.deepEqual(findShortcuts(route, trip([A, corner], [corner, C, { stepM: 250, speed: 10 }])), [], 'even in a vehicle, gaps over 200 m');
+  assert.deepEqual(findShortcuts(route, cutAcross({ stepM: 120 }), { stats }), [], 'walking with GPS gaps too big to trust');
+  assert.equal(stats.gaps, 1);
+  assert.deepEqual(findShortcuts(route, cutAcross({ stepM: 250, speed: 10 })), [], 'even in a vehicle, gaps over 200 m');
   assert.deepEqual(findShortcuts(route, [{ lat: A[0], lng: A[1], t: 0 }]), [], 'too few points');
   assert.deepEqual(findShortcuts(null, trip([A, B])), [], 'no route');
-  console.log('ok: detours and gaps are ignored');
+  console.log('ok: detours, gaps and private ends are not shared');
 }
 
 // ── sharing (signed-in users only)

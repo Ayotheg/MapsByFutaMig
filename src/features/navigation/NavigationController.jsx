@@ -1227,11 +1227,13 @@ const NavigationController = forwardRef(function NavigationController(
       // New trip: fresh id, completion not yet reported.
       tripRef.current = { tripId: createTripId(), completionReported: false };
       tripRouteRef.current = routeData.coords;
-      tripTraceRef.current = createTripTrace();
+      // Only signed-in users share shortcuts, so guests' trips aren't traced.
+      tripTraceRef.current = userIdRef.current ? createTripTrace() : null;
       tripOriginRef.current = { lat, lng };
       tripViaRef.current = new Set();
+      tripTraceRef.current?.add({ lat, lng, accuracy: pos.coords.accuracy, t: pos.timestamp || Date.now() });
+      if (!tripTraceRef.current) removePersistentState(TRACE_KEY);
       noteVia(routeData);
-      tripTraceRef.current.add({ lat, lng, accuracy: pos.coords.accuracy, t: pos.timestamp || Date.now() });
       // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9). No named
       // origin exists for a live GPS fix, so "from" is a fixed label
       // rather than a guessed place name.
