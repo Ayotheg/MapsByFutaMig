@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { track } from '../../lib/analytics';
 import { CalendarDays, Clock, MapPin, Megaphone, MoveUpRight, Video } from 'lucide-react';
 import { SectionHeader } from './ExploreSections';
 import {
@@ -82,15 +84,15 @@ function FeaturedEventCard({ event, onSelect }) {
   );
 }
 
-// Last card in the rail, same look as the Places rail's "Get your spot
-// featured" card (ExplorePromoteCard.jsx).
-function AddEventCard({ size, onAddEvent }) {
+// Last card in the rail, same look and tracking as the Places rail's "Get
+// your spot featured" card (ExplorePromoteCard.jsx). Opens /event.
+function AddEventCard({ size }) {
   const sm = size === 'sm';
   return (
-    <button
-      type="button"
+    <Link
+      to="/event"
       className={`${sectionStyles.promoteCard} ${sm ? sectionStyles.promoteCardSm : ''} ${styles.addCard}`}
-      onClick={() => onAddEvent?.()}
+      onClick={() => track('add_event_click', { source: sm ? 'explore_desktop' : 'explore_mobile' })}
     >
       <span className={sectionStyles.promoteIcon}>
         <Megaphone size={sm ? 16 : 20} strokeWidth={2} aria-hidden="true" />
@@ -103,7 +105,7 @@ function AddEventCard({ size, onAddEvent }) {
           <MoveUpRight size={13} aria-hidden="true" />
         </span>
       </span>
-    </button>
+    </Link>
   );
 }
 
@@ -129,7 +131,7 @@ function EventRow({ event, onSelect }) {
  * events than slots the rail rotates like the Places one, and Upcoming
  * then lists every event so none is only visible mid-rotation.
  */
-export function EventsList({ events, size, onSelect, onSeeAll, onAddEvent, sectionClassName }) {
+export function EventsList({ events, size, onSelect, onSeeAll, sectionClassName }) {
   const sorted = [...events].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
   const featured = sorted.filter((e) => e.isFeatured);
   const rotating = featured.length > FEATURED_SLOTS;
@@ -158,7 +160,7 @@ export function EventsList({ events, size, onSelect, onSeeAll, onAddEvent, secti
           {railEvents.map((e) => (
             <FeaturedEventCard key={e.id} event={e} onSelect={onSelect} />
           ))}
-          <AddEventCard size={size} onAddEvent={onAddEvent} />
+          <AddEventCard size={size} />
         </div>
       </section>
       {upcoming.length > 0 && (

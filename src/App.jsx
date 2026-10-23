@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import './index.css'
 import LoadingScreen from './pages/LoadingScreen'
@@ -13,6 +13,8 @@ import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import TermsOfService from './pages/legal/TermsOfService'
 import CookiePolicy from './pages/legal/CookiePolicy'
 import { useTawkOnRoutes } from './lib/tawk'
+
+const EventListingPage = lazy(() => import('./features/events/EventListingPage'))
 
 // React Router doesn't reset scroll position on navigation by default —
 // without this, clicking e.g. the footer's "Privacy Policy" link (or any
@@ -37,7 +39,7 @@ function TawkChat() {
 // Pages the map stays alive behind once it has loaded. Going /map →
 // /promote → back is instant: no reload, no second loading screen. Any
 // other route (landing page, legal pages…) unmounts the map as before.
-const KEEP_MAP_ALIVE = new Set(["/map", "/promote"]);
+const KEEP_MAP_ALIVE = new Set(["/map", "/promote", "/event"]);
 
 // `npm run build:app` (vite --mode app) builds the Android app, which has no
 // landing page: "/" goes straight to the map. Build-time constant, so the
@@ -91,6 +93,16 @@ function App() {
           the redirect itself. cancel_url points back at /promote?cancelled=1
           instead, so a cancelled checkout never reaches this route. */}
         <Route path="/promote/callback" element={<PromoteCallbackPage />} />
+        {/* "List your event" — Explore's "Add your event" card; its
+            Business tab links back to /promote. */}
+        <Route
+          path="/event"
+          element={
+            <Suspense fallback={null}>
+              <EventListingPage />
+            </Suspense>
+          }
+        />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookiePolicy />} />

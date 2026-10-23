@@ -91,6 +91,9 @@ export const SAMPLE_EVENTS = [
   },
 ];
 
+// Flat fee to list a ticketed or paid event; free events list at ₦0.
+export const EVENT_LISTING_FEE = 3000;
+
 // Featured rail rotation — same pace and slot count as the Places rail
 // (ExplorePanel.jsx's ROTATE_MS / COMPACT_SLOTS).
 export const FEATURED_ROTATE_MS = 7000;
