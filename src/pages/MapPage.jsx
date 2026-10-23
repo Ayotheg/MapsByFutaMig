@@ -1072,12 +1072,15 @@ export default function MapPage({ onReadinessChange }) {
       )}
       <SubmissionToast message={submissionToast} onDismiss={dismissSubmissionToast} />
       {/* One corner card at a time: a due review goes first, then the
-          marketing opt-in, then the WhatsApp channel nudge. */}
+          marketing opt-in, then the WhatsApp channel nudge. Priority only
+          runs one way — the review must NOT wait on the opt-in. When each
+          waited on the other, both being due made them hide and reappear
+          every render, flickering the Tawk bubble they each hide. */}
       <Suspense fallback={null}>
         <ReviewPrompt
           ready={!!map && !waypointsLoading}
           isMobile={isMobile}
-          blocked={mapBusy || isOffline || optInPromptOpen}
+          blocked={mapBusy || isOffline}
           onVisibleChange={setReviewPromptOpen}
           onRate={(dest) => {
             closeOtherOverlays('review');

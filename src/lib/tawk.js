@@ -62,20 +62,53 @@ function api() {
   return typeof window !== 'undefined' ? window.Tawk_API : undefined;
 }
 
+// Hiding is immediate, so a corner card never lands on the bubble. Showing
+// waits until no reason has been held for SHOW_DELAY_MS: when one reason
+// lets go just as another takes over (the map settling right as the email
+// opt-in card appears), the bubble would otherwise pop in and straight back
+// out — a visible blink, repeated each time it happens.
+const SHOW_DELAY_MS = 600;
+let showTimer = null;
+
+function shouldHide() {
+  // Off-route always hides; other reasons yield to an open chat.
+  return reasons.has('route') || (reasons.size > 0 && !chatOpen);
+}
+
 function apply() {
   const t = api();
   if (!t || typeof t.hideWidget !== 'function') return; // not loaded yet — re-applied on tawk:load
-  try {
-    // Off-route always hides; other reasons yield to an open chat.
-    if (reasons.has('route') || (reasons.size > 0 && !chatOpen)) t.hideWidget();
-    else t.showWidget();
-  } catch {
-    // widget mid-initialisation; next apply() fixes it
+  clearTimeout(showTimer);
+  showTimer = null;
+  if (shouldHide()) {
+    try {
+      t.hideWidget();
+    } catch {
+      // widget mid-initialisation; the post-load re-checks below fix it
+    }
+    return;
   }
+  showTimer = setTimeout(() => {
+    showTimer = null;
+    if (shouldHide()) return;
+    try {
+      t.showWidget();
+    } catch {
+      // widget mid-initialisation; next apply() fixes it
+    }
+  }, chatOpen ? 0 : SHOW_DELAY_MS);
+}
+
+// Tawk can still be finishing its own entrance just after onLoad and show
+// itself over a card that asked it to hide, so re-check a little later too.
+function applyAfterLoad() {
+  apply();
+  setTimeout(apply, 500);
+  setTimeout(apply, 1500);
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('tawk:load', apply);
+  window.addEventListener('tawk:load', applyAfterLoad);
   window.addEventListener('tawk:open', () => {
     chatOpen = true;
   });
