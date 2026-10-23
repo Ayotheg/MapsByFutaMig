@@ -291,16 +291,21 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     });
   }, []);
 
+  // `pan: false` re-places the dot without moving the map (used when a
+  // trip ends, see the `hidden` effect below).
   const onPositionUpdate = useCallback(
-    (pos) => {
+    (pos, { pan = true } = {}) => {
       lastKnownPosRef.current = pos;
+      const following = followRef.current;
       const rawLat = pos.coords.latitude;
       const rawLng = pos.coords.longitude;
       const accuracy = pos.coords.accuracy;
       const spd = (pos.coords.speed || 0) * 3.6;
       const hdg = pos.coords.heading;
 
-      updateGauge(accuracy, spd, hdg);
+      // Speed and heading are a Live tracking readout only — a one-off fix
+      // would show them for one reading, then the next fix resets them.
+      updateGauge(accuracy, following ? spd : null, following ? hdg : null);
       const { lat: sLat, lng: sLng } = smoothPos(rawLat, rawLng, spd);
       const ll = [sLat, sLng];
 
@@ -334,7 +339,8 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         `<strong style="color:${c}">You Are Here</strong><br><small>±${Math.round(accuracy)}m · ${spd.toFixed(1)} km/h</small>`
       );
 
-      if (hdg !== null && spd > 1) {
+      // Direction arrow only while following — otherwise it would freeze.
+      if (following && hdg !== null && spd > 1) {
         if (!headingMarkerRef.current) headingMarkerRef.current = L.marker(ll, { icon: makeArrow(hdg, c), zIndexOffset: 999 }).addTo(map);
         else {
           headingMarkerRef.current.setLatLng(ll);
@@ -345,9 +351,10 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         headingMarkerRef.current = null;
       }
 
-      // A one-off "Find my location" fix: centre on it, no trail.
-      if (!followRef.current) {
-        map.panTo(ll, { animate: true, duration: 0.8, easeLinearity: 0.5 });
+      // A one-off "Find my location" fix: centre on it (unless the person
+      // is dragging the map), no trail.
+      if (!following) {
+        if (pan && !map._userInteracting) map.panTo(ll, { animate: true, duration: 0.8, easeLinearity: 0.5 });
         return;
       }
 
@@ -367,13 +374,17 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         trailLineRef.current.setStyle({ color: c });
       }
 
-      if (!map._userInteracting) map.panTo(ll, { animate: true, duration: 0.8, easeLinearity: 0.5 });
+      if (pan && !map._userInteracting) map.panTo(ll, { animate: true, duration: 0.8, easeLinearity: 0.5 });
     },
     [map, smoothPos, updateGauge]
   );
 
   // Hide/restore dot+arrow markers when nav becomes active/inactive —
   // mirrors legacy's `gpsMarker.setOpacity(0/1)` at nav start/stop.
+  // When a trip ends, the dot is re-placed at the latest fix (with its
+  // accuracy circle) — without Live tracking nothing else would move it
+  // from where the trip started.
+  const wasHiddenRef = useRef(hidden);
   useEffect(() => {
     if (gpsMarkerRef.current) gpsMarkerRef.current.setOpacity(hidden ? 0 : 1);
     if (headingMarkerRef.current) headingMarkerRef.current.setOpacity(hidden ? 0 : 1);
@@ -381,7 +392,13 @@ export function useGpsTracking(map, { hidden = false } = {}) {
       map.removeLayer(accCircleRef.current);
       accCircleRef.current = null;
     }
-  }, [hidden, map]);
+    const tripEnded = wasHiddenRef.current && !hidden;
+    wasHiddenRef.current = hidden;
+    if (tripEnded && map && isTrackingRef.current && !acquiringRef.current && lastKnownPosRef.current) {
+      smoothRef.current = { lat: null, lng: null };
+      onPositionUpdate(lastKnownPosRef.current, { pan: false });
+    }
+  }, [hidden, map, onPositionUpdate]);
 
   const stopTracking = useCallback(() => {
     clearTimeout(acquireTimerRef.current);
@@ -468,7 +485,13 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         if (upgrade) approximateRef.current = false;
         // Without live tracking the dot stays where it was found, except
         // that an approximate fix is replaced by the first good one.
-        if (followRef.current || upgrade) onPositionUpdate(pos);
+        if (upgrade && !followRef.current) {
+          // Replace the approximate fix outright — smoothing would blend
+          // the good reading with the bad one and leave the dot off.
+          smoothRef.current = { lat: null, lng: null };
+          trailPtsRef.current = [];
+          onPositionUpdate(pos);
+        } else if (followRef.current) onPositionUpdate(pos);
         else updateGauge(accuracy, null, null);
       } else {
         updateGauge(accuracy, null, null);

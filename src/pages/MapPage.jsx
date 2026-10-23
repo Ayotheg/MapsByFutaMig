@@ -140,6 +140,9 @@ export default function MapPage({ onReadinessChange }) {
   // shift/collapse in step with them, matching legacy's body-class-driven
   // CSS coupling without reaching for globals.
   const [collapsed, setCollapsed] = useState(() => readPersistentState('sidebar-collapsed', false));
+  // Desktop Signal card (floats beside the closed rail, see Sidebar.jsx) —
+  // lifted here so it follows the one-overlay-at-a-time rule below.
+  const [gpsCardOpen, setGpsCardOpen] = useState(false);
   // Not restored: the sheet opens on Explore, so a sheet left open made
   // Explore pop up by itself on every later visit.
   const [sheetState, setSheetState] = useState('peek');
@@ -559,6 +562,7 @@ export default function MapPage({ onReadinessChange }) {
     if (keep !== 'review') setReviewTarget(null);
     if (keep !== 'admin') setAdminPanelOpen(false);
     if (keep !== 'auth') setAuthModalOpen(false);
+    if (keep !== 'gps') setGpsCardOpen(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -598,6 +602,16 @@ export default function MapPage({ onReadinessChange }) {
     (next) => {
       if (!next) closeOtherOverlays('sidebar');
       setCollapsed(next);
+    },
+    [closeOtherOverlays]
+  );
+
+  // Opening the Signal card closes everything else, the expanded drawer
+  // included (closeOtherOverlays collapses it for any keep but 'sidebar').
+  const handleGpsCardChange = useCallback(
+    (next) => {
+      if (next) closeOtherOverlays('gps');
+      setGpsCardOpen(next);
     },
     [closeOtherOverlays]
   );
@@ -735,6 +749,7 @@ export default function MapPage({ onReadinessChange }) {
   // clear, and the Tawk chat bubble steps aside meanwhile so it doesn't sit
   // on top of panels/the expanded mobile sheet.
   const mapBusy =
+    gpsCardOpen ||
     !!selected ||
     !!selectedSegment ||
     !!activeChip ||
@@ -855,7 +870,8 @@ export default function MapPage({ onReadinessChange }) {
           onExploreSelect={handleSelectPlace}
           exploreRequest={exploreRequest}
           exploreOpenRequest={exploreOpenRequest}
-          placeOpen={!!selected}
+          gpsOpen={gpsCardOpen}
+          onGpsOpenChange={handleGpsCardChange}
         />
         </div>
       )}
@@ -910,7 +926,11 @@ export default function MapPage({ onReadinessChange }) {
           chips={quickChips.chips}
           activeChip={activeChip}
           onChipClick={handleChipClick}
-          onAllPlacesOpen={() => setActiveChip(null)}
+          onAllPlacesOpen={() => {
+            setActiveChip(null);
+            // All places opens in the Signal card's spot.
+            setGpsCardOpen(false);
+          }}
           collapsed={collapsed}
           isMobile={isMobile}
         />

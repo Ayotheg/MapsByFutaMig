@@ -110,7 +110,8 @@
 .railBtnActive::before {
   content: '';
   position: absolute;
-  left: -8px;
+  /* The rail's left edge: the 64px button is centred in the rail. */
+  left: calc((64px - var(--sidebar-rail-w)) / 2);
   top: 50%;
   transform: translateY(-50%);
   width: 4px;
@@ -314,18 +315,16 @@
 
 /* ── Layers panel light redesign (Sept 2026, Figma node 96:1227) ─────────
    Scoped to `.panelLayersLight` (only applied to the Layers tab's own
-   `.panel`, above, when `activeKey === 'layers'`) so the Explore/GPS
-   panels' existing dark-glass treatment is untouched. The rail and its
-   own logo/footer stay on the dark navy rail per the Figma reference —
-   only this drawer's surface goes light. */
+   `.panel`, above, when `activeKey === 'layers'`) so the Explore drawer
+   keeps its own treatment. */
 .panelLayersLight {
   background: var(--v2-surface);
   border-right: 1px solid var(--v2-divider);
 }
 /* GPS Signal redesign (Oct 2026): a floating card beside the closed rail,
    sized and placed like PlaceCard's desktop card (under the search bar +
-   chips), only as tall as its content. Inside the sidebar's stacking
-   context, so a place card or search dropdown still sits above it. */
+   chips), only as tall as its content. MapPage closes it whenever another
+   overlay opens (closeOtherOverlays), so nothing stacks on it. */
 .gpsCard {
   position: absolute;
   top: 118px;
@@ -376,7 +375,7 @@
    Scoped to `.panelExploreDesktop`/`.panelBodyExploreDesktop` (only
    applied to the Explore tab's own `.panel`/`.panelBody`, above, when
    `activeKey === 'explore'`). Width was previously hardcoded to 460px,
-   nearly double the Layers/GPS panels' `--sidebar-panel-w` (240px) —
+   nearly double the Layers panel's `--sidebar-panel-w` (240px) —
    that made this the only drawer that didn't line up with the rest of
    the rail, and broke the assumption every other floating element
    (PlaceCard, QuickChips, DesktopSearchBar — all positioned off
@@ -392,32 +391,6 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-/* Generic `.panel-header`/`.panel-title` shell (style.css ~296–309) —
-   distinct from `.panelHeader` above, which is the Layers-only override.
-   Used by the GPS Signal + Navigate panels (Slice 9), which use legacy's
-   plain shared header, not Layers' bespoke one. */
-.panelHeaderGeneric {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 14px 14px;
-  border-bottom: 1px solid rgba(77, 67, 84, 0.35);
-  flex-shrink: 0;
-  margin-top: 76px;
-}
-.panelTitleGeneric {
-  font-family: 'Geist', var(--font-ui);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.01em;
-}
-.panelHeaderRight {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 /* Slice 6: RAW mode dims the Layers panel, ported from legacy's

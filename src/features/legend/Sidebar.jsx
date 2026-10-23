@@ -72,8 +72,10 @@ export default function Sidebar({
   // Bumped once the first-visit zoom hint is done: opens Explore, never
   // closes it (unlike exploreRequest's toggle).
   exploreOpenRequest = 0,
-  // A place card opens in the same spot as the Signal card, so it closes it.
-  placeOpen = false,
+  // Signal is a floating card beside the closed rail; MapPage owns whether
+  // it's open so opening it closes other overlays and vice versa.
+  gpsOpen = false,
+  onGpsOpenChange,
 }) {
   // GPS Signal is a floating card, not a drawer (Oct 2026 redesign), so it
   // isn't remembered as the open drawer — an old saved 'gps' falls back.
@@ -81,8 +83,6 @@ export default function Sidebar({
     const saved = readPersistentState('sidebar-active-panel', 'layers');
     return saved === 'gps' ? 'layers' : saved;
   });
-  const [gpsOpen, setGpsOpen] = useState(false);
-
   // Admin only shows on admin accounts (profiles.is_admin), with a badge
   // counting places waiting for review — the same head-only count
   // AdminPanel.jsx uses for its Pending tab.
@@ -110,9 +110,6 @@ export default function Sidebar({
       cancelled = true;
     };
   }, [user?.id]);
-  useEffect(() => {
-    if (placeOpen) setGpsOpen(false);
-  }, [placeOpen]);
   const lastExploreRequest = useRef(exploreRequest);
   useEffect(() => {
     if (exploreRequest === lastExploreRequest.current) return;
@@ -156,18 +153,13 @@ export default function Sidebar({
 
   function handleRailClick(item) {
     // Signal opens a floating card beside the closed rail (like PlaceCard),
-    // so the map and search bar don't shift; any other rail item closes it.
+    // so the map and search bar don't shift. Opening anything else closes
+    // it via MapPage's closeOtherOverlays.
     if (item.key === 'gps') {
-      if (gpsOpen) {
-        setGpsOpen(false);
-        return;
-      }
-      setGpsOpen(true);
-      onCollapsedChange(true);
-      track('feature_panel_open', { panel: item.key });
+      if (!gpsOpen) track('feature_panel_open', { panel: item.key });
+      onGpsOpenChange?.(!gpsOpen);
       return;
     }
-    setGpsOpen(false);
     // Bug fix (reported directly for the mobile search bar + navbar; the
     // desktop rail's "Nav" item had the identical problem — opening its
     // own panel body, `NavPanel`, a plain "START NAVIGATION" card,
@@ -326,7 +318,7 @@ export default function Sidebar({
       {gpsOpen && (
         <div className={styles.gpsCard}>
           <Suspense fallback={null}>
-            <GpsPanel gps={gps} onClose={() => setGpsOpen(false)} />
+            <GpsPanel gps={gps} onClose={() => onGpsOpenChange?.(false)} />
           </Suspense>
         </div>
       )}

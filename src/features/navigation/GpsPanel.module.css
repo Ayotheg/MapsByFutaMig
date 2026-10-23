@@ -95,8 +95,9 @@
 .bodyDesktop .switchOn .switchThumb {
   transform: translateX(18px);
 }
+/* MobileSheet's .body already adds the safe-area inset at the bottom. */
 .bodyEmbedded {
-  padding: 0 16px calc(4px + var(--mob-safe-bottom));
+  padding: 0 16px 4px;
 }
 
 .grabber {
@@ -406,8 +407,9 @@
 }
 
 /* ── Stats ───────────────────────────────────────────────────────── */
-/* Narrow (the 240px desktop panel): Accuracy on its own row, then Speed
-   and Heading. Wide enough (mobile): three across, as in the design. */
+/* Narrow containers: Accuracy on its own row, then Speed and Heading.
+   300px and up (the mobile sheet and the 400px desktop card): three
+   across, as in the design. */
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
