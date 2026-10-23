@@ -1,55 +1,32 @@
-import { Crosshair, Gauge, Compass, LocateFixed, CircleStop } from 'lucide-react';
+import { Crosshair, Gauge, Compass, LocateFixed, CircleStop, ChevronDown, X } from 'lucide-react';
 import styles from './GpsPanel.module.css';
 
 /**
- * GPS Signal panel body — v2 redesign (Figma node 31:52 "GPS Screen", pulled via the Figma MCP
- * connection). Ported from legacy `index.html` ~542–561 originally; this
- * pass only restyles markup/CSS per the guide's Rule 1/2 — `gps` still
- * carries every value from `useGpsTracking.js` unchanged, same props in,
- * same props out, no new state.
+ * GPS Signal panel body — Oct 2026 redesign (screens "GPS panel · V2
+ * desktop", "· mobile" and "· V3 mobile"). Same `gps` object from
+ * `useGpsTracking.js` as before, plus its Live tracking state
+ * (`isFollowing`/`toggleFollow`).
  *
- * `embedded` (true when MobileSheet.jsx renders this) previously hid the
- * title row entirely (the mobile tab strip already said "Signal"). The
- * Figma reference for this screen is itself the mobile/embedded view and
- * shows the full title+subtitle+badge header, so that hide-on-embedded
- * behavior is dropped in favor of what the reference actually shows —
- * `embedded` now only adjusts content padding/density (mobile vs. the
- * desktop Sidebar panel), same role it already partly played before.
+ * Two variants, same pattern as ExplorePanel:
+ *  - `variant="compact"` (mobile, sheetState === 'half'): "Your location",
+ *    the Find my location button and a one-line signal row whose
+ *    "Details" link calls `onExpand`.
+ *  - `variant="full"` (mobile sheetState === 'full', and always on
+ *    desktop, where Sidebar shows it as a floating card): big signal
+ *    card, button, Accuracy/Speed/Heading and the Live tracking switch.
+ *    The header adds a close button (`onClose`), plus collapse
+ *    (`onCollapse`) on mobile.
  *
- * **Subtitle line (`statusText` below) is computed inline from data the
- * hook already returns (`gpsBtnDisabled`/`isTracking`/`tier`/`warning`) —
- * no new prop, no new state.** Same precedent as ChipResultsPanel's
- * status-line consolidation. The Figma copy
- * "Acquiring high-accuracy lock" is used verbatim for the
- * tracking-but-not-yet-`good` case, which is exactly what that phrase
- * describes.
+ * Two separate actions: the button (`toggleTracking`) finds you once and
+ * puts the dot on the map, then turns into "Stop tracking", which clears
+ * it. The Live tracking switch (`toggleFollow`) keeps the dot, map, speed
+ * and heading following you — it stays disabled until you've been found.
  *
- * **Kept, not literally in the Figma frame:** the signal-strength bar
- * chart, now restyled as a full "Visualization Card" per Figma node 64:2
- * — but the card's own "8/12 Satellites in view" readout is dropped per
- * explicit instruction (this app has no satellite data anywhere) and
- * replaced with a real readout built from the same `activeBars`/`tier`
- * values the bars are drawn from, not a fabricated count. Bar count
- * stays at 5 (matching `activeBars`' real granularity) rather than the
- * frame's 15 decorative bars, since more bars would fake precision the
- * app doesn't have.
- *
- * **Not ported (unchanged from before this session):** the "Altitude"
- * stat cell shown in the Figma frame. `useGpsTracking.js` has no
- * altitude field to bind it to, and inventing a static/fake value would
- * misrepresent live GPS data — flagged rather than fabricated. The stat
- * grid keeps the three real fields (Accuracy, Speed, Heading) the app
- * actually has, with Heading spanning the second row.
- *
- * Value strings (`accuracyText`/`speedText`/`headingText`) are rendered
- * as the single already-formatted string `useGpsTracking.js` returns
- * (e.g. "±12m", "GPS unavailable", "Warming up…") rather than split into
- * a big-number + small-unit pair like the Figma frame — splitting would
- * mean parsing that string's format in this component, which reaches
- * into .js-owned formatting logic and would break on its non-numeric
- * edge-case text. Out of scope for a markup/CSS-only pass.
+ * Signal readout is the real `activeBars`/`tier` (5 bars, matching the
+ * hook's granularity) — no satellite count or altitude, which the app
+ * doesn't have.
  */
-export default function GpsPanel({ gps, embedded = false }) {
+export default function GpsPanel({ gps, embedded = false, variant = 'full', onExpand, onCollapse, onClose }) {
   const {
     tier,
     signalBadgeText,
@@ -59,125 +36,181 @@ export default function GpsPanel({ gps, embedded = false }) {
     speedText,
     headingText,
     warning,
-    gpsBtnDisabled,
     gpsBtnLabel,
     isTracking,
+    isFollowing,
     toggleTracking,
+    toggleFollow,
     acquiring,
     approximate,
     error,
   } = gps;
+  const compact = embedded && variant === 'compact';
 
-  // `error`/`acquiring`/`approximate` (GPS fix pass) are text-only states
-  // from the hook: a GeolocationPositionError message, a fresh fix being
-  // acquired, and the weak-signal fallback fix respectively.
+  // `error`/`acquiring`/`approximate` are text-only states from the hook:
+  // a GeolocationPositionError message, a fresh fix being acquired, and the
+  // weak-signal fallback fix respectively.
   const statusText = error
     ? error
-    : gpsBtnDisabled
-      ? warning.text || 'Location unavailable'
-      : !isTracking
-        ? 'Tap start to begin tracking'
-        : acquiring
-          ? 'Getting a fresh GPS fix…'
-          : approximate
-            ? 'Approximate location — weak signal'
-            : tier === 'good'
-              ? 'Live GPS tracking active'
-              : tier === 'fair'
-                ? 'Locking in — accuracy improving'
-                : 'Acquiring high-accuracy lock';
+    : !isTracking
+      ? compact
+        ? 'Tap below to show where you are'
+        : 'Check your signal, then find yourself'
+      : acquiring
+        ? 'Getting a fresh GPS fix…'
+        : approximate
+          ? 'Approximate location — weak signal'
+          : isFollowing
+            ? 'Live tracking — following you'
+            : 'Found you — shown on the map';
 
-  // Visualization card caption — real data only (see file header): no
-  // satellite count exists in useGpsTracking.js, so the Figma frame's
-  // "8/12 Satellites in view" readout is replaced with the same
-  // activeBars/tier values the bar chart itself is drawn from, not a
-  // fabricated number.
-  const signalLabel = tier === 'good' ? 'Strong signal' : tier === 'fair' ? 'Fair signal' : 'Weak signal';
+  const signalLabel =
+    activeBars === 0
+      ? 'Waiting for signal'
+      : tier === 'good'
+        ? 'Strong signal'
+        : tier === 'fair'
+          ? 'Fair signal'
+          : 'Weak signal';
+
+  // The hook's own label ("FIND MY LOCATION" / "LOCATE ANYWAY" / "RETRY" /
+  // "STOP TRACKING"), sentence-cased to match the design.
+  const btnLabel = gpsBtnLabel.charAt(0) + gpsBtnLabel.slice(1).toLowerCase();
+  const canFollow = isTracking && !acquiring;
+
+  const bars = (small) => (
+    <div className={small ? styles.miniBars : styles.bars} aria-hidden="true">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div
+          key={i}
+          className={`${small ? styles.miniBar : styles.bar} ${i <= activeBars ? styles[`active${tier}`] || '' : ''}`}
+          style={{ height: `${i * 20}%` }}
+        />
+      ))}
+    </div>
+  );
+
+  const warningEl = warning.visible && (
+    <div className={`${styles.warning} ${warning.poor ? styles.poorWarn : ''}`}>{warning.text}</div>
+  );
 
   return (
-    <div className={styles.body}>
-      <div className={`${styles.header} ${!embedded ? styles.headerDesktop : ''}`}>
+    <div className={`${styles.body} ${embedded ? styles.bodyEmbedded : styles.bodyDesktop}`}>
+      {embedded && <div className={styles.grabber} aria-hidden="true" />}
+
+      <div className={styles.header}>
         <div className={styles.headerText}>
-          <span className={styles.title}>GPS Status</span>
-          <span className={styles.subtitle}>{statusText}</span>
+          <h2 className={styles.title}>{compact ? 'Your location' : 'GPS signal'}</h2>
+          <p className={styles.subtitle}>{statusText}</p>
         </div>
-        <span className={`${styles.badge} ${styles[signalBadgeClass] || ''}`}>
-          <span className={styles.badgeDot} />
-          {signalBadgeText}
-        </span>
+        <div className={styles.headerActions}>
+          {!compact && (
+            <span className={`${styles.badge} ${styles[signalBadgeClass] || ''}`}>
+              <span className={styles.badgeDot} />
+              {signalBadgeText}
+            </span>
+          )}
+          {embedded && !compact && onCollapse && (
+            <button type="button" className={styles.iconBtn} onClick={onCollapse} aria-label="Show less">
+              <ChevronDown size={18} strokeWidth={2} />
+            </button>
+          )}
+          {onClose && (
+            <button type="button" className={`${styles.iconBtn} ${styles.iconBtnClose}`} onClick={onClose} aria-label="Close">
+              <X size={18} strokeWidth={2} />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className={`${styles.content} ${embedded ? styles.contentEmbedded : ''}`}>
-        {/* Visualization Card — restyled per Figma node 64:2's "Visualization
-            Card", which shows a tall abstract bar chart + a big number/
-            caption readout ("8/12 Satellites in view"). Per explicit
-            instruction, the satellite readout is dropped (no satellite data
-            exists anywhere in this app) and replaced with the real signal
-            data the old thin 5-bar strip already displayed — activeBars/tier
-            — reusing this card's *visual language* (taller bars, soft
-            violet-tinted card, decorative blur orb, big number + caption
-            beneath) rather than its literal content. Bars stay real (5,
-            matching activeBars' actual granularity) instead of the frame's
-            15 decorative bars, since inventing extra bars with no data
-            behind them would fake precision the app doesn't have. */}
+      {!compact && (
         <div className={styles.visCard}>
           <div className={styles.visOrb} aria-hidden="true" />
-          <div className={styles.bars} aria-hidden="true">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className={`${styles.bar} ${i <= activeBars ? styles[`active${tier}`] || '' : ''}`}
-                style={{ height: `${i * 20}%` }}
-              />
-            ))}
-          </div>
+          {bars(false)}
           <div className={styles.visReadout}>
-            <div className={`${styles.visNumber} ${styles[`text${tier}`] || ''}`}>{activeBars}/5</div>
-            <div className={styles.visCaption}>{signalLabel}</div>
+            <span className={`${styles.visNumber} ${styles[`text${tier}`] || ''}`}>{activeBars}/5</span>
+            <span className={styles.visCaption}>{signalLabel}</span>
           </div>
         </div>
+      )}
 
-        <div className={styles.grid}>
-          <div className={styles.stat}>
-            <div className={styles.statHead}>
-              <Crosshair size={16} strokeWidth={2} className={styles.statIcon} />
-              <span className={styles.statLabel}>Accuracy</span>
-            </div>
-            <div className={styles.statValue} title={accuracyText}>{accuracyText}</div>
-          </div>
-          <div className={styles.stat}>
-            <div className={styles.statHead}>
-              <Gauge size={16} strokeWidth={2} className={styles.statIcon} />
-              <span className={styles.statLabel}>Speed</span>
-            </div>
-            <div className={styles.statValue} title={speedText}>{speedText}</div>
-          </div>
-          <div className={`${styles.stat} ${styles.statWide}`}>
-            <div className={styles.statHead}>
-              <Compass size={16} strokeWidth={2} className={styles.statIcon} />
-              <span className={styles.statLabel}>Heading</span>
-            </div>
-            <div className={styles.statValue} title={headingText}>{headingText}</div>
-          </div>
-        </div>
+      <button
+        type="button"
+        className={`${styles.gpsBtn} ${isTracking ? styles.stop : ''} ${acquiring ? styles.acquiring : ''}`}
+        onClick={toggleTracking}
+        aria-busy={acquiring || undefined}
+      >
+        {isTracking ? <CircleStop size={18} strokeWidth={2.2} /> : <LocateFixed size={18} strokeWidth={2.2} />}
+        {btnLabel}
+      </button>
 
-        <button
-          type="button"
-          className={`${styles.gpsBtn} ${isTracking ? styles.tracking : ''}`}
-          disabled={gpsBtnDisabled}
-          onClick={toggleTracking}
-        >
-          {isTracking ? (
-            <CircleStop size={15} strokeWidth={2} />
-          ) : (
-            <LocateFixed size={15} strokeWidth={2} />
-          )}
-          {gpsBtnLabel}
-        </button>
+      {compact ? (
+        <>
+          <div className={styles.signalRow}>
+            {bars(true)}
+            <div className={styles.signalRowText}>
+              <span className={styles.signalRowTitle}>
+                {signalLabel}
+                {activeBars > 0 && <span className={styles.signalRowScore}> · {activeBars}/5</span>}
+              </span>
+              <span className={styles.signalRowSub} title={accuracyText}>
+                Accuracy {accuracyText}
+              </span>
+            </div>
+            {onExpand && (
+              <button type="button" className={styles.detailsBtn} onClick={onExpand}>
+                Details
+                <ChevronDown size={16} strokeWidth={2.2} />
+              </button>
+            )}
+          </div>
+          {warningEl}
+        </>
+      ) : (
+        <>
+          {warningEl}
+          <div className={styles.grid}>
+            <Stat Icon={Crosshair} label="Accuracy" value={accuracyText} wide />
+            <Stat Icon={Gauge} label="Speed" value={speedText} />
+            <Stat Icon={Compass} label="Heading" value={headingText} />
+          </div>
 
-        {warning.visible && (
-          <div className={`${styles.warning} ${warning.poor ? styles.poorWarn : ''}`}>{warning.text}</div>
-        )}
+          <div className={styles.liveRow}>
+            <div className={styles.liveText}>
+              <span className={styles.liveTitle} id="gps-live-label">
+                Live tracking
+              </span>
+              <span className={styles.liveSub}>
+                {canFollow ? 'Follows you and fills in speed and heading' : 'Find your location first'}
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isFollowing}
+              aria-labelledby="gps-live-label"
+              className={`${styles.switch} ${isFollowing ? styles.switchOn : ''}`}
+              disabled={!canFollow}
+              onClick={toggleFollow}
+            >
+              <span className={styles.switchThumb} />
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Stat({ Icon, label, value, wide }) {
+  return (
+    <div className={`${styles.stat} ${wide ? styles.statWide : ''}`}>
+      <div className={styles.statHead}>
+        <Icon size={14} strokeWidth={2} className={styles.statIcon} />
+        <span className={styles.statLabel}>{label}</span>
+      </div>
+      <div className={styles.statValue} title={value}>
+        {value}
       </div>
     </div>
   );

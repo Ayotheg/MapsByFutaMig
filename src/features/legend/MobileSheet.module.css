@@ -192,9 +192,9 @@
   background: var(--v2-surface);
   box-shadow: 0 -4px 32px rgba(74, 68, 85, 0.14), 0 -1px 0 rgba(74, 68, 85, 0.05);
 }
-/* Explore is a plain white sheet edge to edge — on the lavender
-   --v2-surface its white content left a purple rim around the cards. */
-.panelExplore {
+/* Explore and Signal are plain white sheets edge to edge — on the lavender
+   --v2-surface their white content left a purple rim around the cards. */
+.panelWhite {
   background: var(--v2-on-primary);
 }
 .panelClosed {
@@ -207,6 +207,13 @@
 }
 .panelFull {
   height: calc(var(--mob-sheet-full) - var(--mob-sheet-peek));
+}
+/* Signal sizes to its content in both states (the design's compact view
+   is much shorter than half a screen). Height can't animate to auto, so
+   this sheet opens without the slide. */
+.panelFit {
+  height: auto;
+  max-height: calc(var(--mob-sheet-full) - var(--mob-sheet-peek));
 }
 
 .body {

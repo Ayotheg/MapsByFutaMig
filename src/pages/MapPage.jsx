@@ -853,6 +853,7 @@ export default function MapPage({ onReadinessChange }) {
           onExploreSelect={handleSelectPlace}
           exploreRequest={exploreRequest}
           exploreOpenRequest={exploreOpenRequest}
+          placeOpen={!!selected}
         />
         </div>
       )}

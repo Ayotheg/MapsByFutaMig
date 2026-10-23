@@ -210,8 +210,8 @@ export default function MobileSheet({
         className={`${styles.panel} ${
           !panelOpen ? styles.panelClosed : sheetState === 'full' ? styles.panelFull : styles.panelHalf
         } ${activeTab === 'layers' || activeTab === 'gps' ? styles.panelLight : ''} ${
-          activeTab === 'layers' ? styles.panelExplore : ''
-        }`}
+          activeTab === 'layers' || activeTab === 'gps' ? styles.panelWhite : ''
+        } ${activeTab === 'gps' && panelOpen ? styles.panelFit : ''}`}
         aria-hidden={!panelOpen}
       >
         <div className={styles.body}>
@@ -236,7 +236,14 @@ export default function MobileSheet({
           )}
           {activeTab === 'gps' && (
             <Suspense fallback={null}>
-              <GpsPanel gps={gps} embedded />
+              <GpsPanel
+                gps={gps}
+                embedded
+                variant={sheetState === 'full' ? 'full' : 'compact'}
+                onExpand={() => setSheetState('full')}
+                onCollapse={() => setSheetState('half')}
+                onClose={() => setSheetState('peek')}
+              />
             </Suspense>
           )}
         </div>

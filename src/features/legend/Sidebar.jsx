@@ -79,8 +79,19 @@ export default function Sidebar({
   // Bumped once the first-visit zoom hint is done: opens Explore, never
   // closes it (unlike exploreRequest's toggle).
   exploreOpenRequest = 0,
+  // A place card opens in the same spot as the Signal card, so it closes it.
+  placeOpen = false,
 }) {
-  const [activeKey, setActiveKey] = useState(() => readPersistentState('sidebar-active-panel', 'layers'));
+  // GPS Signal is a floating card, not a drawer (Oct 2026 redesign), so it
+  // isn't remembered as the open drawer — an old saved 'gps' falls back.
+  const [activeKey, setActiveKey] = useState(() => {
+    const saved = readPersistentState('sidebar-active-panel', 'layers');
+    return saved === 'gps' ? 'layers' : saved;
+  });
+  const [gpsOpen, setGpsOpen] = useState(false);
+  useEffect(() => {
+    if (placeOpen) setGpsOpen(false);
+  }, [placeOpen]);
   const lastExploreRequest = useRef(exploreRequest);
   useEffect(() => {
     if (exploreRequest === lastExploreRequest.current) return;
@@ -123,6 +134,19 @@ export default function Sidebar({
   }, [collapsed]);
 
   function handleRailClick(item) {
+    // Signal opens a floating card beside the closed rail (like PlaceCard),
+    // so the map and search bar don't shift; any other rail item closes it.
+    if (item.key === 'gps') {
+      if (gpsOpen) {
+        setGpsOpen(false);
+        return;
+      }
+      setGpsOpen(true);
+      onCollapsedChange(true);
+      track('feature_panel_open', { panel: item.key });
+      return;
+    }
+    setGpsOpen(false);
     // Bug fix (reported directly for the mobile search bar + navbar; the
     // desktop rail's "Nav" item had the identical problem — opening its
     // own panel body, `NavPanel`, a plain "START NAVIGATION" card,
@@ -168,7 +192,7 @@ export default function Sidebar({
 
       <nav className={styles.rail}>
         {RAIL_ITEMS.map((item) => {
-          const active = !collapsed && activeKey === item.key;
+          const active = item.key === 'gps' ? gpsOpen : !collapsed && activeKey === item.key;
           return (
             <button
               key={item.key}
@@ -217,10 +241,10 @@ export default function Sidebar({
         </div>
       )}
 
-      {!collapsed && activeKey === 'gps' && (
-        <div className={styles.panel}>
+      {gpsOpen && (
+        <div className={styles.gpsCard}>
           <Suspense fallback={null}>
-            <GpsPanel gps={gps} />
+            <GpsPanel gps={gps} onClose={() => setGpsOpen(false)} />
           </Suspense>
         </div>
       )}

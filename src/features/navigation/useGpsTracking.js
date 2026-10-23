@@ -166,6 +166,9 @@ export function useGpsTracking(map, { hidden = false } = {}) {
   const [state, setState] = useState({
     tier: 'poor',
     isTracking: false,
+    // Live tracking: the dot, map, speed and heading follow every fix.
+    // Only possible once "Find my location" has placed the dot.
+    isFollowing: false,
     isWarmedUp: false,
     accuracyText: '—',
     speedText: '—',
@@ -189,6 +192,7 @@ export function useGpsTracking(map, { hidden = false } = {}) {
   const lastAccuracyRef = useRef(Infinity);
   const isWarmedUpRef = useRef(false);
   const isTrackingRef = useRef(false);
+  const followRef = useRef(false);
   const hiddenRef = useRef(hidden);
   hiddenRef.current = hidden;
 
@@ -235,17 +239,19 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     const isTracking = isTrackingRef.current;
     const acquiring = acquiringRef.current;
     const approximate = approximateRef.current;
+    const following = followRef.current;
 
     setState((prev) => {
       const next = { ...prev };
       next.tier = t;
       next.isTracking = isTracking;
+      next.isFollowing = following;
       next.acquiring = acquiring;
       next.approximate = approximate;
       next.error = null;
       next.activeBars = nBars;
-      next.signalBadgeClass = isTracking && !acquiring ? 'tracking' : t;
-      next.signalBadgeText = acquiring ? 'LOCATING' : isTracking ? 'LIVE' : t.toUpperCase();
+      next.signalBadgeClass = following && !acquiring ? 'tracking' : t;
+      next.signalBadgeText = acquiring ? 'LOCATING' : following ? 'LIVE' : t.toUpperCase();
       // The live reading is shown even while warming up, so "weak
       // readings" can be told apart from "no readings at all".
       const acc = `±${Math.round(accuracy)}m`;
@@ -339,6 +345,12 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         headingMarkerRef.current = null;
       }
 
+      // A one-off "Find my location" fix: centre on it, no trail.
+      if (!followRef.current) {
+        map.panTo(ll, { animate: true, duration: 0.8, easeLinearity: 0.5 });
+        return;
+      }
+
       // Trail: only record a point if the user moved ≥3 m.
       const trailPts = trailPtsRef.current;
       const lastPt = trailPts[trailPts.length - 1];
@@ -377,7 +389,12 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     approximateRef.current = false;
     bestFixRef.current = null;
     isTrackingRef.current = false;
+    followRef.current = false;
     drRef.current.stop();
+    if (gpsMarkerRef.current) {
+      map.removeLayer(gpsMarkerRef.current);
+      gpsMarkerRef.current = null;
+    }
     if (trailLineRef.current) {
       map.removeLayer(trailLineRef.current);
       trailLineRef.current = null;
@@ -414,6 +431,7 @@ export function useGpsTracking(map, { hidden = false } = {}) {
       setState((s) => ({
         ...s,
         isTracking: false,
+        isFollowing: false,
         acquiring: false,
         approximate: false,
         error: text,
@@ -446,8 +464,12 @@ export function useGpsTracking(map, { hidden = false } = {}) {
         return;
       }
       if (isTrackingRef.current) {
-        if (approximateRef.current && tier(accuracy) !== 'poor') approximateRef.current = false;
-        onPositionUpdate(pos);
+        const upgrade = approximateRef.current && tier(accuracy) !== 'poor';
+        if (upgrade) approximateRef.current = false;
+        // Without live tracking the dot stays where it was found, except
+        // that an approximate fix is replaced by the first good one.
+        if (followRef.current || upgrade) onPositionUpdate(pos);
+        else updateGauge(accuracy, null, null);
       } else {
         updateGauge(accuracy, null, null);
       }
@@ -510,8 +532,13 @@ export function useGpsTracking(map, { hidden = false } = {}) {
       setState((s) => ({
         ...s,
         isTracking: false,
+        isFollowing: false,
         acquiring: false,
         approximate: false,
+        signalBadgeText: s.tier.toUpperCase(),
+        signalBadgeClass: s.tier,
+        speedText: '—',
+        headingText: '—°',
         gpsBtnLabel: 'FIND MY LOCATION',
         gpsBtnDisabled: false,
         warning: { visible: false, poor: false, text: '' },
@@ -526,7 +553,6 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     bestFixRef.current = null;
     smoothRef.current = { lat: null, lng: null };
     trailPtsRef.current = [];
-    drRef.current.start();
 
     // Speak the current location out loud on every "Find my location"
     // tap — see announceLocation.js. Only a fix the live watcher delivered
@@ -561,9 +587,42 @@ export function useGpsTracking(map, { hidden = false } = {}) {
     }, ACQUIRE_FALLBACK_MS);
   }, [stopTracking, acceptFix, failWithError]);
 
+  // Live tracking switch. Needs a found location first (see toggleTracking);
+  // switching it off freezes the dot where it is, Stop tracking clears it.
+  const toggleFollow = useCallback(() => {
+    if (!isTrackingRef.current || acquiringRef.current) return;
+    if (followRef.current) {
+      followRef.current = false;
+      drRef.current.stop();
+      if (trailLineRef.current) {
+        map.removeLayer(trailLineRef.current);
+        trailLineRef.current = null;
+      }
+      if (headingMarkerRef.current) {
+        map.removeLayer(headingMarkerRef.current);
+        headingMarkerRef.current = null;
+      }
+      trailPtsRef.current = [];
+      setState((s) => ({
+        ...s,
+        isFollowing: false,
+        signalBadgeText: s.tier.toUpperCase(),
+        signalBadgeClass: s.tier,
+        speedText: '—',
+        headingText: '—°',
+      }));
+      return;
+    }
+    followRef.current = true;
+    drRef.current.start();
+    setState((s) => ({ ...s, isFollowing: true, signalBadgeText: 'LIVE', signalBadgeClass: 'tracking' }));
+    if (lastKnownPosRef.current) onPositionUpdate(lastKnownPosRef.current);
+  }, [map, onPositionUpdate]);
+
   return {
     ...state,
     toggleTracking,
+    toggleFollow,
     lastKnownPosRef,
   };
 }
