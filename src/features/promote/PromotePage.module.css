@@ -103,6 +103,34 @@
 .backLabel {
   display: none;
 }
+/* Business | Event switch (desktop only; Event links to /event). */
+.listingToggle {
+  display: flex;
+  width: 240px;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--pr-fill);
+}
+.listingToggleBtn {
+  flex: 1 1 0;
+  display: grid;
+  place-items: center;
+  min-height: 36px;
+  border-radius: var(--r-full);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pr-muted);
+  text-decoration: none;
+  transition: color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+a.listingToggleBtn:hover {
+  color: var(--pr-ink);
+}
+.listingToggleBtnActive {
+  background: var(--pr-card);
+  color: var(--pr-accent);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
 .stepLabel {
   font-family: var(--font-ui);
   font-weight: 600;

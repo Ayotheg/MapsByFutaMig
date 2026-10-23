@@ -188,6 +188,12 @@
 
   /* Plus Jakarta Sans (approved alternate) — the Explore panel title. */
   --v2-font-jakarta: 'Plus Jakarta Sans Variable', var(--font-ui);
+  /* Satoshi (approved alternate) — self-hosted in src/assets/fonts/satoshi. */
+  --v2-font-satoshi: 'Satoshi Variable', var(--font-ui);
+  /* Geist (approved alternate) — self-hosted in src/assets/fonts/geist. */
+  --v2-font-geist: 'Geist Variable', var(--font-ui);
+  /* Manrope — numbers on new screens (existing ones keep DM Mono). */
+  --v2-font-manrope: 'Manrope', var(--font-ui);
 
   /* Not yet defined — add only when a screen actually needs it:
      --v2-secondary-container (lighter tint variant, e.g. for the

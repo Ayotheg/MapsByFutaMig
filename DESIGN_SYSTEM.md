@@ -45,15 +45,17 @@ Rules:
 | --- | --- | --- |
 | Headlines | Bricolage Grotesque | `--font-display` |
 | UI, body, labels, inputs, buttons | Inter | `--font-ui` |
-| Numbers, coordinates, distances, ETAs, status pills | DM Mono | `--font-mono` |
+| Numbers, coordinates, distances, ETAs, status pills | Manrope | `--v2-font-manrope` |
 
-Styles in use: modal title 24/32 600 (display) · panel title 17 / 1.2 700 (display) · button 14 600, 0.14px tracking (ui) · item title 14 600 (ui) · body 16/24 (ui) · small body 12 / 1.35 (ui) · overline 11 500, 0.1em, uppercase (ui) · mono value 12 (mono).
+Numbers: new screens and redesigns use **Manrope**. Screens built before this keep **DM Mono** (`--font-mono`) — don't switch them unless asked. Manrope's digits aren't fixed-width, so add `font-variant-numeric: tabular-nums` where numbers update or line up in columns (counters, timers, prices in a list).
 
-Approved alternates for new design and motion work: Satoshi, Plus Jakarta Sans, Geist, Manrope. They are **not bundled in the app**. Any other font is not allowed without the user's approval.
+Styles in use: modal title 24/32 600 (display) · panel title 17 / 1.2 700 (display) · button 14 600, 0.14px tracking (ui) · item title 14 600 (ui) · body 16/24 (ui) · small body 12 / 1.35 (ui) · overline 11 500, 0.1em, uppercase (ui) · number value 12 (Manrope).
+
+Approved alternates for new design and motion work: Satoshi, Plus Jakarta Sans, Geist. All are bundled in the app: Plus Jakarta Sans (`--v2-font-jakarta`), Satoshi (`--v2-font-satoshi`), Geist (`--v2-font-geist`). Any other font is not allowed without the user's approval.
 
 ### Adding a font (only when a screen uses it, after the user approves)
-1. Plus Jakarta Sans, Geist, Manrope: `npm i @fontsource-variable/<name>`, then `@import` it in `src/index.css`.
-   Satoshi (no npm package): put its `.woff2` files in `src/assets/fonts/satoshi/` and declare `@font-face` with `font-display: swap`.
+1. With an npm package (`@fontsource` / `@fontsource-variable`): `npm i` it, then `@import` it in `src/index.css`.
+   Without one: put its `.woff2` files (and licence) in `src/assets/fonts/<name>/` and declare `@font-face` with `font-display: swap` in `src/index.css` — Satoshi, Geist and Manrope are done this way.
 2. Add a variable with a fallback in `tokens-v2.css`, e.g. `--v2-font-geist: 'Geist Variable', var(--font-ui);`.
 3. Components use the variable, never the font name.
 

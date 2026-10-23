@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   ArrowLeft,
@@ -610,6 +610,17 @@ export default function PromotePage() {
             </span>
             <span className={styles.backLabel}>Back</span>
           </button>
+          {/* Business | Event switch to /event — desktop only. */}
+          {isDesktop && (
+            <nav className={styles.listingToggle} aria-label="What are you listing?">
+              <span className={`${styles.listingToggleBtn} ${styles.listingToggleBtnActive}`} aria-current="page">
+                Business
+              </span>
+              <Link to="/event" replace className={styles.listingToggleBtn}>
+                Event
+              </Link>
+            </nav>
+          )}
           <span className={styles.stepLabel}>Step 1 of 2</span>
         </header>
 

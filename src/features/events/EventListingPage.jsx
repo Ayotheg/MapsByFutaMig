@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  CalendarDays,
   Check,
   CheckCircle2,
   Clock,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useSeo } from '../../lib/useSeo';
 import WaypointSearchPanel from '../promote/WaypointSearchPanel';
+import { DayField, TimeField } from './DateTimeFields';
 import { DateBadge } from '../explore/ExploreEvents';
 import { EVENT_LISTING_FEE, shortWhen } from '../explore/eventsData';
 import styles from './EventListingPage.module.css';
@@ -185,6 +185,11 @@ export default function EventListingPage() {
         <svg className={styles.heroPath} viewBox="0 0 200 420" fill="none" aria-hidden="true">
           <path d="M150 40 C 175 120, 170 230, 120 300 S 40 400, 10 415" />
         </svg>
+        {/* Phones: the route drops from the pin down the right-hand gutter,
+            so the title can use the full width. */}
+        <svg className={styles.heroPathMobile} viewBox="0 0 60 220" fill="none" aria-hidden="true">
+          <path d="M40 2 C 52 70, 54 130, 42 170 S 12 212, 2 218" />
+        </svg>
         <MapPin className={styles.heroPin} size={40} strokeWidth={2} aria-hidden="true" />
 
         <div className={styles.heroInner}>
@@ -293,20 +298,8 @@ export default function EventListingPage() {
               />
             </div>
             <div className={styles.twoCol}>
-              <label className={styles.field}>
-                <span className={styles.label}>Day</span>
-                <span className={styles.iconInput}>
-                  <CalendarDays size={17} aria-hidden="true" />
-                  <input className={styles.input} type="date" value={day} onChange={(e) => setDay(e.target.value)} />
-                </span>
-              </label>
-              <label className={styles.field}>
-                <span className={styles.label}>Starts</span>
-                <span className={styles.iconInput}>
-                  <Clock size={17} aria-hidden="true" />
-                  <input className={styles.input} type="time" value={starts} onChange={(e) => setStarts(e.target.value)} />
-                </span>
-              </label>
+              <DayField value={day} onChange={setDay} />
+              <TimeField value={starts} onChange={setStarts} />
             </div>
           </section>
 

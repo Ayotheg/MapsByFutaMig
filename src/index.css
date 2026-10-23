@@ -37,6 +37,74 @@
 /* Explore panel title (approved alternate, DESIGN_SYSTEM.md). */
 @import "@fontsource-variable/plus-jakarta-sans";
 
+/* Satoshi (approved alternate; no npm package, so self-hosted). One
+   variable file covers weights 300–900. */
+@font-face {
+  font-family: "Satoshi Variable";
+  src: url("./assets/fonts/satoshi/Satoshi-Variable.woff2") format("woff2");
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Geist (approved alternate), self-hosted like Satoshi. Variable files,
+   weights 100–900, upright + italic. Licence: assets/fonts/geist/OFL.txt. */
+@font-face {
+  font-family: "Geist Variable";
+  src: url("./assets/fonts/geist/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Variable";
+  src: url("./assets/fonts/geist/Geist-Italic-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* Manrope — numbers on new screens (var(--v2-font-manrope)); existing
+   screens keep DM Mono. Static files, one per weight; the browser only
+   downloads the weights a page uses.
+   Licence: SIL OFL 1.1 (assets/fonts/manrope/Readme.txt). */
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/manrope/Manrope-thin.woff2") format("woff2");
+  font-weight: 100;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/manrope/Manrope-light.woff2") format("woff2");
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/manrope/Manrope-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/manrope/Manrope-medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/manrope/Manrope-semibold.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/manrope/Manrope-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
 /* ── Icons: lucide-react (see src/lib/legacyIconMap.js). No CSS import
    needed — icons are React components, tree-shaken per usage. ────── */
 

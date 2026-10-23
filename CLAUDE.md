@@ -18,7 +18,9 @@ CSS Modules + Tailwind 4, Supabase (Postgres, Auth, Storage, Edge Functions), Re
 ## Design (all UI)
 - Follow `DESIGN_SYSTEM.md`. Read it before building or changing a screen.
 - Colours: only its 17 brand colours, via `tokens-v2.css` variables. Never a new hex.
-- Fonts: `var(--font-ui)` Inter, `var(--font-display)` Bricolage Grotesque, `var(--font-mono)` DM Mono.
+- Fonts: `var(--font-ui)` Inter, `var(--font-display)` Bricolage Grotesque, `var(--v2-font-manrope)` Manrope for numbers.
+  Existing screens keep DM Mono (`var(--font-mono)`) for numbers; don't switch them unless asked.
+  Alternates already bundled: `var(--v2-font-jakarta)`, `var(--v2-font-satoshi)`, `var(--v2-font-geist)`.
   Any other font: stop and ask the user to approve installing it.
 - Icons: `lucide-react`. Build desktop and mobile together.
 

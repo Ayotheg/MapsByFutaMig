@@ -47,13 +47,20 @@
   background: rgba(255, 255, 255, 0.07);
 }
 .heroPath {
+  display: none;
   position: absolute;
-  top: 26px;
-  right: 30px;
-  width: 110px;
-  height: 340px;
 }
-.heroPath path {
+/* Pin top-right, its route running down the 20px gutter (x ≈ 12–24px
+   from the right edge) past the title and pills. */
+.heroPathMobile {
+  position: absolute;
+  top: calc(50px + var(--mob-safe-top, 0px));
+  right: 4px;
+  width: 60px;
+  height: 220px;
+}
+.heroPath path,
+.heroPathMobile path {
   stroke: var(--v2-nav-active-accent);
   stroke-width: 4;
   stroke-linecap: round;
@@ -61,8 +68,8 @@
 }
 .heroPin {
   position: absolute;
-  top: 0;
-  right: 40px;
+  top: calc(8px + var(--mob-safe-top, 0px));
+  right: 4px;
   color: var(--v2-primary);
   fill: var(--v2-nav-active-accent);
 }
@@ -93,8 +100,9 @@
 .backBtn:hover {
   background: rgba(255, 255, 255, 0.26);
 }
+/* Business | Event switch — desktop only (shown in the 960px block below). */
 .toggle {
-  display: flex;
+  display: none;
   flex: 0 1 220px;
   padding: 4px;
   border-radius: var(--r-full);
@@ -122,13 +130,17 @@ a.toggleBtn:hover {
   color: var(--v2-primary);
 }
 
+/* Satoshi at its heaviest: bold enough for the hero, same family as the
+   section and card titles below. On phones it's sized to fill the row:
+   "List your event" is 6.67em wide in Satoshi 900, so (100vw − 40px
+   gutters) / 6.75 — about 52px on a 390px phone, capped at 60px. */
 .title {
   margin: 22px 0 14px;
-  font-family: var(--font-display);
-  font-size: 40px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.04em;
+  font-family: var(--v2-font-satoshi);
+  font-size: clamp(40px, calc((100vw - 40px) / 6.75), 60px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   color: var(--v2-on-primary);
 }
 .pills {
@@ -195,17 +207,18 @@ a.toggleBtn:hover {
   height: 36px;
   border-radius: 10px;
   background: var(--v2-hud-upnext-bg);
+  font-family: var(--v2-font-manrope);
   font-size: 14px;
   font-weight: 700;
   color: var(--v2-primary);
 }
 .stepTitle {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 22px;
+  font-family: var(--v2-font-satoshi);
+  font-size: 21px;
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   color: var(--v2-primary);
 }
 .stepSub {
@@ -288,7 +301,7 @@ a.toggleBtn:hover {
   background: var(--v2-secondary);
 }
 .optionTitle {
-  font-family: var(--font-display);
+  font-family: var(--v2-font-satoshi);
   font-size: 17px;
   font-weight: 700;
   line-height: 1.2;
@@ -358,25 +371,16 @@ a.toggleBtn:hover {
 .input:focus {
   border-color: var(--v2-primary);
 }
-.iconInput {
-  position: relative;
-  display: block;
-}
-.iconInput > svg {
-  position: absolute;
-  top: 50%;
-  left: 14px;
-  transform: translateY(-50%);
-  color: var(--v2-primary);
-  pointer-events: none;
-}
-.iconInput .input {
-  padding-left: 40px;
-}
 .twoCol {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px;
+}
+/* Very narrow phones: Day / Starts and the venue buttons stack. */
+@media (max-width: 359px) {
+  .twoCol {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .dropzone {
@@ -637,9 +641,10 @@ a.toggleBtn:hover {
   color: var(--v2-primary);
 }
 .payValue {
-  font-family: var(--font-display);
+  font-family: var(--v2-font-manrope);
   font-size: 44px;
-  font-weight: 800;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1.05;
   letter-spacing: -0.02em;
   color: var(--v2-primary);
@@ -686,9 +691,10 @@ a.toggleBtn:hover {
   border: none;
   border-radius: var(--r-full);
   background: var(--v2-primary);
-  font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.14px;
   color: var(--v2-on-primary);
   box-shadow: 0 12px 24px -10px var(--v2-primary-glow-strong);
   cursor: pointer;
@@ -724,7 +730,7 @@ a.toggleBtn:hover {
   gap: 8px;
 }
 .previewLabel {
-  font-family: var(--font-display);
+  font-family: var(--v2-font-satoshi);
   font-size: 15px;
   font-weight: 700;
   color: var(--v2-primary);
@@ -785,11 +791,12 @@ a.toggleBtn:hover {
   gap: 5px;
   padding: 14px 16px 16px;
 }
+/* Same type as the real Explore event card title (ExploreEvents.module.css). */
 .previewName {
   margin-bottom: 2px;
-  font-family: var(--font-display);
-  font-size: 19px;
-  font-weight: 700;
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 600;
   color: var(--v2-neutral);
   overflow-wrap: anywhere;
 }
@@ -813,8 +820,11 @@ a.toggleBtn:hover {
 
 /* ── Desktop ──────────────────────────────────────────────────────── */
 @media (min-width: 960px) {
+  /* Title sits 64px below the back button row (was 34px) so it doesn't
+     crowd it; the bottom padding drops by about the same, so the hero
+     keeps its height and the cards still overlap it as before. */
   .hero {
-    padding: 28px 40px 140px;
+    padding: 28px 40px 112px;
     border-radius: 0;
   }
   .heroCircle {
@@ -824,11 +834,13 @@ a.toggleBtn:hover {
     height: 640px;
   }
   .heroPath {
+    display: block;
     top: 0;
     right: 280px;
     width: 160px;
     height: 260px;
   }
+  .heroPathMobile,
   .heroPin {
     display: none;
   }
@@ -837,10 +849,11 @@ a.toggleBtn:hover {
     justify-content: space-between;
   }
   .toggle {
+    display: flex;
     flex-basis: 270px;
   }
   .title {
-    margin: 34px 0 16px;
+    margin: 64px 0 18px;
     font-size: 64px;
   }
   .layout {
