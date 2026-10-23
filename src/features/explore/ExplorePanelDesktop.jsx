@@ -3,6 +3,7 @@ import { ChevronDown, CirclePlus } from 'lucide-react';
 import { GROUP_META, groupOfType } from '../legend/placeTypeGroups';
 import { haversine } from '../../lib/geoUtils';
 import { CategorySegment, FeaturedRail, ListRow, SectionHeader, featuredTitle, moreTitle, splitFeatured } from './ExploreSections';
+import { EventFilterChips, EventsList } from './ExploreEvents';
 import { comparePicks } from './useExplorePicks';
 import styles from './ExplorePanelDesktop.module.css';
 
@@ -26,7 +27,19 @@ const SORT_OPTIONS = [
  * sort, Suggest a Place and the promote link. The cards themselves are
  * the shared ones in ExploreSections.jsx.
  */
-export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSuggestPlace, category = 'places', onCategoryChange, rotatingFeatured }) {
+export default function ExplorePanelDesktop({
+  picks,
+  userCoords,
+  onSelect,
+  onSuggestPlace,
+  category = 'places',
+  onCategoryChange,
+  rotatingFeatured,
+  events,
+  eventFilter,
+  onEventFilterChange,
+  onSelectEvent,
+}) {
   const [activeGroup, setActiveGroup] = useState(null); // null = "All Spots"
   const [sortMode, setSortMode] = useState('featured');
   const [sortOpen, setSortOpen] = useState(false);
@@ -116,6 +129,8 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
       }
     : splitFeatured(sorted);
   const restTitle = isFeaturedOrder ? moreTitle(category) : currentSortLabel;
+  // Events have their own chips and list (ExploreEvents.jsx).
+  const isEvents = category === 'events';
   const noun = NOUNS[category] || NOUNS.places;
 
   function renderRow(pick) {
@@ -148,7 +163,9 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
             supabase/channel_entries.sql). */}
         <CategorySegment category={category} onChange={handleCategoryChange} size="sm" />
 
-        {availableGroups.length > 0 && (
+        {isEvents && <EventFilterChips filter={eventFilter} onChange={onEventFilterChange} size="sm" />}
+
+        {!isEvents && availableGroups.length > 0 && (
           <div className={styles.chipRow}>
             <button
               type="button"
@@ -170,6 +187,7 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
           </div>
         )}
 
+        {!isEvents && (
         <div className={styles.controlsRow}>
           <span className={styles.count}>
             {sorted.length} {sorted.length === 1 ? noun[0] : noun[1]}
@@ -196,8 +214,14 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
             </div>
           )}
         </div>
+        )}
       </div>
 
+      {isEvents ? (
+        <div className={styles.list}>
+          <EventsList events={events || []} size="sm" sectionClassName={styles.section} onSelect={onSelectEvent} />
+        </div>
+      ) : (
       <div className={styles.list}>
         {sorted.length === 0 && (
           <div className={styles.noResults}>
@@ -227,6 +251,7 @@ export default function ExplorePanelDesktop({ picks, userCoords, onSelect, onSug
           </section>
         )}
       </div>
+      )}
 
       {onSuggestPlace && (
         <div className={styles.footer}>

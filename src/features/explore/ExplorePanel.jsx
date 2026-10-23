@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { comparePicks } from './useExplorePicks';
 import { CategorySegment, FeaturedRail, ListRow, SectionHeader, featuredTitle, moreTitle, splitFeatured } from './ExploreSections';
+import { EventFilterChips, EventsList } from './ExploreEvents';
+import { SAMPLE_EVENTS, filterEvents } from './eventsData';
 import ExplorePanelDesktop from './ExplorePanelDesktop';
 import { useOneShotLocation } from './useOneShotLocation';
 import styles from './ExplorePanel.module.css';
+
+const EventCard = lazy(() => import('./EventCard'));
 
 // How often the compact preview swings to the next pair of organic picks.
 // Long enough to actually read a card, short enough that the section
@@ -99,6 +103,23 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
 
   const fullItems = useMemo(() => [...promoted, ...organic], [promoted, organic]);
 
+  // Events tab: sample data until events come from Supabase (eventsData.js).
+  const [eventFilter, setEventFilter] = useState('all');
+  const events = useMemo(() => filterEvents(SAMPLE_EVENTS, eventFilter), [eventFilter]);
+  const [openEvent, setOpenEvent] = useState(null);
+  // EventCard's chunk loads on the first tap, then stays mounted so it can
+  // slide out on close.
+  const [eventCardLoaded, setEventCardLoaded] = useState(false);
+  function selectEvent(event) {
+    setEventCardLoaded(true);
+    setOpenEvent(event);
+  }
+  const eventCard = eventCardLoaded && (
+    <Suspense fallback={null}>
+      <EventCard event={openEvent} isMobile={!desktop} onClose={() => setOpenEvent(null)} />
+    </Suspense>
+  );
+
   if (loading && !picks.length) {
     return (
       <div className={styles.panel}>
@@ -122,15 +143,22 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   // it, so this branch is unreachable from mobile.
   if (variant === 'full' && desktop) {
     return (
-      <ExplorePanelDesktop
-        picks={fullItems}
-        userCoords={userCoords}
-        onSelect={onSelect}
-        onSuggestPlace={onSuggestPlace}
-        category={category}
-        onCategoryChange={setCategory}
-        rotatingFeatured={rotating ? compactItems : null}
-      />
+      <>
+        <ExplorePanelDesktop
+          picks={fullItems}
+          userCoords={userCoords}
+          onSelect={onSelect}
+          onSuggestPlace={onSuggestPlace}
+          category={category}
+          onCategoryChange={setCategory}
+          rotatingFeatured={rotating ? compactItems : null}
+          events={events}
+          eventFilter={eventFilter}
+          onEventFilterChange={setEventFilter}
+          onSelectEvent={selectEvent}
+        />
+        {eventCard}
+      </>
     );
   }
 
@@ -140,6 +168,18 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
       <p className={styles.subtitle}>Campus spots, people and updates.</p>
     </div>
   );
+
+  if (variant === 'full' && category === 'events') {
+    return (
+      <div className={styles.panel}>
+        {header}
+        <CategorySegment category={category} onChange={setCategory} />
+        <EventFilterChips filter={eventFilter} onChange={setEventFilter} />
+        <EventsList events={events} sectionClassName={styles.section} onSelect={selectEvent} />
+        {eventCard}
+      </div>
+    );
+  }
 
   if (variant === 'full') {
     // More picks than slots: the rail rotates (pinned promoted pick +

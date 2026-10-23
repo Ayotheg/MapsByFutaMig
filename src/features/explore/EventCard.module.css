@@ -1,0 +1,290 @@
+/* Event detail card (see EventCard.jsx). Positions match PlaceCard: a
+   floating card under the search bar and chips on desktop, a bottom sheet
+   on mobile. The footer stays put while the details scroll. */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1299;
+  background: var(--v2-scrim);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.scrimVisible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.card {
+  position: fixed;
+  z-index: 1300;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--v2-on-primary);
+  box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.22), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
+  font-family: var(--font-ui);
+  pointer-events: none;
+  will-change: transform;
+}
+.card.visible {
+  pointer-events: auto;
+}
+
+.card.mobile {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: calc(100dvh - var(--mob-safe-top) - 40px);
+  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
+  transform: translateY(100%);
+  transition: transform 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.card.mobile.visible {
+  transform: translateY(0);
+}
+
+.card.desktop {
+  left: calc(var(--sidebar-total-w) + 16px);
+  top: 118px;
+  width: 400px;
+  max-height: calc(100vh - 134px);
+  border-radius: var(--r-2xl);
+  transform: translateX(calc(-1 * (var(--sidebar-total-w) + 100% + 40px)));
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.card.desktop.visible {
+  transform: translateX(0);
+}
+
+.handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  cursor: grab;
+  touch-action: none;
+}
+.handleBar {
+  width: 36px;
+  height: 5px;
+  border-radius: var(--r-full);
+  background: var(--v2-divider);
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* ── Poster with the date badge ───────────────────────────────────── */
+.poster {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 196px;
+  margin: 12px 12px 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--v2-neutral);
+}
+.card.mobile .poster {
+  margin: 0 16px;
+  height: 196px;
+}
+.posterIcon {
+  color: var(--v2-on-primary);
+  opacity: 0.35;
+}
+.poster img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.date {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 48px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--v2-on-primary);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+}
+
+/* ── Details ──────────────────────────────────────────────────────── */
+.body {
+  padding: 18px 16px 20px;
+}
+.card.mobile .body {
+  padding: 18px 20px 20px;
+}
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--v2-neutral);
+  overflow-wrap: anywhere;
+}
+.close {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -3px -6px 0 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--v2-text-muted);
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.close:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.organiser {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--v2-text);
+}
+
+.facts {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fact {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.factIcon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--v2-hud-upnext-bg);
+  color: var(--v2-primary);
+}
+.factText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.factMain {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.factSub {
+  font-size: 13px;
+  color: var(--v2-text);
+}
+
+.aboutTitle {
+  margin: 22px 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.about {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--v2-text);
+  overflow-wrap: anywhere;
+}
+
+/* ── Footer: Navigate / Join + calendar + share ───────────────────── */
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--v2-divider);
+  background: var(--v2-on-primary);
+}
+.card.mobile .footer {
+  padding: 12px 16px calc(14px + var(--mob-safe-bottom));
+}
+.primaryBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 50px;
+  padding: 0 20px;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.14px;
+  box-shadow: 0 12px 24px -10px var(--v2-primary-glow-strong);
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.primaryBtn:hover {
+  background: var(--v2-primary-hover);
+}
+.primaryBtn:active {
+  transform: scale(0.98);
+}
+.iconBtn {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--v2-divider);
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  color: var(--v2-neutral);
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.iconBtn:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.primaryBtn:focus-visible,
+.iconBtn:focus-visible,
+.close:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.mobile,
+  .card.desktop,
+  .scrim {
+    transition: none;
+  }
+}

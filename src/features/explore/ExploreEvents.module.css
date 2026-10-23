@@ -1,0 +1,384 @@
+/* Explore → Events (see ExploreEvents.jsx). Mobile sizes by default; the
+   `Sm` modifiers scale down for the desktop sidebar panel, same as
+   ExploreSections.module.css. Brand tokens only (DESIGN_SYSTEM.md). */
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ── Date badge: "OCT / 24" ───────────────────────────────────────── */
+.dateBadge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  line-height: 1;
+}
+.dateMonth {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--v2-primary);
+}
+.dateDay {
+  margin-top: 3px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+
+/* ── All / Today / This week / Free / Paid ───────────────────────── */
+.chipRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--explore-gutter, 20px));
+  padding: 1px var(--explore-gutter, 20px);
+}
+.chipRow::-webkit-scrollbar {
+  display: none;
+}
+.chip {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--v2-divider);
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--v2-neutral);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    border-color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.chip:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.chipActive,
+.chipActive:hover {
+  background: var(--v2-neutral);
+  border-color: var(--v2-neutral);
+  color: var(--v2-on-primary);
+  font-weight: 600;
+}
+.chipRowSm {
+  gap: 6px;
+}
+.chipRowSm .chip {
+  min-height: 0;
+  padding: 5px 11px;
+  font-size: 11.5px;
+}
+
+/* ── Featured events rail ─────────────────────────────────────────── */
+.rail {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--explore-gutter, 20px));
+  padding: 0 var(--explore-gutter, 20px) 2px;
+  scroll-padding: 0 var(--explore-gutter, 20px);
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.card {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: min(272px, 74vw);
+  padding: 0;
+  border: 1px solid var(--v2-divider);
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--v2-on-primary);
+  text-align: left;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  scroll-snap-align: start;
+  isolation: isolate;
+  /* Same fade-in as the Places rail; cards swapped in by the rotation are
+     re-keyed, so this doubles as its crossfade. */
+  animation: eventIn var(--v2-duration-standard) var(--v2-ease-standard);
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.card:active {
+  transform: scale(0.98);
+}
+@keyframes eventIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* "Add your event" — last card in the rail (see ExploreSections.module.css
+   .promoteCard for the shared shape). */
+.addCard {
+  background: var(--v2-surface);
+  text-align: left;
+  cursor: pointer;
+}
+.addNote {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--v2-text);
+}
+.addAction {
+  margin-top: 6px;
+}
+.railSm .addNote {
+  font-size: 11px;
+}
+.railSm .addAction {
+  margin-top: 3px;
+}
+.card:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+.poster {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 148px;
+  background: var(--v2-neutral);
+}
+.posterIcon {
+  color: var(--v2-on-primary);
+  opacity: 0.35;
+}
+.posterImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cardDate {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 48px;
+  height: 52px;
+  border-radius: 12px;
+  background: var(--v2-on-primary);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+}
+.priceTag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.priceTagFree {
+  background: var(--v2-nav-active-accent);
+}
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px 14px;
+  min-width: 0;
+}
+.cardTitle {
+  margin-bottom: 2px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cardLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--v2-text);
+}
+.cardLine svg {
+  flex-shrink: 0;
+  color: var(--v2-text-muted);
+}
+
+.railSm {
+  gap: 8px;
+}
+.railSm .card {
+  width: 196px;
+  border-radius: 14px;
+}
+.railSm .poster {
+  height: 104px;
+}
+.railSm .cardDate {
+  top: 8px;
+  left: 8px;
+  width: 38px;
+  height: 42px;
+  border-radius: 9px;
+}
+.railSm .dateMonth {
+  font-size: 9px;
+}
+.railSm .dateDay {
+  font-size: 17px;
+}
+.railSm .priceTag {
+  top: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  font-size: 10px;
+}
+.railSm .cardBody {
+  gap: 3px;
+  padding: 9px 10px 10px;
+}
+.railSm .cardTitle {
+  font-size: 13px;
+}
+.railSm .cardLine {
+  gap: 5px;
+  font-size: 11px;
+}
+.railSm .cardLine svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ── Upcoming rows ────────────────────────────────────────────────── */
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  border-radius: var(--r-md);
+  background: none;
+  text-align: left;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.row:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.rowDate {
+  width: 52px;
+  height: 56px;
+  border-radius: 14px;
+  background: var(--v2-hud-upnext-bg);
+}
+.rowBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.rowTop {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.rowTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rowPrice {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+.rowPriceFree {
+  color: var(--v2-secondary);
+}
+.rowWhen {
+  font-size: 13px;
+  color: var(--v2-text);
+}
+.rowPlace {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--v2-text);
+}
+.rowPlace svg {
+  flex-shrink: 0;
+  color: var(--v2-text-muted);
+}
+
+.rowsSm {
+  gap: 2px;
+  margin: 0 -4px;
+}
+.rowsSm .row {
+  gap: 10px;
+  padding: 6px 4px;
+}
+.rowsSm .rowDate {
+  width: 40px;
+  height: 44px;
+  border-radius: 10px;
+}
+.rowsSm .dateMonth {
+  font-size: 9px;
+}
+.rowsSm .dateDay {
+  font-size: 16px;
+}
+.rowsSm .rowTitle {
+  font-size: 12.5px;
+}
+.rowsSm .rowPrice,
+.rowsSm .rowWhen,
+.rowsSm .rowPlace {
+  font-size: 11px;
+}
+.rowsSm .rowPlace svg {
+  width: 12px;
+  height: 12px;
+}
+
+.empty {
+  padding: 24px 4px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--v2-text-muted);
+}

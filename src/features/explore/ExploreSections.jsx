@@ -29,6 +29,7 @@ export const CATEGORIES = [
   { key: 'places', label: 'Places' },
   { key: 'people', label: 'People' },
   { key: 'channels', label: 'Channels' },
+  { key: 'events', label: 'Events' },
 ];
 
 /**
