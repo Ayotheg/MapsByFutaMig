@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Info, MapPin, Navigation, Search, X } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import { dotColor } from '../search/chipConfig';
@@ -24,6 +25,33 @@ import styles from './NavDestPanel.module.css';
  * to them, just markup) were also dropped to match the frame, which
  * shows a single "Where to?" destination search only.
  */
+
+// Bug fix (reported directly): on mobile the on-screen keyboard covered the
+// "Where to?" field. Browsers now overlay the keyboard on the page instead
+// of shrinking the layout viewport, so a `position: fixed; bottom: 0` sheet
+// stays put underneath it. Track how much of the layout viewport the
+// keyboard hides (visualViewport) and lift the sheet by that much — the
+// mobile CSS reads it as `--kb-inset` / `--vv-h`.
+function useKeyboardInset() {
+  const [vp, setVp] = useState({ inset: 0, height: null });
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    const update = () => {
+      const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setVp({ inset, height: Math.round(vv.height) });
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+  return vp;
+}
+
 export default function NavDestPanel({
   destInputValue,
   onDestInputChange,
@@ -39,8 +67,13 @@ export default function NavDestPanel({
   popularPlaces,
   onPopularPlaceSelect,
 }) {
+  const kb = useKeyboardInset();
   return (
-    <div className={styles.panel}>
+    <div
+      className={styles.panel}
+      data-kb={kb.inset > 0 ? 'open' : undefined}
+      style={{ '--kb-inset': `${kb.inset}px`, ...(kb.height && { '--vv-h': `${kb.height}px` }) }}
+    >
       <div className={styles.dragHandle}>
         <span />
       </div>

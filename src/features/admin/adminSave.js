@@ -77,7 +77,7 @@ async function blockedWriteError(action) {
 // PostgREST's missing-column message is "Could not find the 'x' column of
 // 'waypoints' in the schema cache" (PGRST204); Postgres' own is "column ...
 // does not exist" (42703).
-function isMissingColumn(error) {
+export function isMissingColumn(error) {
   return (
     !!error &&
     (error.code === 'PGRST204' ||

@@ -89,7 +89,7 @@
   border: none;
   color: var(--v2-text);
   font-family: var(--font-ui);
-  font-size: 16px;
+  font-size: 14px;
   padding: 0;
   outline: none;
   box-sizing: border-box;
@@ -326,10 +326,12 @@
   .panel {
     left: 0 !important;
     right: 0;
-    bottom: 0;
+    /* Sits on top of the on-screen keyboard instead of behind it — see
+       useKeyboardInset in NavDestPanel.jsx. */
+    bottom: var(--kb-inset, 0px);
     top: auto;
     width: 100%;
-    max-height: 88vh;
+    max-height: calc(var(--vv-h, 100vh) * 0.88);
     border-right: none;
     border-top: none;
     border-radius: 24px 24px 0 0;
@@ -359,11 +361,21 @@
     gap: 24px;
   }
 
+  /* 14px (was 16px "iOS anti-zoom"): the map route's viewport meta sets
+     maximum-scale=1 (HomeRoute.jsx), which already stops focus-zoom. */
   .toInputWrap input {
-    font-size: 16px; /* iOS anti-zoom */
+    font-size: 14px;
   }
 
   .footer {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Lifted onto the keyboard: the home-indicator inset is behind it now. */
+  .panel[data-kb='open'] {
+    padding-bottom: 0;
+  }
+  .panel[data-kb='open'] .footer {
+    padding-bottom: 16px;
   }
 }

@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { uploadImage, insertImageRows } from '../admin/adminSave';
+import { uploadImage, insertImageRows, isMissingColumn } from '../admin/adminSave';
 import { haversine } from '../../lib/geoUtils';
 import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
 import { track } from '../../lib/analytics';
@@ -80,7 +80,7 @@ export async function checkRateLimit(userId) {
  * `submitted_by: userId` — the checks below are client-side UX (fail
  * fast with a friendly message) on top of that, not a substitute for it.
  */
-export async function submitWaypoint({ userId, name, description, type, lat, lng, files }) {
+export async function submitWaypoint({ userId, name, description, type, area, lat, lng, files }) {
   if (files.length > MAX_IMAGES_PER_SUBMISSION) {
     throw new Error(`Please attach at most ${MAX_IMAGES_PER_SUBMISSION} photos.`);
   }
@@ -94,29 +94,34 @@ export async function submitWaypoint({ userId, name, description, type, lat, lng
     );
   }
 
-  const { data, error } = await supabase
-    .from('waypoints')
-    .insert({
-      // The migrated schema preserves Firestore IDs and has no database
-      // default, so new browser-created waypoints must provide a text ID.
-      id: crypto.randomUUID(),
-      name,
-      description,
-      type,
-      lat,
-      lng,
-      // A new source_type value, alongside the existing 'gps_annotation'
-      // (admin-added) and 'osm_import' (bulk-imported) — useWaypoints.js's
-      // `source_type === 'osm_import'` skip doesn't need to change,
-      // 'user_submission' rows render exactly like 'gps_annotation' ones
-      // once approved.
-      source_type: 'user_submission',
-      status: 'pending',
-      submitted_by: userId,
-      saved_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
+  const row = {
+    // The migrated schema preserves Firestore IDs and has no database
+    // default, so new browser-created waypoints must provide a text ID.
+    id: crypto.randomUUID(),
+    name,
+    description,
+    type,
+    // Place area (supabase/waypoint_area.sql), same column the admin edits.
+    area: area?.trim() || null,
+    lat,
+    lng,
+    // A new source_type value, alongside the existing 'gps_annotation'
+    // (admin-added) and 'osm_import' (bulk-imported) — useWaypoints.js's
+    // `source_type === 'osm_import'` skip doesn't need to change,
+    // 'user_submission' rows render exactly like 'gps_annotation' ones
+    // once approved.
+    source_type: 'user_submission',
+    status: 'pending',
+    submitted_by: userId,
+    saved_at: new Date().toISOString(),
+  };
+  const insert = (r) => supabase.from('waypoints').insert(r).select('id').single();
+  let { data, error } = await insert(row);
+  // waypoint_area.sql not run yet: submit without the area rather than fail.
+  if (error && isMissingColumn(error)) {
+    delete row.area;
+    ({ data, error } = await insert(row));
+  }
   if (error) throw error;
   const waypointId = data.id;
 

@@ -30,15 +30,31 @@ const ZOOM_CLOSE_THRESHOLD = 18;
  * No timeout: it stays until the person zooms in (any zoom-in, not only
  * to the close tier) or taps "Got it" — both remember it in localStorage.
  * It also leaves, without remembering, once they're already zoomed close.
+ *
+ * `onDone` fires once per load when the hint is out of the way: after it
+ * fades on a first visit, or straight away when it isn't shown at all
+ * (MapPage opens Explore from it).
  */
-export default function ZoomHint({ map }) {
+export default function ZoomHint({ map, onDone }) {
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const buttonRef = useRef(null);
+  // Ref so a new callback identity doesn't re-run the zoomend effect below.
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  const dismissedRef = useRef(false);
 
   const dismiss = useCallback(() => {
+    // Several zoomends can land during the fade; act on the first.
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
     setLeaving(true);
-    setTimeout(() => setVisible(false), FADE_MS);
+    setTimeout(() => {
+      setVisible(false);
+      // After the fade, so Explore opens once the overlay is gone.
+      onDoneRef.current?.();
+    }, FADE_MS);
     try {
       window.localStorage?.setItem(DISMISSED_KEY, '1');
     } catch {
@@ -56,8 +72,12 @@ export default function ZoomHint({ map }) {
     } catch {
       alreadySeen = false;
     }
-    if (alreadySeen || map.getZoom() >= ZOOM_CLOSE_THRESHOLD) return undefined;
+    if (alreadySeen || map.getZoom() >= ZOOM_CLOSE_THRESHOLD) {
+      onDoneRef.current?.();
+      return undefined;
+    }
 
+    dismissedRef.current = false;
     setVisible(true);
     setLeaving(false);
 

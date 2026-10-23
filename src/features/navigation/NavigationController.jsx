@@ -273,7 +273,7 @@ const NavigationController = forwardRef(function NavigationController(
   // Unsubscribe fn for the shared watcher (gpsWatch.js) — navigation no
   // longer owns a `watchPosition` of its own.
   const navGpsUnsubRef = useRef(null);
-  const navRouteLayersRef = useRef(null); // { done, ahead, pulse }
+  const navRouteLayersRef = useRef(null); // { done, ahead }
   const navDestMarkerRef = useRef(null);
   const navUserMarkerRef = useRef(null);
   const navArrivalCountRef = useRef(0);
@@ -478,13 +478,14 @@ const NavigationController = forwardRef(function NavigationController(
       if (!navRouteLayersRef.current) {
         navRouteLayersRef.current = {
           done: L.polyline([], { color: '#00c896', weight: 5, opacity: 0.25, dashArray: '4 8' }).addTo(map),
-          ahead: L.polyline([], { color: '#00c896', weight: 6, opacity: 0.9 }).addTo(map),
-          pulse: L.polyline([], { color: '#fff', weight: 2, opacity: 0.35, dashArray: '1 18' }).addTo(map),
+          // Dashed, not solid (reported directly): a solid line hid the road
+          // name labels underneath; the gaps let them show through. The old
+          // white "pulse" overlay is gone — it would dot those gaps.
+          ahead: L.polyline([], { color: '#00c896', weight: 5, opacity: 0.9, dashArray: '10 10', lineCap: 'butt' }).addTo(map),
         };
       }
       navRouteLayersRef.current.done.setLatLngs(done.length > 1 ? done : []);
       navRouteLayersRef.current.ahead.setLatLngs(ahead.length > 1 ? ahead : []);
-      navRouteLayersRef.current.pulse.setLatLngs(ahead.length > 1 ? ahead : []);
     },
     [map, clearRouteLayers]
   );

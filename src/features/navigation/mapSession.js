@@ -2,7 +2,9 @@ import { readPersistentState, removePersistentState, writePersistentState } from
 
 // ── Fresh start after a long absence ─────────────────────────────────────
 //
-// The map restores what was open (an active trip, a place card, a chip…)
+// The map restores an active trip (place cards, chips and search no longer
+// come back — Explore opens on load instead; their keys stay listed so old
+// values still get cleared)
 // so a reload or a quick app switch picks up where the person left off.
 // After this long away (tab hidden, screen off, browser closed) that state
 // is stale — most often a trip nobody ended — so the next visit starts

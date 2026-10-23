@@ -5,7 +5,7 @@ import styles from './AdminPanel.module.css';
 import ownStyles from './PendingTab.module.css';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
 import { WP_TYPE_LABELS } from '../waypoints/wpTypeMeta';
-import { approveWaypoint, rejectWaypoint } from './adminSave';
+import { approveWaypoint, rejectWaypoint, isMissingColumn } from './adminSave';
 import { track } from '../../lib/analytics';
 
 /**
@@ -45,11 +45,12 @@ export default function PendingTab({ onRefreshWaypoints, onCountChange }) {
     setLoading(true);
     setError(null);
     try {
-      const { data: wpRows, error: wpErr } = await supabase
-        .from('waypoints')
-        .select('id, name, description, type, lat, lng, submitted_by, saved_at')
-        .eq('status', 'pending')
-        .order('saved_at', { ascending: true });
+      const fetchPending = (cols) =>
+        supabase.from('waypoints').select(cols).eq('status', 'pending').order('saved_at', { ascending: true });
+      const baseCols = 'id, name, description, type, lat, lng, submitted_by, saved_at';
+      // `area` (supabase/waypoint_area.sql) — still load if it isn't migrated yet.
+      let { data: wpRows, error: wpErr } = await fetchPending(`${baseCols}, area`);
+      if (wpErr && isMissingColumn(wpErr)) ({ data: wpRows, error: wpErr } = await fetchPending(baseCols));
       if (wpErr) throw wpErr;
 
       // Only the pending rows' photos (was: every photo in the table, which
@@ -171,6 +172,7 @@ export default function PendingTab({ onRefreshWaypoints, onCountChange }) {
               <span className={styles.itemBadge}>{WP_TYPE_LABELS[wp.type] || wp.type}</span>
             </div>
             <div className={styles.itemMeta}>
+              {wp.area ? `${wp.area} · ` : ''}
               {wp.description || 'No description'} · {Number(wp.lat).toFixed(5)}, {Number(wp.lng).toFixed(5)}
             </div>
             <div className={ownStyles.submitter}>Submitted by {wp.submitterName}</div>

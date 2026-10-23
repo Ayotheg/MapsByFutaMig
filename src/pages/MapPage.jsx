@@ -102,9 +102,12 @@ export default function MapPage({ onReadinessChange }) {
   });
 
   const [map, setMap] = useState(null);
-  const [selected, setSelected] = useState(() => readPersistentState('selected-place', null));
+  // Not restored across reloads (nor are the segment, chip and mobile
+  // search below): Explore opens on every load (handleZoomHintDone), and a
+  // restored card or panel would block it. Only an active trip comes back.
+  const [selected, setSelected] = useState(null);
   const [isMobile] = useState(() => window.innerWidth <= 768);
-  const [selectedSegmentId, setSelectedSegmentId] = useState(() => readPersistentState('selected-segment', null));
+  const [selectedSegmentId, setSelectedSegmentId] = useState(null);
 
   // Live connectivity signal, separate from waypointsOffline/segmentsOffline
   // below — those only flip on a fetch outcome (a cache fallback or a
@@ -144,8 +147,8 @@ export default function MapPage({ onReadinessChange }) {
   const [sheetActiveTab, setSheetActiveTab] = useState(() => readPersistentState('mobile-sheet-tab', 'layers'));
   // Desktop search bar's menu button → Sidebar opens/closes Explore.
   const [exploreRequest, setExploreRequest] = useState(0);
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(() => readPersistentState('mobile-search-open', false));
-  const [activeChip, setActiveChip] = useState(() => readPersistentState('active-chip', null));
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [activeChip, setActiveChip] = useState(null);
   const [mapView, setMapView] = useState(() => readPersistentState('map-view', null));
 
   // ── Slice 6: OSM annotations + dedup ──────────────────────────────────
@@ -237,7 +240,6 @@ export default function MapPage({ onReadinessChange }) {
     writePersistentState('map-view', next);
   }, []);
 
-  useEffect(() => writePersistentState('selected-place', selected), [selected]);
   // Fill an open card's rating and area from the loaded waypoint, whichever
   // way it was opened (pin, search, chip results, Explore — some of those
   // build their own card data without them) and after a refetch (e.g. a
@@ -255,13 +257,10 @@ export default function MapPage({ onReadinessChange }) {
       );
     }
   }, [waypoints, selected]);
-  useEffect(() => writePersistentState('selected-segment', selectedSegmentId), [selectedSegmentId]);
   useEffect(() => writePersistentState('sidebar-collapsed', collapsed), [collapsed]);
   useEffect(() => writePersistentState('mobile-sheet-tab', sheetActiveTab), [sheetActiveTab]);
-  useEffect(() => writePersistentState('active-chip', activeChip), [activeChip]);
   useEffect(() => writePersistentState('navigation-open', navOpen), [navOpen]);
   useEffect(() => writePersistentState('navigation-seeded-destination', navSeedDest), [navSeedDest]);
-  useEffect(() => writePersistentState('mobile-search-open', mobileSearchOpen), [mobileSearchOpen]);
 
   const gps = useGpsTracking(map, { hidden: navActive });
 
@@ -575,6 +574,23 @@ export default function MapPage({ onReadinessChange }) {
     [closeOtherOverlays]
   );
 
+  // Explore features new places, so open it on every load: right away for
+  // returning visitors, after the zoom hint (pinched in, or "Got it") on a
+  // first visit — unless something else is already open (`mapBusy`, below:
+  // a place, search, suggest form, the sheet…), since opening Explore
+  // closes every other overlay.
+  const [exploreOpenRequest, setExploreOpenRequest] = useState(0);
+  const mapBusyRef = useRef(false);
+  const handleZoomHintDone = useCallback(() => {
+    if (navActiveRef.current || mapBusyRef.current) return;
+    if (isMobile) {
+      setSheetActiveTab('layers');
+      handleSheetStateChange('half');
+    } else {
+      setExploreOpenRequest((n) => n + 1);
+    }
+  }, [isMobile, handleSheetStateChange]);
+
   const handleCollapsedChange = useCallback(
     (next) => {
       if (!next) closeOtherOverlays('sidebar');
@@ -729,6 +745,7 @@ export default function MapPage({ onReadinessChange }) {
     mySubmissionsOpen ||
     !!submissionToast ||
     (isMobile && sheetState !== 'peek');
+  mapBusyRef.current = mapBusy;
   const onMapRoute = useLocation().pathname === '/map';
   useEffect(() => {
     setTawkHidden('map-busy', onMapRoute && mapBusy);
@@ -756,7 +773,7 @@ export default function MapPage({ onReadinessChange }) {
   return (
     <>
       <MapShell onMapReady={setMap} initialView={mapView} onViewChange={persistMapView} />
-      <ZoomHint map={map} />
+      <ZoomHint map={map} onDone={handleZoomHintDone} />
       <OfflineBanner
         isOffline={isOffline}
         cachedAt={cachedAt}
@@ -835,6 +852,7 @@ export default function MapPage({ onReadinessChange }) {
           explorePicksLoading={waypointsLoading}
           onExploreSelect={handleSelectPlace}
           exploreRequest={exploreRequest}
+          exploreOpenRequest={exploreOpenRequest}
         />
         </div>
       )}

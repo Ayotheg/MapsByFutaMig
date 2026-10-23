@@ -76,6 +76,9 @@ export default function Sidebar({
   // Bumped by the search bar's menu button: acts like clicking the rail's
   // Explore item (opens Explore, or closes it if it's already open).
   exploreRequest = 0,
+  // Bumped once the first-visit zoom hint is done: opens Explore, never
+  // closes it (unlike exploreRequest's toggle).
+  exploreOpenRequest = 0,
 }) {
   const [activeKey, setActiveKey] = useState(() => readPersistentState('sidebar-active-panel', 'layers'));
   const lastExploreRequest = useRef(exploreRequest);
@@ -85,6 +88,14 @@ export default function Sidebar({
     handleRailClick(RAIL_ITEMS.find((item) => item.key === 'explore'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exploreRequest]);
+  const lastExploreOpenRequest = useRef(exploreOpenRequest);
+  useEffect(() => {
+    if (exploreOpenRequest === lastExploreOpenRequest.current) return;
+    lastExploreOpenRequest.current = exploreOpenRequest;
+    if (activeKey === 'explore' && !collapsed) return;
+    handleRailClick(RAIL_ITEMS.find((item) => item.key === 'explore'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exploreOpenRequest]);
 
   useEffect(() => writePersistentState('sidebar-active-panel', activeKey), [activeKey]);
 

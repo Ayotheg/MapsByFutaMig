@@ -41,6 +41,7 @@ export default function SuggestWaypointModal({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState('landmark');
+  const [area, setArea] = useState('');
   const [coord, setCoord] = useState(null); // { lat, lng }
   const [locating, setLocating] = useState(false);
   const [files, setFiles] = useState([]);
@@ -153,6 +154,7 @@ export default function SuggestWaypointModal({
         name: trimmedName,
         description: description.trim(),
         type,
+        area,
         lat: coord.lat,
         lng: coord.lng,
         files,
@@ -236,6 +238,24 @@ export default function SuggestWaypointModal({
                     </select>
                     <ChevronDown size={18} className={styles.chevron} aria-hidden="true" />
                   </div>
+                </div>
+              </div>
+
+              {/* Same `area` column the admin edit form sets (supabase/waypoint_area.sql). */}
+              <div className={styles.field}>
+                <div className={styles.labelRow}>
+                  <label htmlFor="suggest-area" className={styles.label}>Area</label>
+                  <span className={styles.hint}>Optional</span>
+                </div>
+                <div className={styles.inputBox}>
+                  <input
+                    id="suggest-area"
+                    type="text"
+                    value={area}
+                    maxLength={60}
+                    onChange={(e) => setArea(e.target.value)}
+                    placeholder="e.g. South Gate, West Gate, SUB"
+                  />
                 </div>
               </div>
 
