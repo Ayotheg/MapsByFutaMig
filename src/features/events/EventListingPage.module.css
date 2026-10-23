@@ -313,23 +313,6 @@ a.toggleBtn:hover {
   color: var(--v2-text);
 }
 
-.note {
-  display: flex;
-  gap: 10px;
-  margin: 0;
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--v2-hud-upnext-bg);
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--v2-text);
-}
-.note svg {
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: var(--v2-primary);
-}
-
 /* ── Fields ───────────────────────────────────────────────────────── */
 .field {
   display: flex;
@@ -590,6 +573,12 @@ a.toggleBtn:hover {
 }
 .prefix + .input {
   padding-left: 6px;
+}
+/* Ticket price: numbers font (DESIGN_SYSTEM.md › Type). */
+.priceInput {
+  font-family: var(--v2-font-manrope);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .helper {
   font-size: 12px;

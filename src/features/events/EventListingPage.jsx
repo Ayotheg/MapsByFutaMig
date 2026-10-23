@@ -11,7 +11,6 @@ import {
   LocateFixed,
   MapPin,
   Search,
-  ShieldCheck,
   Ticket,
   Video,
   X,
@@ -20,7 +19,7 @@ import { useSeo } from '../../lib/useSeo';
 import WaypointSearchPanel from '../promote/WaypointSearchPanel';
 import { DayField, TimeField } from './DateTimeFields';
 import { DateBadge } from '../explore/ExploreEvents';
-import { EVENT_LISTING_FEE, shortWhen } from '../explore/eventsData';
+import { EVENT_LISTING_FEE, priceLabel, shortWhen } from '../explore/eventsData';
 import styles from './EventListingPage.module.css';
 
 const naira = (n) => `₦${Number(n).toLocaleString('en-NG')}`;
@@ -46,6 +45,8 @@ export default function EventListingPage() {
   const posterInputRef = useRef(null);
 
   const [entry, setEntry] = useState(null); // null | 'free' | 'ticketed'
+  const [ticketPrice, setTicketPrice] = useState(''); // digits only, naira
+  const [ticketNote, setTicketNote] = useState('');
   const [name, setName] = useState('');
   const [organiser, setOrganiser] = useState('');
   const [poster, setPoster] = useState(null); // { file, url }
@@ -107,8 +108,23 @@ export default function EventListingPage() {
   const previewPlace =
     where === 'online' ? `Online · ${activePlatform.label}` : where === 'venue' && venue ? venue.name : 'Venue';
 
-  const fee = entry === 'free' ? 0 : entry === 'ticketed' ? EVENT_LISTING_FEE : null;
-  const submitLabel = entry === 'free' ? 'Submit for review' : entry === 'ticketed' ? `Pay ${naira(fee)} and submit` : 'Choose free or ticketed';
+  // The event as Explore will show it — same shape as eventsData.js, so the
+  // preview's price reads exactly like the Explore cards and EventCard.
+  const ticketed = entry === 'ticketed';
+  const listing = {
+    price: ticketed ? Number(ticketPrice) || 0 : 0,
+    priceNote: ticketed ? ticketNote.trim() : 'No ticket needed',
+  };
+  const needsPrice = ticketed && !listing.price;
+
+  const fee = entry === 'free' ? 0 : ticketed ? EVENT_LISTING_FEE : null;
+  const submitLabel = !entry
+    ? 'Choose free or ticketed'
+    : needsPrice
+    ? 'Add the ticket price'
+    : ticketed
+    ? `Pay ${naira(fee)} and submit`
+    : 'Submit for review';
 
   const summary = (
     <div className={styles.summaryCard}>
@@ -128,7 +144,15 @@ export default function EventListingPage() {
       <dl className={styles.summaryRows}>
         <div className={styles.summaryRow}>
           <dt>Entry</dt>
-          <dd>{entry === 'free' ? 'Free' : entry === 'ticketed' ? 'Ticketed or paid' : 'Choose above'}</dd>
+          <dd>
+            {entry === 'free'
+              ? 'Free'
+              : ticketed
+              ? listing.price
+                ? `Ticket · ${priceLabel(listing)}`
+                : 'Ticketed or paid'
+              : 'Choose above'}
+          </dd>
         </div>
         <div className={styles.summaryRow}>
           <dt>On the map until</dt>
@@ -142,7 +166,7 @@ export default function EventListingPage() {
           </dd>
         </div>
       </dl>
-      <button type="button" className={styles.submitBtn} disabled={!entry}>
+      <button type="button" className={styles.submitBtn} disabled={!entry || needsPrice}>
         {submitLabel}
       </button>
       <button type="button" className={styles.cancelLink} onClick={() => navigate(-1)}>
@@ -158,8 +182,9 @@ export default function EventListingPage() {
         <div className={styles.previewPoster}>
           {poster ? <img src={poster.url} alt="" /> : <span className={styles.previewPosterText}>[Your poster]</span>}
           <DateBadge iso={previewIso} className={styles.previewDate} />
-          <span className={`${styles.previewPrice} ${entry === 'ticketed' ? styles.previewPricePaid : ''}`}>
-            {entry === 'ticketed' ? 'Paid' : 'Free'}
+          {/* Explore's price tag: white with the price once one is set, mint "Free" otherwise. */}
+          <span className={`${styles.previewPrice} ${ticketed ? styles.previewPricePaid : ''}`}>
+            {ticketed && !listing.price ? 'Paid' : priceLabel(listing)}
           </span>
         </div>
         <div className={styles.previewBody}>
@@ -237,13 +262,41 @@ export default function EventListingPage() {
                 sub={`${naira(EVENT_LISTING_FEE)} flat to list`}
               />
             </div>
-            <p className={styles.note}>
-              <ShieldCheck size={18} aria-hidden="true" />
-              <span>
-                It counts as paid if there's a ticket link, a ticket price or a fee at the door. An admin checks every event
-                before it goes live.
-              </span>
-            </p>
+
+            {ticketed && (
+              <div className={styles.reveal}>
+                <label className={styles.field}>
+                  <span className={styles.label}>Ticket price</span>
+                  <span className={styles.prefixInput}>
+                    <span className={styles.prefix}>₦</span>
+                    <input
+                      className={`${styles.input} ${styles.priceInput}`}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="e.g. 2,000"
+                      value={ticketPrice ? Number(ticketPrice).toLocaleString('en-NG') : ''}
+                      onChange={(e) => setTicketPrice(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 7))}
+                    />
+                  </span>
+                  <span className={styles.helper}>Shown on your event card. If prices vary, enter the lowest.</span>
+                </label>
+                <label className={styles.field}>
+                  <span className={styles.labelRow}>
+                    <span className={styles.label}>How to get a ticket</span>
+                    <span className={styles.optional}>Optional</span>
+                  </span>
+                  <input
+                    className={styles.input}
+                    type="text"
+                    placeholder="e.g. Pay at the gate, or from your class rep"
+                    maxLength={80}
+                    value={ticketNote}
+                    onChange={(e) => setTicketNote(e.target.value)}
+                  />
+                </label>
+              </div>
+            )}
           </section>
 
           {/* 02 The details */}
