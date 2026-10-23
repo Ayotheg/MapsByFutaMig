@@ -16,7 +16,6 @@ import { useSegments } from '../features/segments/useSegments';
 import { useOSMAnnotations } from '../features/osm-annotations/useOSMAnnotations';
 import { useViewMode } from '../features/osm-annotations/useViewMode';
 import OSMAnnotationLayer from '../features/osm-annotations/OSMAnnotationLayer';
-import ViewModeToggle from '../features/osm-annotations/ViewModeToggle';
 import { useSearchIndex } from '../features/search/useSearchIndex';
 import { useQuickChips } from '../features/search/useQuickChips';
 import { useExplorePicks } from '../features/explore/useExplorePicks';
@@ -197,7 +196,11 @@ export default function MapPage({ onReadinessChange }) {
     ],
     [waypoints, osmItems, osmSnaps, osmBadgeMerges]
   );
-  const { viewMode, toggle: toggleViewMode, setViewMode } = useViewMode();
+  // The desktop INFO/RAW toggle was removed (Oct 2026); the map stays in
+  // INFO mode except while navigating, which still switches to RAW itself.
+  // ViewModeToggle.jsx is kept in features/osm-annotations/ in case it's
+  // wanted back.
+  const { viewMode, setViewMode } = useViewMode();
 
   const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations });
   const quickChips = useQuickChips();
@@ -793,7 +796,6 @@ export default function MapPage({ onReadinessChange }) {
         />
       )}
       {map && <OSMAnnotationLayer map={map} items={osmItems} onSelect={handleMapPinSelect} />}
-      {!isMobile && !navActive && <ViewModeToggle viewMode={viewMode} onToggle={toggleViewMode} />}
       <PlaceCard
         data={selected}
         onClose={() => setSelected(null)}
