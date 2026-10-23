@@ -68,9 +68,9 @@
   --pad:               1rem;
   --pad-lg:            1.5rem;
   --header-h:          72px;
-  --sidebar-rail-w:    64px;
+  --sidebar-rail-w:    80px;  /* desktop rail redesign, Oct 2026 */
   --sidebar-panel-w:   240px;
-  --sidebar-total-w:   304px;
+  --sidebar-total-w:   320px;
 
   /* Mobile-specific layout tokens */
   --mob-search-h:      56px;

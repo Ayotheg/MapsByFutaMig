@@ -16,113 +16,230 @@
   width: var(--sidebar-rail-w);
 }
 
-.logo {
-  width: var(--sidebar-rail-w);
-  flex-shrink: 0;
-  background: rgba(8, 14, 28, 0.97);
-  border-right: 1px solid rgba(77, 67, 84, 0.4);
-  border-bottom: 1px solid rgba(77, 67, 84, 0.3);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 14px 6px 12px;
+/* ── Desktop rail redesign (Oct 2026, public/Maps By FUTA — strip-
+   Redesign-png.zip): one light, full-height column. Item states from the
+   "item states" screen — rest (muted), hover (ink), active (primary-tint
+   pill + violet bar on the rail's left edge), keyboard focus (light teal
+   ring). */
+.rail {
   position: absolute;
   top: 0;
   left: 0;
-  height: 76px;
+  bottom: 0;
   z-index: 2;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-.logoIcon {
-  width: 36px;
-  height: 36px;
-  background: var(--v2-primary-glow, rgba(183, 109, 255, 0.15));
-  border: 1px solid var(--v2-primary-outline, rgba(183, 109, 255, 0.3));
-  border-radius: var(--r-lg);
+  width: var(--sidebar-rail-w);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  padding: 16px 0 12px;
+  background: var(--v2-on-primary);
+  border-right: 1px solid var(--v2-divider);
+  font-family: var(--font-ui);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+.logoIcon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--v2-on-primary);
+  box-shadow: 0 6px 16px -4px var(--v2-primary-glow-strong), 0 0 0 1px var(--v2-primary-tint);
 }
 .logoIcon img {
   display: block;
   object-fit: contain;
 }
 
-.rail {
-  position: absolute;
-  top: 76px;
-  left: 0;
-  bottom: 102px;
-  width: var(--sidebar-rail-w);
+.railDivider {
   flex-shrink: 0;
-  background: rgba(8, 14, 28, 0.97);
-  border-right: 1px solid rgba(77, 67, 84, 0.4);
+  width: 36px;
+  height: 1px;
+  margin: 14px 0;
+  background: var(--v2-divider);
+}
+
+.railItems {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 10px 0 12px;
-  overflow: hidden;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  gap: 6px;
+  width: 100%;
 }
 
 .railBtn {
-  width: 48px;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 10px 4px;
-  background: none;
+  width: 64px;
+  padding: 9px 0 8px;
   border: none;
-  border-radius: var(--r-lg);
-  color: rgba(218, 226, 253, 0.4);
+  border-radius: 16px;
+  background: none;
+  color: var(--v2-text-muted);
+  font-family: var(--font-ui);
   cursor: pointer;
-  transition: color 0.2s, background 0.2s;
-  position: relative;
+  transition: color var(--v2-duration-quick) var(--v2-ease-standard),
+    background var(--v2-duration-quick) var(--v2-ease-standard);
 }
-.railBtn span {
-  font-family: var(--font-mono);
-  font-size: 7.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.railBtn > span:last-child {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 14px;
 }
 .railBtn:hover {
-  color: var(--text);
-  background: var(--v2-primary-glow, rgba(221, 183, 255, 0.06));
+  color: var(--v2-neutral);
 }
-.railBtnActive {
+.railBtnActive,
+.railBtnActive:hover {
   color: var(--v2-primary);
-  background: var(--v2-primary-outline, rgba(183, 109, 255, 0.14));
+  background: var(--v2-primary-tint);
+}
+.railBtnActive > span:last-child {
+  font-weight: 600;
 }
 .railBtnActive::before {
   content: '';
   position: absolute;
-  left: 0;
+  left: -8px;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 24px;
+  width: 4px;
+  height: 28px;
+  border-radius: 0 4px 4px 0;
   background: var(--v2-primary);
-  border-radius: 0 3px 3px 0;
+}
+.railBtn:focus-visible,
+.suggestBtn:focus-visible,
+.accountBtn:focus-visible {
+  outline: 2px solid var(--v2-nav-active-accent);
+  outline-offset: 2px;
 }
 
-.brandText {
-  font-family: var(--font-display);
-  font-size: 11px;
-  color: var(--muted);
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  padding-bottom: 24px;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  text-transform: uppercase;
+/* ── Bottom group: Suggest, Admin (admins only), account, version ── */
+.railFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
   margin-top: auto;
+  padding-top: 16px;
+}
+.railFooter .railDivider {
+  margin: 8px 0;
+}
+.footerLabel {
+  max-width: 72px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  color: var(--v2-neutral);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.suggestBtn,
+.accountBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  border: none;
+  border-radius: 14px;
+  background: none;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+.suggestIcon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  box-shadow: 0 8px 18px -6px var(--v2-primary-glow-strong);
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.suggestBtn:hover .suggestIcon {
+  background: var(--v2-primary-hover);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .suggestBtn:active .suggestIcon,
+  .accountBtn:active .avatarRing {
+    transform: scale(0.95);
+  }
+}
+
+.adminIcon {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.countBadge {
+  position: absolute;
+  top: -6px;
+  right: -9px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  border: 2px solid var(--v2-on-primary);
+  background: var(--v2-tertiary);
+  color: var(--v2-on-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+}
+
+.avatarRing {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 2px;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, var(--v2-primary), var(--v2-nav-active-accent));
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.avatarInner {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  color: var(--v2-primary);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+.avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.version {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--v2-text-muted);
 }
 
 .panel {
@@ -312,109 +429,21 @@
   transition: opacity 0.2s;
 }
 
-.sidebarFooter {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: var(--sidebar-rail-w);
-  background: rgba(8, 14, 28, 0.97);
-  border-right: 1px solid rgba(77, 67, 84, 0.4);
-  border-top: 1px solid rgba(77, 67, 84, 0.3);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px 0;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
-
-.authBtn,
-.adminBtn {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--r-lg);
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  background: var(--v2-primary-glow, rgba(183, 109, 255, 0.08));
-  border: 1px solid var(--v2-primary-outline, rgba(183, 109, 255, 0.25));
-  color: var(--text);
-  cursor: pointer;
-  transition: background 0.18s, border-color 0.18s, transform var(--v2-duration-quick) var(--v2-ease-standard);
-  flex-shrink: 0;
-  font-size: 7px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-}
-.authBtn:active,
-.adminBtn:active {
-  transform: scale(0.97);
-}
-
-/* Admin is a desktop-only surface: the
-   mobile tab strip (MobileSheet.jsx) no longer has an Admin entry point
-   at all, and Sidebar itself only mounts on desktop per MapPage's
-   isMobile check. This query is a defensive second layer for the same
-   768px cutoff — hides the button outright if this component were ever
-   left mounted across a viewport resize instead of being swapped out. */
-@media (max-width: 768px) {
-  .adminBtn[title='Admin Panel'] {
-    display: none;
-  }
-}
-
-/* Guest free-navigation counter — small badge on the Sign In rail button,
+/* Guest free-navigation counter — small badge on the Sign in avatar,
    only shown while signed out (Sidebar.jsx's `guestNavRemaining`). */
 .guestBadge {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 3px;
-  border-radius: 999px;
-  background: var(--v2-primary, #a05aff);
-  color: #fff;
-  font-size: 9px;
+  top: -4px;
+  right: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: var(--r-full);
+  border: 2px solid var(--v2-on-primary);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  font-size: 10px;
   font-weight: 700;
-  line-height: 15px;
+  line-height: 13px;
   text-align: center;
-  border: 1.5px solid var(--surface, #1a1224);
-}
-.authBtn:hover,
-.adminBtn:hover {
-  background: var(--v2-primary-outline, rgba(183, 109, 255, 0.18));
-  border-color: var(--v2-primary, rgba(183, 109, 255, 0.5));
-}
-.authBtn span,
-.adminBtn span {
-  font-size: 7px;
-  letter-spacing: 0.06em;
-}
-
-/* Slice 10: signed-in state, legacy style.css ~7660–7677 (`.auth-avatar`/
-   `.auth-display-name`) */
-.avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1.5px solid var(--v2-primary);
-}
-.displayName {
-  font-size: 6.5px;
-  letter-spacing: 0.04em;
-  color: var(--v2-primary);
-  font-weight: 600;
-  max-width: 48px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-transform: uppercase;
 }

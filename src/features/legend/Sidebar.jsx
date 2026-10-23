@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Compass, Rss, Navigation, CirclePlus, CircleUser, Shield, Sparkles } from 'lucide-react';
+import { Layers, Compass, Rss, Navigation, Plus, User, Shield } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import LayersPanel from './LayersPanel';
 import ExplorePanel from '../explore/ExplorePanel';
@@ -7,6 +7,8 @@ import { GROUP_META } from './placeTypeGroups';
 import { displayName } from '../auth/useAuth';
 import { track } from '../../lib/analytics';
 import { readPersistentState, writePersistentState } from '../../lib/persistentState';
+import { supabase } from '../../lib/supabase';
+import { fetchIsAdmin } from '../waypoints/submitWaypoint';
 
 // Slice 9: GPS Signal isn't open by default (only Layers is), so per
 // CLAUDE.md's bundle-size policy it's lazy-loaded like DetailModal/
@@ -15,23 +17,14 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
 // comment for why.
 const GpsPanel = lazy(() => import('../navigation/GpsPanel'));
 
-// ── Rail button icons: previously hand-drawn inline SVGs copied verbatim
-// from legacy index.html (~96–119). The v2 redesign
-// swaps these for lucide-react equivalents — a component swap only, same
-// as the Loading Screen's icon swap flag — chosen to match the icon
-// treatment just established on the mobile MobileSheet tab strip
-// (Section 2's pairing rule: reuse the just-made mobile decisions), which
-// itself matches the "Layers Panel" Figma reference glyphs.
+// Rail items and icons per the desktop rail redesign (Oct 2026, public/
+// Maps By FUTA — strip-Redesign-png.zip): Layers, Explore, Signal,
+// Navigate. Explore takes Compass, matching its mobile tab.
 const RAIL_ITEMS = [
-  { key: 'layers', label: 'Layers', title: 'Layers', Icon: Compass, hasPanel: true },
-  // Desktop's own new rail button, added alongside (not instead of)
-  // Layers — per explicit instruction, desktop keeps Layers untouched;
-  // only mobile's pre-existing "Explore" tab got repurposed (see
-  // MobileSheet.jsx's header comment on that). Sparkles rather than
-  // Compass since Compass is already Layers' icon here on desktop.
-  { key: 'explore', label: 'Explore', title: 'Explore', Icon: Sparkles, hasPanel: true },
+  { key: 'layers', label: 'Layers', title: 'Layers', Icon: Layers, hasPanel: true },
+  { key: 'explore', label: 'Explore', title: 'Explore', Icon: Compass, hasPanel: true },
   { key: 'gps', label: 'Signal', title: 'GPS Signal', Icon: Rss, hasPanel: true },
-  { key: 'navigate', label: 'Nav', title: 'Navigate', Icon: Navigation, hasPanel: true },
+  { key: 'navigate', label: 'Navigate', title: 'Navigate', Icon: Navigation, hasPanel: true },
 ];
 
 /**
@@ -89,6 +82,34 @@ export default function Sidebar({
     return saved === 'gps' ? 'layers' : saved;
   });
   const [gpsOpen, setGpsOpen] = useState(false);
+
+  // Admin only shows on admin accounts (profiles.is_admin), with a badge
+  // counting places waiting for review — the same head-only count
+  // AdminPanel.jsx uses for its Pending tab.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    setIsAdmin(false);
+    setPendingCount(0);
+    if (!user?.id) return undefined;
+    fetchIsAdmin(user.id)
+      .then((admin) => {
+        if (cancelled || !admin) return;
+        setIsAdmin(true);
+        return supabase
+          .from('waypoints')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending')
+          .then(({ count, error }) => {
+            if (!cancelled && !error && typeof count === 'number') setPendingCount(count);
+          });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
   useEffect(() => {
     if (placeOpen) setGpsOpen(false);
   }, [placeOpen]);
@@ -180,34 +201,95 @@ export default function Sidebar({
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
-      <div className={styles.logo}>
-        {/* Desktop redesign (Sept 2026, Figma node 96:1227): swapped from
-            the hand-drawn placeholder pin SVG to the real app icon, same
-            asset AuthModal.jsx already uses (`public/android-chrome-
-            512x512.png`), per explicit instruction. */}
+      {/* Desktop rail redesign (Oct 2026): one light, full-height column —
+          logo, the four rail items, then Suggest, Admin (admins only),
+          account and version at the bottom. */}
+      <div className={styles.rail}>
         <div className={styles.logoIcon}>
-          <img src="/android-chrome-512x512.png" alt="Maps By FUTA" width={24} height={24} />
+          <img src="/android-chrome-512x512.png" alt="Maps By FUTA" width={34} height={34} />
+        </div>
+        <div className={styles.railDivider} />
+
+        <nav className={styles.railItems}>
+          {RAIL_ITEMS.map((item) => {
+            const active = item.key === 'gps' ? gpsOpen : !collapsed && activeKey === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                className={`${styles.railBtn} ${active ? styles.railBtnActive : ''}`}
+                title={item.title}
+                aria-current={active ? 'page' : undefined}
+                onClick={() => handleRailClick(item)}
+              >
+                <item.Icon size={22} strokeWidth={1.8} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className={styles.railFooter}>
+          {/* Slice 13 — always visible; whether it opens the submission
+              form or a "sign in first" prompt is decided by
+              `onSuggestPlaceClick` (MapPage.jsx). */}
+          <button type="button" className={styles.suggestBtn} title="Suggest a Place" onClick={onSuggestPlaceClick}>
+            <span className={styles.suggestIcon}>
+              <Plus size={22} strokeWidth={2.2} />
+            </span>
+            <span className={styles.footerLabel}>Suggest</span>
+          </button>
+          <div className={styles.railDivider} />
+
+          {isAdmin && (
+            <button
+              type="button"
+              className={styles.railBtn}
+              title={pendingCount > 0 ? `Admin Panel — ${pendingCount} waiting for review` : 'Admin Panel'}
+              onClick={() => {
+                track('feature_panel_open', { panel: 'admin' });
+                onAdminClick();
+              }}
+            >
+              <span className={styles.adminIcon}>
+                <Shield size={22} strokeWidth={1.8} />
+                {pendingCount > 0 && <span className={styles.countBadge}>{pendingCount > 99 ? '99+' : pendingCount}</span>}
+              </span>
+              <span>Admin</span>
+            </button>
+          )}
+
+          {/* Sign In / account — opens AuthModal either way (Slice 10). */}
+          <button
+            type="button"
+            className={styles.accountBtn}
+            title={
+              user
+                ? 'Account'
+                : guestNavRemaining != null
+                  ? `Sign In — ${guestNavRemaining} free navigation${guestNavRemaining === 1 ? '' : 's'} left`
+                  : 'Sign In'
+            }
+            onClick={onAuthClick}
+          >
+            <span className={styles.avatarRing}>
+              <span className={styles.avatarInner}>
+                {user && (user.user_metadata?.avatar_url || user.user_metadata?.picture) ? (
+                  <img className={styles.avatar} src={user.user_metadata.avatar_url || user.user_metadata.picture} alt="" />
+                ) : user ? (
+                  displayName(user).charAt(0).toLowerCase()
+                ) : (
+                  <User size={18} strokeWidth={2} />
+                )}
+              </span>
+              {!user && guestNavRemaining != null && <span className={styles.guestBadge}>{guestNavRemaining}</span>}
+            </span>
+            <span className={styles.footerLabel}>{user ? displayName(user).split(' ')[0] : 'Sign in'}</span>
+          </button>
+
+          <span className={styles.version}>v1.0</span>
         </div>
       </div>
-
-      <nav className={styles.rail}>
-        {RAIL_ITEMS.map((item) => {
-          const active = item.key === 'gps' ? gpsOpen : !collapsed && activeKey === item.key;
-          return (
-            <button
-              key={item.key}
-              type="button"
-              className={`${styles.railBtn} ${active ? styles.railBtnActive : ''}`}
-              title={item.title}
-              onClick={() => handleRailClick(item)}
-            >
-              <item.Icon size={18} strokeWidth={1.8} />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-        <div className={styles.brandText}>Maps By Futa v1.0</div>
-      </nav>
 
       {!collapsed && activeKey === 'layers' && (
         <div className={`${styles.panel} ${styles.panelLayersLight}`}>
@@ -248,81 +330,6 @@ export default function Sidebar({
           </Suspense>
         </div>
       )}
-
-      {/* Ported from legacy index.html ~611–630 (`.sidebar-footer`) — sits
-          below the rail, same width. Sign In is wired for real now
-          (Slice 10) — signed-in state swaps to avatar + first name,
-          matching legacy's `updateSidebarBtn` (app.js ~7324–7339). Admin
-          toggle (`onAdminClick`) is PIN-gated (`useAdminPin`/
-          `AdminPinGate`, Slice 10) and, as of Slice 11, opens the real
-          ported admin panel — see MapPage.jsx's `handleAdminClick`. */}
-      <div className={styles.sidebarFooter}>
-        <button
-          type="button"
-          className={styles.authBtn}
-          title={
-            user
-              ? 'Account'
-              : guestNavRemaining != null
-                ? `Sign In — ${guestNavRemaining} free navigation${guestNavRemaining === 1 ? '' : 's'} left`
-                : 'Sign In'
-          }
-          onClick={onAuthClick}
-        >
-          {!user && guestNavRemaining != null && (
-            <span className={styles.guestBadge}>{guestNavRemaining}</span>
-          )}
-          {user ? (
-            <>
-              {/* Legacy shows the avatar only if photoURL exists; no icon
-                  fallback when signed in without one — just the name
-                  (app.js ~7329–7335's `sidebarAvatar.classList.add('hidden')`
-                  else-branch has no icon swap-in). */}
-              {(user.user_metadata?.avatar_url || user.user_metadata?.picture) && (
-                <img className={styles.avatar} src={user.user_metadata.avatar_url || user.user_metadata.picture} alt="" />
-              )}
-              <span className={styles.displayName}>{displayName(user).split(' ')[0]}</span>
-            </>
-          ) : (
-            <>
-              <CircleUser size={15} strokeWidth={1.8} />
-              <span>Sign In</span>
-            </>
-          )}
-        </button>
-        {/* Admin stays desktop-only: Sidebar only ever mounts when
-            MapPage's isMobile check is false (see that file's isMobile ≤
-            768px breakpoint), and MobileSheet's tab strip no longer has
-            an Admin entry point (UI redesign, see MobileSheet.jsx's own
-            header comment). `.adminBtn`'s own `@media (max-width: 768px)`
-            rule below is a belt-and-suspenders CSS guard for the same
-            768px cutoff, in case this component is ever kept mounted
-            across a resize rather than swapped. Icon swapped from the
-            Sign In button's person glyph to Shield so the two are
-            visually distinct — was previously the same icon for both. */}
-        <button
-          type="button"
-          className={styles.adminBtn}
-          title="Admin Panel"
-          onClick={() => {
-            track('feature_panel_open', { panel: 'admin' });
-            onAdminClick();
-          }}
-        >
-          <Shield size={15} strokeWidth={1.8} />
-          <span>Admin</span>
-        </button>
-        {/* Slice 13 — button always visible; whether it opens the
-            submission form or a "sign in first" prompt is decided by
-            `onSuggestPlaceClick` (wired in MapPage.jsx), same reasoning
-            as this button's `title` above not hiding Admin for signed-
-            out visitors either — the entry point stays discoverable,
-            the gate happens on click. */}
-        <button type="button" className={styles.adminBtn} title="Suggest a Place" onClick={onSuggestPlaceClick}>
-          <CirclePlus size={15} strokeWidth={1.8} />
-          <span>Suggest</span>
-        </button>
-      </div>
     </aside>
   );
 }
