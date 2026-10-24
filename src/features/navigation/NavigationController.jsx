@@ -4,7 +4,10 @@ import { haversine, routePosition } from '../../lib/geoUtils';
 import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
-import { isOnPathTowards, walkablePaths } from './shortcutRoute';
+import { isOnPathTowards, ON_PATH_M, walkablePaths } from './shortcutRoute';
+import { createTripTrace, findShortcuts, walkedPath } from './shortcutDetect';
+import { flushPendingShortcuts, reportShortcutOutcomes, setShortcutConsent, shareShortcuts, shortcutConsent } from './learnedShortcutsClient';
+import { useLearnedShortcuts } from './useLearnedShortcuts';
 import { alightPrompt, alightStop, createRideDetector } from './busStops';
 import { turnIcon, fmtDist, startDirection, TURN_ICONS } from './turnHelpers';
 import { fmtDist as fmtDistAway } from '../search/chipConfig';
@@ -34,7 +37,7 @@ const END_NEAR_DEST_M = 50;
 // The "Please wait" cover after a resume gives up waiting for a usable fix
 // after this long; the HUD keeps updating once one arrives.
 const RESUME_MAX_WAIT_MS = 15000;
-// The old shortcut-learning trace; cleared so it doesn't linger in storage.
+// This trip's trace for shortcut detection, kept with the navigation session.
 const TRACE_KEY = 'navigation-trace';
 
 const SVG_FLAG = (size, color = 'currentColor') =>
@@ -99,13 +102,16 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  *
  * `segments` (MapPage's `useSegments()` list): footpath/shortcut segments
  * are routed through when shorter (shortcutRoute.js), and walking along
- * one never counts as going off route.
+ * one never counts as going off route. Shortcuts other users walked
+ * (useLearnedShortcuts.js) are used the same way. Each trip's walk is
+ * traced so that, on arrival, any shorter way this user took can be
+ * shared (shortcutDetect.js → learnedShortcutsClient.js).
  *
- * Routing is walking by default and switches to bike while the user is
- * moving at vehicle speed (busStops.js's ride detector) — see osrmRoute.js.
+ * `userId` (signed-in user's id, or null): only signed-in users share
+ * shortcuts or report on learned ones; guests just get routed through them.
  */
 const NavigationController = forwardRef(function NavigationController(
-  { map, gps, searchIndex, segments, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
+  { map, gps, searchIndex, segments, userId, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
   ref
 ) {
   // startNavigation() awaits GPS + routing; if this controller unmounts in
@@ -123,6 +129,13 @@ const NavigationController = forwardRef(function NavigationController(
   const persistedDestination = readPersistentState('navigation-destination', null);
   const [destPanelOpen, setDestPanelOpen] = useState(!persistedNavigation?.active);
   const [navActive, setNavActive] = useState(Boolean(persistedNavigation?.active));
+  // Mode switching UI removed this session (real functionality change,
+  // flagged per Rule 7, on direct user instruction) — `mode` now just
+  // stays at its 'foot-walking' default forever since nothing calls
+  // `setMode` anymore. Left as real state (not inlined to a constant)
+  // rather than touching `fetchRoute`/`navModeRef`'s plumbing below,
+  // which are functionality files out of scope for this pass.
+  const [mode, setMode] = useState('foot-walking');
   const [destInputValue, setDestInputValue] = useState('');
   const [dropdownResults, setDropdownResults] = useState([]);
   const [hint, setHint] = useState('Tap a pin on the map or type a place name above');
@@ -178,10 +191,10 @@ const NavigationController = forwardRef(function NavigationController(
   const bearingTargetRef = useRef(0);
   const lastHeadingRef = useRef(null);
   const spokenStartRef = useRef(null);
-  // Riding? (busStops.js) Switches routing to bike and drives the shuttle
-  // "get off" prompt; alightSpokenRef is which prompt was last spoken.
+  // Riding a bus? (busStops.js) and which "get off" prompt was last spoken.
   const rideRef = useRef(createRideDetector());
   const alightSpokenRef = useRef('');
+  const alightStopRef = useRef(null); // the stop we last told them to get off at
   const [nearby, setNearby] = useState([]);
   const nearbySigRef = useRef('');
   const candidatesRef = useRef(nearbyCandidates);
@@ -253,9 +266,7 @@ const NavigationController = forwardRef(function NavigationController(
   }, [map]);
 
   const navDestRef = useRef(persistedNavigation?.dest || persistedDestination || null); // {lat,lng,name,id,type}
-  // Routing mode: 'foot-walking', or 'cycling-regular' while riding. A
-  // restored trip starts on foot; the ride detector switches it back.
-  const navModeRef = useRef('foot-walking');
+  const navModeRef = useRef(persistedNavigation?.mode || 'foot-walking');
   const navRouteDataRef = useRef(persistedNavigation?.routeData || null);
   const navStepIndexRef = useRef(persistedNavigation?.stepIndex || 0);
   const navUserPosRef = useRef(persistedNavigation?.userPos || null);
@@ -288,6 +299,7 @@ const NavigationController = forwardRef(function NavigationController(
     writePersistentState('navigation-session', {
       active: true,
       dest: navDestRef.current,
+      mode: navModeRef.current,
       routeData: navRouteDataRef.current,
       stepIndex: navStepIndexRef.current,
       userPos: navUserPosRef.current,
@@ -572,16 +584,68 @@ const NavigationController = forwardRef(function NavigationController(
   const rerouteInFlightRef = useRef(false);
   const lastRerouteAtRef = useRef(0);
   const offRouteTicksRef = useRef(0);
-  const shortcutPaths = useMemo(() => walkablePaths(segments), [segments]);
-  useEffect(() => {
-    removePersistentState(TRACE_KEY);
+  const learnedShortcuts = useLearnedShortcuts();
+  const shortcutPaths = useMemo(() => walkablePaths([...(segments || []), ...learnedShortcuts]), [segments, learnedShortcuts]);
+  // This trip's walk and the route it started with, for finding shortcuts
+  // on arrival. Not kept across a reload (a restored trip isn't traced).
+  //
+  // Saved alongside the navigation session (TRACE_KEY) so a page reload —
+  // common on phones after switching apps mid-trip — doesn't lose it.
+  const [restoredTrace] = useState(() => {
+    const saved = persistedNavigation?.active ? readPersistentState(TRACE_KEY, null) : null;
+    return saved && saved.tripId === tripRef.current.tripId && Array.isArray(saved.points) ? saved : null;
+  });
+  const tripTraceRef = useRef(restoredTrace ? createTripTrace(restoredTrace.points) : null);
+  const tripRouteRef = useRef(restoredTrace?.route || null);
+  const tripOriginRef = useRef(restoredTrace?.origin || null);
+  // The learned shortcut the live route goes through, and the ones this
+  // trip actually reached (got within ON_PATH_M of an end of) while its
+  // route went through them. Only those are reported on arrival as taken
+  // or gone around (learnedShortcuts.js) — not one a reroute dropped
+  // before they got there.
+  const liveViaRef = useRef(restoredTrace?.liveVia || null);
+  const tripViaRef = useRef(restoredTrace ? new Set(restoredTrace.via || []) : null);
+  const saveTrace = useCallback(() => {
+    if (!tripTraceRef.current) return;
+    writePersistentState(TRACE_KEY, {
+      tripId: tripRef.current.tripId,
+      route: tripRouteRef.current,
+      origin: tripOriginRef.current,
+      points: tripTraceRef.current.points,
+      via: [...(tripViaRef.current || [])],
+      liveVia: liveViaRef.current,
+    });
   }, []);
+  const noteVia = useCallback(
+    (route) => {
+      liveViaRef.current = typeof route?.via === 'string' && route.via.startsWith('learned:') ? route.via : null;
+      saveTrace();
+    },
+    [saveTrace]
+  );
+  const noteViaReached = useCallback(
+    (lat, lng) => {
+      const via = liveViaRef.current;
+      if (!via || !tripViaRef.current || tripViaRef.current.has(via)) return;
+      const coords = shortcutPathsRef.current.find((p) => p.id === via)?.coords;
+      if (coords && [coords[0], coords[coords.length - 1]].some(([a, b]) => haversine(lat, lng, a, b) <= ON_PATH_M)) {
+        tripViaRef.current.add(via);
+        saveTrace();
+      }
+    },
+    [saveTrace]
+  );
+  const [shortcutOffer, setShortcutOffer] = useState(null);
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+  useEffect(() => {
+    if (userId) flushPendingShortcuts(userId);
+  }, [userId]);
   const shortcutPathsRef = useRef(shortcutPaths);
   shortcutPathsRef.current = shortcutPaths;
 
-  // A fresh route from (lat, lng), e.g. after going off route or switching
-  // between walking and riding.
-  const rerouteFromRef = useRef(null);
+  // A fresh route from (lat, lng), e.g. after going off route or getting
+  // off a bus.
   const rerouteFrom = useCallback(
     (lat, lng) => {
       const dest = navDestRef.current;
@@ -589,13 +653,12 @@ const NavigationController = forwardRef(function NavigationController(
       rerouteInFlightRef.current = true;
       offRouteTicksRef.current = 0;
       lastRerouteAtRef.current = Date.now();
-      const mode = navModeRef.current;
 
-      fetchRoute(lat, lng, dest.lat, dest.lng, mode, shortcutPathsRef.current)
+      fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current, shortcutPathsRef.current)
         .then((fresh) => {
           if (!navActiveRef.current || navDestRef.current !== dest) return; // nav ended/changed while fetching
-          if (navModeRef.current !== mode) return; // replaced in finally
           navRouteDataRef.current = fresh;
+          noteVia(fresh);
           navStepIndexRef.current = 0;
           lastSpokenStepRef.current = -1;
           spokenTurnNowRef.current = false;
@@ -607,15 +670,10 @@ const NavigationController = forwardRef(function NavigationController(
         .catch((e) => console.warn('Reroute failed:', e.message))
         .finally(() => {
           rerouteInFlightRef.current = false;
-          // Started or stopped riding while this was in flight: route again
-          // in the new mode from where they are now.
-          const pos = navUserPosRef.current;
-          if (navModeRef.current !== mode && navActiveRef.current && pos) rerouteFromRef.current?.(pos.lat, pos.lng);
         });
     },
-    [drawRoute, persistNavigation]
+    [drawRoute, persistNavigation, noteVia]
   );
-  rerouteFromRef.current = rerouteFrom;
 
   // ── Reroute when the live route drifts too far from reality ───────────
   // OSRM's foot-routing steps are fixed at fetch time and never update on
@@ -675,7 +733,65 @@ const NavigationController = forwardRef(function NavigationController(
     // user's Navigations stat regardless of destination type — see this
     // file's header comment.
     onNavigationSuccess?.({ tripId: tripRef.current.tripId });
+
+    // Did they find a shorter way than the route? Shared straight away if
+    // they've agreed before, otherwise the arrived banner asks.
+    // Signed-in users only (see the header comment).
+    const uid = userIdRef.current;
+    const trace = uid ? tripTraceRef.current : null;
+    const stats = {};
+    const found = trace ? findShortcuts(tripRouteRef.current, trace.points, { origin: tripOriginRef.current, stats }) : [];
+    // Counts only, no locations: why a trip did or didn't yield a shortcut.
+    if (uid) track('shortcut_check', { traced: Boolean(trace), found: found.length, ...stats });
+    removePersistentState(TRACE_KEY);
+    // Learned shortcuts we routed them through and they reached: taken, or
+    // went around? No location is sent for this, so it needs no consent.
+    if (trace && tripViaRef.current?.size) {
+      const outcomes = [...tripViaRef.current]
+        .map((via) => ({ via, coords: shortcutPathsRef.current.find((p) => p.id === via)?.coords }))
+        .filter(({ coords }) => coords)
+        .map(({ via, coords }) => ({ shortcutId: Number(via.slice('learned:'.length)), used: walkedPath(coords, trace.points) }));
+      reportShortcutOutcomes(uid, tripRef.current.tripId, outcomes);
+    }
+    tripTraceRef.current = null;
+    tripViaRef.current = null;
+    liveViaRef.current = null;
+    if (found.length) {
+      const tripId = tripRef.current.tripId;
+      const saved = found.reduce((sum, s) => sum + s.saved, 0);
+      track('shortcut_found', { count: found.length, saved_m: saved });
+      if (shortcutConsent(uid) === true) {
+        shareShortcuts(uid, tripId, found);
+        setShortcutOffer({ state: 'shared', saved });
+      } else {
+        setShortcutOffer({ state: 'ask', saved, userId: uid, tripId, shortcuts: found });
+      }
+    }
   }, [speak, onNavigationSuccess, persistNavigation]);
+
+  // 'share' / 'skip' answer the question; 'stop' (offered after an
+  // automatic share) stops sharing automatically — they'll be asked again.
+  const answerShortcutOffer = useCallback(
+    (answer) => {
+      const offer = shortcutOffer;
+      if (answer === 'stop') {
+        setShortcutConsent(userIdRef.current, false);
+        track('shortcut_sharing_stopped');
+        setShortcutOffer({ state: 'stopped', saved: offer?.saved ?? 0 });
+        return;
+      }
+      if (offer?.state !== 'ask') return;
+      if (answer !== 'share') {
+        setShortcutOffer(null);
+        return;
+      }
+      setShortcutConsent(offer.userId, true);
+      shareShortcuts(offer.userId, offer.tripId, offer.shortcuts);
+      track('shortcut_shared', { count: offer.shortcuts.length });
+      setShortcutOffer({ state: 'shared', saved: offer.saved });
+    },
+    [shortcutOffer]
+  );
 
   // Stable, so the arrived banner's auto-close timer isn't restarted every
   // time MapPage re-renders with a new inline `onArrival`.
@@ -684,6 +800,7 @@ const NavigationController = forwardRef(function NavigationController(
   const dismissArrivedBanner = useCallback(() => {
     const dest = navDestRef.current;
     setArrivedBannerDest(null);
+    setShortcutOffer(null);
     stopNavigationRef.current?.();
     if (dest && dest.id && isRateablePOI(dest.type)) {
       onArrivalRef.current?.(dest);
@@ -850,6 +967,7 @@ const NavigationController = forwardRef(function NavigationController(
       nextHud.turnInstruction = prompt.instruction;
       nextHud.turnDist = prompt.stage === 'now' ? 'Now' : `In ${fmtDist(alight.toUser)}`;
       nextHud.nextPreview = '';
+      alightStopRef.current = alight.place;
       const key = `${alight.place.key}:${prompt.stage}`;
       if (alightSpokenRef.current !== key) {
         alightSpokenRef.current = key;
@@ -882,7 +1000,9 @@ const NavigationController = forwardRef(function NavigationController(
       const walkingBearing = Number.isFinite(heading) && speed > 0.5 ? heading : null;
       navUserPosRef.current = { lat: latitude, lng: longitude, heading: walkingBearing };
       navGpsTicksRef.current++;
+      if (tripTraceRef.current?.add({ lat: latitude, lng: longitude, accuracy, t: p.timestamp || Date.now() })) saveTrace();
       const ride = rideRef.current.update(speed);
+      noteViaReached(latitude, longitude);
 
       clearTimeout(navGpsStaleTimerRef.current);
       navGpsStaleTimerRef.current = setTimeout(() => {
@@ -891,21 +1011,22 @@ const NavigationController = forwardRef(function NavigationController(
 
       updateNavUserDot(latitude, longitude);
       updateHUD();
-      // Bike routing while riding (motorcycle, keke, car, bus): still the
-      // short streets, but no footpaths or steps a vehicle can't use. On
-      // getting off, fresh walking directions from where they're standing,
-      // which start with the landmark / which-way-to-turn instructions.
-      const mode = ride.riding ? 'cycling-regular' : 'foot-walking';
-      if (mode !== navModeRef.current) {
-        navModeRef.current = mode;
-        rerouteFrom(latitude, longitude);
+      // Just got off at the stop we told them about: fresh walking
+      // directions from where they're standing, which start with the
+      // landmark / which-way-to-turn instructions.
+      if (ride.alighted) {
+        const stop = alightStopRef.current;
+        if (stop && haversine(latitude, longitude, Number(stop.lat), Number(stop.lng)) < 80) {
+          rerouteFrom(latitude, longitude);
+        }
+        alightStopRef.current = null;
+        alightSpokenRef.current = '';
       }
-      if (ride.alighted) alightSpokenRef.current = '';
       persistNavigation();
       // updateHUD() has just moved the map and route to this fix.
       endResume();
     },
-    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume, rerouteFrom]
+    [gps, updateNavUserDot, updateHUD, persistNavigation, endResume, rerouteFrom, noteViaReached, saveTrace]
   );
 
   const startWatch = useCallback(() => {
@@ -921,6 +1042,7 @@ const NavigationController = forwardRef(function NavigationController(
     navActiveRef.current = true;
     navGpsTicksRef.current = 2;
     lastSpokenStepRef.current = navStepIndexRef.current;
+    setMode(navModeRef.current);
     onActiveChange?.(true);
     // Same nav-start framing as startNavigation() below, for a session
     // resumed after a reload — otherwise the map would just stay wherever
@@ -1105,6 +1227,14 @@ const NavigationController = forwardRef(function NavigationController(
       navStartTimeRef.current = Date.now();
       // New trip: fresh id, completion not yet reported.
       tripRef.current = { tripId: createTripId(), completionReported: false };
+      tripRouteRef.current = routeData.coords;
+      // Only signed-in users share shortcuts, so guests' trips aren't traced.
+      tripTraceRef.current = userIdRef.current ? createTripTrace() : null;
+      tripOriginRef.current = { lat, lng };
+      tripViaRef.current = new Set();
+      tripTraceRef.current?.add({ lat, lng, accuracy: pos.coords.accuracy, t: pos.timestamp || Date.now() });
+      if (!tripTraceRef.current) removePersistentState(TRACE_KEY);
+      noteVia(routeData);
       // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9). No named
       // origin exists for a live GPS fix, so "from" is a fixed label
       // rather than a guessed place name.
@@ -1146,7 +1276,7 @@ const NavigationController = forwardRef(function NavigationController(
       setGoDisabled(false);
       setGoLabel('Start Navigation');
     }
-  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch]);
+  }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch, noteVia]);
 
   const stopNavigation = useCallback(() => {
     navActiveRef.current = false;
@@ -1161,9 +1291,13 @@ const NavigationController = forwardRef(function NavigationController(
 
     navGpsUnsubRef.current?.();
     navGpsUnsubRef.current = null;
+    tripTraceRef.current = null;
+    tripViaRef.current = null;
+    liveViaRef.current = null;
+    removePersistentState(TRACE_KEY);
     rideRef.current = createRideDetector();
-    navModeRef.current = 'foot-walking';
     alightSpokenRef.current = '';
+    alightStopRef.current = null;
 
     clearRouteLayers();
     if (navDestMarkerRef.current) {
@@ -1244,6 +1378,10 @@ const NavigationController = forwardRef(function NavigationController(
     if (!destPanelOpen && !navActive) onRequestClose?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destPanelOpen, navActive]);
+
+  useEffect(() => {
+    navModeRef.current = mode;
+  }, [mode]);
 
   // ── Popular places on campus (new, this session — see header comment) ──
   // Places only — People (supabase/people_entries.sql) and Channel
@@ -1400,7 +1538,7 @@ const NavigationController = forwardRef(function NavigationController(
         />
       )}
       {arrivedBannerDest && (
-        <NavArrivedBanner destName={arrivedBannerDest} onDismiss={dismissArrivedBanner} />
+        <NavArrivedBanner destName={arrivedBannerDest} onDismiss={dismissArrivedBanner} shortcut={shortcutOffer} onShortcutAnswer={answerShortcutOffer} />
       )}
       {navActive && resuming && <NavResumeOverlay map={map} />}
     </>

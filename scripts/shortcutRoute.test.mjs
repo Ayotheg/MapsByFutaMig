@@ -73,8 +73,8 @@ const far = [[7.31, 5.15], [7.311, 5.151]];
   assert.equal(route.coords.length, 7, 'leg A + path + leg B');
   assert.deepEqual(
     route.steps.map((s) => s.instruction),
-    ['Head off', 'Turn slightly left onto Path 1', 'Turn slightly left onto Senate Road', 'You have arrived at your destination'],
-    'normal turn instructions, the first naming the path; one depart and one arrive for the whole trip'
+    ['Head off', 'Turn slightly left', 'Turn slightly left onto Senate Road', 'You have arrived at your destination'],
+    'normal turn instructions; one depart and one arrive for the whole trip'
   );
 
   // Straight on to a straight path: nothing extra to announce.
@@ -90,7 +90,7 @@ const far = [[7.31, 5.15], [7.311, 5.151]];
   const bentRoute = stitchRoute(leg([[7.2981, 5.1371], [7.2981, 5.1381]]), bent, leg([[7.3019, 5.1405], [7.3019, 5.1415]]), 1 / 1.4);
   assert.deepEqual(
     bentRoute.steps.map((s) => s.instruction),
-    ['Head off', 'Turn left onto Path 2', 'Turn right', 'Continue straight', 'You have arrived at your destination'],
+    ['Head off', 'Turn left', 'Turn right', 'Continue straight', 'You have arrived at your destination'],
     'east → north (left) → east (right) → straight off the path'
   );
   console.log('ok: stitchRoute');

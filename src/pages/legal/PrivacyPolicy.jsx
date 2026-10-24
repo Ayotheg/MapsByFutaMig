@@ -22,6 +22,18 @@ function PrivacyPolicy() {
         requests access to your device's GPS location. This is used live,
         in your browser, to power navigation — it's not something we sell
         or hand to advertisers.</p>
+      <p><strong>Shared shortcuts:</strong> if you're signed in and take a
+        shorter way than the route we suggested, on foot or in any vehicle,
+        we ask whether you'd like to share it. Only if you
+        agree, we store that shorter stretch of path (never your whole trip,
+        and never where it started or ended) with your account. If you
+        choose to share, later shortcuts are shared automatically until you
+        tap "Stop sharing automatically" on the arrival screen. Once enough
+        people have taken the same way, we use it to guide others. Other
+        users only ever see the path itself, never who took it. When we
+        guide you through a shared shortcut, we also note whether you took
+        it or went around it (no location is stored for this), so
+        shortcuts that don't work can be switched off.</p>
       <p><strong>Account information:</strong> if you sign in, we store the
         basic profile details needed to attach your reviews and ratings
         to your account.</p>
