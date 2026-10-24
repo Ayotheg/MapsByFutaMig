@@ -520,9 +520,10 @@ export async function removeEvent(id, { erase = false } = {}) {
   // Only ever delete a file in this event's own folder. The database now
   // refuses any other poster_path (events_hardening.sql); this guards rows
   // and paths it hasn't seen.
-  if (!row?.poster_path || !row.poster_path.startsWith(`event/${id}/`)) return { photoError: null };
+  const path = row?.poster_path;
+  if (!path || !path.startsWith(`event/${id}/`) || path.includes('..')) return { photoError: null };
   try {
-    await removeStorageFiles([row.poster_path]);
+    await removeStorageFiles([path]);
     return { photoError: null };
   } catch (e) {
     return { photoError: e?.message || String(e) };

@@ -146,7 +146,7 @@ export function createHandler({ createClient, env }) {
         .update({
           payment_status: 'paid',
           status: 'pending_review',
-          bachs_payment_id: event.data?.id ?? null,
+          bachs_payment_id: paymentIdOf(event),
           paid_at: new Date().toISOString(),
         })
         .eq('id', promotionId)
@@ -225,7 +225,13 @@ async function handleEventPayment(adminClient, event, eventId) {
         return new Response('Lookup failed', { status: 500 });
       }
       if (!row) {
-        console.error('[bachs-webhook] no event row for', eventId, 'event', event.id);
+        // Money arrived for a listing that no longer exists (deleted while a
+        // checkout was still open). Nothing to attach it to: refund by hand.
+        console.error('[bachs-webhook] PAYMENT FOR MISSING EVENT — refund needed:', {
+          listingId: eventId,
+          payment: paymentIdOf(event),
+          eventId: event.id,
+        });
         break;
       }
 
@@ -248,7 +254,7 @@ async function handleEventPayment(adminClient, event, eventId) {
       // listing (two checkouts both paid): leave the row as it is, but log it
       // loudly so it can be refunded.
       if (row.payment_status === 'paid') {
-        const paymentId = event.data?.id ?? null;
+        const paymentId = paymentIdOf(event);
         if (paymentId && row.bachs_payment_id && paymentId !== row.bachs_payment_id) {
           console.error('[bachs-webhook] POSSIBLE DOUBLE PAYMENT for event — refund needed:', {
             listingId: eventId,
@@ -265,7 +271,7 @@ async function handleEventPayment(adminClient, event, eventId) {
         .update({
           payment_status: 'paid',
           status: 'pending_review',
-          bachs_payment_id: event.data?.id ?? null,
+          bachs_payment_id: paymentIdOf(event),
           paid_at: new Date().toISOString(),
         })
         .eq('id', eventId)
@@ -289,11 +295,16 @@ async function handleEventPayment(adminClient, event, eventId) {
     }
     case 'collection.failed':
     case 'checkout.expired': {
-      const { error } = await adminClient
+      let update = adminClient
         .from('events')
         .update({ payment_status: event.type === 'checkout.expired' ? 'expired' : 'failed' })
         .eq('id', eventId)
         .eq('payment_status', 'unpaid'); // never downgrade an already-paid row
+      // Only the event's CURRENT checkout can close it: a late "expired" from
+      // an older checkout must not mark it expired while a newer one is open.
+      const checkoutId = event.data?.checkout_id ?? null;
+      if (checkoutId) update = update.eq('bachs_checkout_id', checkoutId);
+      const { error } = await update;
       if (error) {
         console.error('[bachs-webhook] event failed-update failed:', error.message);
         await releaseEvent(adminClient, event.id);
@@ -328,6 +339,14 @@ async function handleEventPayment(adminClient, event, eventId) {
 // Comparison is paid >= expected, not ===: with fee_bearer = 'customer'
 // BACHS adds its fee on top of the price, so `amount` can exceed
 // promotions.amount. Short payments are what this guards against.
+// The BACHS payment (charge) id: collection.* events carry data.charge_id,
+// checkout.completed carries data.charge.id (docs.bachs.io, event pages).
+// data.id is kept as a last resort for older payload shapes.
+function paymentIdOf(event) {
+  const d = event.data ?? {};
+  return d.charge_id ?? d.charge?.id ?? d.id ?? null;
+}
+
 function toMinorUnits(value) {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);

@@ -171,6 +171,19 @@ a.toggleBtn:hover {
   margin: -52px auto 0;
   padding: 0 16px 40px;
 }
+/* Wraps the steps so they can all be locked at once (savedEventId) without
+   changing the layout: display: contents keeps the steps as the form's
+   own flex items. */
+.lockSet {
+  display: contents;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.lockSet:disabled .step {
+  opacity: 0.6;
+}
 .formCol {
   display: flex;
   flex-direction: column;

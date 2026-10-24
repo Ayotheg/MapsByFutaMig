@@ -3,8 +3,11 @@
 // Ticketed events pay a flat listing fee before review. Same shape as
 // create-promotion-checkout (see its comments and docs/payments.md): called
 // by src/features/events/submitEvent.js with the user's JWT, reads the row
-// as the caller (RLS proves ownership), sets the fee server-side, opens a
-// BACHS checkout, and stores the checkout id/url with the service role.
+// as the caller (RLS proves ownership), then claims it through
+// claim_event_checkout() (supabase/events_checkout_guard.sql) — one locked
+// step that hands back a still-open checkout, refuses while another call is
+// opening one, or lets this call open a fresh one — and stores the result
+// with the service role.
 //
 // Deploy: `supabase functions deploy create-event-checkout`
 // Secrets: BACHS_SECRET_KEY, BACHS_BASE_URL (optional), SITE_URL — the same
@@ -18,14 +21,14 @@ import { bachsRequest } from '../_shared/bachs.ts';
 const EVENT_LISTING_FEE = 3000;
 // Always naira (events.currency is pinned to NGN in events_hardening.sql).
 const CURRENCY = 'NGN';
-// How long a just-opened checkout is handed back instead of a new one.
-const REUSE_CHECKOUT_MS = 30 * 60 * 1000;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+const TRY_AGAIN = "We couldn't open the payment page. Please try again in a moment.";
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -56,71 +59,62 @@ Deno.serve(async (req) => {
   });
   const adminClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
 
+  // Read as the caller: RLS (events_select_own_or_admin) proves it's theirs.
   const { data: event, error: fetchError } = await callerClient
     .from('events')
-    .select(
-      'id, title, entry_type, listing_fee, payment_status, status, starts_at, bachs_checkout_url, bachs_checkout_started_at'
-    )
+    .select('id, entry_type, payment_status')
     .eq('id', eventId)
     .maybeSingle();
-
   if (fetchError) return json({ error: fetchError.message }, 500);
   if (!event) return json({ error: 'Event not found (or not yours).' }, 404);
   if (event.entry_type !== 'ticketed') {
     return json({ error: 'Free events have nothing to pay.' }, 409);
   }
-  // A started event can't go live any more (public_events() / review), so
-  // don't take money for it — e.g. an old "Pay now" link.
-  if (Date.parse(event.starts_at) <= Date.now()) {
-    return json({ error: 'This event has already started, so it can no longer be listed.' }, 409);
+
+  // One locked step decides what happens (claim_event_checkout). It also
+  // sets the fee and currency, never trusting what the client inserted.
+  const { data: claimRows, error: claimError } = await adminClient.rpc('claim_event_checkout', {
+    p_id: event.id,
+    p_fee: EVENT_LISTING_FEE,
+  });
+  if (claimError) {
+    console.error('[create-event-checkout] claim failed:', event.id, claimError.message);
+    return json({ error: TRY_AGAIN }, 500);
   }
-  // "Try payment again" on /event/callback reuses the saved event after a
-  // cancelled (still 'unpaid'), failed or expired checkout. Paid events and
-  // anything already in review can't be charged twice.
-  const RETRYABLE = ['unpaid', 'failed', 'expired'];
-  if (event.status !== 'awaiting_payment' || !RETRYABLE.includes(event.payment_status)) {
-    return json(
-      {
-        error:
-          event.payment_status === 'paid'
-            ? 'This event is already paid for.'
-            : `This event can't be paid for in its current state (${event.status}).`,
-      },
-      409
-    );
+  const claim = Array.isArray(claimRows) ? claimRows[0] : claimRows;
+  switch (claim?.result) {
+    case 'reuse':
+      // A checkout for this event is still open: same one, never a second.
+      return json({ checkoutUrl: claim.checkout_url });
+    case 'busy':
+      return json({ error: 'Your payment page is already opening. Wait a few seconds, then try again.' }, 409);
+    case 'started':
+      return json({ error: 'This event has already started, so it can no longer be listed.' }, 409);
+    case 'not_payable':
+      return json(
+        {
+          error:
+            event.payment_status === 'paid'
+              ? 'This event is already paid for.'
+              : "This event can't be paid for in its current state.",
+        },
+        409
+      );
+    case 'claimed':
+      break;
+    default:
+      return json({ error: 'Event not found (or not yours).' }, 404);
   }
 
-  // A checkout opened moments ago (cancelled, or the tab was closed) can still
-  // be paid. Hand the same one back instead of opening a second that could
-  // ALSO be paid. Once BACHS expires it, the webhook marks the row 'expired'
-  // and the next call opens a fresh one.
-  const startedAt = event.bachs_checkout_started_at ? Date.parse(event.bachs_checkout_started_at) : NaN;
-  if (
-    event.payment_status === 'unpaid' &&
-    event.bachs_checkout_url &&
-    Number.isFinite(startedAt) &&
-    Date.now() - startedAt < REUSE_CHECKOUT_MS
-  ) {
-    return json({ checkoutUrl: event.bachs_checkout_url });
-  }
-
-  // Never trust the client-inserted fee or currency. The claim below also
-  // puts a failed/expired row back to 'unpaid' for the new checkout (the
-  // webhook only moves 'unpaid' rows to failed/expired, and still accepts a
-  // late success on any of them). It must match the row: if the webhook
-  // marked it paid since we read it, nothing matches and we stop.
-  const amount = EVENT_LISTING_FEE;
-  const currency = CURRENCY;
-  const { data: claimed, error: claimError } = await adminClient
-    .from('events')
-    .update({ listing_fee: amount, currency, payment_status: 'unpaid' })
-    .eq('id', event.id)
-    .eq('status', 'awaiting_payment')
-    .in('payment_status', RETRYABLE)
-    .select('id');
-  if (claimError) return json({ error: claimError.message }, 500);
-  if (!claimed || claimed.length === 0) {
-    return json({ error: 'This event was just updated (it may already be paid). Refresh and check again.' }, 409);
+  // Claimed: the row is 'unpaid' with the old checkout link cleared. If
+  // anything below fails, release the claim so the next tap can try again.
+  async function releaseClaim() {
+    const { error } = await adminClient
+      .from('events')
+      .update({ bachs_checkout_started_at: null })
+      .eq('id', event.id)
+      .is('bachs_checkout_url', null);
+    if (error) console.error('[create-event-checkout] could not release claim:', event.id, error.message);
   }
 
   // Every way back from BACHS lands on the event's status page, which reads
@@ -133,13 +127,13 @@ Deno.serve(async (req) => {
   try {
     checkout = await bachsRequest('/v1/checkout-sessions', {
       body: {
-        pricing: { amount: amount.toFixed(2), currency },
+        pricing: { amount: EVENT_LISTING_FEE.toFixed(2), currency: CURRENCY },
         success_url: successUrl,
         cancel_url: cancelUrl,
         // bachs-webhook tells events from promotions by metadata.event_id,
-        // or by this "event:<id>:" prefix if an event shape drops metadata.
-        // BACHS rejects a reference it has seen before ("Duplicate
-        // reference"), so every attempt for the same event gets a suffix.
+        // or by this "event:<id>:" prefix (failed/collection events can carry
+        // an empty metadata object). BACHS rejects a reference it has seen
+        // before ("Duplicate reference"), so every attempt gets a suffix.
         reference: `event:${event.id}:${Date.now().toString(36)}`,
         metadata: { event_id: event.id },
       },
@@ -147,21 +141,26 @@ Deno.serve(async (req) => {
   } catch (e) {
     // The raw BACHS message is for the logs, not the person paying.
     console.error('[create-event-checkout] BACHS checkout failed:', event.id, e.message);
-    return json({ error: "We couldn't open the payment page. Please try again in a moment." }, 502);
+    await releaseClaim();
+    return json({ error: TRY_AGAIN }, 502);
   }
 
   const checkoutUrl = checkout.url || checkout.checkout_url;
+  const checkoutId = checkout.checkout_id || checkout.id || null;
   if (!checkoutUrl) {
     console.error('[create-event-checkout] no checkout URL in BACHS reply:', event.id, JSON.stringify(checkout).slice(0, 500));
-    return json({ error: "We couldn't open the payment page. Please try again in a moment." }, 502);
+    await releaseClaim();
+    return json({ error: TRY_AGAIN }, 502);
   }
 
+  // BACHS's own expiry for this checkout, so "still open" (reuse) is exact.
+  const expiresAt = checkout.expires_at && !Number.isNaN(Date.parse(checkout.expires_at)) ? checkout.expires_at : null;
   const { error: updateError } = await adminClient
     .from('events')
     .update({
-      bachs_checkout_id: checkout.id,
+      bachs_checkout_id: checkoutId,
       bachs_checkout_url: checkoutUrl,
-      bachs_checkout_started_at: new Date().toISOString(),
+      bachs_checkout_expires_at: expiresAt,
     })
     .eq('id', event.id);
   if (updateError) {

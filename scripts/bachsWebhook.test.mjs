@@ -23,13 +23,14 @@ const SECRET = 'whsec_test';
 const db = {
   bachs_webhook_events: [],
   promotions: [{ id: 'promo-1', amount: '400.00', currency: 'NGN', payment_status: 'unpaid', status: 'awaiting_payment' }],
-  events: ['ev-1', 'ev-2', 'ev-3'].map((id) => ({
+  events: ['ev-1', 'ev-2', 'ev-3', 'ev-4'].map((id, i) => ({
     id,
     listing_fee: '3000.00',
     currency: 'NGN',
     payment_status: 'unpaid',
     status: 'awaiting_payment',
     bachs_payment_id: null,
+    bachs_checkout_id: `chk-${i + 1}`,
   })),
 };
 
@@ -82,7 +83,9 @@ async function send(body, { sign = true } = {}) {
 const logged = [];
 for (const level of ['error', 'warn']) console[level] = (...args) => logged.push([level, ...args]);
 
-const paid = (amount, id) => ({ id, status: 'SUCCEEDED', amount, currency: 'NGN' });
+// Shapes from docs.bachs.io: collection.* carries data.charge_id and
+// data.checkout_id; checkout.completed carries data.charge.id.
+const paid = (amount, chargeId) => ({ charge_id: chargeId, status: 'SUCCEEDED', amount, currency: 'NGN' });
 const row = (t, id) => db[t].find((r) => r.id === id);
 
 // ── unsigned requests are refused
@@ -108,15 +111,23 @@ await send({ id: 'e3', type: 'collection.succeeded', data: { ...paid('2999.00', 
 assert.equal(row('events', 'ev-2').payment_status, 'unpaid');
 
 // ── wrong currency is not marked paid
-await send({ id: 'e3b', type: 'collection.succeeded', data: { id: 'pay-2b', status: 'SUCCEEDED', amount: '3000.00', currency: 'UGX', reference: 'event:ev-2' } });
+await send({ id: 'e3b', type: 'collection.succeeded', data: { charge_id: 'pay-2b', status: 'SUCCEEDED', amount: '3000.00', currency: 'UGX', reference: 'event:ev-2' } });
 assert.equal(row('events', 'ev-2').payment_status, 'unpaid');
 
-// ── checkout.completed shape, reference only, with a retry's attempt suffix
-await send({ id: 'e4', type: 'checkout.completed', data: { id: 'pay-3', payment_status: 'paid', charge: { amount: '3000.00', currency: 'NGN' }, reference: 'event:ev-2:lx3k9a' } });
+// ── checkout.completed shape, reference only, with a retry's attempt suffix;
+//    the payment id comes from data.charge.id
+await send({ id: 'e4', type: 'checkout.completed', data: { checkout_id: 'chk-2', payment_status: 'paid', charge: { id: 'pay-3', amount: '3000.00', currency: 'NGN' }, reference: 'event:ev-2:lx3k9a' } });
 assert.equal(row('events', 'ev-2').payment_status, 'paid');
+assert.equal(row('events', 'ev-2').bachs_payment_id, 'pay-3');
+
+// ── an "expired" from an OLDER checkout doesn't close the event's current one
+await send({ id: 'e5a', type: 'checkout.expired', data: { checkout_id: 'chk-old', reference: 'event:ev-4:a1' } });
+assert.equal(row('events', 'ev-4').payment_status, 'unpaid');
+await send({ id: 'e5b', type: 'collection.failed', data: { checkout_id: 'chk-4', status: 'FAILED', reference: 'event:ev-4:a2', metadata: {} } });
+assert.equal(row('events', 'ev-4').payment_status, 'failed', 'its own checkout can');
 
 // ── expiry, then a late success rescues it
-await send({ id: 'e5', type: 'checkout.expired', data: { reference: 'event:ev-3' } });
+await send({ id: 'e5', type: 'checkout.expired', data: { checkout_id: 'chk-3', reference: 'event:ev-3' } });
 assert.equal(row('events', 'ev-3').payment_status, 'expired');
 await send({ id: 'e6', type: 'collection.succeeded', data: { ...paid('3000.00', 'pay-4'), metadata: { event_id: 'ev-3' } } });
 assert.equal(row('events', 'ev-3').payment_status, 'paid');
@@ -132,8 +143,16 @@ assert.ok(
 
 // ── the sibling event of the same payment is not a double payment
 logged.length = 0;
-await send({ id: 'e8', type: 'checkout.completed', data: { id: 'pay-1', payment_status: 'paid', charge: { amount: '3000.00', currency: 'NGN' }, metadata: { event_id: 'ev-1' } } });
+await send({ id: 'e8', type: 'checkout.completed', data: { checkout_id: 'chk-1', payment_status: 'paid', charge: { id: 'pay-1', amount: '3000.00', currency: 'NGN' }, metadata: { event_id: 'ev-1' } } });
 assert.ok(!logged.some(([, msg]) => String(msg).includes('DOUBLE PAYMENT')), 'same payment id is not flagged');
+
+// ── money for a listing that no longer exists is flagged for a refund
+logged.length = 0;
+await send({ id: 'e9', type: 'collection.succeeded', data: { ...paid('3000.00', 'pay-9'), metadata: { event_id: 'ev-deleted' } } });
+assert.ok(logged.some(([level, msg]) => level === 'error' && String(msg).includes('PAYMENT FOR MISSING EVENT')));
+
+// ── promotions record the payment id too (data.charge_id)
+assert.equal(row('promotions', 'promo-1').bachs_payment_id, 'pay-p1');
 
 assert.equal(db.promotions.length, 1);
 process.stdout.write('ok: bachs-webhook handles promotions and event listing fees\n');

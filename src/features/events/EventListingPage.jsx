@@ -188,7 +188,10 @@ export default function EventListingPage() {
     } catch (e) {
       if (e.savedEventId) {
         setSavedEventId(e.savedEventId);
-        setSubmitError(`Your event is saved, but payment couldn't start: ${e.message}`);
+        setSubmitError(
+          `Your event is saved, but payment couldn't start: ${e.message} ` +
+            "The form is now locked so you pay for exactly what was saved. To change something, remove it from your profile and list it again."
+        );
       } else {
         setSubmitError(e.message || 'Could not send your event. Try again.');
       }
@@ -368,6 +371,10 @@ export default function EventListingPage() {
 
       <div className={styles.layout}>
         <form className={styles.formCol} onSubmit={(e) => e.preventDefault()}>
+          {/* Once the event is saved (payment couldn't start), the form locks:
+              "Try payment again" pays for exactly what was saved, so edits
+              made now would be silently lost. */}
+          <fieldset className={styles.lockSet} disabled={Boolean(savedEventId)}>
           {/* 01 Entry */}
           <section className={styles.step}>
             <StepHead n="01" title="Entry" subtitle="This decides if there is a fee." />
@@ -621,6 +628,7 @@ export default function EventListingPage() {
               </div>
             )}
           </section>
+          </fieldset>
         </form>
 
         <aside className={styles.sideCol}>
