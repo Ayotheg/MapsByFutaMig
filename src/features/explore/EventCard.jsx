@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CalendarDays, CalendarPlus, ExternalLink, MapPin, Navigation, Share, Ticket, Video, X } from 'lucide-react';
-import { DateBadge } from './ExploreEvents';
+import { DateBadge, EventPosterArt } from './ExploreEvents';
 import { longDate, priceLabel, timeRange } from './eventsData';
 import styles from './EventCard.module.css';
 
@@ -110,8 +110,7 @@ export default function EventCard({ event, onClose, isMobile, onNavigate, onJoin
 
             <div className={styles.scroll}>
               <div className={styles.poster}>
-                <CalendarDays className={styles.posterIcon} size={44} strokeWidth={1.5} aria-hidden="true" />
-                {e.poster && <img src={e.poster} alt="" decoding="async" />}
+                <EventPosterArt event={e} large />
                 <DateBadge iso={e.startsAt} className={styles.date} />
               </div>
 

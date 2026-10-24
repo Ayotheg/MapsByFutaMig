@@ -159,11 +159,44 @@
   width: 100%;
   height: 148px;
   overflow: hidden;
-  background: var(--v2-neutral);
+  background: var(--v2-primary);
 }
-.posterIcon {
+
+/* ── Poster art (EventPosterArt): placeholder + fading-in poster ────── */
+/* Same violet-to-teal gradient as the /event live preview, with a soft
+   ring of light in the corner so an empty poster still feels designed. */
+.posterFallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--v2-primary-hover) 0%, var(--v2-primary) 55%, var(--v2-secondary) 100%);
+}
+.posterFallback::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -25%;
+  width: 75%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+.posterBadge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.16);
   color: var(--v2-on-primary);
-  opacity: 0.35;
+}
+.posterBadgeLarge {
+  width: 72px;
+  height: 72px;
 }
 .posterImg {
   position: absolute;
@@ -171,6 +204,16 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.posterImgLoaded {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .posterImg {
+    transition: none;
+  }
 }
 .cardDate {
   position: absolute;
@@ -234,6 +277,14 @@
 }
 .railSm .poster {
   height: 104px;
+}
+.railSm .posterBadge {
+  width: 42px;
+  height: 42px;
+}
+.railSm .posterBadge svg {
+  width: 20px;
+  height: 20px;
 }
 .railSm .cardDate {
   top: 8px;

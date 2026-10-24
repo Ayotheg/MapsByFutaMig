@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { track } from '../../lib/analytics';
-import { CalendarDays, Clock, MapPin, Megaphone, MoveUpRight, Video } from 'lucide-react';
+import { Clock, MapPin, Megaphone, MoveUpRight, PartyPopper, Ticket, Video } from 'lucide-react';
+import { useImageStatus } from '../../lib/useImageStatus';
 import { SectionHeader } from './ExploreSections';
 import {
   EVENT_FILTERS,
@@ -29,6 +30,38 @@ export function DateBadge({ iso, className }) {
       <span className={styles.dateMonth}>{monthShort(iso)}</span>
       <span className={styles.dateDay}>{dayOfMonth(iso)}</span>
     </span>
+  );
+}
+
+/**
+ * The poster area's contents, shared by the Explore card and EventCard: a
+ * brand-gradient placeholder with an icon for the kind of event (online,
+ * ticketed, free) always underneath, and the real poster fading in on top
+ * once it has loaded. A missing, slow or broken poster still leaves a
+ * proper card, never a blank or broken-image one (same layering as the
+ * Places photos in ExploreSections.jsx). The caller's container sets size.
+ */
+export function EventPosterArt({ event, large }) {
+  const img = useImageStatus(event.poster);
+  const Icon = event.online ? Video : event.price ? Ticket : PartyPopper;
+  return (
+    <>
+      <span className={styles.posterFallback} aria-hidden="true">
+        <span className={`${styles.posterBadge} ${large ? styles.posterBadgeLarge : ''}`}>
+          <Icon size={large ? 32 : 26} strokeWidth={1.75} />
+        </span>
+      </span>
+      {event.poster && !img.failed && (
+        <img
+          className={`${styles.posterImg} ${img.loaded ? styles.posterImgLoaded : ''}`}
+          src={event.poster}
+          alt=""
+          decoding="async"
+          onLoad={img.onLoad}
+          onError={img.onError}
+        />
+      )}
+    </>
   );
 }
 
@@ -83,8 +116,7 @@ function FeaturedEventCard({ event, onSelect }) {
       }}
     >
       <span className={styles.poster}>
-        <CalendarDays className={styles.posterIcon} size={36} strokeWidth={1.5} aria-hidden="true" />
-        {event.poster && <img className={styles.posterImg} src={event.poster} alt="" decoding="async" />}
+        <EventPosterArt event={event} />
         <DateBadge iso={event.startsAt} className={styles.cardDate} />
         <span className={`${styles.priceTag} ${event.price ? '' : styles.priceTagFree}`}>{priceLabel(event)}</span>
       </span>
