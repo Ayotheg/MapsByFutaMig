@@ -36,6 +36,9 @@ const END_NEAR_DEST_M = 50;
 const RESUME_MAX_WAIT_MS = 15000;
 // The old shortcut-learning trace; cleared so it doesn't linger in storage.
 const TRACE_KEY = 'navigation-trace';
+// Travel mode → OSRM profile (osrmRoute.js).
+const TRAVEL_MODES = { walk: 'foot-walking', ride: 'cycling-regular', drive: 'driving-car' };
+const TRAVEL_MODE_KEY = 'nav-travel-mode';
 
 const SVG_FLAG = (size, color = 'currentColor') =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg>`;
@@ -101,8 +104,10 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  * are routed through when shorter (shortcutRoute.js), and walking along
  * one never counts as going off route.
  *
- * Routing is walking by default and switches to bike while the user is
- * moving at vehicle speed (busStops.js's ride detector) — see osrmRoute.js.
+ * Travel mode, picked in NavDestPanel and remembered per phone: Walk
+ * (walking routes, switching to bike while moving at vehicle speed —
+ * busStops.js's ride detector), Keke/Okada (bike routes) or Car (car
+ * routes). See osrmRoute.js.
  */
 const NavigationController = forwardRef(function NavigationController(
   { map, gps, searchIndex, segments, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
@@ -253,9 +258,20 @@ const NavigationController = forwardRef(function NavigationController(
   }, [map]);
 
   const navDestRef = useRef(persistedNavigation?.dest || persistedDestination || null); // {lat,lng,name,id,type}
-  // Routing mode: 'foot-walking', or 'cycling-regular' while riding. A
-  // restored trip starts on foot; the ride detector switches it back.
-  const navModeRef = useRef('foot-walking');
+  // 'walk' | 'ride' | 'drive' (TRAVEL_MODES), and the OSRM profile in use
+  // for it. Walk becomes 'cycling-regular' while riding; a restored trip
+  // starts on foot and the ride detector switches it back.
+  const [travelMode, setTravelMode] = useState(() => {
+    const saved = readPersistentState(TRAVEL_MODE_KEY, 'walk');
+    return TRAVEL_MODES[saved] ? saved : 'walk';
+  });
+  const travelModeRef = useRef(travelMode);
+  const navModeRef = useRef(TRAVEL_MODES[travelMode]);
+  const chooseTravelMode = useCallback((mode) => {
+    travelModeRef.current = mode;
+    setTravelMode(mode);
+    writePersistentState(TRAVEL_MODE_KEY, mode);
+  }, []);
   const navRouteDataRef = useRef(persistedNavigation?.routeData || null);
   const navStepIndexRef = useRef(persistedNavigation?.stepIndex || 0);
   const navUserPosRef = useRef(persistedNavigation?.userPos || null);
@@ -781,7 +797,7 @@ const NavigationController = forwardRef(function NavigationController(
       // unknown, then which way to turn once they're walking.
       // Only while the landmark is still ahead of them.
       if (currentStep.type === 'depart' && landmark && landmark.along > along + 10) {
-        nextHud.turnInstruction = `Walk towards ${landmark.place.name}`;
+        nextHud.turnInstruction = `${navModeRef.current === 'foot-walking' ? 'Walk' : 'Head'} towards ${landmark.place.name}`;
       }
       if (currentStep.type === 'depart' && userPos.heading != null && lastHeadingRef.current != null) {
         const start = startDirection(userPos.heading, lastHeadingRef.current);
@@ -843,7 +859,7 @@ const NavigationController = forwardRef(function NavigationController(
     // Riding (shuttle, keke or car: speed can't tell) near the recorded
     // shuttle stop closest to the destination: tell shuttle riders where
     // to get off. Not riding, or no such stop: nothing changes.
-    const alight = rideRef.current.riding ? alightStop(dest, userPos, candidatesRef.current) : null;
+    const alight = rideRef.current.riding && travelModeRef.current !== 'drive' ? alightStop(dest, userPos, candidatesRef.current) : null;
     const prompt = alight && alightPrompt(alight.toUser, alight.place.name);
     if (prompt) {
       nextHud.turnIcon = 'bus-front-fill';
@@ -891,11 +907,13 @@ const NavigationController = forwardRef(function NavigationController(
 
       updateNavUserDot(latitude, longitude);
       updateHUD();
-      // Bike routing while riding (motorcycle, keke, car, bus): still the
-      // short streets, but no footpaths or steps a vehicle can't use. On
-      // getting off, fresh walking directions from where they're standing,
-      // which start with the landmark / which-way-to-turn instructions.
-      const mode = ride.riding ? 'cycling-regular' : 'foot-walking';
+      // Walk mode only: bike routing while riding (keke, okada, cab,
+      // shuttle) — still the short streets, but no footpaths or steps a
+      // vehicle can't use. On getting off, fresh walking directions from
+      // where they're standing, which start with the landmark /
+      // which-way-to-turn instructions. Keke/Okada and Car keep theirs.
+      const travel = travelModeRef.current;
+      const mode = travel === 'walk' && ride.riding ? 'cycling-regular' : TRAVEL_MODES[travel];
       if (mode !== navModeRef.current) {
         navModeRef.current = mode;
         rerouteFrom(latitude, longitude);
@@ -1084,6 +1102,9 @@ const NavigationController = forwardRef(function NavigationController(
 
       setGoLabel('Calculating route…');
 
+      // The mode picked in NavDestPanel; Walk turns to bike once riding.
+      rideRef.current = createRideDetector();
+      navModeRef.current = TRAVEL_MODES[travelModeRef.current];
       let routeData;
       try {
         routeData = await fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current, shortcutPathsRef.current);
@@ -1127,7 +1148,7 @@ const NavigationController = forwardRef(function NavigationController(
       // After updateHUD(), which picks the start landmark for this route.
       const { landmark } = routeCumRef.current;
       const firstInstruction = landmark
-        ? `Walk towards ${landmark.place.name}`
+        ? `${navModeRef.current === 'foot-walking' ? 'Walk' : 'Head'} towards ${landmark.place.name}`
         : routeData.steps[0]?.instruction || 'Head towards your destination';
       speak(`Starting navigation to ${dest.name}. ${firstInstruction}.`);
       persistNavigation();
@@ -1162,7 +1183,7 @@ const NavigationController = forwardRef(function NavigationController(
     navGpsUnsubRef.current?.();
     navGpsUnsubRef.current = null;
     rideRef.current = createRideDetector();
-    navModeRef.current = 'foot-walking';
+    navModeRef.current = TRAVEL_MODES[travelModeRef.current];
     alightSpokenRef.current = '';
 
     clearRouteLayers();
@@ -1360,6 +1381,8 @@ const NavigationController = forwardRef(function NavigationController(
           onClose={() => setDestPanelOpen(false)}
           popularPlaces={popularPlaces}
           onPopularPlaceSelect={(place) => setNavDest(place.waypoint)}
+          travelMode={travelMode}
+          onTravelModeChange={chooseTravelMode}
         />
       )}
       {navActive && (

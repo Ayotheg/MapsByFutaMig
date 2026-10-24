@@ -288,6 +288,43 @@
   box-shadow: 0 -4px 5px rgba(0, 0, 0, 0.02);
 }
 
+/* Travel mode: a segmented control above Start. */
+.modePicker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-divider);
+  border-radius: 12px;
+}
+.modeOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 6px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--v2-text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard), color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.modeOption svg {
+  flex-shrink: 0;
+}
+.modeOptionActive {
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+}
+
 .goBtn {
   display: flex;
   align-items: center;

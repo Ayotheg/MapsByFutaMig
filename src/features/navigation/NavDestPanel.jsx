@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Info, MapPin, Navigation, Search, X } from 'lucide-react';
+import { Bike, Car, Footprints, Info, MapPin, Navigation, Search, X } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import { dotColor } from '../search/chipConfig';
 import styles from './NavDestPanel.module.css';
@@ -13,10 +13,9 @@ import styles from './NavDestPanel.module.css';
  * Redesigned to v2 light tokens this session, per Figma node 1:311
  * ("Navigation Mode"). Two real functionality changes on direct user
  * instruction, both flagged per Rule 7:
- *  - Mode picker (Walk/Moto/Drive) removed — the Figma frame doesn't
- *    show one at all. `mode` stays hardcoded to 'foot-walking' in
- *    `NavigationController` (its default, never changed now that
- *    nothing calls `setMode`) — see that file's own comment.
+ *  - Travel mode picker (Walk / Keke-Okada / Car) above the Start
+ *    button: `travelMode`, `onTravelModeChange` (NavigationController
+ *    remembers it per phone and maps it to a routing server).
  *  - "Popular places on campus" section added — `popularPlaces` is
  *    `NavigationController`'s slice of the *same* `explorePicks` array
  *    MapPage's Explore panel already renders from, not a separate
@@ -25,6 +24,12 @@ import styles from './NavDestPanel.module.css';
  * to them, just markup) were also dropped to match the frame, which
  * shows a single "Where to?" destination search only.
  */
+
+const TRAVEL_OPTIONS = [
+  { mode: 'walk', label: 'Walk', Icon: Footprints },
+  { mode: 'ride', label: 'Keke/Okada', Icon: Bike },
+  { mode: 'drive', label: 'Car', Icon: Car },
+];
 
 // Bug fix (reported directly): on mobile the on-screen keyboard covered the
 // "Where to?" field. Browsers now overlay the keyboard on the page instead
@@ -66,6 +71,8 @@ export default function NavDestPanel({
   onClose,
   popularPlaces,
   onPopularPlaceSelect,
+  travelMode,
+  onTravelModeChange,
 }) {
   const kb = useKeyboardInset();
   return (
@@ -161,6 +168,21 @@ export default function NavDestPanel({
       </div>
 
       <div className={styles.footer}>
+        <div className={styles.modePicker} role="radiogroup" aria-label="How are you travelling?">
+          {TRAVEL_OPTIONS.map(({ mode, label, Icon }) => (
+            <button
+              key={mode}
+              type="button"
+              role="radio"
+              aria-checked={travelMode === mode}
+              className={`${styles.modeOption} ${travelMode === mode ? styles.modeOptionActive : ''}`}
+              onClick={() => onTravelModeChange(mode)}
+            >
+              <Icon size={15} />
+              {label}
+            </button>
+          ))}
+        </div>
         <button type="button" className={styles.goBtn} disabled={goDisabled} onClick={onGo}>
           <Navigation size={15} />
           {goLabel}
