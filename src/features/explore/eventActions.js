@@ -1,4 +1,4 @@
-import { longDate, placeLabel, timeRange } from './eventsData';
+import { isWebLink, longDate, placeLabel, timeRange } from './eventsData';
 import { track } from '../../lib/analytics';
 
 // Events without an end time are saved to calendars as two hours long.
@@ -17,7 +17,11 @@ function icsText(s) {
 export function addEventToCalendar(event) {
   const start = new Date(event.startsAt);
   const end = event.endsAt ? new Date(event.endsAt) : new Date(start.getTime() + DEFAULT_LENGTH_MS);
-  const location = event.online ? event.online.link || placeLabel(event) : event.venue?.name || '';
+  const location = event.online
+    ? isWebLink(event.online.link)
+      ? event.online.link
+      : placeLabel(event)
+    : event.venue?.name || '';
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -69,8 +73,10 @@ export async function shareEvent(event) {
   }
 }
 
+// The database only accepts http(s) links (events_hardening.sql); checked
+// again here so nothing else is ever handed to window.open.
 export function joinOnlineEvent(event) {
-  if (!event.online?.link) return;
+  if (!isWebLink(event.online?.link)) return;
   track('event_join_online', { platform: event.online.platform || 'other' });
   window.open(event.online.link, '_blank', 'noopener,noreferrer');
 }

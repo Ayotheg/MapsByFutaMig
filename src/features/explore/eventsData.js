@@ -7,9 +7,15 @@
  *     priceNote, poster (url | null), about, isFeatured,
  *     venue: { name, hint, lat, lng } | null,
  *     online: { platform, link } | null }
+ *
+ * All event dates are FUTA (Lagos) time, whatever the device's time zone:
+ * that's the time an organiser means, and what public_events() uses to
+ * decide when an event drops off. Lagos is UTC+1 all year (no DST).
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+export const EVENT_TZ = 'Africa/Lagos';
+const LAGOS_OFFSET = '+01:00';
 
 // Flat fee to list a ticketed or paid event; free events list at ₦0.
 export const EVENT_LISTING_FEE = 3000;
@@ -27,14 +33,27 @@ export const EVENT_FILTERS = [
   { key: 'paid', label: 'Paid' },
 ];
 
-function sameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+/** 'YYYY-MM-DD' of an instant, in Lagos. */
+export function lagosDayKey(date) {
+  return new Date(date).toLocaleDateString('en-CA', { timeZone: EVENT_TZ });
+}
+
+/** The instant a Lagos day + 'HH:MM' time happens. */
+export function lagosInstant(day, time) {
+  const d = new Date(`${day}T${time}:00${LAGOS_OFFSET}`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Last moment of the Lagos day an event starts on (when it leaves Explore). */
+export function lagosEndOfDay(iso) {
+  return new Date(`${lagosDayKey(iso)}T23:59:59.999${LAGOS_OFFSET}`);
 }
 
 export function filterEvents(events, filter, now = new Date()) {
+  const today = lagosDayKey(now);
   return events.filter((e) => {
     const start = new Date(e.startsAt);
-    if (filter === 'today') return sameDay(start, now);
+    if (filter === 'today') return lagosDayKey(start) === today;
     if (filter === 'week') return start.getTime() - now.getTime() < 7 * DAY_MS;
     if (filter === 'free') return !e.price;
     if (filter === 'paid') return e.price > 0;
@@ -42,27 +61,35 @@ export function filterEvents(events, filter, now = new Date()) {
   });
 }
 
+function fmt(iso, options) {
+  return new Date(iso).toLocaleString('en-GB', { timeZone: EVENT_TZ, ...options });
+}
+
 export function monthShort(iso) {
-  return new Date(iso).toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
+  return fmt(iso, { month: 'short' }).toUpperCase();
 }
 
 export function dayOfMonth(iso) {
-  return new Date(iso).getDate();
+  return Number(fmt(iso, { day: 'numeric' }));
 }
 
 function timeOf(iso) {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return new Date(iso).toLocaleTimeString('en-US', { timeZone: EVENT_TZ, hour: 'numeric', minute: '2-digit' });
 }
 
 // "Fri · 10:00 AM"
 export function shortWhen(iso) {
-  return `${new Date(iso).toLocaleDateString('en-GB', { weekday: 'short' })} · ${timeOf(iso)}`;
+  return `${fmt(iso, { weekday: 'short' })} · ${timeOf(iso)}`;
 }
 
 // "Friday, 24 October"
 export function longDate(iso) {
-  const d = new Date(iso);
-  return `${d.toLocaleDateString('en-GB', { weekday: 'long' })}, ${d.getDate()} ${d.toLocaleDateString('en-GB', { month: 'long' })}`;
+  return `${fmt(iso, { weekday: 'long' })}, ${dayOfMonth(iso)} ${fmt(iso, { month: 'long' })}`;
+}
+
+// "Sat, 25 Oct"
+export function shortDate(iso) {
+  return fmt(iso, { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 // "10:00 AM – 2:00 PM"
@@ -78,4 +105,9 @@ export function priceLabel(e) {
 export function placeLabel(e) {
   if (e.online) return e.online.platform ? `Online · ${e.online.platform}` : 'Online';
   return e.venue?.name || '';
+}
+
+/** Only plain web links are ever opened or written into calendar files. */
+export function isWebLink(url) {
+  return typeof url === 'string' && /^https?:\/\/\S+$/i.test(url.trim());
 }

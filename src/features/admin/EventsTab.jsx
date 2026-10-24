@@ -7,6 +7,7 @@ import { supabase, getPlaceImageUrl } from '../../lib/supabase';
 import { approveEvent, rejectEvent, removeEvent, setEventFeatured } from './adminSave';
 import { track } from '../../lib/analytics';
 import { formatNaira } from '../promote/pricing';
+import { lagosEndOfDay, shortDate, shortWhen } from '../explore/eventsData';
 
 /**
  * Admin review queue for listed events (`events`, supabase/events.sql).
@@ -70,15 +71,13 @@ function when(iso) {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleString();
 }
 
+// Event times are FUTA (Lagos) time, same as Explore and public_events().
 function eventDay(iso) {
-  const d = new Date(iso);
-  return d.toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  return `${shortDate(iso)}, ${shortWhen(iso).split(' · ')[1]}`;
 }
 
 function hasEnded(iso) {
-  const end = new Date(iso);
-  end.setHours(23, 59, 59, 999);
-  return end < new Date();
+  return lagosEndOfDay(iso) < new Date();
 }
 
 export default function EventsTab({ onCountChange }) {
@@ -335,8 +334,8 @@ export default function EventsTab({ onCountChange }) {
                   </div>
                 ))}
 
+              {/* Unpaid listings can be deleted too (spam that never paid). */}
               {!canReview &&
-                filter !== 'unpaid' &&
                 (removing?.id === ev.id ? (
                   <div className={ownStyles.rejectForm}>
                     <div className={styles.itemMeta}>

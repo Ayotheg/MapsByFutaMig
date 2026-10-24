@@ -16,6 +16,10 @@ import { bachsRequest } from '../_shared/bachs.ts';
 // Mirrors EVENT_LISTING_FEE in src/features/explore/eventsData.js — keep the
 // two in sync. This copy decides what BACHS actually collects.
 const EVENT_LISTING_FEE = 3000;
+// Always naira (events.currency is pinned to NGN in events_hardening.sql).
+const CURRENCY = 'NGN';
+// How long a just-opened checkout is handed back instead of a new one.
+const REUSE_CHECKOUT_MS = 30 * 60 * 1000;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -54,7 +58,9 @@ Deno.serve(async (req) => {
 
   const { data: event, error: fetchError } = await callerClient
     .from('events')
-    .select('id, title, entry_type, listing_fee, currency, payment_status, status')
+    .select(
+      'id, title, entry_type, listing_fee, payment_status, status, starts_at, bachs_checkout_url, bachs_checkout_started_at'
+    )
     .eq('id', eventId)
     .maybeSingle();
 
@@ -62,6 +68,11 @@ Deno.serve(async (req) => {
   if (!event) return json({ error: 'Event not found (or not yours).' }, 404);
   if (event.entry_type !== 'ticketed') {
     return json({ error: 'Free events have nothing to pay.' }, 409);
+  }
+  // A started event can't go live any more (public_events() / review), so
+  // don't take money for it — e.g. an old "Pay now" link.
+  if (Date.parse(event.starts_at) <= Date.now()) {
+    return json({ error: 'This event has already started, so it can no longer be listed.' }, 409);
   }
   // "Try payment again" on /event/callback reuses the saved event after a
   // cancelled (still 'unpaid'), failed or expired checkout. Paid events and
@@ -79,22 +90,37 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Never trust the client-inserted fee. A failed/expired row goes back to
-  // 'unpaid' for the new checkout (the webhook only moves 'unpaid' rows to
-  // failed/expired, and still accepts a late success on any of them).
+  // A checkout opened moments ago (cancelled, or the tab was closed) can still
+  // be paid. Hand the same one back instead of opening a second that could
+  // ALSO be paid. Once BACHS expires it, the webhook marks the row 'expired'
+  // and the next call opens a fresh one.
+  const startedAt = event.bachs_checkout_started_at ? Date.parse(event.bachs_checkout_started_at) : NaN;
+  if (
+    event.payment_status === 'unpaid' &&
+    event.bachs_checkout_url &&
+    Number.isFinite(startedAt) &&
+    Date.now() - startedAt < REUSE_CHECKOUT_MS
+  ) {
+    return json({ checkoutUrl: event.bachs_checkout_url });
+  }
+
+  // Never trust the client-inserted fee or currency. The claim below also
+  // puts a failed/expired row back to 'unpaid' for the new checkout (the
+  // webhook only moves 'unpaid' rows to failed/expired, and still accepts a
+  // late success on any of them). It must match the row: if the webhook
+  // marked it paid since we read it, nothing matches and we stop.
   const amount = EVENT_LISTING_FEE;
-  const currency = event.currency || 'NGN';
-  const reset = {};
-  if (Number(event.listing_fee) !== amount) reset.listing_fee = amount;
-  if (event.payment_status !== 'unpaid') reset.payment_status = 'unpaid';
-  if (Object.keys(reset).length) {
-    const { error: resetError } = await adminClient
-      .from('events')
-      .update(reset)
-      .eq('id', event.id)
-      .eq('status', 'awaiting_payment')
-      .in('payment_status', RETRYABLE);
-    if (resetError) return json({ error: resetError.message }, 500);
+  const currency = CURRENCY;
+  const { data: claimed, error: claimError } = await adminClient
+    .from('events')
+    .update({ listing_fee: amount, currency, payment_status: 'unpaid' })
+    .eq('id', event.id)
+    .eq('status', 'awaiting_payment')
+    .in('payment_status', RETRYABLE)
+    .select('id');
+  if (claimError) return json({ error: claimError.message }, 500);
+  if (!claimed || claimed.length === 0) {
+    return json({ error: 'This event was just updated (it may already be paid). Refresh and check again.' }, 409);
   }
 
   // Every way back from BACHS lands on the event's status page, which reads
@@ -129,7 +155,11 @@ Deno.serve(async (req) => {
 
   const { error: updateError } = await adminClient
     .from('events')
-    .update({ bachs_checkout_id: checkout.id, bachs_checkout_url: checkoutUrl })
+    .update({
+      bachs_checkout_id: checkout.id,
+      bachs_checkout_url: checkoutUrl,
+      bachs_checkout_started_at: new Date().toISOString(),
+    })
     .eq('id', event.id);
   if (updateError) {
     // Non-fatal: the person can still pay with the URL they have.

@@ -8,6 +8,7 @@ import { displayName, initials } from './useAuth';
 import { fetchProfileStats, statTileValue } from './profileStats';
 import { fetchActivePromotion } from '../promote/activePromotion';
 import { fetchMyEvents } from '../events/myEvents';
+import { shortDate } from '../explore/eventsData';
 import { fetchMarketingConsent, saveMarketingConsent } from './marketingConsent';
 import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
 import WhatsAppIcon from '../../lib/WhatsAppIcon';
@@ -368,7 +369,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
         )}
 
         {myEvents.map((ev) => {
-          const day = new Date(ev.startsAt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+          const day = shortDate(ev.startsAt);
           return (
             <div key={ev.id} className={styles.adCard}>
               <CalendarDays size={16} className={ev.state === 'rejected' ? styles.adIconMuted : styles.adIcon} />
@@ -385,7 +386,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
                       Pay the listing fee to send it for review.{' '}
                       <Link
                         className={styles.adAction}
-                        to={`/event/callback?event=${encodeURIComponent(ev.id)}&cancelled=1`}
+                        to={`/event/callback?event=${encodeURIComponent(ev.id)}&pay=1`}
                         onClick={onClose}
                       >
                         Pay now

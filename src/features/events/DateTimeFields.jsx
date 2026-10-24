@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { lagosDayKey } from '../explore/eventsData';
 import styles from './DateTimeFields.module.css';
 
 /**
@@ -20,10 +21,10 @@ function fromKey(key) {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
+// Today's date in Lagos (the calendar's dates are FUTA days), as a plain
+// local Date for the calendar arithmetic below.
 function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return fromKey(lagosDayKey(new Date()));
 }
 
 function Picker({ open, title, onClose, align, children }) {

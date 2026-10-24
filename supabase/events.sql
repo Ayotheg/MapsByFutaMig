@@ -1,7 +1,8 @@
 -- ── Events — listing, payment, admin review, public read (supabase/events.sql)
 --
 -- Run AFTER: waypoint_submissions.sql (is_admin()), promotions.sql
--- (bachs_webhook_events). Safe to run more than once.
+-- (bachs_webhook_events). Safe to run more than once. Then run
+-- events_hardening.sql (extra checks, checkout reuse, admin erase).
 --
 -- Flow (mirrors promotions, see docs/payments.md):
 --   /event form (src/features/events/submitEvent.js) inserts a row.

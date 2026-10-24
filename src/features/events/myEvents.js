@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { lagosEndOfDay } from '../explore/eventsData';
 
 // ── The account's events, for the profile card ───────────────────────────
 //
@@ -17,13 +18,8 @@ const REJECTED_SHOW_DAYS = 7;
 const MAX_CARDS = 3;
 const ORDER = { unpaid: 0, review: 1, live: 2, rejected: 3 };
 
-// End of the event's day, matching public_events() (local day, Lagos for
-// FUTA's users).
-function endOfDay(iso) {
-  const d = new Date(iso);
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
+// End of the event's day in Lagos, matching public_events().
+const endOfDay = lagosEndOfDay;
 
 function classify(e, now) {
   if (e.status === 'awaiting_payment' && ['unpaid', 'failed', 'expired'].includes(e.payment_status)) return 'unpaid';

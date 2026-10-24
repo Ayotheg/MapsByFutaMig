@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase';
 import { uploadImage } from '../admin/adminSave';
 import { track } from '../../lib/analytics';
+import { isWebLink, lagosInstant } from '../explore/eventsData';
 
 /**
  * /event form → `events` row (supabase/events.sql). Same split as
@@ -20,31 +21,42 @@ export const ONLINE_PREFIXES = {
   telegram: 'https://t.me/',
 };
 
+/**
+ * The full link "Join online" opens, or null when it isn't a web link. The
+ * database only accepts http(s) links (events_hardening.sql), so anything
+ * else is caught here with a friendly message instead.
+ */
 export function buildOnlineLink(platform, value) {
   const trimmed = (value || '').trim();
   if (!trimmed) return null;
+  let url;
   // Pasting a whole link into a prefixed field still works.
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  const prefix = ONLINE_PREFIXES[platform];
-  if (prefix) return `${prefix}${trimmed.replace(/^\/+/, '')}`;
-  return /^[\w-]+(\.[\w-]+)+/.test(trimmed) ? `https://${trimmed}` : trimmed;
+  if (/^https?:\/\//i.test(trimmed)) url = trimmed;
+  else if (ONLINE_PREFIXES[platform]) url = `${ONLINE_PREFIXES[platform]}${trimmed.replace(/^\/+/, '')}`;
+  else if (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(trimmed)) url = `https://${trimmed}`;
+  return url && isWebLink(url) && url.length <= LINK_MAX ? url : null;
 }
 
-// Matches the events.about check in supabase/events.sql.
+// Match the checks in supabase/events.sql and events_hardening.sql.
 export const ABOUT_MAX = 1000;
+export const TITLE_MAX = 120;
+export const VENUE_NAME_MAX = 120;
+const LINK_MAX = 500;
 
+// The day and time picked are FUTA (Lagos) time, whatever the device's zone.
 export function startsAtFrom(day, time) {
   if (!day || !time) return null;
-  const d = new Date(`${day}T${time}`);
-  return Number.isNaN(d.getTime()) ? null : d;
+  return lagosInstant(day, time);
 }
 
 /** Returns the first problem as a sentence, or null when the form can be sent. */
-export function validateEventForm({ entry, ticketPrice, title, organiser, day, starts, where, venue, venueName, link }) {
+export function validateEventForm({ entry, ticketPrice, title, organiser, day, starts, where, venue, venueName, platform, link }) {
   if (entry !== 'free' && entry !== 'ticketed') return 'Choose free or ticketed in step 1.';
   if (entry === 'ticketed' && !(Number(ticketPrice) > 0)) return 'Add the ticket price.';
   if (!title?.trim()) return 'Add the event name.';
+  if (title.trim().length > TITLE_MAX) return `Keep the event name under ${TITLE_MAX} characters.`;
   if (!organiser?.trim()) return 'Add the organiser.';
+  if (organiser.trim().length > TITLE_MAX) return `Keep the organiser under ${TITLE_MAX} characters.`;
   const startsAt = startsAtFrom(day, starts);
   if (!startsAt) return 'Pick the day and start time.';
   if (startsAt.getTime() <= Date.now()) return 'The start time has already passed.';
@@ -52,8 +64,12 @@ export function validateEventForm({ entry, ticketPrice, title, organiser, day, s
   if (where === 'venue') {
     if (!venue) return 'Set the venue: search the map or use your current location.';
     if (!venueName?.trim()) return 'Add the venue name.';
+    if (venueName.trim().length > VENUE_NAME_MAX) return `Keep the venue name under ${VENUE_NAME_MAX} characters.`;
   }
-  if (where === 'online' && !link?.trim()) return 'Add the event link.';
+  if (where === 'online') {
+    if (!link?.trim()) return 'Add the event link.';
+    if (!buildOnlineLink(platform, link)) return 'That event link doesn’t look right. Paste the full link, starting with https://';
+  }
   return null;
 }
 
@@ -76,7 +92,7 @@ export async function submitEvent({
 }) {
   if (!userId) throw new Error('Sign in first — an event has to be tied to your account.');
 
-  const problem = validateEventForm({ entry, ticketPrice, title, organiser, day, starts, where, venue, venueName, link });
+  const problem = validateEventForm({ entry, ticketPrice, title, organiser, day, starts, where, venue, venueName, platform, link });
   if (problem) throw new Error(problem);
 
   const eventId = crypto.randomUUID();
@@ -122,8 +138,16 @@ export async function submitEvent({
 
   if (!ticketed) return { eventId, checkoutUrl: null };
 
-  const checkoutUrl = await startEventCheckout(eventId);
-  return { eventId, checkoutUrl };
+  // The event is saved at this point. If payment can't start, the error
+  // carries its id so the page retries payment for THIS event instead of
+  // inserting a duplicate on the next tap.
+  try {
+    const checkoutUrl = await startEventCheckout(eventId);
+    return { eventId, checkoutUrl };
+  } catch (e) {
+    e.savedEventId = eventId;
+    throw e;
+  }
 }
 
 /**
@@ -158,6 +182,10 @@ function friendlyInsertError(error) {
 
 /** Polled by the callback page after BACHS redirects back (and shown for free events). */
 export async function fetchEventStatus(eventId) {
+  // Wait for the saved login to be restored first: straight after BACHS
+  // redirects back, a query fired too early runs signed out, finds nothing
+  // (RLS) and the page would wrongly say the event doesn't exist.
+  await supabase.auth.getSession();
   const { data, error } = await supabase
     .from('events')
     .select('id, title, status, payment_status, entry_type')

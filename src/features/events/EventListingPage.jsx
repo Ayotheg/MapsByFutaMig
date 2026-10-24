@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -20,10 +20,10 @@ import {
 import { useSeo } from '../../lib/useSeo';
 import { useAuth, friendlyError } from '../auth/useAuth';
 import WaypointSearchPanel from '../promote/WaypointSearchPanel';
-import { ABOUT_MAX, submitEvent, validateEventForm } from './submitEvent';
+import { ABOUT_MAX, TITLE_MAX, startEventCheckout, submitEvent, validateEventForm } from './submitEvent';
 import { DayField, TimeField } from './DateTimeFields';
 import { DateBadge } from '../explore/ExploreEvents';
-import { EVENT_LISTING_FEE, priceLabel, shortWhen } from '../explore/eventsData';
+import { EVENT_LISTING_FEE, lagosDayKey, lagosInstant, priceLabel, shortWhen } from '../explore/eventsData';
 import styles from './EventListingPage.module.css';
 
 // Only mounts when a signed-out person tries to submit.
@@ -52,11 +52,11 @@ export default function EventListingPage() {
   const navigate = useNavigate();
   const posterInputRef = useRef(null);
   const auth = useAuth();
-  // BACHS's cancel_url (create-event-checkout) comes back with ?cancelled=1.
-  const [searchParams] = useSearchParams();
-  const showCancelledNotice = searchParams.get('cancelled') === '1';
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  // Set when the event was saved but payment couldn't start: the next tap
+  // retries payment for that saved event instead of listing it twice.
+  const [savedEventId, setSavedEventId] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const [entry, setEntry] = useState(null); // null | 'free' | 'ticketed'
@@ -133,6 +133,10 @@ export default function EventListingPage() {
 
   async function handleSubmit() {
     if (submitting) return;
+    if (savedEventId) {
+      await retrySavedPayment();
+      return;
+    }
     const problem = validateEventForm({
       entry,
       ticketPrice,
@@ -143,6 +147,7 @@ export default function EventListingPage() {
       where,
       venue,
       venueName,
+      platform,
       link,
     });
     if (problem) {
@@ -181,18 +186,31 @@ export default function EventListingPage() {
       }
       navigate(`/event/callback?event=${eventId}`, { replace: true });
     } catch (e) {
-      setSubmitError(e.message || 'Could not send your event. Try again.');
+      if (e.savedEventId) {
+        setSavedEventId(e.savedEventId);
+        setSubmitError(`Your event is saved, but payment couldn't start: ${e.message}`);
+      } else {
+        setSubmitError(e.message || 'Could not send your event. Try again.');
+      }
       setSubmitting(false);
     }
   }
 
-  // Preview falls back to the design's sample date and time until filled in.
-  const previewIso = (() => {
-    const d = day ? new Date(`${day}T00:00`) : new Date();
-    const [h, m] = (starts || '10:00').split(':').map(Number);
-    d.setHours(h, m, 0, 0);
-    return d.toISOString();
-  })();
+  async function retrySavedPayment() {
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      // Left spinning on purpose: the browser is about to leave for BACHS.
+      window.location.href = await startEventCheckout(savedEventId);
+    } catch (e) {
+      setSubmitError(`Your event is saved, but payment couldn't start: ${e.message}`);
+      setSubmitting(false);
+    }
+  }
+
+  // Preview falls back to the design's sample date and time until filled in
+  // (Lagos time, like the saved event).
+  const previewIso = (lagosInstant(day || lagosDayKey(new Date()), starts || '10:00') || new Date()).toISOString();
   const previewPlace =
     where === 'online' ? `Online · ${activePlatform.label}` : where === 'venue' && venueName.trim() ? venueName.trim() : 'Venue';
 
@@ -254,10 +272,10 @@ export default function EventListingPage() {
           </dd>
         </div>
       </dl>
-      {(submitError || showCancelledNotice) && (
+      {submitError && (
         <p className={styles.formError} role="alert">
           <AlertCircle size={15} aria-hidden="true" />
-          <span>{submitError || 'Payment was cancelled, nothing was charged. Your event is saved as unpaid; submit again to pay.'}</span>
+          <span>{submitError}</span>
         </p>
       )}
       <button
@@ -272,6 +290,8 @@ export default function EventListingPage() {
             <Loader2 size={17} className={styles.spinner} aria-hidden="true" />
             {ticketed ? 'Starting payment…' : 'Sending…'}
           </>
+        ) : savedEventId ? (
+          'Try payment again'
         ) : (
           submitLabel
         )}
@@ -415,6 +435,7 @@ export default function EventListingPage() {
                 className={styles.input}
                 type="text"
                 placeholder="e.g. Tech Week Kick-off"
+                maxLength={TITLE_MAX}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -425,6 +446,7 @@ export default function EventListingPage() {
                 className={styles.input}
                 type="text"
                 placeholder="Club, department or your name"
+                maxLength={TITLE_MAX}
                 value={organiser}
                 onChange={(e) => setOrganiser(e.target.value)}
               />

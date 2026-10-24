@@ -129,7 +129,10 @@ Deno.serve(async (req) => {
     typeof promoCode === 'string' && promoCode.trim().toUpperCase() === PROMO_CODE;
   const fullAmount = days * NAIRA_PER_DAY;
   const amount = promoApplied ? Math.round(fullAmount * (1 - PROMO_DISCOUNT)) : fullAmount;
-  const currency = promotion.currency || 'NGN';
+  // Always naira, never the row's currency: the client inserts that column,
+  // and the webhook compares the payment against it (promotions.currency is
+  // also pinned to NGN in events_hardening.sql).
+  const currency = 'NGN';
 
   // Overwrite whatever amount the client inserted, so the row (and the
   // admin Promotions tab) shows what is actually being charged.

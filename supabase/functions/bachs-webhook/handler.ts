@@ -213,7 +213,7 @@ async function handleEventPayment(adminClient, event, eventId) {
     case 'checkout.completed': {
       const { data: row, error: lookupError } = await adminClient
         .from('events')
-        .select('listing_fee, currency, payment_status')
+        .select('listing_fee, currency, payment_status, bachs_payment_id')
         .eq('id', eventId)
         .maybeSingle();
       if (lookupError) {
@@ -240,8 +240,22 @@ async function handleEventPayment(adminClient, event, eventId) {
         break;
       }
 
-      // Sibling event (collection.succeeded + checkout.completed) already applied.
-      if (row.payment_status === 'paid') break;
+      // Sibling event (collection.succeeded + checkout.completed) already
+      // applied. A different payment id means a SECOND payment for the same
+      // listing (two checkouts both paid): leave the row as it is, but log it
+      // loudly so it can be refunded.
+      if (row.payment_status === 'paid') {
+        const paymentId = event.data?.id ?? null;
+        if (paymentId && row.bachs_payment_id && paymentId !== row.bachs_payment_id) {
+          console.error('[bachs-webhook] POSSIBLE DOUBLE PAYMENT for event — refund needed:', {
+            listingId: eventId,
+            firstPayment: row.bachs_payment_id,
+            secondPayment: paymentId,
+            eventId: event.id,
+          });
+        }
+        break;
+      }
 
       const { data: updated, error } = await adminClient
         .from('events')

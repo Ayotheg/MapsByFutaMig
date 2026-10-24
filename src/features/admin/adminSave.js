@@ -517,7 +517,10 @@ export async function removeEvent(id, { erase = false } = {}) {
   if (error) throw eventRpcError(error, erase ? 'delete' : 'remove');
   track('admin_action', { action: erase ? 'delete' : 'remove', entity: 'event' });
 
-  if (!row?.poster_path) return { photoError: null };
+  // Only ever delete a file in this event's own folder. The database now
+  // refuses any other poster_path (events_hardening.sql); this guards rows
+  // and paths it hasn't seen.
+  if (!row?.poster_path || !row.poster_path.startsWith(`event/${id}/`)) return { photoError: null };
   try {
     await removeStorageFiles([row.poster_path]);
     return { photoError: null };

@@ -51,7 +51,10 @@ export default function PromoteCallbackPage({ kind = 'promotion' }) {
   const isEvent = kind === 'event';
   // BACHS's cancel_url for events. Checked against the row, not trusted:
   // a cancelled page that the webhook has since marked paid shows success.
-  const wasCancelled = isEvent && searchParams.get('cancelled') === '1';
+  // ?pay=1 is the profile card's "Pay now": nothing was attempted yet, so
+  // the same "not paid" handling with its own wording.
+  const payNow = isEvent && searchParams.get('pay') === '1';
+  const wasCancelled = isEvent && (searchParams.get('cancelled') === '1' || payNow);
 
   const [promotion, setPromotion] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -177,6 +180,17 @@ export default function PromoteCallbackPage({ kind = 'promotion' }) {
         </p>
       </>
     );
+  } else if (eventCancelled && payNow) {
+    body = (
+      <>
+        <Clock size={40} strokeWidth={2} className={styles.iconStill} />
+        <h1 className={styles.title}>Payment needed</h1>
+        <p className={styles.subtitle}>
+          <strong>{cfg.name(promotion)}</strong> is saved. Pay the listing fee and it goes straight
+          to review.
+        </p>
+      </>
+    );
   } else if (eventCancelled) {
     body = (
       <>
@@ -253,7 +267,7 @@ export default function PromoteCallbackPage({ kind = 'promotion' }) {
         )}
         {canRetry && (
           <button type="button" className={styles.homeBtn} onClick={retryPayment} disabled={retrying} aria-busy={retrying}>
-            {retrying ? 'Opening payment…' : 'Try payment again'}
+            {retrying ? 'Opening payment…' : eventCancelled && payNow ? 'Pay now' : 'Try payment again'}
           </button>
         )}
         {timedOut && !settled && !canRetry && !notFound && (

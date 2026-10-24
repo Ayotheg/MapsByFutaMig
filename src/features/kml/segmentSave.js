@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase';
+import { compressImageFile } from '../../lib/imageCompression';
 
 /**
  * segmentSave.js — Supabase insert logic for the save flow.
@@ -53,7 +54,9 @@ const PLACE_IMAGES_BUCKET = 'place-images';
  * public URL — same convention waypoint_images/segment_images already use,
  * resolved to a URL on read via getPlaceImageUrl).
  */
-async function uploadSegmentImage(segmentId, file, position) {
+async function uploadSegmentImage(segmentId, rawFile, position) {
+  // Same compression as every other photo upload (lib/imageCompression.js).
+  const file = await compressImageFile(rawFile);
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `segments/${segmentId}/${position}.${ext}`;
   const { error } = await supabase.storage
