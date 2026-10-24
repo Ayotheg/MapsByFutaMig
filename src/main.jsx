@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.jsx'
 import { installLoadingMusicPrimer } from './lib/loadingMusic'
 import { isNativeApp } from './lib/platform'
+import { initSessionReplay } from './lib/sessionReplay'
 
 const rootEl = document.getElementById('root')
 
@@ -33,6 +34,8 @@ if (window.location.pathname === '/' && rootEl.childElementCount > 0) {
 // Starts the loading-screen song inside the tap on any link to /map, so it
 // also plays on iPhones (see lib/loadingMusic.js).
 installLoadingMusicPrimer()
+
+window.addEventListener('load', initSessionReplay, { once: true })
 
 // Tile + photo cache (public/sw.js). Production only — a service worker
 // in `vite dev` caches stale modules and makes local changes look broken.
