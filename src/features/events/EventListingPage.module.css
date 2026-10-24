@@ -354,6 +354,24 @@ a.toggleBtn:hover {
 .input:focus {
   border-color: var(--v2-primary);
 }
+.textarea {
+  min-height: 112px;
+  padding: 12px 16px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.helperRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.counter {
+  flex-shrink: 0;
+  font-family: var(--v2-font-manrope);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-text-muted);
+}
 .twoCol {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

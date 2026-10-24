@@ -847,6 +847,7 @@ export default function MapPage({ onReadinessChange }) {
           explorePicks={explorePicksState.picks}
           explorePicksLoading={waypointsLoading}
           onExploreSelect={handleSelectPlace}
+          onExploreNavigate={handlePlaceCardNavigate}
         />
       ) : (
         // Hidden (not unmounted) during nav so its body.sidebar-collapsed
@@ -868,6 +869,7 @@ export default function MapPage({ onReadinessChange }) {
           explorePicks={explorePicksState.picks}
           explorePicksLoading={waypointsLoading}
           onExploreSelect={handleSelectPlace}
+          onExploreNavigate={handlePlaceCardNavigate}
           exploreRequest={exploreRequest}
           exploreOpenRequest={exploreOpenRequest}
           gpsOpen={gpsCardOpen}

@@ -108,6 +108,7 @@ export default function MobileSheet({
   explorePicks,
   explorePicksLoading,
   onExploreSelect,
+  onExploreNavigate,
 }) {
   const [internalSheetState, setInternalSheetState] = useState('peek');
   const sheetState = controlledSheetState ?? internalSheetState;
@@ -231,6 +232,10 @@ export default function MobileSheet({
               onSelect={(wp) => {
                 onExploreSelect?.(wp);
                 setSheetState('peek');
+              }}
+              onNavigate={(dest) => {
+                setSheetState('peek');
+                onExploreNavigate?.(dest);
               }}
             />
           )}

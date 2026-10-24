@@ -30,6 +30,9 @@ export function buildOnlineLink(platform, value) {
   return /^[\w-]+(\.[\w-]+)+/.test(trimmed) ? `https://${trimmed}` : trimmed;
 }
 
+// Matches the events.about check in supabase/events.sql.
+export const ABOUT_MAX = 1000;
+
 export function startsAtFrom(day, time) {
   if (!day || !time) return null;
   const d = new Date(`${day}T${time}`);
@@ -61,6 +64,7 @@ export async function submitEvent({
   ticketNote,
   title,
   organiser,
+  about,
   poster, // { file } | null
   day,
   starts,
@@ -94,6 +98,7 @@ export async function submitEvent({
     submitted_by: userId,
     title: title.trim(),
     organiser: organiser.trim(),
+    about: about?.trim().slice(0, ABOUT_MAX) || null,
     poster_path: posterPath,
     starts_at: startsAtFrom(day, starts).toISOString(),
     entry_type: entry,

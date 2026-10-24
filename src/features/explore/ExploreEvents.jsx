@@ -131,7 +131,7 @@ function EventRow({ event, onSelect }) {
  * events than slots the rail rotates like the Places one, and Upcoming
  * then lists every event so none is only visible mid-rotation.
  */
-export function EventsList({ events, size, onSelect, onSeeAll, sectionClassName }) {
+export function EventsList({ events, loading, size, onSelect, onSeeAll, sectionClassName }) {
   const sorted = [...events].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
   const featured = sorted.filter((e) => e.isFeatured);
   const rotating = featured.length > FEATURED_SLOTS;
@@ -149,12 +149,14 @@ export function EventsList({ events, size, onSelect, onSeeAll, sectionClassName 
     : featured;
   const upcoming = rotating ? sorted : sorted.filter((e) => !e.isFeatured);
 
-  if (!sorted.length) return <div className={styles.empty}>No events here yet.</div>;
+  if (loading && !sorted.length) return <div className={styles.empty}>Loading events…</div>;
 
   return (
     <>
       <section className={sectionClassName}>
         <SectionHeader title="Featured events" size={size} onSeeAll={featured.length ? onSeeAll : undefined} />
+        {/* Nothing listed yet: the rail still offers "Add your event". */}
+        {!sorted.length && <p className={styles.emptyNote}>No events here yet. Be the first to list one.</p>}
         <div className={`${styles.rail} ${sm ? styles.railSm : ''}`}>
           {/* Keyed by id, so a card swapped in by the rotation fades in. */}
           {railEvents.map((e) => (

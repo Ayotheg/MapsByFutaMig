@@ -20,7 +20,7 @@ import {
 import { useSeo } from '../../lib/useSeo';
 import { useAuth, friendlyError } from '../auth/useAuth';
 import WaypointSearchPanel from '../promote/WaypointSearchPanel';
-import { submitEvent, validateEventForm } from './submitEvent';
+import { ABOUT_MAX, submitEvent, validateEventForm } from './submitEvent';
 import { DayField, TimeField } from './DateTimeFields';
 import { DateBadge } from '../explore/ExploreEvents';
 import { EVENT_LISTING_FEE, priceLabel, shortWhen } from '../explore/eventsData';
@@ -64,6 +64,7 @@ export default function EventListingPage() {
   const [ticketNote, setTicketNote] = useState('');
   const [name, setName] = useState('');
   const [organiser, setOrganiser] = useState('');
+  const [about, setAbout] = useState('');
   const [poster, setPoster] = useState(null); // { file, url }
   const [day, setDay] = useState('');
   const [starts, setStarts] = useState('');
@@ -163,6 +164,7 @@ export default function EventListingPage() {
         ticketNote,
         title: name,
         organiser,
+        about,
         poster,
         day,
         starts,
@@ -426,6 +428,27 @@ export default function EventListingPage() {
                 value={organiser}
                 onChange={(e) => setOrganiser(e.target.value)}
               />
+            </label>
+            {/* The event card's "About" section. Links in it are tappable there. */}
+            <label className={styles.field}>
+              <span className={styles.labelRow}>
+                <span className={styles.label}>About</span>
+                <span className={styles.optional}>Optional</span>
+              </span>
+              <textarea
+                className={`${styles.input} ${styles.textarea}`}
+                rows={4}
+                maxLength={ABOUT_MAX}
+                placeholder="What happens, who it's for, anything to bring. Add a link if there's a form to fill."
+                value={about}
+                onChange={(e) => setAbout(e.target.value)}
+              />
+              <span className={styles.helperRow}>
+                <span className={styles.helper}>Links like a registration form become tappable on the card.</span>
+                <span className={styles.counter}>
+                  {about.length}/{ABOUT_MAX}
+                </span>
+              </span>
             </label>
             <div className={styles.field}>
               <span className={styles.labelRow}>

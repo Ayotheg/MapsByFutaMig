@@ -376,6 +376,11 @@
   height: 12px;
 }
 
+.emptyNote {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  color: var(--v2-text-muted);
+}
 .empty {
   padding: 24px 4px;
   text-align: center;

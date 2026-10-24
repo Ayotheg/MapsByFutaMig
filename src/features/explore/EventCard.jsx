@@ -5,6 +5,30 @@ import { DateBadge } from './ExploreEvents';
 import { longDate, priceLabel, timeRange } from './eventsData';
 import styles from './EventCard.module.css';
 
+// http(s) links and bare www. links in the organiser's About text.
+const URL_RE = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
+
+/**
+ * About text with its links made tappable. Plain text otherwise (React
+ * escapes it), and trailing punctuation stays outside the link.
+ */
+function linkify(text) {
+  const parts = String(text).split(URL_RE);
+  return parts.map((part, i) => {
+    if (i % 2 === 0) return part;
+    const [, url, trail] = part.match(/^(.*?)([.,!?;:)\]]*)$/);
+    const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+    return (
+      <span key={i}>
+        <a className={styles.aboutLink} href={href} target="_blank" rel="noopener noreferrer nofollow ugc">
+          {url}
+        </a>
+        {trail}
+      </span>
+    );
+  });
+}
+
 /**
  * Event detail (public/Maps By FUTA — events-Redesign-png.zip, "Event page ·
  * desktop / mobile"). `event={null}` renders closed.
@@ -135,7 +159,7 @@ export default function EventCard({ event, onClose, isMobile, onNavigate, onJoin
                 {e.about?.trim() && (
                   <>
                     <h3 className={styles.aboutTitle}>About</h3>
-                    <p className={styles.about}>{e.about}</p>
+                    <p className={styles.about}>{linkify(e.about)}</p>
                   </>
                 )}
               </div>

@@ -36,6 +36,7 @@ export default function ExplorePanelDesktop({
   onCategoryChange,
   rotatingFeatured,
   events,
+  eventsLoading,
   eventFilter,
   onEventFilterChange,
   onSelectEvent,
@@ -219,7 +220,13 @@ export default function ExplorePanelDesktop({
 
       {isEvents ? (
         <div className={styles.list}>
-          <EventsList events={events || []} size="sm" sectionClassName={styles.section} onSelect={onSelectEvent} />
+          <EventsList
+            events={events || []}
+            loading={eventsLoading}
+            size="sm"
+            sectionClassName={styles.section}
+            onSelect={onSelectEvent}
+          />
         </div>
       ) : (
       <div className={styles.list}>

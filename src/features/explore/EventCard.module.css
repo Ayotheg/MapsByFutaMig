@@ -216,6 +216,17 @@
   line-height: 1.55;
   color: var(--v2-text);
   overflow-wrap: anywhere;
+  /* Keep the organiser's own line breaks. */
+  white-space: pre-line;
+}
+.aboutLink {
+  font-weight: 500;
+  color: var(--v2-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.aboutLink:hover {
+  color: var(--v2-primary-hover);
 }
 
 /* ── Footer: Navigate / Join + calendar + share ───────────────────── */

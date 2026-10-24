@@ -66,6 +66,8 @@ export default function Sidebar({
   explorePicks,
   explorePicksLoading,
   onExploreSelect,
+  // An event card's "Navigate to venue" (Explore → Events).
+  onExploreNavigate,
   // Bumped by the search bar's menu button: acts like clicking the rail's
   // Explore item (opens Explore, or closes it if it's already open).
   exploreRequest = 0,
@@ -309,6 +311,7 @@ export default function Sidebar({
               variant="full"
               desktop
               onSelect={onExploreSelect}
+              onNavigate={onExploreNavigate}
               onSuggestPlace={onSuggestPlaceClick}
             />
           </div>

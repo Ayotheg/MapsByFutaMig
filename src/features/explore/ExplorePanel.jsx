@@ -2,7 +2,9 @@ import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { comparePicks } from './useExplorePicks';
 import { CategorySegment, FeaturedRail, ListRow, SectionHeader, featuredTitle, moreTitle, splitFeatured } from './ExploreSections';
 import { EventFilterChips, EventsList } from './ExploreEvents';
-import { SAMPLE_EVENTS, filterEvents } from './eventsData';
+import { filterEvents } from './eventsData';
+import { useEvents } from './useEvents';
+import { addEventToCalendar, joinOnlineEvent, shareEvent } from './eventActions';
 import ExplorePanelDesktop from './ExplorePanelDesktop';
 import { useOneShotLocation } from './useOneShotLocation';
 import styles from './ExplorePanel.module.css';
@@ -38,7 +40,7 @@ function emptyLabel(category) {
  *    stable scrollable list — no rotation once someone's actually
  *    reading the whole thing.
  */
-export default function ExplorePanel({ picks, loading, variant = 'compact', onViewAll, onSelect, desktop, onSuggestPlace }) {
+export default function ExplorePanel({ picks, loading, variant = 'compact', onViewAll, onSelect, onNavigate, desktop, onSuggestPlace }) {
   const userCoords = useOneShotLocation(true);
 
   // PLACES / PEOPLE / CHANNELS pill (supabase/people_entries.sql,
@@ -167,6 +169,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
           onCategoryChange={setCategory}
           rotatingFeatured={rotating ? compactItems : null}
           events={events}
+          eventsLoading={eventsLoading}
           eventFilter={eventFilter}
           onEventFilterChange={setEventFilter}
           onSelectEvent={selectEvent}
@@ -189,7 +192,7 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
         {header}
         <CategorySegment category={category} onChange={setCategory} />
         <EventFilterChips filter={eventFilter} onChange={setEventFilter} />
-        <EventsList events={events} sectionClassName={styles.section} onSelect={selectEvent} />
+        <EventsList events={events} loading={eventsLoading} sectionClassName={styles.section} onSelect={selectEvent} />
         {eventCard}
       </div>
     );
