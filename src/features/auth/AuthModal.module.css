@@ -346,6 +346,20 @@
   color: var(--v2-text);
 }
 .adMeta strong { color: var(--v2-primary); }
+/* Event cards (myEvents.js) reuse the ad card; a rejected one is quieter. */
+.adIconMuted {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--v2-text-muted);
+}
+.adCard + .adCard { margin-top: 8px; }
+.adAction {
+  font-weight: 600;
+  color: var(--v2-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.adAction:hover { color: var(--v2-primary-hover); }
 
 /* "Email updates" preference row + v2 switch. */
 .prefRow {

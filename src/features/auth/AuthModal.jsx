@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ChevronLeft, TriangleAlert, X, Mail, LogOut, Megaphone } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CalendarDays, CheckCircle2, ChevronLeft, TriangleAlert, X, Mail, LogOut, Megaphone } from 'lucide-react';
 import styles from './AuthModal.module.css';
 import AuthFlow from './AuthFlow';
 import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
 import { fetchProfileStats, statTileValue } from './profileStats';
 import { fetchActivePromotion } from '../promote/activePromotion';
+import { fetchMyEvents } from '../events/myEvents';
 import { fetchMarketingConsent, saveMarketingConsent } from './marketingConsent';
 import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
 import WhatsAppIcon from '../../lib/WhatsAppIcon';
@@ -66,6 +68,18 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
     let cancelled = false;
     fetchActivePromotion(userId).then((result) => {
       if (!cancelled) setActiveAd(result);
+    });
+    return () => { cancelled = true; };
+  }, [tab, userId]);
+
+  // The account's listed events (myEvents.js) — same card as the ad above:
+  // not paid yet, waiting for approval, live, or recently not approved.
+  const [myEvents, setMyEvents] = useState([]);
+  useEffect(() => {
+    if (tab !== 'profile' || !userId) return;
+    let cancelled = false;
+    fetchMyEvents(userId).then((result) => {
+      if (!cancelled && result.status === 'ok') setMyEvents(result.events);
     });
     return () => { cancelled = true; };
   }, [tab, userId]);
@@ -352,6 +366,44 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
             </div>
           </div>
         )}
+
+        {myEvents.map((ev) => {
+          const day = new Date(ev.startsAt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+          return (
+            <div key={ev.id} className={styles.adCard}>
+              <CalendarDays size={16} className={ev.state === 'rejected' ? styles.adIconMuted : styles.adIcon} />
+              <div className={styles.adText}>
+                <div className={styles.adTitle}>
+                  {ev.state === 'unpaid' && 'Event not paid yet'}
+                  {ev.state === 'review' && 'Event waiting for approval'}
+                  {ev.state === 'live' && (ev.isFeatured ? 'Event featured in Explore' : 'Event live in Explore')}
+                  {ev.state === 'rejected' && 'Event not approved'} · {ev.title}
+                </div>
+                <div className={styles.adMeta}>
+                  {ev.state === 'unpaid' && (
+                    <>
+                      Pay the listing fee to send it for review.{' '}
+                      <Link
+                        className={styles.adAction}
+                        to={`/event/callback?event=${encodeURIComponent(ev.id)}&cancelled=1`}
+                        onClick={onClose}
+                      >
+                        Pay now
+                      </Link>
+                    </>
+                  )}
+                  {ev.state === 'review' && `For ${day}. It shows in Explore once it's approved.`}
+                  {ev.state === 'live' && (
+                    <>
+                      <strong>{day}</strong> · showing until the end of the day
+                    </>
+                  )}
+                  {ev.state === 'rejected' && (ev.rejectionReason ? `Reason: ${ev.rejectionReason}` : 'Contact us if you have questions.')}
+                </div>
+              </div>
+            </div>
+          );
+        })}
 
         {optIn !== null && (
           <label className={styles.prefRow}>
