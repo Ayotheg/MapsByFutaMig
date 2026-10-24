@@ -15,7 +15,8 @@ import TravelModePicker from './TravelModePicker';
  * ("Navigation Mode"). Two real functionality changes on direct user
  * instruction:
  *  - Travel mode (TravelModePicker: Walk / Bike / Ride, Ride's Shuttle /
- *    Keke / Car-Cab) sits where the "tap a pin" tip was; `travelMode`,
+ *    Keke / Car-Cab) after the popular places, above Start; the "tap a
+ *    pin" tip is gone (the tip card is only for problems). `travelMode`,
  *    `onTravelModeChange`, `shuttleStop` come from NavigationController.
  *  - "Popular places on campus" section added — `popularPlaces` is
  *    `NavigationController`'s slice of the *same* `explorePicks` array
@@ -128,9 +129,6 @@ export default function NavDestPanel({
           </button>
         </div>
 
-        {/* Where the "tap a pin" tip used to be: Walk / Bike / Ride. */}
-        <TravelModePicker travelMode={travelMode} onTravelModeChange={onTravelModeChange} shuttleStop={shuttleStop} />
-
         {!!hint && (
           <div className={styles.hintCard}>
             <span className={styles.hintIconBg}>
@@ -164,6 +162,9 @@ export default function NavDestPanel({
             </div>
           </div>
         )}
+
+        {/* After the places, just above Start: Walk / Bike / Ride. */}
+        <TravelModePicker travelMode={travelMode} onTravelModeChange={onTravelModeChange} shuttleStop={shuttleStop} />
       </div>
 
       <div className={styles.footer}>
