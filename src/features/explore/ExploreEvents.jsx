@@ -63,9 +63,25 @@ function PlaceLine({ event, className }) {
   );
 }
 
+// A <div role="button">, not a <button>: iOS WebKit doesn't lay out a
+// <button> as a flex column with positioned children reliably, so the
+// poster collapsed to a sliver and the price tag slid over the date (same
+// fix as PersonFeaturedCard in ExploreSections.jsx).
 function FeaturedEventCard({ event, onSelect }) {
+  const open = () => onSelect?.(event);
   return (
-    <button type="button" className={styles.card} onClick={() => onSelect?.(event)}>
+    <div
+      role="button"
+      tabIndex={0}
+      className={styles.card}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      }}
+    >
       <span className={styles.poster}>
         <CalendarDays className={styles.posterIcon} size={36} strokeWidth={1.5} aria-hidden="true" />
         {event.poster && <img className={styles.posterImg} src={event.poster} alt="" decoding="async" />}
@@ -80,7 +96,7 @@ function FeaturedEventCard({ event, onSelect }) {
         </span>
         <PlaceLine event={event} className={styles.cardLine} />
       </span>
-    </button>
+    </div>
   );
 }
 
