@@ -1,16 +1,15 @@
 import { stepInstruction } from './turnHelpers';
 import { pickShortcuts, stitchRoute } from './shortcutRoute';
 
-/**
- * Ported from legacy `app.js` ~4499–4540 (`OSRM_PROFILES`, `fetchRoute`).
- * Free public OSRM demo server, no API key, matching legacy exactly
- * (the header comment's "ORS fallback" was aspirational — legacy never
- * actually implements an ORS fallback path, only OSRM is called).
- */
-const OSRM_PROFILES = {
-  'foot-walking': 'foot',
-  'cycling-regular': 'bike',
-  'driving-car': 'car',
+// FOSSGIS's public OSRM servers (the ones openstreetmap.org's directions
+// use), one per profile. Not OSRM's demo server: it only runs the car
+// profile whatever the URL says, so it keeps to main roads and never uses
+// footpaths. Bike is for riders: short streets like walking, but no
+// footpaths or steps a vehicle can't use. Free, no key, fair use
+// (https://routing.openstreetmap.de).
+const OSRM_SERVERS = {
+  'foot-walking': 'https://routing.openstreetmap.de/routed-foot',
+  'cycling-regular': 'https://routing.openstreetmap.de/routed-bike',
 };
 
 /**
@@ -19,9 +18,9 @@ const OSRM_PROFILES = {
  * shortest result wins; a detour whose requests fail is just skipped.
  */
 export async function fetchRoute(fromLat, fromLng, toLat, toLng, mode, paths = []) {
-  const profile = OSRM_PROFILES[mode] || 'foot';
-  const base = await requestRoute(fromLat, fromLng, toLat, toLng, profile);
-  if (profile !== 'foot' || !paths.length) return base;
+  const server = OSRM_SERVERS[mode] || OSRM_SERVERS['foot-walking'];
+  const base = await requestRoute(fromLat, fromLng, toLat, toLng, server);
+  if (server !== OSRM_SERVERS['foot-walking'] || !paths.length) return base;
 
   const shortcuts = pickShortcuts(base, paths);
   if (!shortcuts.length) return base;
@@ -30,8 +29,8 @@ export async function fetchRoute(fromLat, fromLng, toLat, toLng, mode, paths = [
     shortcuts.map(async (s) => {
       const [entry, exit] = [s.coords[0], s.coords[s.coords.length - 1]];
       const [legA, legB] = await Promise.all([
-        requestRoute(fromLat, fromLng, entry[0], entry[1], profile),
-        requestRoute(exit[0], exit[1], toLat, toLng, profile),
+        requestRoute(fromLat, fromLng, entry[0], entry[1], server),
+        requestRoute(exit[0], exit[1], toLat, toLng, server),
       ]);
       return stitchRoute(legA, s, legB, secondsPerMetre);
     })
@@ -42,9 +41,10 @@ export async function fetchRoute(fromLat, fromLng, toLat, toLng, mode, paths = [
     .reduce((best, { value }) => (value.distance < best.distance ? value : best), base);
 }
 
-async function requestRoute(fromLat, fromLng, toLat, toLng, profile) {
+async function requestRoute(fromLat, fromLng, toLat, toLng, server) {
+  // These servers take 'driving' in the path whatever their profile.
   const url =
-    `https://router.project-osrm.org/route/v1/${profile}/` +
+    `${server}/route/v1/driving/` +
     `${fromLng},${fromLat};${toLng},${toLat}` +
     `?overview=full&geometries=geojson&steps=true&annotations=false&alternatives=true`;
 
