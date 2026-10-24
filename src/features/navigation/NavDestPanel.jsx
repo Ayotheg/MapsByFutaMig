@@ -3,6 +3,7 @@ import { Info, MapPin, Navigation, Search, X } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import { dotColor } from '../search/chipConfig';
 import styles from './NavDestPanel.module.css';
+import TravelModePicker from './TravelModePicker';
 
 /**
  * Ported from legacy `index.html` ~634–671 (`#navDestPanel`). Desktop:
@@ -12,11 +13,10 @@ import styles from './NavDestPanel.module.css';
  *
  * Redesigned to v2 light tokens this session, per Figma node 1:311
  * ("Navigation Mode"). Two real functionality changes on direct user
- * instruction, both flagged per Rule 7:
- *  - Mode picker (Walk/Moto/Drive) removed — the Figma frame doesn't
- *    show one at all. `mode` stays hardcoded to 'foot-walking' in
- *    `NavigationController` (its default, never changed now that
- *    nothing calls `setMode`) — see that file's own comment.
+ * instruction:
+ *  - Travel mode (TravelModePicker: Walk / Bike / Ride, Ride's Shuttle /
+ *    Keke / Car-Cab) sits where the "tap a pin" tip was; `travelMode`,
+ *    `onTravelModeChange`, `shuttleStop` come from NavigationController.
  *  - "Popular places on campus" section added — `popularPlaces` is
  *    `NavigationController`'s slice of the *same* `explorePicks` array
  *    MapPage's Explore panel already renders from, not a separate
@@ -66,6 +66,9 @@ export default function NavDestPanel({
   onClose,
   popularPlaces,
   onPopularPlaceSelect,
+  travelMode,
+  onTravelModeChange,
+  shuttleStop,
 }) {
   const kb = useKeyboardInset();
   return (
@@ -124,6 +127,9 @@ export default function NavDestPanel({
             <X size={14} />
           </button>
         </div>
+
+        {/* Where the "tap a pin" tip used to be: Walk / Bike / Ride. */}
+        <TravelModePicker travelMode={travelMode} onTravelModeChange={onTravelModeChange} shuttleStop={shuttleStop} />
 
         {!!hint && (
           <div className={styles.hintCard}>

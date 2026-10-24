@@ -1,0 +1,92 @@
+/* ── Travel mode: segmented control ─────────────────────────────── */
+.modePicker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-divider);
+  border-radius: 14px;
+  flex-shrink: 0;
+}
+.modeOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 6px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--v2-text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard), color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.modeOption svg {
+  flex-shrink: 0;
+}
+.modeOptionActive {
+  background: var(--v2-on-primary);
+  color: var(--v2-primary-hover);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+}
+
+/* Ride's options: small pills, a sub-choice under the tabs. */
+.rideOptions {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: -10px;
+  flex-shrink: 0;
+}
+.rideOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--v2-divider);
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  color: var(--v2-text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rideOption svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+.rideOptionActive {
+  border-color: var(--v2-primary);
+  color: var(--v2-primary-hover);
+  background: var(--v2-primary-tint);
+}
+
+/* Shuttle: the stop to get off at. */
+.shuttleNote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: -10px 0 0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--v2-text);
+}
+.shuttleNote svg {
+  color: var(--v2-secondary);
+  flex-shrink: 0;
+}
+.shuttleNote strong {
+  color: var(--v2-neutral);
+}
