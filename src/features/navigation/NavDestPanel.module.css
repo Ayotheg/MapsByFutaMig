@@ -77,6 +77,23 @@
   padding: 20px 16px 16px;
 }
 
+/* Each step fades in as it replaces the other. */
+@media (prefers-reduced-motion: no-preference) {
+  .stepIn {
+    animation: stepIn var(--v2-duration-standard) var(--v2-ease-standard) backwards;
+  }
+}
+@keyframes stepIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Step 2 is short: Start sits right under it, not at the panel's foot. */
 .bodyCompact {
   flex: 0 0 auto;

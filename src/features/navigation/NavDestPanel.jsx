@@ -108,7 +108,7 @@ export default function NavDestPanel({
       </div>
 
       {!hasDest ? (
-        <div className={styles.body}>
+        <div className={`${styles.body} ${styles.stepIn}`}>
           <div className={styles.searchRow}>
             <div className={styles.searchField}>
               <Search size={18} className={styles.searchIcon} aria-hidden="true" />
@@ -189,7 +189,7 @@ export default function NavDestPanel({
         </div>
       ) : (
         <>
-          <div className={`${styles.body} ${styles.bodyCompact}`}>
+          <div className={`${styles.body} ${styles.bodyCompact} ${styles.stepIn}`}>
             <div className={styles.destCard}>
               <span className={styles.destIcon} aria-hidden="true">
                 <MapPin size={18} />
@@ -249,7 +249,7 @@ export default function NavDestPanel({
             {!!hint && <Hint text={hint} />}
           </div>
 
-          <div className={styles.footer}>
+          <div className={`${styles.footer} ${styles.stepIn}`}>
             <button type="button" className={styles.goBtn} disabled={goDisabled} onClick={onGo}>
               <Navigation size={16} />
               {busyLabel || START_LABEL[travelMode] || START_LABEL.walk}
