@@ -7,7 +7,6 @@ import { fetchRoute } from './osrmRoute';
 import { isOnPathTowards, walkablePaths } from './shortcutRoute';
 import { alightPrompt, alightStop, createRideDetector } from './busStops';
 import { turnIcon, fmtDist, startDirection, TURN_ICONS } from './turnHelpers';
-import { fmtDist as fmtDistAway } from '../search/chipConfig';
 import { NAV_START_ZOOM } from './gpsConstants';
 import { subscribeGps } from './gpsWatch';
 import { useOneShotLocation } from '../explore/useOneShotLocation';
@@ -36,8 +35,14 @@ const END_NEAR_DEST_M = 50;
 const RESUME_MAX_WAIT_MS = 15000;
 // The old shortcut-learning trace; cleared so it doesn't linger in storage.
 const TRACE_KEY = 'navigation-trace';
+const previewKey = (dest, mode) => `${dest.lat},${dest.lng}|${mode}`;
 // Travel mode → OSRM profile (osrmRoute.js).
-const TRAVEL_MODES = { walk: 'foot-walking', ride: 'cycling-regular', drive: 'driving-car' };
+// Bike is keke/okada, Ride is a car or cab.
+const TRAVEL_MODES = { walk: 'foot-walking', bike: 'cycling-regular', car: 'driving-car' };
+// A route planned in the background (NavDestPanel's summary card) is used
+// on Start if it's this recent and they haven't moved this far.
+const PREVIEW_MAX_AGE_MS = 3 * 60 * 1000;
+const PREVIEW_MAX_MOVE_M = 50;
 const TRAVEL_MODE_KEY = 'nav-travel-mode';
 
 const SVG_FLAG = (size, color = 'currentColor') =>
@@ -106,8 +111,9 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  *
  * Travel mode, picked in NavDestPanel and remembered per phone: Walk
  * (walking routes, switching to bike while moving at vehicle speed —
- * busStops.js's ride detector), Keke/Okada (bike routes) or Car (car
- * routes). See osrmRoute.js.
+ * busStops.js's ride detector), Bike (keke/okada: bike routes) or Ride
+ * (car routes). See osrmRoute.js. The route is planned as soon as a
+ * destination is picked, and that same route is used on Start.
  */
 const NavigationController = forwardRef(function NavigationController(
   { map, gps, searchIndex, segments, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
@@ -128,11 +134,15 @@ const NavigationController = forwardRef(function NavigationController(
   const persistedDestination = readPersistentState('navigation-destination', null);
   const [destPanelOpen, setDestPanelOpen] = useState(!persistedNavigation?.active);
   const [navActive, setNavActive] = useState(Boolean(persistedNavigation?.active));
-  const [destInputValue, setDestInputValue] = useState('');
+  // A destination picked before a reload is shown again, ready to start.
+  const restoredDest = persistedNavigation?.active ? null : persistedDestination;
+  const [destInputValue, setDestInputValue] = useState(restoredDest?.name || '');
   const [dropdownResults, setDropdownResults] = useState([]);
-  const [hint, setHint] = useState('Tap a pin on the map or type a place name above');
-  const [goDisabled, setGoDisabled] = useState(true);
-  const [goLabel, setGoLabel] = useState('Start Navigation');
+  // Only for problems (no location, routing failed); empty otherwise.
+  const [hint, setHint] = useState('');
+  const [goDisabled, setGoDisabled] = useState(!restoredDest);
+  // Replaces the Start label while getting a location or route.
+  const [goLabel, setGoLabel] = useState(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [arrivedBannerDest, setArrivedBannerDest] = useState(null);
   // "Please wait" cover (NavResumeOverlay) while a restored or resumed
@@ -258,12 +268,14 @@ const NavigationController = forwardRef(function NavigationController(
   }, [map]);
 
   const navDestRef = useRef(persistedNavigation?.dest || persistedDestination || null); // {lat,lng,name,id,type}
-  // 'walk' | 'ride' | 'drive' (TRAVEL_MODES), and the OSRM profile in use
+  // The same destination as state, for the panel and the route preview.
+  const [navDest, setNavDestState] = useState(navDestRef.current);
+  // 'walk' | 'bike' | 'car' (TRAVEL_MODES), and the OSRM profile in use
   // for it. Walk becomes 'cycling-regular' while riding; a restored trip
   // starts on foot and the ride detector switches it back.
   const [travelMode, setTravelMode] = useState(() => {
     const saved = readPersistentState(TRAVEL_MODE_KEY, 'walk');
-    return TRAVEL_MODES[saved] ? saved : 'walk';
+    return Object.hasOwn(TRAVEL_MODES, saved) ? saved : 'walk';
   });
   const travelModeRef = useRef(travelMode);
   const navModeRef = useRef(TRAVEL_MODES[travelMode]);
@@ -384,11 +396,23 @@ const NavigationController = forwardRef(function NavigationController(
       type: entry.type || entry.subtype || null,
     };
     navDestRef.current = destination;
+    setNavDestState(destination);
     writePersistentState('navigation-destination', destination);
     setDestInputValue(entry.name);
     setDropdownResults([]);
-    setHint(`Destination set: ${entry.name}`);
+    setHint('');
     setGoDisabled(false);
+  }, []);
+
+  // The "Where to?" field's clear button.
+  const clearNavDest = useCallback(() => {
+    navDestRef.current = null;
+    setNavDestState(null);
+    removePersistentState('navigation-destination');
+    setDestInputValue('');
+    setDropdownResults([]);
+    setHint('');
+    setGoDisabled(true);
   }, []);
 
   // Seed from PlaceCard's "Navigate Here" / re-seed on a fresh click while
@@ -403,6 +427,13 @@ const NavigationController = forwardRef(function NavigationController(
   const onDestInputChange = useCallback(
     (val) => {
       setDestInputValue(val);
+      // Editing the name means a new search: the old pick no longer applies.
+      if (navDestRef.current && val !== navDestRef.current.name) {
+        navDestRef.current = null;
+        setNavDestState(null);
+        removePersistentState('navigation-destination');
+        setGoDisabled(true);
+      }
       const q = val.trim();
       if (!q) {
         setDropdownResults([]);
@@ -859,7 +890,7 @@ const NavigationController = forwardRef(function NavigationController(
     // Riding (shuttle, keke or car: speed can't tell) near the recorded
     // shuttle stop closest to the destination: tell shuttle riders where
     // to get off. Not riding, or no such stop: nothing changes.
-    const alight = rideRef.current.riding && travelModeRef.current !== 'drive' ? alightStop(dest, userPos, candidatesRef.current) : null;
+    const alight = rideRef.current.riding && travelModeRef.current !== 'car' ? alightStop(dest, userPos, candidatesRef.current) : null;
     const prompt = alight && alightPrompt(alight.toUser, alight.place.name);
     if (prompt) {
       nextHud.turnIcon = 'bus-front-fill';
@@ -911,7 +942,7 @@ const NavigationController = forwardRef(function NavigationController(
       // shuttle) — still the short streets, but no footpaths or steps a
       // vehicle can't use. On getting off, fresh walking directions from
       // where they're standing, which start with the landmark /
-      // which-way-to-turn instructions. Keke/Okada and Car keep theirs.
+      // which-way-to-turn instructions. Bike and Ride keep theirs.
       const travel = travelModeRef.current;
       const mode = travel === 'walk' && ride.riding ? 'cycling-regular' : TRAVEL_MODES[travel];
       if (mode !== navModeRef.current) {
@@ -1084,7 +1115,7 @@ const NavigationController = forwardRef(function NavigationController(
         pos = await resolveStartPosition();
       } catch (err) {
         setGoDisabled(false);
-        setGoLabel('Start Navigation');
+        setGoLabel(null);
         const reason =
           err.code === 1
             ? 'Location permission denied — enable it in browser settings.'
@@ -1105,12 +1136,20 @@ const NavigationController = forwardRef(function NavigationController(
       // The mode picked in NavDestPanel; Walk turns to bike once riding.
       rideRef.current = createRideDetector();
       navModeRef.current = TRAVEL_MODES[travelModeRef.current];
+      // Already planned in the background from (nearly) here: use it.
+      const planned = previewRef.current;
+      const usePlanned =
+        planned?.key === previewKey(dest, navModeRef.current) &&
+        Date.now() - planned.at < PREVIEW_MAX_AGE_MS &&
+        haversine(lat, lng, planned.from.lat, planned.from.lng) < PREVIEW_MAX_MOVE_M;
       let routeData;
       try {
-        routeData = await fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current, shortcutPathsRef.current);
+        routeData = usePlanned
+          ? planned.routeData
+          : await fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current, shortcutPathsRef.current);
       } catch (e) {
         setGoDisabled(false);
-        setGoLabel('Start Navigation');
+        setGoLabel(null);
         setHint(`Routing failed: ${e.message}. Check your connection.`);
         // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
         track('error_occurred', { context: 'nav_routing', message: e?.message || String(e) });
@@ -1165,7 +1204,7 @@ const NavigationController = forwardRef(function NavigationController(
       startWatch();
 
       setGoDisabled(false);
-      setGoLabel('Start Navigation');
+      setGoLabel(null);
     }
   }, [gps, map, placeDestMarker, drawRoute, updateNavUserDot, speak, unlockSpeech, updateHUD, persistNavigation, onActiveChange, onStartingChange, onGuestBlocked, startWatch]);
 
@@ -1217,6 +1256,7 @@ const NavigationController = forwardRef(function NavigationController(
     });
     navRouteDataRef.current = null;
     navDestRef.current = null;
+    setNavDestState(null);
     navUserPosRef.current = null;
     navStepIndexRef.current = 0;
     navArrivalCountRef.current = 0;
@@ -1275,16 +1315,55 @@ const NavigationController = forwardRef(function NavigationController(
     () =>
       (explorePicks || [])
         .filter((pick) => !pick.isPerson && !pick.isChannel && !pick.isBusiness)
-        .slice(0, 2)
+        .slice(0, 3)
         .map((pick) => ({
-        ...pick,
-        distanceLabel:
-          userCoords && pick.lat != null && pick.lng != null
-            ? fmtDistAway(haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng))
-            : null,
+          ...pick,
+          // Straight line from here; the panel formats it.
+          distance:
+            userCoords && pick.lat != null && pick.lng != null ? haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng) : null,
         })),
     [explorePicks, userCoords]
   );
+
+  // ── Route preview: planned as soon as there's a destination, so the
+  // panel can show time and arrival and Start can begin straight away. ──
+  const [preview, setPreview] = useState(null); // null | { loading } | { distance, duration }
+  const previewRef = useRef(null); // { key, from, at, routeData }
+  useEffect(() => {
+    if (!destPanelOpen || !navDest) {
+      setPreview(null);
+      return undefined;
+    }
+    const fix = gps.lastKnownPosRef.current;
+    const from =
+      fix && Date.now() - fix.timestamp < PREVIEW_MAX_AGE_MS ? { lat: fix.coords.latitude, lng: fix.coords.longitude } : userCoords;
+    // No location yet: no card. Start still works, it just plans then.
+    if (!from) {
+      setPreview(null);
+      return undefined;
+    }
+    const mode = TRAVEL_MODES[travelMode];
+    const key = previewKey(navDest, mode);
+    const planned = previewRef.current;
+    if (planned?.key === key && Date.now() - planned.at < PREVIEW_MAX_AGE_MS && haversine(from.lat, from.lng, planned.from.lat, planned.from.lng) < PREVIEW_MAX_MOVE_M) {
+      setPreview({ distance: planned.routeData.distance, duration: planned.routeData.duration });
+      return undefined;
+    }
+    let cancelled = false;
+    setPreview({ loading: true });
+    fetchRoute(from.lat, from.lng, navDest.lat, navDest.lng, mode, shortcutPathsRef.current)
+      .then((routeData) => {
+        if (cancelled) return;
+        previewRef.current = { key, from, at: Date.now(), routeData };
+        setPreview({ distance: routeData.distance, duration: routeData.duration });
+      })
+      .catch(() => {
+        if (!cancelled) setPreview(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [destPanelOpen, navDest, travelMode, userCoords, gps]);
 
   useImperativeHandle(
     ref,
@@ -1376,13 +1455,16 @@ const NavigationController = forwardRef(function NavigationController(
           highlight={searchIndex.highlight}
           onGo={startNavigation}
           goDisabled={goDisabled}
-          goLabel={goLabel}
+          busyLabel={goLabel}
           hint={hint}
           onClose={() => setDestPanelOpen(false)}
           popularPlaces={popularPlaces}
           onPopularPlaceSelect={(place) => setNavDest(place.waypoint)}
           travelMode={travelMode}
           onTravelModeChange={chooseTravelMode}
+          hasDest={!!navDest}
+          onClearDest={clearNavDest}
+          preview={preview}
         />
       )}
       {navActive && (
