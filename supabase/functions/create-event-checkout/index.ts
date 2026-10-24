@@ -137,20 +137,23 @@ Deno.serve(async (req) => {
         success_url: successUrl,
         cancel_url: cancelUrl,
         // bachs-webhook tells events from promotions by metadata.event_id,
-        // or by this "event:" prefix if an event shape drops metadata.
-        reference: `event:${event.id}`,
+        // or by this "event:<id>:" prefix if an event shape drops metadata.
+        // BACHS rejects a reference it has seen before ("Duplicate
+        // reference"), so every attempt for the same event gets a suffix.
+        reference: `event:${event.id}:${Date.now().toString(36)}`,
         metadata: { event_id: event.id },
       },
     });
   } catch (e) {
+    // The raw BACHS message is for the logs, not the person paying.
     console.error('[create-event-checkout] BACHS checkout failed:', event.id, e.message);
-    return json({ error: `Could not start BACHS checkout: ${e.message}` }, 502);
+    return json({ error: "We couldn't open the payment page. Please try again in a moment." }, 502);
   }
 
   const checkoutUrl = checkout.url || checkout.checkout_url;
   if (!checkoutUrl) {
     console.error('[create-event-checkout] no checkout URL in BACHS reply:', event.id, JSON.stringify(checkout).slice(0, 500));
-    return json({ error: 'BACHS did not return a checkout URL.' }, 502);
+    return json({ error: "We couldn't open the payment page. Please try again in a moment." }, 502);
   }
 
   const { error: updateError } = await adminClient

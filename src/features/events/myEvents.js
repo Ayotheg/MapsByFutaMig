@@ -37,6 +37,20 @@ function classify(e, now) {
  * Events whose start time has passed are skipped unless already live (an
  * unpaid or unreviewed event for yesterday can't go live any more).
  */
+/**
+ * The profile card's "Remove" on an unpaid listing (events_owner_remove.sql).
+ * Hides it rather than deleting it, so a payment still in flight is never
+ * lost. Throws a sentence the card can show.
+ */
+export async function removeMyUnpaidEvent(eventId) {
+  const { error } = await supabase.rpc('remove_my_unpaid_event', { p_id: eventId });
+  if (!error) return;
+  if (error.code === 'PGRST202' || /could not find the function/i.test(error.message || '')) {
+    throw new Error("Removing isn't set up yet. Try again later.");
+  }
+  throw new Error(error.message || "Couldn't remove this event.");
+}
+
 export async function fetchMyEvents(userId) {
   if (!userId) return { status: 'ok', events: [] };
   const { data, error } = await supabase

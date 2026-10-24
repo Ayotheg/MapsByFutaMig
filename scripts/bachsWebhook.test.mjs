@@ -111,8 +111,8 @@ assert.equal(row('events', 'ev-2').payment_status, 'unpaid');
 await send({ id: 'e3b', type: 'collection.succeeded', data: { id: 'pay-2b', status: 'SUCCEEDED', amount: '3000.00', currency: 'UGX', reference: 'event:ev-2' } });
 assert.equal(row('events', 'ev-2').payment_status, 'unpaid');
 
-// ── checkout.completed shape, reference only
-await send({ id: 'e4', type: 'checkout.completed', data: { id: 'pay-3', payment_status: 'paid', charge: { amount: '3000.00', currency: 'NGN' }, reference: 'event:ev-2' } });
+// ── checkout.completed shape, reference only, with a retry's attempt suffix
+await send({ id: 'e4', type: 'checkout.completed', data: { id: 'pay-3', payment_status: 'paid', charge: { amount: '3000.00', currency: 'NGN' }, reference: 'event:ev-2:lx3k9a' } });
 assert.equal(row('events', 'ev-2').payment_status, 'paid');
 
 // ── expiry, then a late success rescues it

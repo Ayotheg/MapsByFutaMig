@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
 import { fetchProfileStats, statTileValue } from './profileStats';
 import { fetchActivePromotion } from '../promote/activePromotion';
-import { fetchMyEvents } from '../events/myEvents';
+import { fetchMyEvents, removeMyUnpaidEvent } from '../events/myEvents';
 import { shortDate } from '../explore/eventsData';
 import { fetchMarketingConsent, saveMarketingConsent } from './marketingConsent';
 import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
@@ -76,6 +76,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
   // The account's listed events (myEvents.js) — same card as the ad above:
   // not paid yet, waiting for approval, live, or recently not approved.
   const [myEvents, setMyEvents] = useState([]);
+  const [eventsAttempt, setEventsAttempt] = useState(0);
   useEffect(() => {
     if (tab !== 'profile' || !userId) return;
     let cancelled = false;
@@ -83,7 +84,27 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
       if (!cancelled && result.status === 'ok') setMyEvents(result.events);
     });
     return () => { cancelled = true; };
-  }, [tab, userId]);
+  }, [tab, userId, eventsAttempt]);
+
+  // "Remove" on an unpaid event card: ask once, then hide it
+  // (removeMyUnpaidEvent) and reload, so the next one (if any) moves up.
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null);
+  const [removingId, setRemovingId] = useState(null);
+  const [removeError, setRemoveError] = useState(null); // { id, message }
+  async function handleRemoveEvent(id) {
+    setRemovingId(id);
+    setRemoveError(null);
+    try {
+      await removeMyUnpaidEvent(id);
+      setMyEvents((list) => list.filter((e) => e.id !== id));
+      setConfirmRemoveId(null);
+      setEventsAttempt((n) => n + 1);
+    } catch (e) {
+      setRemoveError({ id, message: e.message });
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   // "Email updates" switch (profiles.marketing_opt_in). Turning it off
   // marks the Resend contact unsubscribed (marketing_optin.sql). Hidden
@@ -381,18 +402,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
                   {ev.state === 'rejected' && 'Event not approved'} · {ev.title}
                 </div>
                 <div className={styles.adMeta}>
-                  {ev.state === 'unpaid' && (
-                    <>
-                      Pay the listing fee to send it for review.{' '}
-                      <Link
-                        className={styles.adAction}
-                        to={`/event/callback?event=${encodeURIComponent(ev.id)}&pay=1`}
-                        onClick={onClose}
-                      >
-                        Pay now
-                      </Link>
-                    </>
-                  )}
+                  {ev.state === 'unpaid' && 'Pay the listing fee to send it for review.'}
                   {ev.state === 'review' && `For ${day}. It shows in Explore once it's approved.`}
                   {ev.state === 'live' && (
                     <>
@@ -401,6 +411,53 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
                   )}
                   {ev.state === 'rejected' && (ev.rejectionReason ? `Reason: ${ev.rejectionReason}` : 'Contact us if you have questions.')}
                 </div>
+                {ev.state === 'unpaid' &&
+                  (confirmRemoveId === ev.id ? (
+                    <div className={styles.adActions}>
+                      <span className={styles.adConfirm}>Remove this event?</span>
+                      <button
+                        type="button"
+                        className={`${styles.adButton} ${styles.adButtonDanger}`}
+                        onClick={() => handleRemoveEvent(ev.id)}
+                        disabled={removingId === ev.id}
+                      >
+                        {removingId === ev.id ? 'Removing…' : 'Yes, remove'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.adButton}
+                        onClick={() => setConfirmRemoveId(null)}
+                        disabled={removingId === ev.id}
+                      >
+                        Keep
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={styles.adActions}>
+                      <Link
+                        className={styles.adAction}
+                        to={`/event/callback?event=${encodeURIComponent(ev.id)}&pay=1`}
+                        onClick={onClose}
+                      >
+                        Pay now
+                      </Link>
+                      <button
+                        type="button"
+                        className={styles.adButton}
+                        onClick={() => {
+                          setRemoveError(null);
+                          setConfirmRemoveId(ev.id);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                {removeError?.id === ev.id && (
+                  <div className={styles.adError} role="alert">
+                    {removeError.message}
+                  </div>
+                )}
               </div>
             </div>
           );

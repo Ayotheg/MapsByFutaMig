@@ -360,6 +360,40 @@
   text-underline-offset: 2px;
 }
 .adAction:hover { color: var(--v2-primary-hover); }
+/* Pay now · Remove row on an unpaid event card, and its confirm step. */
+.adActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.adConfirm {
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.adButton {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.adButton:hover:not(:disabled) { color: var(--v2-neutral); }
+.adButton:disabled { opacity: 0.6; cursor: default; }
+.adButtonDanger { color: var(--v2-error-text); }
+.adButtonDanger:hover:not(:disabled) { color: var(--v2-error-text); }
+.adError {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--v2-error-text);
+}
 
 /* "Email updates" preference row + v2 switch. */
 .prefRow {

@@ -77,11 +77,14 @@ export function createHandler({ createClient, env }) {
   }
 
   // Event listing fees are told apart by metadata.event_id, or the
-  // "event:" reference prefix create-event-checkout sets.
+  // "event:<id>:<attempt>" reference create-event-checkout sets (BACHS
+  // refuses a reused reference, so each checkout attempt has its own suffix).
   const reference = event.data?.reference;
   const eventId =
     event.data?.metadata?.event_id ||
-    (typeof reference === 'string' && reference.startsWith('event:') ? reference.slice('event:'.length) : null);
+    (typeof reference === 'string' && reference.startsWith('event:')
+      ? reference.slice('event:'.length).split(':')[0] || null
+      : null);
   if (eventId) {
     return handleEventPayment(adminClient, event, eventId);
   }

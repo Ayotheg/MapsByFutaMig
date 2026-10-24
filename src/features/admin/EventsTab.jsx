@@ -251,6 +251,10 @@ export default function EventsTab({ onCountChange }) {
               {ev.status === 'rejected' && ev.rejection_reason && (
                 <div className={ownStyles.submitter}>Rejected: {ev.rejection_reason}</div>
               )}
+              {/* e.g. "Removed by the organiser before paying" (remove_my_unpaid_event) */}
+              {ev.status === 'removed' && ev.rejection_reason && (
+                <div className={ownStyles.submitter}>{ev.rejection_reason}</div>
+              )}
 
               {ev.posterUrl ? (
                 <div className={ownStyles.photoStrip}>
