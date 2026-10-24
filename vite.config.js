@@ -30,6 +30,8 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineConfig({
   plugins: [react(),
     tailwindcss()],
+  // POSTHOG_* are public (project token + host), read by lib/sessionReplay.js.
+  envPrefix: ['VITE_', 'POSTHOG_'],
   build: {
     rolldownOptions: {
       output: {

@@ -1,4 +1,4 @@
-// PostHog session replay. Off when VITE_POSTHOG_KEY is unset and in
+// PostHog session replay. Off when POSTHOG_PROJECT_TOKEN is unset and in
 // `vite dev`, so only real visits are recorded.
 //
 // inlineStylesheet copies the CSS into each recording. Without it a replay
@@ -6,8 +6,8 @@
 // every deploy to main deletes that file, so old sessions play unstyled.
 // maskAllInputs hides typed text (emails, passwords, promo codes).
 
-const KEY = import.meta.env.VITE_POSTHOG_KEY
-const HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com'
+const KEY = import.meta.env.POSTHOG_PROJECT_TOKEN
+const HOST = import.meta.env.POSTHOG_HOST || 'https://us.i.posthog.com'
 
 export function initSessionReplay() {
   if (!KEY || !import.meta.env.PROD) return
