@@ -1340,32 +1340,28 @@ const NavigationController = forwardRef(function NavigationController(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destPanelOpen, navActive]);
 
-  // ── Popular places on campus (new, this session — see header comment) ──
-  // Places only — People (supabase/people_entries.sql) and Channel
-  // (supabase/channel_entries.sql) picks have no map location, so they
-  // can't be a walkable "popular place to visit" here.
+  // ── Popular on campus: every place featured in Explore ──
+  // Places only — People (supabase/people_entries.sql), Channel and
+  // Business picks have no map location to navigate to.
   const userCoords = useOneShotLocation(destPanelOpen);
   const popularPlaces = useMemo(
     () =>
       (explorePicks || [])
-        .filter((pick) => !pick.isPerson && !pick.isChannel && !pick.isBusiness)
-        .slice(0, 3)
+        .filter((pick) => !pick.isPerson && !pick.isChannel && !pick.isBusiness && pick.lat != null && pick.lng != null)
         .map((pick) => ({
           ...pick,
           // Straight line from here; the panel formats it.
-          distance:
-            userCoords && pick.lat != null && pick.lng != null ? haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng) : null,
+          distance: userCoords ? haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng) : null,
         })),
     [explorePicks, userCoords]
   );
 
-  // ── Route preview: planned as soon as there's a destination, so the
-  // panel can show the distance and Start can begin straight away. Kept
-  // PREVIEW_MAX_AGE_MS per destination and mode, so switching back to a
-  // tab or pressing Start doesn't ask the server again. No times: the
-  // routing server's speeds aren't Nigerian roads or campus walking. ──
+  // ── Route preview: planned as soon as there's a destination, so Start
+  // can begin straight away. Kept PREVIEW_MAX_AGE_MS per destination and
+  // mode, so switching back to a tab or pressing Start doesn't ask the
+  // server again. ──
   // null | { loading } | { distance, stop }; `stop` is the shuttle stop
-  // to get off at (Shuttle mode), or null if none is near.
+  // to get off at (Shuttle mode), shown in the panel, or null if none.
   const [preview, setPreview] = useState(null);
   const previewCacheRef = useRef(new Map()); // previewKey → { from, at, routeData }
   useEffect(() => {
@@ -1501,11 +1497,16 @@ const NavigationController = forwardRef(function NavigationController(
           onClose={() => setDestPanelOpen(false)}
           popularPlaces={popularPlaces}
           onPopularPlaceSelect={(place) => setNavDest(place.waypoint)}
+          onPopularPlaceGo={(place) => {
+            // Straight into navigation, inside the tap (speech needs it).
+            setNavDest(place.waypoint);
+            startNavigation();
+          }}
           travelMode={travelMode}
           onTravelModeChange={chooseTravelMode}
           hasDest={!!navDest}
           onClearDest={clearNavDest}
-          preview={preview}
+          shuttleStop={preview?.stop || null}
         />
       )}
       {navActive && (

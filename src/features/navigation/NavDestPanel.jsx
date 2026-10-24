@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bike, BusFront, Car, CarFront, CarTaxiFront, Footprints, Info, MapPin, Navigation, X } from 'lucide-react';
+import { Bike, BusFront, Car, CarFront, CarTaxiFront, Footprints, Info, MapPin, Navigation, Search, X } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import { dotColor } from '../search/chipConfig';
 import styles from './NavDestPanel.module.css';
@@ -11,9 +11,8 @@ import { fmtRouteDistance } from './routeSummary';
  * style bottom sheet (`NavDestPanel.module.css`'s `@media (max-width:
  * 768px)` block) — purely a CSS-driven layout swap, same component.
  *
- * "Popular on campus" is `NavigationController`'s slice of the same
- * `explorePicks` array MapPage's Explore panel renders from, so it always
- * agrees with Explore about what's featured.
+ * "Popular on campus" is every place featured in Explore (the same
+ * `explorePicks` array MapPage's Explore panel renders from).
  */
 
 // The tabs; Ride opens RIDE_OPTIONS (NavigationController maps each mode
@@ -28,12 +27,12 @@ const RIDE_OPTIONS = [
   { mode: 'keke', label: 'Keke', Icon: CarFront },
   { mode: 'car', label: 'Car / Cab', Icon: CarTaxiFront },
 ];
-const MODE_TEXT = {
-  walk: { start: 'Start walking', route: 'Walking route' },
-  bike: { start: 'Start riding', route: 'Bike route' },
-  shuttle: { start: 'Start ride', route: 'Shuttle' },
-  keke: { start: 'Start ride', route: 'Keke route' },
-  car: { start: 'Start ride', route: 'Car route' },
+const START_LABEL = {
+  walk: 'Start walking',
+  bike: 'Start riding',
+  shuttle: 'Start ride',
+  keke: 'Start ride',
+  car: 'Start ride',
 };
 
 // Bug fix (reported directly): on mobile the on-screen keyboard covered the
@@ -63,17 +62,17 @@ function useKeyboardInset() {
 }
 
 /*
- * "Directions" (designer's mobile screens, Oct 2026): your location → where
- * to, travel mode, then either "Popular on campus" (no destination yet) or
- * the route summary card (distance, or the stop for Shuttle). The route is planned in
- * the background as soon as a destination is picked (`preview`, from
- * NavigationController), so Start begins straight away.
+ * Two steps (designer's screens, same on desktop): "Where to?" with the
+ * places featured in Explore, then once a destination is picked, "From your
+ * location to …" with Change, the travel mode and Start. The route is
+ * planned in the background as soon as a destination is picked
+ * (NavigationController), so Start begins straight away.
  *
- * `preview`: null (nothing to show), { loading: true }, or { distance,
- * stop }: the route's length in metres and, in Shuttle mode, the stop to
- * get off at. No times: the routing server's estimates don't fit here.
- * `busyLabel` replaces the Start label while it's getting a location or
- * route. `onClearDest` empties the field.
+ * A row picks that place; its arrow (`onPopularPlaceGo`) starts navigating
+ * there at once in the remembered mode. `shuttleStop`: in Shuttle mode, the
+ * stop to get off at, if one is near the destination. `busyLabel` replaces
+ * the Start label while it's getting a location or route. `onClearDest`
+ * (Change) goes back to step one.
  */
 export default function NavDestPanel({
   destInputValue,
@@ -89,14 +88,14 @@ export default function NavDestPanel({
   onClose,
   popularPlaces,
   onPopularPlaceSelect,
+  onPopularPlaceGo,
   travelMode,
   onTravelModeChange,
   hasDest,
   onClearDest,
-  preview,
+  shuttleStop,
 }) {
   const kb = useKeyboardInset();
-  const text = MODE_TEXT[travelMode] || MODE_TEXT.walk;
   const tab = travelMode === 'walk' || travelMode === 'bike' ? travelMode : 'ride';
   return (
     <div
@@ -108,23 +107,11 @@ export default function NavDestPanel({
         <span />
       </div>
 
-      <div className={styles.header}>
-        <h2 className={styles.title}>Directions</h2>
-        <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
-          <X size={16} />
-        </button>
-      </div>
-
-      <div className={styles.body}>
-        <div className={styles.routeCard}>
-          <div className={styles.routeRow}>
-            <span className={styles.fromDot} aria-hidden="true" />
-            <span className={styles.fromText}>Your location</span>
-          </div>
-          <span className={styles.routeLink} aria-hidden="true" />
-          <div className={styles.routeRow}>
-            <MapPin size={16} className={styles.toPin} aria-hidden="true" />
-            <div className={styles.toInputWrap}>
+      {!hasDest ? (
+        <div className={styles.body}>
+          <div className={styles.searchRow}>
+            <div className={styles.searchField}>
+              <Search size={18} className={styles.searchIcon} aria-hidden="true" />
               <input
                 type="text"
                 placeholder="Where to?"
@@ -161,114 +148,126 @@ export default function NavDestPanel({
                 </div>
               )}
             </div>
-            {!!destInputValue && (
-              <button type="button" className={styles.clearBtn} onClick={onClearDest} aria-label="Clear destination">
-                <X size={12} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className={styles.modePicker} role="radiogroup" aria-label="How are you travelling?">
-          {TRAVEL_TABS.map(({ tab: t, label, Icon }) => (
-            <button
-              key={t}
-              type="button"
-              role="radio"
-              aria-checked={tab === t}
-              className={`${styles.modeOption} ${tab === t ? styles.modeOptionActive : ''}`}
-              onClick={() => tab !== t && onTravelModeChange(t)}
-            >
-              <Icon size={15} />
-              {label}
+            <button type="button" className={styles.close} onClick={onClose} aria-label="Close">
+              <X size={16} />
             </button>
-          ))}
+          </div>
+
+          {!!hint && <Hint text={hint} />}
+
+          {!!(popularPlaces && popularPlaces.length) && (
+            <div className={styles.popularSection}>
+              <div className={styles.popularLabel}>Popular on campus</div>
+              <div className={styles.popularList}>
+                {popularPlaces.map((place) => {
+                  const Icon = LEGACY_ICON_MAP[icon(place.waypoint)] || MapPin;
+                  return (
+                    <div key={place.id} className={styles.popularRow}>
+                      <button type="button" className={styles.popularPick} onClick={() => onPopularPlaceSelect(place)}>
+                        <span className={styles.popularIconBg} style={{ '--place-colour': dotColor(place.type) }}>
+                          <Icon size={16} />
+                        </span>
+                        <span className={styles.popularText}>
+                          <span className={styles.popularName}>{place.name}</span>
+                          {place.distance != null && <span className={styles.popularDist}>{fmtRouteDistance(place.distance)}</span>}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.popularGo}
+                        onClick={() => onPopularPlaceGo(place)}
+                        aria-label={`Start navigating to ${place.name}`}
+                      >
+                        <Navigation size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-
-        {tab === 'ride' && (
-          <div className={styles.rideOptions} role="radiogroup" aria-label="What are you riding?">
-            {RIDE_OPTIONS.map(({ mode, label, Icon }) => (
-              <button
-                key={mode}
-                type="button"
-                role="radio"
-                aria-checked={travelMode === mode}
-                className={`${styles.rideOption} ${travelMode === mode ? styles.rideOptionActive : ''}`}
-                onClick={() => onTravelModeChange(mode)}
-              >
-                <Icon size={15} />
-                {label}
+      ) : (
+        <>
+          <div className={`${styles.body} ${styles.bodyCompact}`}>
+            <div className={styles.destCard}>
+              <span className={styles.destIcon} aria-hidden="true">
+                <MapPin size={18} />
+              </span>
+              <span className={styles.destText}>
+                <span className={styles.destLabel}>From your location to</span>
+                <span className={styles.destName}>{destInputValue}</span>
+              </span>
+              <button type="button" className={styles.changeBtn} onClick={onClearDest}>
+                Change
               </button>
-            ))}
-          </div>
-        )}
+            </div>
 
-        {!!hint && (
-          <div className={styles.hintCard}>
-            <span className={styles.hintIconBg}>
-              <Info size={12} />
-            </span>
-            <div className={styles.hintText}>{hint}</div>
-          </div>
-        )}
+            <div className={styles.modePicker} role="radiogroup" aria-label="How are you travelling?">
+              {TRAVEL_TABS.map(({ tab: t, label, Icon }) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="radio"
+                  aria-checked={tab === t}
+                  className={`${styles.modeOption} ${tab === t ? styles.modeOptionActive : ''}`}
+                  onClick={() => tab !== t && onTravelModeChange(t)}
+                >
+                  <Icon size={15} />
+                  {label}
+                </button>
+              ))}
+            </div>
 
-        {hasDest && preview && (
-          <div className={styles.summary} aria-live="polite">
-            {preview.loading ? (
-              <span className={styles.summaryLoading}>Finding the quickest way…</span>
-            ) : travelMode === 'shuttle' ? (
-              <>
-                <div className={styles.summaryStopWrap}>
-                  <div className={styles.summaryMeta}>{preview.stop ? 'Get off at' : 'Shuttle'}</div>
-                  <div className={styles.summaryStop}>{preview.stop || 'No shuttle stop near this place'}</div>
-                </div>
-                <div className={styles.summaryRight}>
-                  <div className={styles.summaryMeta}>Distance</div>
-                  <div className={styles.summaryRightValue}>{fmtRouteDistance(preview.distance)}</div>
-                </div>
-              </>
-            ) : (
-              <div>
-                <div className={styles.summaryDistance}>{fmtRouteDistance(preview.distance)}</div>
-                <div className={styles.summaryMeta}>{text.route}</div>
+            {tab === 'ride' && (
+              <div className={styles.rideOptions} role="radiogroup" aria-label="What are you riding?">
+                {RIDE_OPTIONS.map(({ mode, label, Icon }) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={travelMode === mode}
+                    className={`${styles.rideOption} ${travelMode === mode ? styles.rideOptionActive : ''}`}
+                    onClick={() => onTravelModeChange(mode)}
+                  >
+                    <Icon size={15} />
+                    {label}
+                  </button>
+                ))}
               </div>
             )}
-          </div>
-        )}
 
-        {!hasDest && !!(popularPlaces && popularPlaces.length) && (
-          <div className={styles.popularSection}>
-            <div className={styles.popularLabel}>Popular on campus</div>
-            <div className={styles.popularList}>
-              {popularPlaces.map((place) => {
-                const Icon = LEGACY_ICON_MAP[icon(place.waypoint)] || MapPin;
-                const colour = dotColor(place.type);
-                return (
-                  <button
-                    key={place.id}
-                    type="button"
-                    className={styles.popularRow}
-                    onClick={() => onPopularPlaceSelect(place)}
-                  >
-                    <span className={styles.popularIconBg} style={{ '--place-colour': colour }}>
-                      <Icon size={16} />
-                    </span>
-                    <span className={styles.popularName}>{place.name}</span>
-                    {place.distance != null && <span className={styles.popularDist}>{fmtRouteDistance(place.distance)}</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+            {travelMode === 'shuttle' && shuttleStop && (
+              <p className={styles.shuttleNote}>
+                <BusFront size={14} />
+                <span>
+                  Get off at <strong>{shuttleStop}</strong>
+                </span>
+              </p>
+            )}
 
-      <div className={styles.footer}>
-        <button type="button" className={styles.goBtn} disabled={goDisabled || !hasDest} onClick={onGo}>
-          <Navigation size={16} />
-          {busyLabel || (hasDest ? text.start : 'Pick a destination')}
-        </button>
-      </div>
+            {!!hint && <Hint text={hint} />}
+          </div>
+
+          <div className={styles.footer}>
+            <button type="button" className={styles.goBtn} disabled={goDisabled} onClick={onGo}>
+              <Navigation size={16} />
+              {busyLabel || START_LABEL[travelMode] || START_LABEL.walk}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Hint({ text }) {
+  return (
+    <div className={styles.hintCard}>
+      <span className={styles.hintIconBg}>
+        <Info size={12} />
+      </span>
+      <div className={styles.hintText}>{text}</div>
     </div>
   );
 }
