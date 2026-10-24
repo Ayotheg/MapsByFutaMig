@@ -3,7 +3,16 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { useSeo } from '../../lib/useSeo';
 import { fetchPromotionStatus } from './submitPromotion';
+import { fetchEventStatus } from '../events/submitEvent';
 import styles from './PromoteCallbackPage.module.css';
+
+// Also serves /event/callback (kind="event"): same polling, the `events`
+// row instead of `promotions`. A free event lands here straight after
+// submitting, with payment_status 'not_required' — nothing to wait for.
+const KINDS = {
+  promotion: { param: 'promotion', fetch: fetchPromotionStatus, name: (r) => r.business_name },
+  event: { param: 'event', fetch: fetchEventStatus, name: (r) => r.title },
+};
 
 // ── /promote/callback ────────────────────────────────────────────────────
 //
@@ -27,12 +36,13 @@ import styles from './PromoteCallbackPage.module.css';
 const POLL_INTERVAL_MS = 2500;
 const POLL_TIMEOUT_MS = 60000;
 
-export default function PromoteCallbackPage() {
+export default function PromoteCallbackPage({ kind = 'promotion' }) {
   useSeo({ title: 'Confirming Payment – Maps By FUTA', robots: 'noindex, nofollow' });
 
+  const cfg = KINDS[kind] || KINDS.promotion;
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const promotionId = searchParams.get('promotion');
+  const promotionId = searchParams.get(cfg.param);
 
   const [promotion, setPromotion] = useState(null);
   const [timedOut, setTimedOut] = useState(false);
@@ -54,11 +64,11 @@ export default function PromoteCallbackPage() {
     // them on "Something went wrong" with no way to re-check.
     async function poll() {
       try {
-        const row = await fetchPromotionStatus(promotionId);
+        const row = await cfg.fetch(promotionId);
         if (cancelled) return;
         setOffline(false);
         setPromotion(row);
-        if (row?.payment_status === 'paid' || row?.payment_status === 'failed') {
+        if (['paid', 'failed', 'not_required'].includes(row?.payment_status)) {
           return; // terminal state — stop polling
         }
       } catch {
@@ -84,14 +94,15 @@ export default function PromoteCallbackPage() {
       clearTimeout(timer);
       window.removeEventListener('online', onOnline);
     };
-  }, [promotionId, attempt]);
+  }, [promotionId, attempt, cfg]);
 
   function checkAgain() {
     setTimedOut(false);
     setAttempt((n) => n + 1);
   }
 
-  const settled = promotion?.payment_status === 'paid' || promotion?.payment_status === 'failed';
+  const settled = ['paid', 'failed', 'not_required'].includes(promotion?.payment_status);
+  const isEvent = kind === 'event';
 
   let body;
   if (error) {
@@ -102,14 +113,19 @@ export default function PromoteCallbackPage() {
         <p className={styles.subtitle}>{error}</p>
       </>
     );
-  } else if (promotion?.payment_status === 'paid') {
+  } else if (promotion?.payment_status === 'paid' || promotion?.payment_status === 'not_required') {
     body = (
       <>
         <CheckCircle2 size={40} strokeWidth={2} className={styles.iconSuccess} />
-        <h1 className={styles.title}>Payment received</h1>
+        <h1 className={styles.title}>
+          {promotion.payment_status === 'not_required' ? 'Event sent for review' : 'Payment received'}
+        </h1>
         <p className={styles.subtitle}>
-          Thanks — <strong>{promotion.business_name}</strong> is now waiting on a quick review by
-          our team before it goes live. We'll show it on the map/Explore page once it's approved.
+          Thanks — <strong>{cfg.name(promotion)}</strong> is now waiting on a quick review by our team
+          before it goes live.{' '}
+          {isEvent
+            ? "Once it's approved it shows in Explore → Events until the day of the event."
+            : "We'll show it on the map/Explore page once it's approved."}
         </p>
       </>
     );
@@ -140,7 +156,7 @@ export default function PromoteCallbackPage() {
     body = (
       <>
         <Clock size={40} strokeWidth={2} className={styles.iconPending} />
-        <h1 className={styles.title}>Confirming your payment…</h1>
+        <h1 className={styles.title}>{isEvent ? 'Checking your event…' : 'Confirming your payment…'}</h1>
         <p className={styles.subtitle}>
           {offline
             ? 'Your connection looks weak — still trying. You can safely refresh this page.'

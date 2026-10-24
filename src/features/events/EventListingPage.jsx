@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  AlertCircle,
   ArrowLeft,
   Check,
   CheckCircle2,
@@ -8,6 +9,7 @@ import {
   Gift,
   ImagePlus,
   Info,
+  Loader2,
   LocateFixed,
   MapPin,
   Search,
@@ -16,11 +18,16 @@ import {
   X,
 } from 'lucide-react';
 import { useSeo } from '../../lib/useSeo';
+import { useAuth, friendlyError } from '../auth/useAuth';
 import WaypointSearchPanel from '../promote/WaypointSearchPanel';
+import { submitEvent, validateEventForm } from './submitEvent';
 import { DayField, TimeField } from './DateTimeFields';
 import { DateBadge } from '../explore/ExploreEvents';
 import { EVENT_LISTING_FEE, priceLabel, shortWhen } from '../explore/eventsData';
 import styles from './EventListingPage.module.css';
+
+// Only mounts when a signed-out person tries to submit.
+const AuthModal = lazy(() => import('../auth/AuthModal'));
 
 const naira = (n) => `₦${Number(n).toLocaleString('en-NG')}`;
 
@@ -37,12 +44,20 @@ const PLATFORMS = [
  * "Add an event · V2 desktop / mobile"). Same flow as /promote, which the
  * Business tab links to: entry type sets the fee (free ₦0, ticketed flat
  * EVENT_LISTING_FEE), then details and where, with a live preview of the
- * Explore card. Submitting isn't wired yet.
+ * Explore card. Submitting goes through submitEvent.js: free events go
+ * straight to admin review, ticketed ones pay the fee through BACHS first.
  */
 export default function EventListingPage() {
   useSeo({ title: 'List your event – Maps By FUTA', robots: 'noindex, nofollow' });
   const navigate = useNavigate();
   const posterInputRef = useRef(null);
+  const auth = useAuth();
+  // BACHS's cancel_url (create-event-checkout) comes back with ?cancelled=1.
+  const [searchParams] = useSearchParams();
+  const showCancelledNotice = searchParams.get('cancelled') === '1';
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const [entry, setEntry] = useState(null); // null | 'free' | 'ticketed'
   const [ticketPrice, setTicketPrice] = useState(''); // digits only, naira
@@ -54,6 +69,8 @@ export default function EventListingPage() {
   const [starts, setStarts] = useState('');
   const [where, setWhere] = useState(null); // null | 'venue' | 'online'
   const [venue, setVenue] = useState(null); // { name, lat, lng, waypointId }
+  // A picked place fills this; a GPS pin needs the person to name it.
+  const [venueName, setVenueName] = useState('');
   const [mapSearchOpen, setMapSearchOpen] = useState(false);
   const [locStatus, setLocStatus] = useState(null); // { text, error }
   const [platform, setPlatform] = useState('whatsapp');
@@ -85,6 +102,7 @@ export default function EventListingPage() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setVenue({ name: 'Your current location', lat: pos.coords.latitude, lng: pos.coords.longitude, waypointId: null });
+        setVenueName('');
         setLocStatus(null);
       },
       (err) => setLocStatus({ text: `Couldn't get your location: ${err.message}`, error: true }),
@@ -94,8 +112,76 @@ export default function EventListingPage() {
 
   function handleVenuePicked(wp) {
     setVenue({ name: wp.name, lat: wp.lat, lng: wp.lng, waypointId: wp.id });
+    setVenueName(wp.name);
     setLocStatus(null);
     setMapSearchOpen(false);
+  }
+
+  // Back from BACHS with the browser's Back button: the page is restored from
+  // the back/forward cache with `submitting` still true (same fix as /promote).
+  useEffect(() => {
+    function handlePageShow(e) {
+      if (e.persisted) {
+        setSubmitting(false);
+        setSubmitError(null);
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
+  async function handleSubmit() {
+    if (submitting) return;
+    const problem = validateEventForm({
+      entry,
+      ticketPrice,
+      title: name,
+      organiser,
+      day,
+      starts,
+      where,
+      venue,
+      venueName,
+      link,
+    });
+    if (problem) {
+      setSubmitError(problem);
+      return;
+    }
+    if (!auth.user) {
+      setAuthModalOpen(true);
+      return;
+    }
+
+    setSubmitError(null);
+    setSubmitting(true);
+    try {
+      const { eventId, checkoutUrl } = await submitEvent({
+        userId: auth.user.id,
+        entry,
+        ticketPrice,
+        ticketNote,
+        title: name,
+        organiser,
+        poster,
+        day,
+        starts,
+        where,
+        venue,
+        venueName,
+        platform,
+        link,
+      });
+      if (checkoutUrl) {
+        // Left spinning on purpose: the browser is about to leave for BACHS.
+        window.location.href = checkoutUrl;
+        return;
+      }
+      navigate(`/event/callback?event=${eventId}`, { replace: true });
+    } catch (e) {
+      setSubmitError(e.message || 'Could not send your event. Try again.');
+      setSubmitting(false);
+    }
   }
 
   // Preview falls back to the design's sample date and time until filled in.
@@ -106,7 +192,7 @@ export default function EventListingPage() {
     return d.toISOString();
   })();
   const previewPlace =
-    where === 'online' ? `Online · ${activePlatform.label}` : where === 'venue' && venue ? venue.name : 'Venue';
+    where === 'online' ? `Online · ${activePlatform.label}` : where === 'venue' && venueName.trim() ? venueName.trim() : 'Venue';
 
   // The event as Explore will show it — same shape as eventsData.js, so the
   // preview's price reads exactly like the Explore cards and EventCard.
@@ -166,10 +252,29 @@ export default function EventListingPage() {
           </dd>
         </div>
       </dl>
-      <button type="button" className={styles.submitBtn} disabled={!entry || needsPrice}>
-        {submitLabel}
+      {(submitError || showCancelledNotice) && (
+        <p className={styles.formError} role="alert">
+          <AlertCircle size={15} aria-hidden="true" />
+          <span>{submitError || 'Payment was cancelled, nothing was charged. Your event is saved as unpaid; submit again to pay.'}</span>
+        </p>
+      )}
+      <button
+        type="button"
+        className={styles.submitBtn}
+        disabled={!entry || needsPrice || submitting}
+        aria-busy={submitting}
+        onClick={handleSubmit}
+      >
+        {submitting ? (
+          <>
+            <Loader2 size={17} className={styles.spinner} aria-hidden="true" />
+            {ticketed ? 'Starting payment…' : 'Sending…'}
+          </>
+        ) : (
+          submitLabel
+        )}
       </button>
-      <button type="button" className={styles.cancelLink} onClick={() => navigate(-1)}>
+      <button type="button" className={styles.cancelLink} onClick={() => navigate(-1)} disabled={submitting}>
         Cancel and go back
       </button>
     </div>
@@ -407,6 +512,20 @@ export default function EventListingPage() {
                     <span className={styles.ellipsis}>{venue.name}</span>
                   </div>
                 )}
+                {/* A GPS pin has no name; the card needs one. */}
+                {venue && !venue.waypointId && (
+                  <label className={styles.field}>
+                    <span className={styles.label}>Venue name</span>
+                    <input
+                      className={styles.input}
+                      type="text"
+                      placeholder="e.g. 1000 Seater Auditorium"
+                      maxLength={80}
+                      value={venueName}
+                      onChange={(e) => setVenueName(e.target.value)}
+                    />
+                  </label>
+                )}
                 {locStatus && (
                   <p className={`${styles.status} ${locStatus.error ? styles.statusError : ''}`}>{locStatus.text}</p>
                 )}
@@ -464,6 +583,26 @@ export default function EventListingPage() {
           {preview}
         </aside>
       </div>
+
+      {authModalOpen && (
+        <Suspense fallback={null}>
+          <AuthModal
+            initialTab="signin"
+            user={auth.user}
+            onClose={() => setAuthModalOpen(false)}
+            signInWithGoogle={auth.signInWithGoogle}
+            signInWithEmail={auth.signInWithEmail}
+            signUpWithEmail={auth.signUpWithEmail}
+            checkEmailStatus={auth.checkEmailStatus}
+            resetPassword={auth.resetPassword}
+            verifyRecoveryCode={auth.verifyRecoveryCode}
+            setNewPassword={auth.setNewPassword}
+            signOut={auth.signOut}
+            friendlyError={friendlyError}
+            message="Sign in to list your event. It ties the listing to your account so you can see when it's approved."
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

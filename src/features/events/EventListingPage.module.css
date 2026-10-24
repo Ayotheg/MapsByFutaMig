@@ -689,6 +689,35 @@ a.toggleBtn:hover {
   cursor: pointer;
   transition: background var(--v2-duration-quick) var(--v2-ease-standard);
 }
+.submitBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.formError {
+  display: flex;
+  gap: 8px;
+  margin: 16px 22px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--v2-error-tint);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--v2-error-text);
+}
+.formError svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
 .submitBtn:hover:not(:disabled) {
   background: var(--v2-primary-hover);
 }
@@ -708,8 +737,12 @@ a.toggleBtn:hover {
   color: var(--v2-text-muted);
   cursor: pointer;
 }
-.cancelLink:hover {
+.cancelLink:hover:not(:disabled) {
   color: var(--v2-neutral);
+}
+.cancelLink:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ── Live preview ─────────────────────────────────────────────────── */

@@ -13,8 +13,8 @@ import { useEffect, useState } from 'react';
 // shown again only once no reason is left. An open chat is never hidden.
 
 const TAWK_SRC = 'https://embed.tawk.to/6ad143736df7e334c4c14ca3/1k50muv02';
-// /promote/callback: where someone lands if a payment won't confirm.
-const TAWK_ROUTES = new Set(['/map', '/promote', '/promote/callback']);
+// The callback pages: where someone lands if a payment won't confirm.
+const TAWK_ROUTES = new Set(['/map', '/promote', '/promote/callback', '/event/callback']);
 
 const reasons = new Set();
 let chatOpen = false;

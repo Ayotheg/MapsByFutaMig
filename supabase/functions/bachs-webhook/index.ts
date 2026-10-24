@@ -102,7 +102,17 @@ Deno.serve(async (req) => {
     // bookkeeping table shouldn't block a real payment confirmation.
   }
 
-  const promotionId = event.data?.metadata?.promotion_id || event.data?.reference;
+  // Event listing fees (create-event-checkout) are told apart by
+  // metadata.event_id, or the "event:" reference prefix as a fallback.
+  const reference = event.data?.reference;
+  const eventId =
+    event.data?.metadata?.event_id ||
+    (typeof reference === 'string' && reference.startsWith('event:') ? reference.slice('event:'.length) : null);
+  if (eventId) {
+    return handleEventPayment(adminClient, event, eventId);
+  }
+
+  const promotionId = event.data?.metadata?.promotion_id || reference;
   if (!promotionId) {
     console.error('[bachs-webhook] event has no promotion_id/reference, ignoring:', event.id, event.type);
     return new Response('OK (no promotion reference)', { status: 200 });
@@ -191,6 +201,74 @@ Deno.serve(async (req) => {
 
   return new Response('OK', { status: 200 });
 });
+
+// Same rules as the promotion branch above, against `events`: the amount is
+// checked against events.listing_fee (set server-side by
+// create-event-checkout), and a paid event moves to 'pending_review'.
+async function handleEventPayment(adminClient, event, eventId) {
+  switch (event.type) {
+    case 'collection.succeeded':
+    case 'checkout.completed': {
+      const { data: row, error: lookupError } = await adminClient
+        .from('events')
+        .select('listing_fee, currency, payment_status')
+        .eq('id', eventId)
+        .maybeSingle();
+      if (lookupError) {
+        console.error('[bachs-webhook] event lookup failed:', lookupError.message);
+        await adminClient.from('bachs_webhook_events').delete().eq('id', event.id);
+        return new Response('Lookup failed', { status: 500 });
+      }
+      if (!row) {
+        console.error('[bachs-webhook] no event row for', eventId, 'event', event.id);
+        break;
+      }
+
+      const check = checkAmountPaid(event, { amount: row.listing_fee, currency: row.currency });
+      if (!check.ok) {
+        console.error('[bachs-webhook] event amount check failed, NOT marking paid:', {
+          eventId: event.id,
+          listingId: eventId,
+          reason: check.reason,
+          expected: row.listing_fee,
+          expectedCurrency: row.currency,
+          paid: check.paid,
+          paidCurrency: check.currency,
+        });
+        break;
+      }
+
+      const { error } = await adminClient
+        .from('events')
+        .update({
+          payment_status: 'paid',
+          status: 'pending_review',
+          bachs_payment_id: event.data?.id ?? null,
+          paid_at: new Date().toISOString(),
+        })
+        .eq('id', eventId)
+        .eq('payment_status', 'unpaid');
+      if (error) console.error('[bachs-webhook] event paid-update failed:', error.message);
+      break;
+    }
+    case 'collection.failed':
+    case 'checkout.expired': {
+      const { error } = await adminClient
+        .from('events')
+        .update({ payment_status: event.type === 'checkout.expired' ? 'expired' : 'failed' })
+        .eq('id', eventId)
+        .eq('payment_status', 'unpaid');
+      if (error) console.error('[bachs-webhook] event failed-update failed:', error.message);
+      break;
+    }
+    case 'collection.underpaid':
+      console.warn('[bachs-webhook] underpaid collection for event', eventId, event.data);
+      break;
+    default:
+      break;
+  }
+  return new Response('OK', { status: 200 });
+}
 
 // BACHS money fields are decimal STRINGS in major units ("200.00"), never
 // minor units/floats (docs.bachs.io, event pages). `promotions.amount` is

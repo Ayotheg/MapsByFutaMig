@@ -103,9 +103,11 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
 
   const fullItems = useMemo(() => [...promoted, ...organic], [promoted, organic]);
 
-  // Events tab: sample data until events come from Supabase (eventsData.js).
+  // Events tab: approved events (supabase/events.sql), fetched the first
+  // time the tab opens.
   const [eventFilter, setEventFilter] = useState('all');
-  const events = useMemo(() => filterEvents(SAMPLE_EVENTS, eventFilter), [eventFilter]);
+  const { events: allEvents, loading: eventsLoading } = useEvents(category === 'events');
+  const events = useMemo(() => filterEvents(allEvents, eventFilter), [allEvents, eventFilter]);
   const [openEvent, setOpenEvent] = useState(null);
   // EventCard's chunk loads on the first tap, then stays mounted so it can
   // slide out on close.
@@ -116,7 +118,19 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   }
   const eventCard = eventCardLoaded && (
     <Suspense fallback={null}>
-      <EventCard event={openEvent} isMobile={!desktop} onClose={() => setOpenEvent(null)} />
+      <EventCard
+        event={openEvent}
+        isMobile={!desktop}
+        onClose={() => setOpenEvent(null)}
+        onNavigate={(e) => {
+          if (!e.venue || !Number.isFinite(e.venue.lat)) return;
+          setOpenEvent(null);
+          onNavigate?.({ lat: e.venue.lat, lng: e.venue.lng, name: e.venue.name });
+        }}
+        onJoinOnline={joinOnlineEvent}
+        onAddToCalendar={addEventToCalendar}
+        onShare={shareEvent}
+      />
     </Suspense>
   );
 

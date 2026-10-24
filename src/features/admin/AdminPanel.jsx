@@ -6,6 +6,7 @@ import KmlTab from './KmlTab';
 import QuickChipsTab from './QuickChipsTab';
 import PendingTab from './PendingTab';
 import PromotionsTab from './PromotionsTab';
+import EventsTab from './EventsTab';
 import ShortcutsTab from './ShortcutsTab';
 import L from 'leaflet';
 import AdminEditModal from './AdminEditModal';
@@ -37,6 +38,7 @@ const TABS = [
   { key: 'chips', label: 'Chips' },
   { key: 'pending', label: 'Pending' },
   { key: 'promotions', label: 'Promotions' },
+  { key: 'events', label: 'Events' },
   { key: 'insights', label: 'Insights' },
   { key: 'shortcuts', label: 'Shortcuts' },
 ];
@@ -74,6 +76,7 @@ export default function AdminPanel({
   const [pickedCoord, setPickedCoord] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [promoCount, setPromoCount] = useState(0);
+  const [eventCount, setEventCount] = useState(0);
   const clickHandlerRef = useRef(null);
 
   const adminKml = useAdminKml({ map, onSelect, searchRegister });
@@ -102,6 +105,15 @@ export default function AdminPanel({
       .eq('status', 'pending_review')
       .then(({ count, error }) => {
         if (!cancelled && !error && typeof count === 'number') setPromoCount(count);
+      });
+    // Events waiting on review (free, or ticketed and paid).
+    supabase
+      .from('events')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending_review')
+      .in('payment_status', ['not_required', 'paid'])
+      .then(({ count, error }) => {
+        if (!cancelled && !error && typeof count === 'number') setEventCount(count);
       });
     return () => {
       cancelled = true;
@@ -232,6 +244,9 @@ export default function AdminPanel({
                   {t.key === 'promotions' && promoCount > 0 && (
                     <span className={styles.atabCount}>{promoCount}</span>
                   )}
+                  {t.key === 'events' && eventCount > 0 && (
+                    <span className={styles.atabCount}>{eventCount}</span>
+                  )}
                 </button>
               );
             })}
@@ -294,6 +309,7 @@ export default function AdminPanel({
             <PendingTab onRefreshWaypoints={onWaypointsChanged} onCountChange={setPendingCount} />
           )}
           {activeTab === 'promotions' && <PromotionsTab onCountChange={setPromoCount} onRefreshWaypoints={onWaypointsChanged} />}
+          {activeTab === 'events' && <EventsTab onCountChange={setEventCount} />}
           {activeTab === 'insights' && (
             <InsightsErrorBoundary>
               <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: '#94a3b8', fontSize: 11 }}>Loading insights…</div>}>

@@ -485,6 +485,57 @@ export async function rejectPromotion(id, reason) {
   track('admin_action', { action: 'reject', entity: 'promotion' });
 }
 
+// ── Events (supabase/events.sql) ──────────────────────────────────────────
+// Same SECURITY DEFINER RPC pattern as promotions: the events table has no
+// client UPDATE policy because payment columns share the row.
+export async function approveEvent(id, { featured = false } = {}) {
+  const { error } = await supabase.rpc('admin_approve_event', { p_id: id, p_featured: featured });
+  if (error) throw eventRpcError(error, 'approve');
+  track('admin_action', { action: 'approve', entity: 'event' });
+}
+
+export async function rejectEvent(id, reason) {
+  const { error } = await supabase.rpc('admin_reject_event', { p_id: id, p_reason: reason || null });
+  if (error) throw eventRpcError(error, 'reject');
+  track('admin_action', { action: 'reject', entity: 'event' });
+}
+
+export async function setEventFeatured(id, featured) {
+  const { error } = await supabase.rpc('admin_set_event_featured', { p_id: id, p_featured: featured });
+  if (error) throw eventRpcError(error, 'update');
+  track('admin_action', { action: featured ? 'feature' : 'unfeature', entity: 'event' });
+}
+
+/**
+ * Takes an event down (`erase: false`, kept under Removed) or deletes the
+ * record (`erase: true`). The poster file is deleted from Storage after the
+ * database step succeeds; a failure there is returned as `photoError`.
+ */
+export async function removeEvent(id, { erase = false } = {}) {
+  const { data: row } = await supabase.from('events').select('poster_path').eq('id', id).maybeSingle();
+  const { error } = await supabase.rpc('admin_remove_event', { p_id: id, p_erase: erase });
+  if (error) throw eventRpcError(error, erase ? 'delete' : 'remove');
+  track('admin_action', { action: erase ? 'delete' : 'remove', entity: 'event' });
+
+  if (!row?.poster_path) return { photoError: null };
+  try {
+    await removeStorageFiles([row.poster_path]);
+    return { photoError: null };
+  } catch (e) {
+    return { photoError: e?.message || String(e) };
+  }
+}
+
+function eventRpcError(error, verb) {
+  const missing = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
+  if (missing) {
+    return new Error(
+      `Could not ${verb} this event — the database function is missing. Run supabase/events.sql in the Supabase SQL editor.`
+    );
+  }
+  return new Error(error.message || `Could not ${verb} this event.`);
+}
+
 function promotionRpcError(error, verb) {
   const missing = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
   if (missing) {

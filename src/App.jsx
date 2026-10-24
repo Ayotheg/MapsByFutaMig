@@ -103,6 +103,8 @@ function App() {
             </Suspense>
           }
         />
+        {/* create-event-checkout's success_url; free events land here too. */}
+        <Route path="/event/callback" element={<PromoteCallbackPage kind="event" />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookiePolicy />} />
