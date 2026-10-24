@@ -507,38 +507,6 @@
   flex-direction: column;
   gap: 10px;
 }
-/* Shortcuts tab: the "switched off automatically" notice, and the bar
-   shown over the map while previewing a shortcut. */
-.shortcutNote {
-  margin: 0 16px 10px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--v2-error-tint);
-  color: var(--v2-error-text);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.previewBar {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-  z-index: 3000;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: calc(100vw - 32px);
-  padding: 8px 8px 8px 16px;
-  border-radius: var(--r-full);
-  background: var(--v2-surface);
-  border: 1px solid var(--v2-track);
-  box-shadow: 0 6px 18px -4px rgba(15, 23, 42, 0.2);
-  font-family: var(--font-ui);
-  font-size: 12px;
-  color: var(--v2-text-variant);
-}
-
 .loading,
 .empty {
   font-family: var(--font-mono);
