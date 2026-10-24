@@ -207,6 +207,26 @@
 .modeOption svg {
   flex-shrink: 0;
 }
+/* With times: name on top, time under it. */
+.modeOption:has(.modeTime) {
+  flex-direction: column;
+  gap: 2px;
+}
+.modeName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.modeTime {
+  font-family: var(--v2-font-manrope);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--v2-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.modeOptionActive .modeTime {
+  color: var(--v2-primary-hover);
+}
 .modeOptionActive {
   background: var(--v2-on-primary);
   color: var(--v2-primary-hover);

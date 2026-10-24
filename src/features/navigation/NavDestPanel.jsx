@@ -71,7 +71,9 @@ function useKeyboardInset() {
  *
  * `preview`: null (nothing to show), { loading: true }, or { distance,
  * duration, stop } in metres / seconds; `stop` is the shuttle stop to get
- * off at in Shuttle mode (no time then: waiting and stops aren't known). `busyLabel` replaces the Start label
+ * off at in Shuttle mode (no time then: waiting and stops aren't known).
+ * `tabTimes`: { walk, bike, ride } seconds, filled in as each route is
+ * planned (Ride is the car route), shown under each tab's name. `busyLabel` replaces the Start label
  * while it's getting a location or route. `onClearDest` empties the field.
  */
 export default function NavDestPanel({
@@ -93,6 +95,7 @@ export default function NavDestPanel({
   hasDest,
   onClearDest,
   preview,
+  tabTimes = {},
 }) {
   const kb = useKeyboardInset();
   const text = MODE_TEXT[travelMode] || MODE_TEXT.walk;
@@ -178,8 +181,11 @@ export default function NavDestPanel({
               className={`${styles.modeOption} ${tab === t ? styles.modeOptionActive : ''}`}
               onClick={() => tab !== t && onTravelModeChange(t)}
             >
-              <Icon size={15} />
-              {label}
+              <span className={styles.modeName}>
+                <Icon size={15} />
+                {label}
+              </span>
+              {hasDest && tabTimes[t] != null && <span className={styles.modeTime}>{fmtDuration(tabTimes[t])}</span>}
             </button>
           ))}
         </div>
