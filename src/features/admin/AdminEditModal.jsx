@@ -9,7 +9,7 @@ import {
   Pencil,
   ChevronDown,
   Copy,
-  Lock,
+  Move,
   Star,
   Trash2,
   Check,
@@ -39,6 +39,8 @@ import {
   deleteSegment,
 } from './adminSave';
 import { track } from '../../lib/analytics';
+import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
+import { formatLatLng, parseLatLng } from './coordInput';
 
 const SEGMENT_CATEGORIES = ['footpath', 'road', 'shortcut', 'indoor', 'other'];
 
@@ -87,7 +89,12 @@ function previewUrlFor(file) {
  * (`adminKml.addImageFile`/`removeImageFile`) and only actually upload
  * once "Import to Supabase" runs (`useAdminKml.importFeature`).
  */
-export default function AdminEditModal({ editContext, onClose, onWaypointChanged, onSegmentChanged, adminKml }) {
+/*
+ * `onMovePin(start)` (optional): hides this form while the admin drags the
+ * pin on the map; resolves to the new { lat, lng }, or null if cancelled.
+ * `hidden` keeps the form mounted (and its unsaved edits) meanwhile.
+ */
+export default function AdminEditModal({ editContext, onClose, onWaypointChanged, onSegmentChanged, adminKml, onMovePin, hidden }) {
   const { type, isNew } = editContext;
 
   const [name, setName] = useState('');
@@ -138,6 +145,10 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
   const [status, setStatus] = useState(null); // { text, error }
   const [busy, setBusy] = useState(false);
+  // A place's position as "lat, lng" text; only saved when it changed, as
+  // the loaded position may be nudged apart from a pin at the same spot.
+  const [coordText, setCoordText] = useState('');
+  const [coordStart, setCoordStart] = useState('');
 
   useEffect(() => {
     setStatus(null);
@@ -170,6 +181,9 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       setIsPromoted(!!wp.isPromoted);
       setSponsorName(wp.sponsorName || '');
       setPromoLabel(wp.promoLabel || 'Promoted');
+      const coords = wp.lat != null && wp.lng != null ? formatLatLng(wp.lat, wp.lng) : '';
+      setCoordText(coords);
+      setCoordStart(coords);
       if (editContext.id) {
         setImagesLoading(true);
         fetchImageRows('waypoint_images', 'waypoint_id', editContext.id)
@@ -208,9 +222,23 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
 
   function handleCopyCoords() {
     if (type !== 'waypoint') return;
-    const text = `${Number(editContext.data.lat).toFixed(6)}, ${Number(editContext.data.lng).toFixed(6)}`;
-    navigator.clipboard?.writeText(text).catch(() => {});
+    navigator.clipboard?.writeText(coordText.trim()).catch(() => {});
   }
+
+  async function handleMovePin() {
+    const start = parseLatLng(coordText) || parseLatLng(coordStart);
+    if (!start) return;
+    const moved = await onMovePin(start);
+    if (moved) setCoordText(formatLatLng(moved.lat, moved.lng));
+  }
+
+  const coordsChanged = coordText.trim() !== coordStart;
+  const parsedCoords = parseLatLng(coordText);
+  const coordHint = !parsedCoords
+    ? { warn: true, text: 'Enter latitude, longitude, e.g. 7.301230, 5.134560' }
+    : !CAMPUS_BOUNDS.contains([parsedCoords.lat, parsedCoords.lng])
+      ? { warn: true, text: 'Outside the FUTA campus area. Check the numbers if this place is on campus.' }
+      : { warn: false, text: coordsChanged ? 'New position, saved when you press Save.' : 'Paste from Google Maps, type, or move the pin on the map.' };
 
   function handleFilesChosen(e) {
     const files = Array.from(e.target.files || []);
@@ -247,6 +275,11 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
       setStatus({ text: 'Business link is required.', error: true });
       return;
     }
+    const placeEdit = type === 'waypoint' && !isNew && !isPerson && !isChannel && !isBusiness;
+    if (placeEdit && coordsChanged && !parsedCoords) {
+      setStatus({ text: 'Coordinates must be latitude, longitude, e.g. 7.301230, 5.134560', error: true });
+      return;
+    }
     setBusy(true);
     setStatus(null);
     try {
@@ -266,6 +299,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
           ? { isBusiness: true, businessLink: businessLink.trim(), businessPlatform }
           : {};
         const isPlace = !isPerson && !isChannel && !isBusiness;
+        const moved = placeEdit && coordsChanged ? parsedCoords : null;
         // Saved, but one field (the area) needs a migration — shown instead
         // of the success message once photos and refresh have run.
         let warning = null;
@@ -297,11 +331,17 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
             description: description.trim(),
             ...(isPlace && { type: wpType, area }),
             ...(isPerson && { area }),
+            ...(moved && { lat: moved.lat, lng: moved.lng }),
             ...channelFields,
             ...businessFields,
             ...exploreFields,
           });
           warning = result?.warning || null;
+          if (moved) {
+            const saved = formatLatLng(moved.lat, moved.lng);
+            setCoordText(saved);
+            setCoordStart(saved);
+          }
           await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
           setStatus({
             text: warning || (isPerson ? 'Person updated!' : isChannel ? 'Channel updated!' : isBusiness ? 'Business updated!' : 'Waypoint updated!'),
@@ -389,7 +429,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
   if (type === 'waypoint') {
     const shortId = editContext.id != null ? String(editContext.id).slice(0, 8) : '';
     return (
-      <div className={styles.overlay}>
+      <div className={styles.overlay} style={hidden ? { display: 'none' } : undefined}>
         <div className={`${styles.modal} ${styles.modalWaypoint}`}>
           <div className={styles.headerWaypoint}>
             <div className={styles.headerWpLeft}>
@@ -617,7 +657,7 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                 </div>
               </div>
             ) : (
-              <div className={styles.wpRow}>
+              <>
                 <div className={styles.wpField}>
                   <div className={styles.wpFieldHead}>
                     {!isPerson && (
@@ -644,30 +684,44 @@ export default function AdminEditModal({ editContext, onClose, onWaypointChanged
                     </div>
                   )}
                 </div>
-
-                {/* People entries (supabase/people_entries.sql) have no map
+                {/* People, Channel and Business entries have no map
                     location — coordinates are Places-only. */}
-                {!isPerson && (
+                {!isPerson && !isChannel && !isBusiness && !isNew && (
                   <div className={styles.wpField}>
                     <div className={styles.wpFieldHead}>
-                      <span className={styles.wpLabel}>
-                        Coordinates <span className={styles.wpHintPill}>read-only</span>
-                      </span>
-                      <button type="button" className={styles.wpCopyBtn} onClick={handleCopyCoords}>
-                        <Copy size={12} /> Copy
-                      </button>
+                      <label className={styles.wpLabel} htmlFor="ae-coords">
+                        Coordinates
+                      </label>
+                      <div className={styles.wpCoordActions}>
+                        {onMovePin && (
+                          <button type="button" className={styles.wpCopyBtn} onClick={handleMovePin}>
+                            <Move size={12} /> Move on map
+                          </button>
+                        )}
+                        <button type="button" className={styles.wpCopyBtn} onClick={handleCopyCoords}>
+                          <Copy size={12} /> Copy
+                        </button>
+                      </div>
                     </div>
                     <div className={styles.wpInputWrap}>
-                      <div className={styles.wpCoordInput}>
-                        {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
-                      </div>
+                      <input
+                        id="ae-coords"
+                        type="text"
+                        className={`${styles.wpInput} ${styles.wpCoordField}`}
+                        value={coordText}
+                        onChange={(e) => setCoordText(e.target.value)}
+                        placeholder="7.301230, 5.134560"
+                        spellCheck={false}
+                        autoComplete="off"
+                      />
                       <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
-                        <Lock size={16} />
+                        <MapPin size={16} />
                       </span>
                     </div>
+                    <span className={coordHint.warn ? styles.wpCoordWarn : styles.wpHint}>{coordHint.text}</span>
                   </div>
                 )}
-              </div>
+              </>
             )}
 
             {/* "Feature in Explore" — the whole ask was "just me picking a

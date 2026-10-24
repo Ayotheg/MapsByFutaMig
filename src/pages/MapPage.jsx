@@ -169,7 +169,7 @@ export default function MapPage({ onReadinessChange }) {
   const kmlAnnotations = EMPTY_KML_ANNOTATIONS;
   const dedupIndex = useMemo(
     () => [
-      ...waypoints.map((wp) => ({ id: wp.id, lat: wp.lat, lng: wp.lng, name: wp.name, source: 'waypoint' })),
+      ...waypoints.map((wp) => ({ id: wp.id, lat: wp.lat, lng: wp.lng, name: wp.name, source: 'waypoint', pinLocked: wp.pinLocked })),
       ...kmlAnnotations.map((a) => ({ ...a, source: 'kml' })),
     ],
     [waypoints, kmlAnnotations]

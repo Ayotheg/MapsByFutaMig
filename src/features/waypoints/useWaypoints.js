@@ -89,6 +89,8 @@ export function useWaypoints() {
     const PROMO_COLS = 'promo_days, promo_paid_at';
     // Place area, e.g. "South Gate" (supabase/waypoint_area.sql).
     const AREA_COLS = 'area';
+    // Placed by an admin, kept off OSM's position (supabase/waypoint_pin_locked.sql).
+    const PIN_COLS = 'pin_locked';
 
     // ── Two-phase load ────────────────────────────────────────────────────
     // DATA SCALE — read before optimizing anything here: as of Sept 2026
@@ -131,7 +133,11 @@ export function useWaypoints() {
     // (explore_fields.sql). Falls all the way back to BASE_COLS so the map
     // still works on a project where none of these have been run yet.
     const COL_TIERS = [
-      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}, ${PROMO_COLS}, ${AREA_COLS}`, missingMsg: null },
+      { cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}, ${PROMO_COLS}, ${AREA_COLS}, ${PIN_COLS}`, missingMsg: null },
+      {
+        cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}, ${PROMO_COLS}, ${AREA_COLS}`,
+        missingMsg: '[waypoints] Pin lock not found — run supabase/waypoint_pin_locked.sql so admin-moved pins stay put.',
+      },
       {
         cols: `${BASE_COLS}, ${EXPLORE_COLS}, ${PEOPLE_COLS}, ${CHANNEL_COLS}, ${BUSINESS_COLS}, ${PROMO_COLS}`,
         missingMsg: '[waypoints] Area field not found — run supabase/waypoint_area.sql to show place areas.',
@@ -316,6 +322,7 @@ export function useWaypoints() {
           isChannel: false,
           isBusiness: false,
           area: wp.area || '',
+          pinLocked: !!wp.pin_locked,
         });
       }
       return out;

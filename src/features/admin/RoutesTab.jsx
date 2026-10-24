@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Route, Camera, ChevronRight, Search } from 'lucide-react';
+import { Route, Camera, ChevronRight, Search, PenLine } from 'lucide-react';
 import styles from './AdminPanel.module.css';
 import { badgeStyleFor } from './adminBadgeColors';
 
-/** Legacy: `renderSegmentList` (app.js ~3773–3800). No "add" affordance —
- * legacy never gave this tab one either (segments are only ever created
- * via the KML import pipeline, not from inside the admin panel). */
-export default function RoutesTab({ segments, onEditSegment }) {
+/** Legacy: `renderSegmentList` (app.js ~3773–3800). Segments come from the
+ * KML import pipeline, or "Draw path" (`onDrawPath`, AdminPanel.jsx) for a
+ * footpath the map doesn't have. */
+export default function RoutesTab({ segments, onEditSegment, onDrawPath }) {
   const [search, setSearch] = useState('');
   const filter = search.toLowerCase();
   const filtered = segments.filter(
@@ -32,6 +32,9 @@ export default function RoutesTab({ segments, onEditSegment }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <button type="button" className={styles.addBtn} onClick={onDrawPath}>
+          <PenLine size={14} /> Draw path
+        </button>
       </div>
       <div className={styles.list}>
         {filtered.length === 0 && <div className={styles.empty}>No segments found.</div>}

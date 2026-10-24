@@ -354,16 +354,6 @@
   pointer-events: none;
 }
 
-.wpCoordInput {
-  background: rgba(241, 245, 249, 0.8);
-  border: 1px solid #e2e8f0;
-  border-radius: var(--r-lg);
-  color: #334155;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 11px 17px 11px 41px;
-  width: 100%;
-}
 .wpCopyBtn {
   display: flex;
   align-items: center;
@@ -983,4 +973,21 @@
   border: 1.5px solid #e2e8f0;
   background: #f1f5f9;
   color: #94a3b8;
+}
+
+/* Editable coordinates: DM Mono like the read-only field it replaces. */
+.wpCoordField {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding-left: 41px;
+}
+.wpCoordActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wpCoordWarn {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--v2-error-text);
 }
