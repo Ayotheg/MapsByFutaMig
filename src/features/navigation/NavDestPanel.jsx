@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bike, Car, Footprints, Info, MapPin, Navigation, X } from 'lucide-react';
+import { Bike, BusFront, Car, CarFront, CarTaxiFront, Footprints, Info, MapPin, Navigation, X } from 'lucide-react';
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import { dotColor } from '../search/chipConfig';
 import styles from './NavDestPanel.module.css';
@@ -16,12 +16,25 @@ import { arrivalTime, fmtDuration, fmtRouteDistance } from './routeSummary';
  * agrees with Explore about what's featured.
  */
 
-// Bike is keke/okada (bike routing); Ride is a car or cab (car routing).
-const TRAVEL_OPTIONS = [
-  { mode: 'walk', label: 'Walk', Icon: Footprints, start: 'Start walking', by: 'walking' },
-  { mode: 'bike', label: 'Bike', Icon: Bike, start: 'Start riding', by: 'by bike' },
-  { mode: 'car', label: 'Ride', Icon: Car, start: 'Start ride', by: 'by car' },
+// The tabs; Ride opens RIDE_OPTIONS (NavigationController maps each mode
+// to a routing server and remembers the last Ride option).
+const TRAVEL_TABS = [
+  { tab: 'walk', label: 'Walk', Icon: Footprints },
+  { tab: 'bike', label: 'Bike', Icon: Bike },
+  { tab: 'ride', label: 'Ride', Icon: Car },
 ];
+const RIDE_OPTIONS = [
+  { mode: 'shuttle', label: 'Shuttle', Icon: BusFront },
+  { mode: 'keke', label: 'Keke', Icon: CarFront },
+  { mode: 'car', label: 'Car / Cab', Icon: CarTaxiFront },
+];
+const MODE_TEXT = {
+  walk: { start: 'Start walking', by: 'walking' },
+  bike: { start: 'Start riding', by: 'by bike' },
+  shuttle: { start: 'Start ride', by: 'by shuttle' },
+  keke: { start: 'Start ride', by: 'by keke' },
+  car: { start: 'Start ride', by: 'by car' },
+};
 
 // Bug fix (reported directly): on mobile the on-screen keyboard covered the
 // "Where to?" field. Browsers now overlay the keyboard on the page instead
@@ -57,7 +70,8 @@ function useKeyboardInset() {
  * NavigationController), so Start begins straight away.
  *
  * `preview`: null (nothing to show), { loading: true }, or { distance,
- * duration } in metres / seconds. `busyLabel` replaces the Start label
+ * duration, stop } in metres / seconds; `stop` is the shuttle stop to get
+ * off at in Shuttle mode (no time then: waiting and stops aren't known). `busyLabel` replaces the Start label
  * while it's getting a location or route. `onClearDest` empties the field.
  */
 export default function NavDestPanel({
@@ -81,7 +95,8 @@ export default function NavDestPanel({
   preview,
 }) {
   const kb = useKeyboardInset();
-  const option = TRAVEL_OPTIONS.find((o) => o.mode === travelMode) || TRAVEL_OPTIONS[0];
+  const text = MODE_TEXT[travelMode] || MODE_TEXT.walk;
+  const tab = travelMode === 'walk' || travelMode === 'bike' ? travelMode : 'ride';
   return (
     <div
       className={styles.panel}
@@ -154,20 +169,38 @@ export default function NavDestPanel({
         </div>
 
         <div className={styles.modePicker} role="radiogroup" aria-label="How are you travelling?">
-          {TRAVEL_OPTIONS.map(({ mode, label, Icon }) => (
+          {TRAVEL_TABS.map(({ tab: t, label, Icon }) => (
             <button
-              key={mode}
+              key={t}
               type="button"
               role="radio"
-              aria-checked={travelMode === mode}
-              className={`${styles.modeOption} ${travelMode === mode ? styles.modeOptionActive : ''}`}
-              onClick={() => onTravelModeChange(mode)}
+              aria-checked={tab === t}
+              className={`${styles.modeOption} ${tab === t ? styles.modeOptionActive : ''}`}
+              onClick={() => tab !== t && onTravelModeChange(t)}
             >
               <Icon size={15} />
               {label}
             </button>
           ))}
         </div>
+
+        {tab === 'ride' && (
+          <div className={styles.rideOptions} role="radiogroup" aria-label="What are you riding?">
+            {RIDE_OPTIONS.map(({ mode, label, Icon }) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={travelMode === mode}
+                className={`${styles.rideOption} ${travelMode === mode ? styles.rideOptionActive : ''}`}
+                onClick={() => onTravelModeChange(mode)}
+              >
+                <Icon size={15} />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {!!hint && (
           <div className={styles.hintCard}>
@@ -182,12 +215,23 @@ export default function NavDestPanel({
           <div className={styles.summary} aria-live="polite">
             {preview.loading ? (
               <span className={styles.summaryLoading}>Finding the quickest way…</span>
+            ) : travelMode === 'shuttle' ? (
+              <>
+                <div className={styles.summaryStopWrap}>
+                  <div className={styles.summaryMeta}>{preview.stop ? 'Get off at' : 'Shuttle'}</div>
+                  <div className={styles.summaryStop}>{preview.stop || 'No shuttle stop near this place'}</div>
+                </div>
+                <div className={styles.summaryArrive}>
+                  <div className={styles.summaryMeta}>Distance</div>
+                  <div className={styles.summaryClock}>{fmtRouteDistance(preview.distance)}</div>
+                </div>
+              </>
             ) : (
               <>
                 <div>
                   <div className={styles.summaryTime}>{fmtDuration(preview.duration)}</div>
                   <div className={styles.summaryMeta}>
-                    {fmtRouteDistance(preview.distance)} · {option.by}
+                    {fmtRouteDistance(preview.distance)} · {text.by}
                   </div>
                 </div>
                 <div className={styles.summaryArrive}>
@@ -229,7 +273,7 @@ export default function NavDestPanel({
       <div className={styles.footer}>
         <button type="button" className={styles.goBtn} disabled={goDisabled || !hasDest} onClick={onGo}>
           <Navigation size={16} />
-          {busyLabel || (hasDest ? option.start : 'Pick a destination')}
+          {busyLabel || (hasDest ? text.start : 'Pick a destination')}
         </button>
       </div>
     </div>

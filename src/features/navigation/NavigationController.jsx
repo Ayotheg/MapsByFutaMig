@@ -36,9 +36,19 @@ const RESUME_MAX_WAIT_MS = 15000;
 // The old shortcut-learning trace; cleared so it doesn't linger in storage.
 const TRACE_KEY = 'navigation-trace';
 const previewKey = (dest, mode) => `${dest.lat},${dest.lng}|${mode}`;
-// Travel mode → OSRM profile (osrmRoute.js).
-// Bike is keke/okada, Ride is a car or cab.
-const TRAVEL_MODES = { walk: 'foot-walking', bike: 'cycling-regular', car: 'driving-car' };
+// Travel mode → OSRM profile (osrmRoute.js). Bike is okada/bicycle; Ride
+// is one of RIDE_MODES. A keke fits the streets an okada does. The
+// shuttle keeps to its own roads: the car route is only a guide until
+// they get off, then it's walking (see handleGpsFix).
+const TRAVEL_MODES = {
+  walk: 'foot-walking',
+  bike: 'cycling-regular',
+  shuttle: 'driving-car',
+  keke: 'cycling-regular',
+  car: 'driving-car',
+};
+const RIDE_MODES = ['shuttle', 'keke', 'car'];
+const RIDE_MODE_KEY = 'nav-ride-mode'; // last Ride option, so Ride is one tap
 // A route planned in the background (NavDestPanel's summary card) is used
 // on Start if it's this recent and they haven't moved this far.
 const PREVIEW_MAX_AGE_MS = 3 * 60 * 1000;
@@ -270,20 +280,29 @@ const NavigationController = forwardRef(function NavigationController(
   const navDestRef = useRef(persistedNavigation?.dest || persistedDestination || null); // {lat,lng,name,id,type}
   // The same destination as state, for the panel and the route preview.
   const [navDest, setNavDestState] = useState(navDestRef.current);
-  // 'walk' | 'bike' | 'car' (TRAVEL_MODES), and the OSRM profile in use
-  // for it. Walk becomes 'cycling-regular' while riding; a restored trip
-  // starts on foot and the ride detector switches it back.
+  // A TRAVEL_MODES key, and the OSRM profile in use for it. Walk becomes
+  // 'cycling-regular' while riding; a restored trip starts in the mode's
+  // own profile and the ride detector switches it from there.
   const [travelMode, setTravelMode] = useState(() => {
     const saved = readPersistentState(TRAVEL_MODE_KEY, 'walk');
     return Object.hasOwn(TRAVEL_MODES, saved) ? saved : 'walk';
   });
   const travelModeRef = useRef(travelMode);
   const navModeRef = useRef(TRAVEL_MODES[travelMode]);
-  const chooseTravelMode = useCallback((mode) => {
+  // 'ride' (the Ride tab) means the last Ride option, Shuttle at first.
+  const chooseTravelMode = useCallback((choice) => {
+    let mode = choice;
+    if (choice === 'ride') {
+      const last = readPersistentState(RIDE_MODE_KEY, 'shuttle');
+      mode = RIDE_MODES.includes(last) ? last : 'shuttle';
+    }
+    if (RIDE_MODES.includes(mode)) writePersistentState(RIDE_MODE_KEY, mode);
     travelModeRef.current = mode;
     setTravelMode(mode);
     writePersistentState(TRAVEL_MODE_KEY, mode);
   }, []);
+  // Shuttle mode: set once they've ridden and got off, for walking routes.
+  const shuttleDoneRef = useRef(false);
   const navRouteDataRef = useRef(persistedNavigation?.routeData || null);
   const navStepIndexRef = useRef(persistedNavigation?.stepIndex || 0);
   const navUserPosRef = useRef(persistedNavigation?.userPos || null);
@@ -673,6 +692,11 @@ const NavigationController = forwardRef(function NavigationController(
   const maybeReroute = useCallback(
     (lat, lng, offRouteMeters) => {
       if (!navDestRef.current || rerouteInFlightRef.current) return;
+      // On the shuttle, its road is the way: re-plan once they're off.
+      if (travelModeRef.current === 'shuttle' && rideRef.current.riding) {
+        offRouteTicksRef.current = 0;
+        return;
+      }
 
       // Someone on a known path that leads towards the destination is
       // taking a shortcut, not getting lost.
@@ -890,7 +914,8 @@ const NavigationController = forwardRef(function NavigationController(
     // Riding (shuttle, keke or car: speed can't tell) near the recorded
     // shuttle stop closest to the destination: tell shuttle riders where
     // to get off. Not riding, or no such stop: nothing changes.
-    const alight = rideRef.current.riding && travelModeRef.current !== 'car' ? alightStop(dest, userPos, candidatesRef.current) : null;
+    const travel = travelModeRef.current;
+    const alight = rideRef.current.riding && (travel === 'walk' || travel === 'shuttle') ? alightStop(dest, userPos, candidatesRef.current) : null;
     const prompt = alight && alightPrompt(alight.toUser, alight.place.name);
     if (prompt) {
       nextHud.turnIcon = 'bus-front-fill';
@@ -938,13 +963,20 @@ const NavigationController = forwardRef(function NavigationController(
 
       updateNavUserDot(latitude, longitude);
       updateHUD();
-      // Walk mode only: bike routing while riding (keke, okada, cab,
-      // shuttle) — still the short streets, but no footpaths or steps a
-      // vehicle can't use. On getting off, fresh walking directions from
-      // where they're standing, which start with the landmark /
-      // which-way-to-turn instructions. Bike and Ride keep theirs.
+      // Walk: bike routing while riding (keke, okada, cab, shuttle) —
+      // still the short streets, but no footpaths or steps a vehicle can't
+      // use. Shuttle: walking once they've got off. Either way, getting
+      // off gives fresh walking directions from where they're standing,
+      // which start with the landmark / which-way-to-turn instructions.
+      // The other modes keep theirs.
       const travel = travelModeRef.current;
-      const mode = travel === 'walk' && ride.riding ? 'cycling-regular' : TRAVEL_MODES[travel];
+      if (travel === 'shuttle' && ride.alighted) shuttleDoneRef.current = true;
+      const mode =
+        travel === 'walk' && ride.riding
+          ? 'cycling-regular'
+          : travel === 'shuttle' && shuttleDoneRef.current
+            ? 'foot-walking'
+            : TRAVEL_MODES[travel];
       if (mode !== navModeRef.current) {
         navModeRef.current = mode;
         rerouteFrom(latitude, longitude);
@@ -1135,6 +1167,7 @@ const NavigationController = forwardRef(function NavigationController(
 
       // The mode picked in NavDestPanel; Walk turns to bike once riding.
       rideRef.current = createRideDetector();
+      shuttleDoneRef.current = false;
       navModeRef.current = TRAVEL_MODES[travelModeRef.current];
       // Already planned in the background from (nearly) here: use it.
       const planned = previewRef.current;
@@ -1223,6 +1256,7 @@ const NavigationController = forwardRef(function NavigationController(
     navGpsUnsubRef.current = null;
     rideRef.current = createRideDetector();
     navModeRef.current = TRAVEL_MODES[travelModeRef.current];
+    shuttleDoneRef.current = false;
     alightSpokenRef.current = '';
 
     clearRouteLayers();
@@ -1327,7 +1361,9 @@ const NavigationController = forwardRef(function NavigationController(
 
   // ── Route preview: planned as soon as there's a destination, so the
   // panel can show time and arrival and Start can begin straight away. ──
-  const [preview, setPreview] = useState(null); // null | { loading } | { distance, duration }
+  // null | { loading } | { distance, duration, stop }; `stop` is the
+  // shuttle stop to get off at (Shuttle mode), or null if none is near.
+  const [preview, setPreview] = useState(null);
   const previewRef = useRef(null); // { key, from, at, routeData }
   useEffect(() => {
     if (!destPanelOpen || !navDest) {
@@ -1344,9 +1380,11 @@ const NavigationController = forwardRef(function NavigationController(
     }
     const mode = TRAVEL_MODES[travelMode];
     const key = previewKey(navDest, mode);
+    const stop = travelMode === 'shuttle' ? alightStop(navDest, from, candidatesRef.current)?.place.name || null : null;
+    const summary = (routeData) => ({ distance: routeData.distance, duration: routeData.duration, stop });
     const planned = previewRef.current;
     if (planned?.key === key && Date.now() - planned.at < PREVIEW_MAX_AGE_MS && haversine(from.lat, from.lng, planned.from.lat, planned.from.lng) < PREVIEW_MAX_MOVE_M) {
-      setPreview({ distance: planned.routeData.distance, duration: planned.routeData.duration });
+      setPreview(summary(planned.routeData));
       return undefined;
     }
     let cancelled = false;
@@ -1355,7 +1393,7 @@ const NavigationController = forwardRef(function NavigationController(
       .then((routeData) => {
         if (cancelled) return;
         previewRef.current = { key, from, at: Date.now(), routeData };
-        setPreview({ distance: routeData.distance, duration: routeData.duration });
+        setPreview(summary(routeData));
       })
       .catch(() => {
         if (!cancelled) setPreview(null);
