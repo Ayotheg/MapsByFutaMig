@@ -63,21 +63,45 @@ Deno.serve(async (req) => {
   if (event.entry_type !== 'ticketed') {
     return json({ error: 'Free events have nothing to pay.' }, 409);
   }
-  if (event.payment_status !== 'unpaid' || event.status !== 'awaiting_payment') {
-    return json({ error: `This event is already ${event.payment_status}.` }, 409);
+  // "Try payment again" on /event/callback reuses the saved event after a
+  // cancelled (still 'unpaid'), failed or expired checkout. Paid events and
+  // anything already in review can't be charged twice.
+  const RETRYABLE = ['unpaid', 'failed', 'expired'];
+  if (event.status !== 'awaiting_payment' || !RETRYABLE.includes(event.payment_status)) {
+    return json(
+      {
+        error:
+          event.payment_status === 'paid'
+            ? 'This event is already paid for.'
+            : `This event can't be paid for in its current state (${event.status}).`,
+      },
+      409
+    );
   }
 
-  // Never trust the client-inserted fee.
+  // Never trust the client-inserted fee. A failed/expired row goes back to
+  // 'unpaid' for the new checkout (the webhook only moves 'unpaid' rows to
+  // failed/expired, and still accepts a late success on any of them).
   const amount = EVENT_LISTING_FEE;
   const currency = event.currency || 'NGN';
-  if (Number(event.listing_fee) !== amount) {
-    const { error: amountError } = await adminClient.from('events').update({ listing_fee: amount }).eq('id', event.id);
-    if (amountError) return json({ error: amountError.message }, 500);
+  const reset = {};
+  if (Number(event.listing_fee) !== amount) reset.listing_fee = amount;
+  if (event.payment_status !== 'unpaid') reset.payment_status = 'unpaid';
+  if (Object.keys(reset).length) {
+    const { error: resetError } = await adminClient
+      .from('events')
+      .update(reset)
+      .eq('id', event.id)
+      .eq('status', 'awaiting_payment')
+      .in('payment_status', RETRYABLE);
+    if (resetError) return json({ error: resetError.message }, 500);
   }
 
+  // Every way back from BACHS lands on the event's status page, which reads
+  // the row: success, cancelled (with "Try payment again"), failed, expired.
   const siteUrl = Deno.env.get('SITE_URL') || req.headers.get('Origin') || '';
   const successUrl = `${siteUrl}/event/callback?event=${event.id}`;
-  const cancelUrl = `${siteUrl}/event?cancelled=1`;
+  const cancelUrl = `${siteUrl}/event/callback?event=${event.id}&cancelled=1`;
 
   let checkout;
   try {

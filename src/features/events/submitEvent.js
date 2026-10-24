@@ -122,6 +122,16 @@ export async function submitEvent({
 
   if (!ticketed) return { eventId, checkoutUrl: null };
 
+  const checkoutUrl = await startEventCheckout(eventId);
+  return { eventId, checkoutUrl };
+}
+
+/**
+ * Opens a BACHS checkout for an already-saved ticketed event: the first time
+ * from submitEvent, and again from /event/callback after a cancelled, failed
+ * or expired payment ("Try payment again") so the person doesn't re-list it.
+ */
+export async function startEventCheckout(eventId) {
   const { data, error: fnError } = await supabase.functions.invoke('create-event-checkout', { body: { eventId } });
   if (fnError) {
     let serverMessage = null;
@@ -135,7 +145,7 @@ export async function submitEvent({
   if (!data?.checkoutUrl) throw new Error('Payment could not be started (no checkout URL returned). Try again.');
 
   track('event_checkout_started', {});
-  return { eventId, checkoutUrl: data.checkoutUrl };
+  return data.checkoutUrl;
 }
 
 function friendlyInsertError(error) {

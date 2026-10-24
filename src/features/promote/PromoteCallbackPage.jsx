@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, SearchX, XCircle } from 'lucide-react';
 import { useSeo } from '../../lib/useSeo';
 import { fetchPromotionStatus } from './submitPromotion';
-import { fetchEventStatus } from '../events/submitEvent';
+import { fetchEventStatus, startEventCheckout } from '../events/submitEvent';
 import styles from './PromoteCallbackPage.module.css';
 
 // Also serves /event/callback (kind="event"): same polling, the `events`
 // row instead of `promotions`. A free event lands here straight after
 // submitting, with payment_status 'not_required' — nothing to wait for.
+// Every way out of an event's BACHS checkout lands here too: success_url,
+// and cancel_url with ?cancelled=1 (create-event-checkout). Cancelled,
+// failed and expired payments get "Try payment again" for the same saved
+// event, so nobody has to fill the form in twice.
 const KINDS = {
   promotion: { param: 'promotion', fetch: fetchPromotionStatus, name: (r) => r.business_name },
   event: { param: 'event', fetch: fetchEventStatus, name: (r) => r.title },
@@ -44,9 +48,17 @@ export default function PromoteCallbackPage({ kind = 'promotion' }) {
   const [searchParams] = useSearchParams();
   const promotionId = searchParams.get(cfg.param);
 
+  const isEvent = kind === 'event';
+  // BACHS's cancel_url for events. Checked against the row, not trusted:
+  // a cancelled page that the webhook has since marked paid shows success.
+  const wasCancelled = isEvent && searchParams.get('cancelled') === '1';
+
   const [promotion, setPromotion] = useState(null);
+  const [notFound, setNotFound] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState(null);
   // Bumped by "Check again" to restart the poll loop from scratch.
   const [attempt, setAttempt] = useState(0);
   const error = promotionId ? null : 'Missing promotion reference — nothing to confirm.';
@@ -67,10 +79,19 @@ export default function PromoteCallbackPage({ kind = 'promotion' }) {
         const row = await cfg.fetch(promotionId);
         if (cancelled) return;
         setOffline(false);
+        // An event that doesn't come back (wrong account, or deleted) won't
+        // appear by waiting — say so instead of spinning for a minute.
+        if (isEvent && !row) {
+          setNotFound(true);
+          return;
+        }
         setPromotion(row);
-        if (['paid', 'failed', 'not_required'].includes(row?.payment_status)) {
+        const terminal = isEvent ? ['paid', 'failed', 'expired', 'not_required'] : ['paid', 'failed', 'not_required'];
+        if (terminal.includes(row?.payment_status)) {
           return; // terminal state — stop polling
         }
+        // Back from cancelling: nothing is in flight, so there's nothing to wait for.
+        if (wasCancelled && row?.payment_status === 'unpaid') return;
       } catch {
         if (cancelled) return;
         setOffline(true);
@@ -94,15 +115,31 @@ export default function PromoteCallbackPage({ kind = 'promotion' }) {
       clearTimeout(timer);
       window.removeEventListener('online', onOnline);
     };
-  }, [promotionId, attempt, cfg]);
+  }, [promotionId, attempt, cfg, isEvent, wasCancelled]);
 
   function checkAgain() {
     setTimedOut(false);
     setAttempt((n) => n + 1);
   }
 
-  const settled = ['paid', 'failed', 'not_required'].includes(promotion?.payment_status);
-  const isEvent = kind === 'event';
+  async function retryPayment() {
+    if (retrying) return;
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      // Left spinning on purpose: the browser is about to leave for BACHS.
+      window.location.href = await startEventCheckout(promotionId);
+    } catch (e) {
+      setRetryError(e.message || 'Could not start payment. Try again in a moment.');
+      setRetrying(false);
+    }
+  }
+
+  const status = promotion?.payment_status;
+  const settled = ['paid', 'failed', 'not_required'].includes(status);
+  const eventCancelled = wasCancelled && status === 'unpaid';
+  // Ticketed events that still need paying, and can be paid without re-listing.
+  const canRetry = isEvent && (eventCancelled || status === 'failed' || status === 'expired');
 
   let body;
   if (error) {
@@ -129,14 +166,53 @@ export default function PromoteCallbackPage({ kind = 'promotion' }) {
         </p>
       </>
     );
-  } else if (promotion?.payment_status === 'failed') {
+  } else if (notFound) {
+    body = (
+      <>
+        <SearchX size={40} strokeWidth={2} className={styles.iconStill} />
+        <h1 className={styles.title}>We couldn't find this event</h1>
+        <p className={styles.subtitle}>
+          Sign in with the account you used to list it. If you paid, the payment is still recorded
+          against your event.
+        </p>
+      </>
+    );
+  } else if (eventCancelled) {
+    body = (
+      <>
+        <XCircle size={40} strokeWidth={2} className={styles.iconStill} />
+        <h1 className={styles.title}>Payment cancelled</h1>
+        <p className={styles.subtitle}>
+          Nothing was charged. <strong>{cfg.name(promotion)}</strong> is saved — pay the listing fee
+          whenever you're ready and it goes straight to review.
+        </p>
+      </>
+    );
+  } else if (isEvent && status === 'expired') {
+    body = (
+      <>
+        <Clock size={40} strokeWidth={2} className={styles.iconStill} />
+        <h1 className={styles.title}>Checkout timed out</h1>
+        <p className={styles.subtitle}>
+          The payment page expired before payment finished. Nothing was charged, and{' '}
+          <strong>{cfg.name(promotion)}</strong> is still saved.
+        </p>
+      </>
+    );
+  } else if (status === 'failed') {
     body = (
       <>
         <XCircle size={40} strokeWidth={2} className={styles.iconError} />
         <h1 className={styles.title}>Payment didn't go through</h1>
         <p className={styles.subtitle}>
-          BACHS reported this payment as failed. No charge should have been made — head back and
-          try again.
+          {isEvent ? (
+            <>
+              BACHS reported this payment as failed. No charge should have been made, and{' '}
+              <strong>{cfg.name(promotion)}</strong> is still saved.
+            </>
+          ) : (
+            'BACHS reported this payment as failed. No charge should have been made — head back and try again.'
+          )}
         </p>
       </>
     );
@@ -170,12 +246,31 @@ export default function PromoteCallbackPage({ kind = 'promotion' }) {
     <div className={styles.page}>
       <div className={styles.card}>
         {body}
-        {timedOut && !settled && (
+        {retryError && (
+          <p className={styles.retryError} role="alert">
+            {retryError}
+          </p>
+        )}
+        {canRetry && (
+          <button type="button" className={styles.homeBtn} onClick={retryPayment} disabled={retrying} aria-busy={retrying}>
+            {retrying ? 'Opening payment…' : 'Try payment again'}
+          </button>
+        )}
+        {timedOut && !settled && !canRetry && !notFound && (
           <button type="button" className={styles.secondaryBtn} onClick={checkAgain}>
             Check again
           </button>
         )}
-        <button type="button" className={styles.homeBtn} onClick={() => navigate('/map')}>
+        {notFound && (
+          <button type="button" className={styles.secondaryBtn} onClick={() => navigate('/event')}>
+            List an event
+          </button>
+        )}
+        <button
+          type="button"
+          className={canRetry ? styles.secondaryBtn : styles.homeBtn}
+          onClick={() => navigate('/map')}
+        >
           Back to the map
         </button>
       </div>

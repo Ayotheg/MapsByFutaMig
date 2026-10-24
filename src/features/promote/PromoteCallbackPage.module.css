@@ -74,3 +74,19 @@
   cursor: pointer;
 }
 .secondaryBtn + .homeBtn { margin-top: 0; }
+.homeBtn + .secondaryBtn { margin-top: 0; }
+.homeBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* "Try payment again" couldn't open BACHS. */
+.retryError {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--v2-error-tint);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--v2-error-text);
+}
