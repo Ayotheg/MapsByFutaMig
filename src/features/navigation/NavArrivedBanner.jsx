@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { PartyPopper, Heart, Check, Footprints } from 'lucide-react';
+import { PartyPopper, Heart, Check } from 'lucide-react';
 import styles from './NavArrivedBanner.module.css';
 
 // Same campaign link used on the landing page's donate CTA
@@ -39,22 +39,11 @@ const CROWDR_CAMPAIGN_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
  * `target="_blank"` + `rel="noopener noreferrer"` — opens the campaign
  * page, doesn't touch `onDismiss` or any existing handler.
  */
-/*
- * `shortcut` (optional): the user took a shorter way than the route.
- *   { state: 'ask' } → ask whether to share it (onShortcutAnswer('share' | 'skip'));
- *   { state: 'shared' } → thank them, with a way to stop automatic sharing
- *     (onShortcutAnswer('stop'));
- *   { state: 'stopped' } → confirm sharing is off.
- * Each also has `saved` (metres). The banner doesn't auto-close while
- * there's a choice on it.
- */
-export default function NavArrivedBanner({ destName, onDismiss, shortcut, onShortcutAnswer }) {
-  const hasChoice = shortcut?.state === 'ask' || shortcut?.state === 'shared';
+export default function NavArrivedBanner({ destName, onDismiss }) {
   useEffect(() => {
-    if (hasChoice) return undefined;
     const t = setTimeout(onDismiss, 8000);
     return () => clearTimeout(t);
-  }, [onDismiss, hasChoice]);
+  }, [onDismiss]);
 
   return (
     <div className={styles.overlay}>
@@ -65,44 +54,6 @@ export default function NavArrivedBanner({ destName, onDismiss, shortcut, onShor
 
         <h2 className={styles.heading}>You&apos;ve Arrived!</h2>
         <p className={styles.subtitle}>{destName}</p>
-
-        {shortcut && (
-          <div className={styles.shortcutBox}>
-            <p className={styles.shortcutTitle}>
-              <Footprints size={16} />
-              You found a shorter way{shortcut.saved >= 10 ? ` (about ${Math.round(shortcut.saved / 10) * 10} m shorter)` : ''}
-            </p>
-            {shortcut.state === 'ask' && (
-              <>
-                <p className={styles.shortcutText}>
-                  Share it so the app can guide other students this way too? Only the shorter stretch is shared, never
-                  where you started or ended.
-                </p>
-                <div className={styles.shortcutActions}>
-                  <button type="button" className={styles.shareBtn} onClick={() => onShortcutAnswer('share')}>
-                    Share it
-                  </button>
-                  <button type="button" className={styles.skipBtn} onClick={() => onShortcutAnswer('skip')}>
-                    No thanks
-                  </button>
-                </div>
-              </>
-            )}
-            {shortcut.state === 'shared' && (
-              <>
-                <p className={styles.shortcutText}>Shared. Thanks for helping other students!</p>
-                <div className={styles.shortcutActions}>
-                  <button type="button" className={styles.skipBtn} onClick={() => onShortcutAnswer('stop')}>
-                    Stop sharing automatically
-                  </button>
-                </div>
-              </>
-            )}
-            {shortcut.state === 'stopped' && (
-              <p className={styles.shortcutText}>Automatic sharing is off. We&apos;ll ask you next time.</p>
-            )}
-          </div>
-        )}
 
         <div className={styles.supportRow}>
           <div className={styles.divider} />

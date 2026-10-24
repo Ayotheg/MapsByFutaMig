@@ -2,7 +2,7 @@ import { haversine, routePosition, simplifyPath } from '../../lib/geoUtils.js';
 import { bearingBetween, cumulativeDistances } from './routeAhead.js';
 import { stepInstruction, turnAngle } from './turnHelpers.js';
 
-// Approved walking paths (admin-recorded segments for now) that OSRM's
+// Approved walking paths (admin-imported segments) that OSRM's
 // OpenStreetMap data doesn't know about. fetchRoute tries routing through
 // the most promising ones and keeps whichever route is shortest.
 
@@ -11,7 +11,7 @@ import { stepInstruction, turnAngle } from './turnHelpers.js';
 const ROUTABLE_CATEGORIES = new Set(['footpath', 'shortcut']);
 
 export const MAX_ENTRY_M = 150; // how far a path's end may be from the route
-export const MIN_SAVING_M = 50; // same rule as learning one (shortcutDetect.js)
+export const MIN_SAVING_M = 50; // about 40 s of walking: worth the detour
 export const MAX_SHORTCUTS = 2; // each one costs two more OSRM requests
 export const ON_PATH_M = 25;
 // OSRM snaps each leg to the nearest road; if that's further than this
@@ -152,8 +152,10 @@ export function stitchRoute(legA, shortcut, legB, secondsPerMetre) {
     }
     heading = next;
   }
+  // The first turn names the path ("Turn right onto Behind SOC
+  // shortcut"), so it's clear which way off the road is meant.
   const pathSteps = turns.map(({ i, modifier }, k) =>
-    turnStep(pts[i], modifier, (k + 1 < turns.length ? cum[turns[k + 1].i] : pathLength) - cum[i], secondsPerMetre)
+    turnStep(pts[i], modifier, (k + 1 < turns.length ? cum[turns[k + 1].i] : pathLength) - cum[i], secondsPerMetre, k === 0 ? shortcut.name : '')
   );
 
   // Leaving the path: legB's "depart" would announce a fresh start
