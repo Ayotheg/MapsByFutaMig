@@ -3,7 +3,7 @@ import { Bike, BusFront, Car, CarFront, CarTaxiFront, Footprints, Info, MapPin, 
 import { LEGACY_ICON_MAP } from '../../lib/legacyIconMap';
 import { dotColor } from '../search/chipConfig';
 import styles from './NavDestPanel.module.css';
-import { arrivalTime, fmtDuration, fmtRouteDistance } from './routeSummary';
+import { fmtRouteDistance } from './routeSummary';
 
 /**
  * Ported from legacy `index.html` ~634–671 (`#navDestPanel`). Desktop:
@@ -29,11 +29,11 @@ const RIDE_OPTIONS = [
   { mode: 'car', label: 'Car / Cab', Icon: CarTaxiFront },
 ];
 const MODE_TEXT = {
-  walk: { start: 'Start walking', by: 'walking' },
-  bike: { start: 'Start riding', by: 'by bike' },
-  shuttle: { start: 'Start ride', by: 'by shuttle' },
-  keke: { start: 'Start ride', by: 'by keke' },
-  car: { start: 'Start ride', by: 'by car' },
+  walk: { start: 'Start walking', route: 'Walking route' },
+  bike: { start: 'Start riding', route: 'Bike route' },
+  shuttle: { start: 'Start ride', route: 'Shuttle' },
+  keke: { start: 'Start ride', route: 'Keke route' },
+  car: { start: 'Start ride', route: 'Car route' },
 };
 
 // Bug fix (reported directly): on mobile the on-screen keyboard covered the
@@ -65,16 +65,15 @@ function useKeyboardInset() {
 /*
  * "Directions" (designer's mobile screens, Oct 2026): your location → where
  * to, travel mode, then either "Popular on campus" (no destination yet) or
- * the route summary card (time, distance, arrival). The route is planned in
+ * the route summary card (distance, or the stop for Shuttle). The route is planned in
  * the background as soon as a destination is picked (`preview`, from
  * NavigationController), so Start begins straight away.
  *
  * `preview`: null (nothing to show), { loading: true }, or { distance,
- * duration, stop } in metres / seconds; `stop` is the shuttle stop to get
- * off at in Shuttle mode (no time then: waiting and stops aren't known).
- * `tabTimes`: { walk, bike, ride } seconds, filled in as each route is
- * planned (Ride is the car route), shown under each tab's name. `busyLabel` replaces the Start label
- * while it's getting a location or route. `onClearDest` empties the field.
+ * stop }: the route's length in metres and, in Shuttle mode, the stop to
+ * get off at. No times: the routing server's estimates don't fit here.
+ * `busyLabel` replaces the Start label while it's getting a location or
+ * route. `onClearDest` empties the field.
  */
 export default function NavDestPanel({
   destInputValue,
@@ -95,7 +94,6 @@ export default function NavDestPanel({
   hasDest,
   onClearDest,
   preview,
-  tabTimes = {},
 }) {
   const kb = useKeyboardInset();
   const text = MODE_TEXT[travelMode] || MODE_TEXT.walk;
@@ -181,11 +179,8 @@ export default function NavDestPanel({
               className={`${styles.modeOption} ${tab === t ? styles.modeOptionActive : ''}`}
               onClick={() => tab !== t && onTravelModeChange(t)}
             >
-              <span className={styles.modeName}>
-                <Icon size={15} />
-                {label}
-              </span>
-              {hasDest && tabTimes[t] != null && <span className={styles.modeTime}>{fmtDuration(tabTimes[t])}</span>}
+              <Icon size={15} />
+              {label}
             </button>
           ))}
         </div>
@@ -227,24 +222,16 @@ export default function NavDestPanel({
                   <div className={styles.summaryMeta}>{preview.stop ? 'Get off at' : 'Shuttle'}</div>
                   <div className={styles.summaryStop}>{preview.stop || 'No shuttle stop near this place'}</div>
                 </div>
-                <div className={styles.summaryArrive}>
+                <div className={styles.summaryRight}>
                   <div className={styles.summaryMeta}>Distance</div>
-                  <div className={styles.summaryClock}>{fmtRouteDistance(preview.distance)}</div>
+                  <div className={styles.summaryRightValue}>{fmtRouteDistance(preview.distance)}</div>
                 </div>
               </>
             ) : (
-              <>
-                <div>
-                  <div className={styles.summaryTime}>{fmtDuration(preview.duration)}</div>
-                  <div className={styles.summaryMeta}>
-                    {fmtRouteDistance(preview.distance)} · {text.by}
-                  </div>
-                </div>
-                <div className={styles.summaryArrive}>
-                  <div className={styles.summaryMeta}>Arrive</div>
-                  <div className={styles.summaryClock}>{arrivalTime(preview.duration)}</div>
-                </div>
-              </>
+              <div>
+                <div className={styles.summaryDistance}>{fmtRouteDistance(preview.distance)}</div>
+                <div className={styles.summaryMeta}>{text.route}</div>
+              </div>
             )}
           </div>
         )}

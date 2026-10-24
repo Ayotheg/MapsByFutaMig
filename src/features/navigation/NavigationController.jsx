@@ -42,8 +42,6 @@ function freshPlan(cache, key, from) {
   if (!p || Date.now() - p.at >= PREVIEW_MAX_AGE_MS) return null;
   return haversine(from.lat, from.lng, p.from.lat, p.from.lng) < PREVIEW_MAX_MOVE_M ? p.routeData : null;
 }
-// The three routes behind every option: the tabs show each one's time.
-const PREVIEW_PROFILES = ['foot-walking', 'cycling-regular', 'driving-car'];
 // Travel mode → OSRM profile (osrmRoute.js). Bike is okada/bicycle; Ride
 // is one of RIDE_MODES. A keke fits the streets an okada does. The
 // shuttle keeps to its own roads: the car route is only a guide until
@@ -1362,19 +1360,17 @@ const NavigationController = forwardRef(function NavigationController(
   );
 
   // ── Route preview: planned as soon as there's a destination, so the
-  // panel can show time and arrival and Start can begin straight away.
-  // The selected mode's route comes first; then the other two, one at a
-  // time, so each tab can show its time. All kept PREVIEW_MAX_AGE_MS, so
-  // switching tabs or pressing Start doesn't ask the server again. ──
-  // null | { loading } | { distance, duration, stop }; `stop` is the
-  // shuttle stop to get off at (Shuttle mode), or null if none is near.
+  // panel can show the distance and Start can begin straight away. Kept
+  // PREVIEW_MAX_AGE_MS per destination and mode, so switching back to a
+  // tab or pressing Start doesn't ask the server again. No times: the
+  // routing server's speeds aren't Nigerian roads or campus walking. ──
+  // null | { loading } | { distance, stop }; `stop` is the shuttle stop
+  // to get off at (Shuttle mode), or null if none is near.
   const [preview, setPreview] = useState(null);
-  const [profileTimes, setProfileTimes] = useState({}); // profile → seconds
   const previewCacheRef = useRef(new Map()); // previewKey → { from, at, routeData }
   useEffect(() => {
     if (!destPanelOpen || !navDest) {
       setPreview(null);
-      setProfileTimes({});
       return undefined;
     }
     const fix = gps.lastKnownPosRef.current;
@@ -1383,46 +1379,28 @@ const NavigationController = forwardRef(function NavigationController(
     // No location yet: no card. Start still works, it just plans then.
     if (!from) {
       setPreview(null);
-      setProfileTimes({});
       return undefined;
     }
     const cache = previewCacheRef.current;
-    // Times already planned stay on the tabs; the rest fill in below.
-    const known = {};
-    for (const profile of PREVIEW_PROFILES) {
-      const r = freshPlan(cache, previewKey(navDest, profile), from);
-      if (r) known[profile] = r.duration;
-    }
-    setProfileTimes(known);
-    const selected = TRAVEL_MODES[travelMode];
+    const profile = TRAVEL_MODES[travelMode];
+    const key = previewKey(navDest, profile);
     const stop = travelMode === 'shuttle' ? alightStop(navDest, from, candidatesRef.current)?.place.name || null : null;
-    const show = (profile, routeData) => {
-      setProfileTimes((t) => ({ ...t, [profile]: routeData.duration }));
-      if (profile === selected) setPreview({ distance: routeData.distance, duration: routeData.duration, stop });
-    };
-
+    const planned = freshPlan(cache, key, from);
+    if (planned) {
+      setPreview({ distance: planned.distance, stop });
+      return undefined;
+    }
     let cancelled = false;
-    if (!freshPlan(cache, previewKey(navDest, selected), from)) setPreview({ loading: true });
-    (async () => {
-      for (const profile of [selected, ...PREVIEW_PROFILES.filter((p) => p !== selected)]) {
-        const key = previewKey(navDest, profile);
-        let routeData = freshPlan(cache, key, from);
-        if (!routeData) {
-          try {
-            routeData = await fetchRoute(from.lat, from.lng, navDest.lat, navDest.lng, profile, shortcutPathsRef.current);
-          } catch {
-            // No card without the selected route; a missing tab time is fine.
-            if (!cancelled && profile === selected) setPreview(null);
-            if (profile === selected) return;
-            continue;
-          }
-          for (const [k, v] of cache) if (Date.now() - v.at >= PREVIEW_MAX_AGE_MS) cache.delete(k);
-          cache.set(key, { from, at: Date.now(), routeData });
-        }
-        if (cancelled) return;
-        show(profile, routeData);
-      }
-    })();
+    setPreview({ loading: true });
+    fetchRoute(from.lat, from.lng, navDest.lat, navDest.lng, profile, shortcutPathsRef.current)
+      .then((routeData) => {
+        for (const [k, v] of cache) if (Date.now() - v.at >= PREVIEW_MAX_AGE_MS) cache.delete(k);
+        cache.set(key, { from, at: Date.now(), routeData });
+        if (!cancelled) setPreview({ distance: routeData.distance, stop });
+      })
+      .catch(() => {
+        if (!cancelled) setPreview(null);
+      });
     return () => {
       cancelled = true;
     };
@@ -1528,7 +1506,6 @@ const NavigationController = forwardRef(function NavigationController(
           hasDest={!!navDest}
           onClearDest={clearNavDest}
           preview={preview}
-          tabTimes={{ walk: profileTimes['foot-walking'], bike: profileTimes['cycling-regular'], ride: profileTimes['driving-car'] }}
         />
       )}
       {navActive && (
