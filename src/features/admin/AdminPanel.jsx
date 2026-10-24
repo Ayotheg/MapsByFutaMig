@@ -154,7 +154,7 @@ export default function AdminPanel({
     <>
       <div
         className={styles.overlay}
-        style={pickingCoord || previewing ? { display: 'none' } : undefined}
+        style={pickingCoord ? { display: 'none' } : undefined}
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
