@@ -153,7 +153,9 @@ export function useOSMAnnotations(dedupIndex) {
       if (conflict) {
         deduped++;
         const key = `${conflict.source}:${conflict.id}`;
-        if (!snaps[key]) {
+        // An admin placed this pin by hand: keep it there, but still hide
+        // the OSM duplicate.
+        if (!snaps[key] && !conflict.pinLocked) {
           snaps[key] = { lat: item.lat, lng: item.lng };
           snapped++;
         }

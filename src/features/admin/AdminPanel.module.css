@@ -777,3 +777,79 @@
     font-size: 15px;
   }
 }
+
+/* ── Map modes (Move on map, Draw path): a bar over the map while the
+   panel is hidden. Same width rules on phones and desktop. ─────────── */
+.mapBar {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 3000;
+  width: min(520px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
+  box-shadow: 0 6px 18px -4px rgba(15, 23, 42, 0.2);
+  font-family: var(--font-ui);
+}
+.mapBarText {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--v2-text);
+}
+.mapBarText svg {
+  flex-shrink: 0;
+  color: var(--v2-primary);
+}
+.mapBarActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.mapBarActions .formCancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mapBarActions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mapBarForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mapBarForm > .fieldGroup {
+  flex: 1 1 160px;
+}
+.mapBarError {
+  margin: 0;
+  font-size: 11px;
+  color: var(--v2-error-text);
+}
+
+/* Leaflet markers for those modes (L.divIcon className). */
+.movePin {
+  border-radius: 50%;
+  background: var(--v2-primary);
+  border: 3px solid var(--v2-on-primary);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+  cursor: grab;
+}
+.drawVertex {
+  border-radius: 50%;
+  background: var(--v2-on-primary);
+  border: 3px solid var(--v2-secondary);
+  cursor: grab;
+}
