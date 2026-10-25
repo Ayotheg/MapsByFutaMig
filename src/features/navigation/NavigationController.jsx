@@ -5,7 +5,7 @@ import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
 import { fetchRoute } from './osrmRoute';
 import { isOnPathTowards, walkablePaths } from './shortcutRoute';
-import { alightPrompt, alightStop, createRideDetector } from './busStops';
+import { alightPrompt, alightStop, createRideDetector, routeProfile, speedBetween } from './busStops';
 import { turnIcon, fmtDist, startDirection, TURN_ICONS } from './turnHelpers';
 import { fmtDist as fmtDistAway } from '../search/chipConfig';
 import { createPlanCache } from './routePlans';
@@ -38,15 +38,14 @@ const END_NEAR_DEST_M = 50;
 const RESUME_MAX_WAIT_MS = 15000;
 // The old shortcut-learning trace; cleared so it doesn't linger in storage.
 const TRACE_KEY = 'navigation-trace';
-// Travel mode → OSRM profile (osrmRoute.js). Bike is okada/bicycle; Ride
-// is one of RIDE_MODES. A keke fits the streets an okada does. The
-// shuttle keeps to its own roads: the car route is only a guide until
-// they get off, then it's walking (see handleGpsFix).
+// Travel mode → OSRM profile at the start of a trip (osrmRoute.js). Ride
+// is one of RIDE_MODES, all on car routes. Speed switches it during the
+// trip (routeProfile).
 const TRAVEL_MODES = {
   walk: 'foot-walking',
   bike: 'cycling-regular',
   shuttle: 'driving-car',
-  keke: 'cycling-regular',
+  keke: 'driving-car',
   car: 'driving-car',
 };
 const RIDE_MODES = ['shuttle', 'keke', 'car'];
@@ -119,11 +118,12 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  * are routed through when shorter (shortcutRoute.js), and walking along
  * one never counts as going off route.
  *
- * Travel mode, picked in NavDestPanel and remembered per phone: Walk
- * (walking routes, switching to bike while moving at vehicle speed —
- * busStops.js's ride detector), Bike (keke/okada: bike routes) or Ride
- * (car routes). See osrmRoute.js. The route is planned as soon as a
- * destination is picked, and that same route is used on Start.
+ * Travel mode, picked in NavDestPanel and remembered per phone. Speed
+ * switches the route in the background (busStops.js's ride detector and
+ * routeProfile): the vehicle's routes while riding, walking routes once
+ * they get off. Bike keeps bike routes. See osrmRoute.js. The route is
+ * planned as soon as a destination is picked, and that same route is used
+ * on Start.
  */
 const NavigationController = forwardRef(function NavigationController(
   { map, gps, searchIndex, segments, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
@@ -202,9 +202,10 @@ const NavigationController = forwardRef(function NavigationController(
   const bearingTargetRef = useRef(0);
   const lastHeadingRef = useRef(null);
   const spokenStartRef = useRef(null);
-  // Riding? (busStops.js) Switches routing to bike and drives the shuttle
-  // "get off" prompt; alightSpokenRef is which prompt was last spoken.
-  const rideRef = useRef(createRideDetector());
+  // Riding? (busStops.js) Switches routing between the vehicle's and
+  // walking, and drives the shuttle "get off" prompt; alightSpokenRef is
+  // which prompt was last spoken.
+  const rideRef = useRef(createRideDetector({ riding: !!persistedNavigation?.riding }));
   const alightSpokenRef = useRef('');
   const [nearby, setNearby] = useState([]);
   const nearbySigRef = useRef('');
@@ -279,9 +280,8 @@ const NavigationController = forwardRef(function NavigationController(
   const navDestRef = useRef(persistedNavigation?.dest || persistedDestination || null); // {lat,lng,name,id,type}
   // The same destination as state, for the panel and the route preview.
   const [navDest, setNavDestState] = useState(navDestRef.current);
-  // A TRAVEL_MODES key, and the OSRM profile in use for it. Walk becomes
-  // 'cycling-regular' while riding; a restored trip starts in the mode's
-  // own profile and the ride detector switches it from there.
+  // A TRAVEL_MODES key, and the OSRM profile in use for it (routeProfile
+  // switches it with speed during a trip).
   const [travelMode, setTravelMode] = useState(() => {
     const saved = readPersistentState(TRAVEL_MODE_KEY, 'walk');
     return Object.prototype.hasOwnProperty.call(TRAVEL_MODES, saved) ? saved : 'walk';
@@ -303,9 +303,17 @@ const NavigationController = forwardRef(function NavigationController(
     setTravelMode(mode);
     writePersistentState(TRAVEL_MODE_KEY, mode);
   }, []);
-  // Shuttle mode: set once they've ridden and got off, for walking routes.
-  const shuttleDoneRef = useRef(!!persistedNavigation?.shuttleDone);
-  const navRouteDataRef = useRef(persistedNavigation?.routeData || null);
+  // Set once they've ridden and got off (routeProfile).
+  // Sessions saved by older versions call it `shuttleDone`.
+  const gotOffRef = useRef(!!(persistedNavigation?.gotOff ?? persistedNavigation?.shuttleDone));
+  // Last fix, for working out speed on phones that don't report it.
+  const prevFixRef = useRef(null);
+  // The route on screen, with the OSRM `profile` it was planned for.
+  const navRouteDataRef = useRef(
+    persistedNavigation?.routeData
+      ? { profile: persistedNavigation.mode, ...persistedNavigation.routeData }
+      : null
+  );
   const navStepIndexRef = useRef(persistedNavigation?.stepIndex || 0);
   const navUserPosRef = useRef(persistedNavigation?.userPos || null);
   // Unsubscribe fn for the shared watcher (gpsWatch.js) — navigation no
@@ -338,7 +346,8 @@ const NavigationController = forwardRef(function NavigationController(
       active: true,
       dest: navDestRef.current,
       mode: navModeRef.current,
-      shuttleDone: shuttleDoneRef.current,
+      gotOff: gotOffRef.current,
+      riding: rideRef.current.riding,
       routeData: navRouteDataRef.current,
       stepIndex: navStepIndexRef.current,
       userPos: navUserPosRef.current,
@@ -638,6 +647,7 @@ const NavigationController = forwardRef(function NavigationController(
   // filters most of these, but not all) can't trigger a spurious reroute.
   const OFF_ROUTE_TICKS_REQUIRED = 3;
   const MIN_REROUTE_INTERVAL_MS = 20000;
+  const MODE_SWITCH_MIN_MS = 10000;
 
   const rerouteInFlightRef = useRef(false);
   const lastRerouteAtRef = useRef(0);
@@ -672,7 +682,7 @@ const NavigationController = forwardRef(function NavigationController(
         .then((fresh) => {
           if (!navActiveRef.current || navDestRef.current !== dest) return; // nav ended/changed while fetching
           if (navModeRef.current !== mode) return; // replaced in finally
-          navRouteDataRef.current = fresh;
+          navRouteDataRef.current = { ...fresh, profile: mode };
           navStepIndexRef.current = 0;
           lastSpokenStepRef.current = -1;
           spokenTurnNowRef.current = false;
@@ -961,11 +971,16 @@ const NavigationController = forwardRef(function NavigationController(
 
       if (typeof accuracy === 'number' && accuracy > MAX_USEFUL_ACCURACY_M) return;
 
+      // Phones that don't report speed: worked out from the last fix. A
+      // late, older fix (the resume one) mustn't become the reference.
+      const fix = { lat: latitude, lng: longitude, accuracy, at: p.timestamp || Date.now() };
+      const moving = Number.isFinite(speed) ? speed : speedBetween(prevFixRef.current, fix);
+      if (!prevFixRef.current || fix.at > prevFixRef.current.at) prevFixRef.current = fix;
       // GPS heading is only meaningful while moving.
-      const walkingBearing = Number.isFinite(heading) && speed > 0.5 ? heading : null;
+      const walkingBearing = Number.isFinite(heading) && moving > 0.5 ? heading : null;
       navUserPosRef.current = { lat: latitude, lng: longitude, heading: walkingBearing };
       navGpsTicksRef.current++;
-      const ride = rideRef.current.update(speed);
+      const ride = rideRef.current.update(moving, fix.at);
 
       clearTimeout(navGpsStaleTimerRef.current);
       navGpsStaleTimerRef.current = setTimeout(() => {
@@ -974,22 +989,17 @@ const NavigationController = forwardRef(function NavigationController(
 
       updateNavUserDot(latitude, longitude);
       updateHUD();
-      // Walk: bike routing while riding (keke, okada, cab, shuttle) —
-      // still the short streets, but no footpaths or steps a vehicle can't
-      // use. Shuttle: walking once they've got off. Either way, getting
-      // off gives fresh walking directions from where they're standing,
-      // which start with the landmark / which-way-to-turn instructions.
-      // The other modes keep theirs.
-      const travel = travelModeRef.current;
-      if (travel === 'shuttle' && ride.alighted) shuttleDoneRef.current = true;
-      const mode =
-        travel === 'walk' && ride.riding
-          ? 'cycling-regular'
-          : travel === 'shuttle' && shuttleDoneRef.current
-            ? 'foot-walking'
-            : TRAVEL_MODES[travel];
-      if (mode !== navModeRef.current) {
-        navModeRef.current = mode;
+      // The vehicle's routes while riding, walking once they get off —
+      // fresh directions from where they're standing, without telling them.
+      if (ride.alighted) gotOffRef.current = true;
+      // Until the route on screen is in that profile, try again at most
+      // every MODE_SWITCH_MIN_MS: covers a failed request, and stop-and-go
+      // traffic can't flood the routing servers.
+      navModeRef.current = routeProfile(travelModeRef.current, ride.riding, gotOffRef.current);
+      if (
+        navModeRef.current !== navRouteDataRef.current?.profile &&
+        Date.now() - lastRerouteAtRef.current >= MODE_SWITCH_MIN_MS
+      ) {
         rerouteFrom(latitude, longitude);
       }
       if (ride.alighted) alightSpokenRef.current = '';
@@ -1184,9 +1194,10 @@ const NavigationController = forwardRef(function NavigationController(
 
       setGoLabel('Calculating route…');
 
-      // The mode picked in NavDestPanel; Walk turns to bike once riding.
+      // The mode picked in NavDestPanel; speed switches it from here.
       rideRef.current = createRideDetector();
-      shuttleDoneRef.current = false;
+      gotOffRef.current = false;
+      prevFixRef.current = null;
       navModeRef.current = TRAVEL_MODES[travelModeRef.current];
       // Planned in the background from (nearly) here, or still being
       // planned: use that request rather than sending another.
@@ -1205,7 +1216,7 @@ const NavigationController = forwardRef(function NavigationController(
       }
       if (!mountedRef.current) return;
       if (navDestRef.current !== dest) return abortStart();
-      navRouteDataRef.current = routeData;
+      navRouteDataRef.current = { ...routeData, profile: navModeRef.current };
 
       setDestPanelOpen(false);
       navActiveRef.current = true;
@@ -1272,7 +1283,8 @@ const NavigationController = forwardRef(function NavigationController(
     navGpsUnsubRef.current = null;
     rideRef.current = createRideDetector();
     navModeRef.current = TRAVEL_MODES[travelModeRef.current];
-    shuttleDoneRef.current = false;
+    gotOffRef.current = false;
+    prevFixRef.current = null;
     alightSpokenRef.current = '';
 
     clearRouteLayers();
