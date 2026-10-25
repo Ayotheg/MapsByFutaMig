@@ -1,0 +1,353 @@
+/* Desktop "Where to?" / Directions panel: a left panel next to the
+   sidebar rail. Phones use NavDestPanel's bottom sheet. */
+
+.panel {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-total-w);
+  bottom: 0;
+  width: 320px;
+  z-index: 2100;
+  background: var(--v2-on-primary);
+  border-right: 1px solid var(--v2-divider);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: navSlideInLeft 0.3s cubic-bezier(0.34, 1.04, 0.64, 1);
+  box-shadow: 4px 0 32px color-mix(in srgb, var(--v2-neutral) 12%, transparent);
+  transform: translateZ(0);
+  will-change: transform;
+  isolation: isolate;
+}
+:global(.sidebar-collapsed) .panel {
+  left: var(--sidebar-rail-w);
+}
+
+@keyframes navSlideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 16px 4px;
+  flex-shrink: 0;
+}
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--v2-neutral);
+}
+.close {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
+  color: var(--v2-neutral);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard), transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.close:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.close:active {
+  transform: scale(0.94);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 16px 16px;
+}
+
+/* ── Your location → Where to? ──────────────────────────────────── */
+.routeCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
+  border-radius: 16px;
+  flex-shrink: 0;
+}
+.routeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+}
+.fromDot {
+  width: 12px;
+  height: 12px;
+  margin: 0 2px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  box-shadow: 0 0 0 3px var(--v2-primary-tint);
+  flex-shrink: 0;
+}
+.fromText {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+/* Dashed line joining the two ends. */
+.routeLink {
+  width: 0;
+  height: 10px;
+  margin-left: 7px;
+  border-left: 2px dashed var(--v2-divider);
+}
+.toPin {
+  color: var(--v2-secondary);
+  flex-shrink: 0;
+}
+/* Not positioned: the results dropdown hangs under the whole card. */
+.toInputWrap {
+  flex: 1;
+  min-width: 0;
+}
+.toInputWrap input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0;
+  outline: none;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+}
+.toInputWrap input::placeholder {
+  color: var(--v2-text-muted);
+  font-weight: 400;
+}
+.clearBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  border: none;
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-border);
+  border-radius: 12px;
+  z-index: 9999;
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--v2-neutral) 14%, transparent);
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--v2-border) transparent;
+}
+.ddItem {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--v2-divider);
+  transition: background 0.12s;
+}
+.ddItem:first-child {
+  border-radius: 12px 12px 0 0;
+}
+.ddItem:last-child {
+  border-bottom: none;
+  border-radius: 0 0 12px 12px;
+}
+.ddItem:hover {
+  background: var(--v2-primary-glow);
+}
+.ddIcon {
+  font-size: 15px;
+  flex-shrink: 0;
+  color: var(--v2-primary);
+}
+.ddName {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  line-height: 1.3;
+}
+.ddName :global(mark) {
+  background: var(--v2-primary-glow-strong);
+  color: var(--v2-on-primary);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.ddSub {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--v2-text-variant);
+  margin-top: 2px;
+}
+
+/* ── Instructional hint card ────────────────────────────────────── */
+.hintCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 17px;
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-primary-tint);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.hintIconBg {
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hintText {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--v2-text);
+}
+
+/* ── Popular on campus ──────────────────────────────────────────── */
+.popularSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.popularLabel {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v2-primary);
+  margin-bottom: 4px;
+}
+.popularList {
+  display: flex;
+  flex-direction: column;
+}
+.popularRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.popularRow:active {
+  opacity: 0.7;
+}
+/* Place's category colour (chipConfig.js dotColor), as a pale square. */
+.popularIconBg {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--place-colour);
+  background: color-mix(in srgb, var(--place-colour) 16%, var(--v2-on-primary));
+}
+.popularName {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.popularDist {
+  font-family: var(--v2-font-manrope);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2-text);
+  flex-shrink: 0;
+}
+
+.footer {
+  flex-shrink: 0;
+  padding: 12px 16px 16px;
+  background: var(--v2-on-primary);
+}
+
+.goBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  border: none;
+  border-radius: var(--r-full);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 16px 24px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.14s cubic-bezier(0.34, 1.3, 0.64, 1), box-shadow 0.2s;
+  box-shadow: 0 4px 7px color-mix(in srgb, var(--v2-primary) 30%, transparent);
+}
+.goBtn:hover:not(:disabled) {
+  background: var(--v2-primary-hover);
+}
+.goBtn:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--v2-primary) 25%, transparent);
+}
+.goBtn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ══ MOBILE — Apple Maps-style bottom sheet (matches Figma frame) ══ */
