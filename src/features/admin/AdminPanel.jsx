@@ -7,10 +7,14 @@ import QuickChipsTab from './QuickChipsTab';
 import PendingTab from './PendingTab';
 import PromotionsTab from './PromotionsTab';
 import EventsTab from './EventsTab';
+import L from 'leaflet';
+import { Footprints, MapPin, Undo2 } from 'lucide-react';
 import AdminEditModal from './AdminEditModal';
 import { useAdminKml } from './useAdminKml';
 import InsightsErrorBoundary from '../analytics/InsightsErrorBoundary';
 import { supabase } from '../../lib/supabase';
+import { insertKmlLineAsSegment } from './adminSave';
+import { lineLength } from './coordInput';
 
 // Slice 14: the Insights tab is lazy-loaded per CLAUDE.md's bundle-size
 // policy — this is explicitly the heaviest tab (recharts + presence +
@@ -139,6 +143,126 @@ export default function AdminPanel({
     [map]
   );
 
+  // ── Map modes: the panel steps aside while the admin works on the map ──
+  // Leaflet needs real colours, not CSS variables.
+  const brandColour = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+
+  // "Move on map" (AdminEditModal): drag the pin, or tap where it goes.
+  const [moving, setMoving] = useState(false);
+  const moveRef = useRef(null); // { marker, onClick, resolve }
+  const endMove = useCallback(
+    (keep) => {
+      const m = moveRef.current;
+      if (!m) return;
+      moveRef.current = null;
+      map.off('click', m.onClick);
+      map.removeLayer(m.marker);
+      const { lat, lng } = m.marker.getLatLng();
+      m.resolve(keep ? { lat, lng } : null);
+      setMoving(false);
+    },
+    [map]
+  );
+  const movePin = useCallback(
+    (start) =>
+      new Promise((resolve) => {
+        endMove(false);
+        const marker = L.marker([start.lat, start.lng], {
+          draggable: true,
+          zIndexOffset: 1000,
+          icon: L.divIcon({ className: styles.movePin, iconSize: [22, 22], iconAnchor: [11, 11] }),
+        }).addTo(map);
+        const onClick = (e) => marker.setLatLng(e.latlng);
+        map.on('click', onClick);
+        moveRef.current = { marker, onClick, resolve };
+        map.setView([start.lat, start.lng], Math.max(map.getZoom(), 18));
+        setMoving(true);
+      }),
+    [map, endMove]
+  );
+
+  // "Draw path" (Routes tab): tap along a footpath the map doesn't have.
+  // Each point can be dragged to adjust it.
+  const [drawing, setDrawing] = useState(false);
+  const [drawPoints, setDrawPoints] = useState([]);
+  const [drawDetails, setDrawDetails] = useState(null); // { name, category, saving, error } once "Next" is pressed
+  const drawRef = useRef(null); // { line, vertices: L.Marker[], onClick }
+  const syncDraw = useCallback(() => {
+    const d = drawRef.current;
+    const pts = d.vertices.map((v) => v.getLatLng());
+    d.line.setLatLngs(pts);
+    setDrawPoints(pts.map(({ lat, lng }) => ({ lat, lng })));
+  }, []);
+  const addDrawPoint = useCallback(
+    (latlng) => {
+      const d = drawRef.current;
+      const v = L.marker(latlng, {
+        draggable: true,
+        icon: L.divIcon({ className: styles.drawVertex, iconSize: [14, 14], iconAnchor: [7, 7] }),
+      }).addTo(map);
+      v.on('drag', syncDraw);
+      d.vertices.push(v);
+      syncDraw();
+    },
+    [map, syncDraw]
+  );
+  const endDraw = useCallback(() => {
+    const d = drawRef.current;
+    if (!d) return;
+    drawRef.current = null;
+    map.off('click', d.onClick);
+    d.vertices.forEach((v) => map.removeLayer(v));
+    map.removeLayer(d.line);
+    setDrawing(false);
+    setDrawPoints([]);
+    setDrawDetails(null);
+  }, [map]);
+  const startDraw = useCallback(() => {
+    endDraw();
+    const line = L.polyline([], { color: brandColour('--v2-secondary', 'teal'), weight: 5, opacity: 0.9 }).addTo(map);
+    const onClick = (e) => addDrawPoint(e.latlng);
+    map.on('click', onClick);
+    drawRef.current = { line, vertices: [], onClick };
+    setDrawing(true);
+  }, [map, endDraw, addDrawPoint]);
+  const undoDrawPoint = useCallback(() => {
+    const d = drawRef.current;
+    const v = d?.vertices.pop();
+    if (!v) return;
+    map.removeLayer(v);
+    syncDraw();
+  }, [map, syncDraw]);
+  const saveDrawnPath = useCallback(async () => {
+    const name = drawDetails.name.trim();
+    if (!name) {
+      setDrawDetails((dd) => ({ ...dd, error: 'Give the path a name.' }));
+      return;
+    }
+    setDrawDetails((dd) => ({ ...dd, saving: true, error: null }));
+    try {
+      await insertKmlLineAsSegment({
+        name,
+        description: '',
+        category: drawDetails.category,
+        points: drawPoints,
+        distanceM: Math.round(lineLength(drawPoints)),
+      });
+      onSegmentsChanged?.();
+      endDraw();
+      setActiveTab('routes');
+    } catch (e) {
+      setDrawDetails((dd) => ({ ...dd, saving: false, error: e.message || 'Could not save the path.' }));
+    }
+  }, [drawDetails, drawPoints, onSegmentsChanged, endDraw]);
+
+  useEffect(
+    () => () => {
+      endMove(false);
+      endDraw();
+    },
+    [endMove, endDraw]
+  );
+
   function handleRefresh() {
     // Legacy: `#adminRefresh` ("Sync from Firebase") has no listener
     // anywhere in app.js — a confirmed-dead button, not a feature this
@@ -154,7 +278,7 @@ export default function AdminPanel({
     <>
       <div
         className={styles.overlay}
-        style={pickingCoord ? { display: 'none' } : undefined}
+        style={pickingCoord || moving || drawing ? { display: 'none' } : undefined}
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
@@ -265,6 +389,7 @@ export default function AdminPanel({
             <RoutesTab
               segments={segments}
               onEditSegment={(seg) => setEditContext({ type: 'segment', id: seg.id, data: seg })}
+              onDrawPath={startDraw}
             />
           )}
           {activeTab === 'kml' && (
@@ -294,9 +419,93 @@ export default function AdminPanel({
         </div>
       </div>
 
+      {moving && (
+        <div className={styles.mapBar}>
+          <p className={styles.mapBarText}>
+            <MapPin size={16} />
+            Drag the pin to the right spot, or tap where it should go.
+          </p>
+          <div className={styles.mapBarActions}>
+            <button type="button" className={styles.formCancel} onClick={() => endMove(false)}>
+              Cancel
+            </button>
+            <button type="button" className={styles.formSave} onClick={() => endMove(true)}>
+              Use this spot
+            </button>
+          </div>
+        </div>
+      )}
+
+      {drawing && !drawDetails && (
+        <div className={styles.mapBar}>
+          <p className={styles.mapBarText}>
+            <Footprints size={16} />
+            {drawPoints.length === 0
+              ? 'Tap along the path, from the road it leaves to the road it joins.'
+              : `${drawPoints.length} point${drawPoints.length === 1 ? '' : 's'} · ${Math.round(lineLength(drawPoints))} m. Drag a point to adjust it.`}
+          </p>
+          <div className={styles.mapBarActions}>
+            <button type="button" className={styles.formCancel} onClick={undoDrawPoint} disabled={!drawPoints.length}>
+              <Undo2 size={12} /> Undo
+            </button>
+            <button type="button" className={styles.formCancel} onClick={endDraw}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={styles.formSave}
+              onClick={() => setDrawDetails({ name: '', category: 'footpath', saving: false, error: null })}
+              disabled={drawPoints.length < 2}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {drawing && drawDetails && (
+        <div className={styles.mapBar}>
+          <div className={styles.mapBarForm}>
+            <div className={styles.fieldGroup}>
+              <label htmlFor="draw-path-name">Name</label>
+              <input
+                id="draw-path-name"
+                type="text"
+                value={drawDetails.name}
+                onChange={(e) => setDrawDetails((dd) => ({ ...dd, name: e.target.value, error: null }))}
+                placeholder="e.g. Behind SOC shortcut"
+                autoFocus
+              />
+            </div>
+            <div className={styles.fieldGroup}>
+              <label htmlFor="draw-path-category">Type</label>
+              <select
+                id="draw-path-category"
+                value={drawDetails.category}
+                onChange={(e) => setDrawDetails((dd) => ({ ...dd, category: e.target.value }))}
+              >
+                <option value="footpath">Footpath</option>
+                <option value="shortcut">Shortcut</option>
+              </select>
+            </div>
+          </div>
+          {drawDetails.error && <p className={styles.mapBarError}>{drawDetails.error}</p>}
+          <div className={styles.mapBarActions}>
+            <button type="button" className={styles.formCancel} onClick={() => setDrawDetails(null)} disabled={drawDetails.saving}>
+              Back
+            </button>
+            <button type="button" className={styles.formSave} onClick={saveDrawnPath} disabled={drawDetails.saving}>
+              {drawDetails.saving ? 'Saving…' : 'Save path'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {editContext && (
         <AdminEditModal
           editContext={editContext}
+          onMovePin={movePin}
+          hidden={moving}
           onClose={() => setEditContext(null)}
           onWaypointChanged={onWaypointsChanged}
           onSegmentChanged={onSegmentsChanged}
