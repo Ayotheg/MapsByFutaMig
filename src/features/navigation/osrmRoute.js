@@ -4,9 +4,9 @@ import { pickShortcuts, stitchRoute } from './shortcutRoute';
 // FOSSGIS's public OSRM servers (the ones openstreetmap.org's directions
 // use), one per profile. Not OSRM's demo server: it only runs the car
 // profile whatever the URL says, so walking routes kept to main roads and
-// never used footpaths. Bike is for keke/okada: short streets like
-// walking, but no footpaths or steps a vehicle can't use. Car keeps to
-// roads cars may use, one-ways included. Free, no key, fair use
+// never used footpaths. Bike is for bicycles/okada: short streets like
+// walking, but no footpaths or steps. Car (keke, cab, shuttle, car) keeps
+// to roads cars may use, one-ways included. Free, no key, fair use
 // (https://routing.openstreetmap.de).
 const OSRM_SERVERS = {
   'foot-walking': 'https://routing.openstreetmap.de/routed-foot',
