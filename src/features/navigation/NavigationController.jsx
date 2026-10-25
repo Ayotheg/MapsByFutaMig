@@ -39,13 +39,13 @@ const RESUME_MAX_WAIT_MS = 15000;
 // The old shortcut-learning trace; cleared so it doesn't linger in storage.
 const TRACE_KEY = 'navigation-trace';
 // Travel mode → OSRM profile at the start of a trip (osrmRoute.js). Ride
-// is one of RIDE_MODES. A keke fits the streets an okada does. Speed
-// switches it during the trip (routeProfile).
+// is one of RIDE_MODES, all on car routes. Speed switches it during the
+// trip (routeProfile).
 const TRAVEL_MODES = {
   walk: 'foot-walking',
   bike: 'cycling-regular',
   shuttle: 'driving-car',
-  keke: 'cycling-regular',
+  keke: 'driving-car',
   car: 'driving-car',
 };
 const RIDE_MODES = ['shuttle', 'keke', 'car'];

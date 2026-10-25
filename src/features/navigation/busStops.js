@@ -18,21 +18,20 @@ export const ANNOUNCE_AHEAD_M = 250;
 export const GET_OFF_NOW_M = 40;
 
 /**
- * The OSRM profile for a travel mode at this moment, from speed:
- *  - Walk: walking; bike routes while riding (a keke, mostly), walking
- *    again once off.
- *  - Keke: bike routes; Car: car routes. Walking once they get off (the
- *    last stretch may be a path a vehicle can't take), back to the
- *    vehicle's routes if they ride again.
+ * The OSRM profile for a travel mode at this moment, from speed. Vehicles
+ * get car routes: bike routes may walk a bike down footpaths or against
+ * one-ways, which a keke can't do.
+ *  - Walk: walking; car routes while riding, walking again once off.
+ *  - Keke / Car: car routes; walking once they get off (the last stretch
+ *    may be a path a vehicle can't take), car again if they ride again.
  *  - Shuttle: car routes until they get off, then walking for good.
- *  - Bike: bike routes throughout.
+ *  - Bike (bicycle, okada): bike routes throughout.
  */
 export function routeProfile(travel, riding, gotOff) {
   if (travel === 'bike') return 'cycling-regular';
-  if (travel === 'walk') return riding ? 'cycling-regular' : 'foot-walking';
+  if (travel === 'walk') return riding ? 'driving-car' : 'foot-walking';
   if (travel === 'shuttle') return gotOff ? 'foot-walking' : 'driving-car';
-  if (gotOff && !riding) return 'foot-walking';
-  return travel === 'keke' ? 'cycling-regular' : 'driving-car';
+  return gotOff && !riding ? 'foot-walking' : 'driving-car';
 }
 
 /**

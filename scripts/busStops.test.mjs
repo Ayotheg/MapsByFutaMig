@@ -56,9 +56,9 @@ import { createRideDetector, alightStop, alightPrompt, routeProfile, speedBetwee
 // ── route profile by mode and speed
 {
   assert.equal(routeProfile('walk', false, false), 'foot-walking');
-  assert.equal(routeProfile('walk', true, false), 'cycling-regular', 'walk: hopped on a keke');
+  assert.equal(routeProfile('walk', true, false), 'driving-car', 'walk: hopped on a keke');
   assert.equal(routeProfile('walk', false, true), 'foot-walking', 'walk: got off');
-  for (const [mode, vehicle] of [['keke', 'cycling-regular'], ['car', 'driving-car']]) {
+  for (const [mode, vehicle] of [['keke', 'driving-car'], ['car', 'driving-car']]) {
     assert.equal(routeProfile(mode, false, false), vehicle, `${mode}: before setting off`);
     assert.equal(routeProfile(mode, true, false), vehicle);
     assert.equal(routeProfile(mode, false, true), 'foot-walking', `${mode}: got off / parked`);
