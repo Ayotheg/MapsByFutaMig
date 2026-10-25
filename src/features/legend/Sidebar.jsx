@@ -153,6 +153,14 @@ export default function Sidebar({
     return () => document.body.classList.remove('sidebar-collapsed');
   }, [collapsed]);
 
+  // Explore is wider than the other panels; the body class widens the
+  // sidebar tokens so the map and floating controls move over with it.
+  const exploreOpen = activeKey === 'explore' && !collapsed;
+  useEffect(() => {
+    document.body.classList.toggle('explore-open', exploreOpen);
+    return () => document.body.classList.remove('explore-open');
+  }, [exploreOpen]);
+
   function handleRailClick(item) {
     // Signal opens a floating card beside the closed rail (like PlaceCard),
     // so the map and search bar don't shift. Opening anything else closes

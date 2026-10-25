@@ -1,5 +1,5 @@
 /* Explore redesign — shared pieces (see ExploreSections.jsx). Sizes are the
-   mobile frame's; the `Sm` modifiers scale them down for the 240px desktop
+   mobile frame's; the `Sm` modifiers scale them down for the desktop
    sidebar panel. Colours are brand tokens only (DESIGN_SYSTEM.md). */
 
 /* ── Places / People / Channels segmented control ─────────────────── */
@@ -375,7 +375,7 @@
   color: var(--v2-primary);
 }
 
-/* Desktop (240px) rail. */
+/* Desktop rail. */
 .railSm {
   gap: 8px;
 }
@@ -621,7 +621,7 @@
   font-weight: 600;
 }
 
-/* Desktop (240px) rows. */
+/* Desktop rows. */
 .rowSm {
   gap: 10px;
   padding: 6px 4px;
