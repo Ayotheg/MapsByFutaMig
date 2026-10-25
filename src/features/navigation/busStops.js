@@ -18,6 +18,36 @@ export const ANNOUNCE_AHEAD_M = 250;
 export const GET_OFF_NOW_M = 40;
 
 /**
+ * The OSRM profile for a travel mode at this moment, from speed:
+ *  - Walk: walking; bike routes while riding (a keke, mostly), walking
+ *    again once off.
+ *  - Keke: bike routes; Car: car routes. Walking once they get off (the
+ *    last stretch may be a path a vehicle can't take), back to the
+ *    vehicle's routes if they ride again.
+ *  - Shuttle: car routes until they get off, then walking for good.
+ *  - Bike: bike routes throughout.
+ */
+export function routeProfile(travel, riding, gotOff) {
+  if (travel === 'bike') return 'cycling-regular';
+  if (travel === 'walk') return riding ? 'cycling-regular' : 'foot-walking';
+  if (travel === 'shuttle') return gotOff ? 'foot-walking' : 'driving-car';
+  if (gotOff && !riding) return 'foot-walking';
+  return travel === 'keke' ? 'cycling-regular' : 'driving-car';
+}
+
+/**
+ * Speed (m/s) between two fixes, for phones that don't report one.
+ * Null when the fixes are too close together or too far apart in time to
+ * tell.
+ */
+export function speedBetween(prev, next) {
+  if (!prev || !next) return null;
+  const secs = (next.at - prev.at) / 1000;
+  if (!(secs >= 1 && secs <= 30)) return null;
+  return haversine(prev.lat, prev.lng, next.lat, next.lng) / secs;
+}
+
+/**
  * Feed it each fix's GPS speed (m/s, may be null). `update` returns
  * { riding, alighted } — `alighted` is true once, on the fix where a ride
  * ends.
