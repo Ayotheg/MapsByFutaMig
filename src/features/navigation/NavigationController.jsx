@@ -7,10 +7,11 @@ import { fetchRoute } from './osrmRoute';
 import { isOnPathTowards, walkablePaths } from './shortcutRoute';
 import { alightPrompt, alightStop, createRideDetector } from './busStops';
 import { turnIcon, fmtDist, startDirection, TURN_ICONS } from './turnHelpers';
+import { fmtDist as fmtDistAway } from '../search/chipConfig';
+import { createPlanCache } from './routePlans';
 import { NAV_START_ZOOM } from './gpsConstants';
 import { subscribeGps } from './gpsWatch';
 import { useOneShotLocation } from '../explore/useOneShotLocation';
-import { fmtDist as fmtDistAway } from '../search/chipConfig';
 import NavDestPanel from './NavDestPanel';
 import NavDestDesktop from './NavDestDesktop';
 import NavHud from './NavHud';
@@ -37,13 +38,6 @@ const END_NEAR_DEST_M = 50;
 const RESUME_MAX_WAIT_MS = 15000;
 // The old shortcut-learning trace; cleared so it doesn't linger in storage.
 const TRACE_KEY = 'navigation-trace';
-const previewKey = (dest, mode) => `${dest.lat},${dest.lng}|${mode}`;
-// A route planned in the background for `key`, if it's still usable from `from`.
-function freshPlan(cache, key, from) {
-  const p = cache.get(key);
-  if (!p || Date.now() - p.at >= PREVIEW_MAX_AGE_MS) return null;
-  return haversine(from.lat, from.lng, p.from.lat, p.from.lng) < PREVIEW_MAX_MOVE_M ? p.routeData : null;
-}
 // Travel mode → OSRM profile (osrmRoute.js). Bike is okada/bicycle; Ride
 // is one of RIDE_MODES. A keke fits the streets an okada does. The
 // shuttle keeps to its own roads: the car route is only a guide until
@@ -56,12 +50,10 @@ const TRAVEL_MODES = {
   car: 'driving-car',
 };
 const RIDE_MODES = ['shuttle', 'keke', 'car'];
-const RIDE_MODE_KEY = 'nav-ride-mode'; // last Ride option, so Ride is one tap
-// A route planned in the background as soon as a destination is picked is
-// used on Start if it's this recent and they haven't moved this far.
-const PREVIEW_MAX_AGE_MS = 3 * 60 * 1000;
-const PREVIEW_MAX_MOVE_M = 50;
 const TRAVEL_MODE_KEY = 'nav-travel-mode';
+const RIDE_MODE_KEY = 'nav-ride-mode'; // last Ride option, so Ride is one tap
+// Background route plans start from a fix this recent.
+const PLAN_FIX_MAX_AGE_MS = 60 * 1000;
 
 const SVG_FLAG = (size, color = 'currentColor') =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></svg>`;
@@ -156,8 +148,7 @@ const NavigationController = forwardRef(function NavigationController(
   const restoredDest = persistedNavigation?.active ? null : persistedDestination;
   const [destInputValue, setDestInputValue] = useState(restoredDest?.name || '');
   const [dropdownResults, setDropdownResults] = useState([]);
-  // Only for problems (no location, routing failed): the travel mode
-  // picker sits where the "tap a pin" tip was.
+  // Only for problems (no location, routing failed).
   const [hint, setHint] = useState('');
   const [goDisabled, setGoDisabled] = useState(!restoredDest);
   const [goLabel, setGoLabel] = useState('Start Navigation');
@@ -293,10 +284,13 @@ const NavigationController = forwardRef(function NavigationController(
   // own profile and the ride detector switches it from there.
   const [travelMode, setTravelMode] = useState(() => {
     const saved = readPersistentState(TRAVEL_MODE_KEY, 'walk');
-    return Object.hasOwn(TRAVEL_MODES, saved) ? saved : 'walk';
+    return Object.prototype.hasOwnProperty.call(TRAVEL_MODES, saved) ? saved : 'walk';
   });
   const travelModeRef = useRef(travelMode);
-  const navModeRef = useRef(TRAVEL_MODES[travelMode]);
+  // A restored trip carries on in the profile it was using.
+  const navModeRef = useRef(
+    Object.values(TRAVEL_MODES).includes(persistedNavigation?.mode) ? persistedNavigation.mode : TRAVEL_MODES[travelMode]
+  );
   // 'ride' (the Ride tab) means the last Ride option, Shuttle at first.
   const chooseTravelMode = useCallback((choice) => {
     let mode = choice;
@@ -310,7 +304,7 @@ const NavigationController = forwardRef(function NavigationController(
     writePersistentState(TRAVEL_MODE_KEY, mode);
   }, []);
   // Shuttle mode: set once they've ridden and got off, for walking routes.
-  const shuttleDoneRef = useRef(false);
+  const shuttleDoneRef = useRef(!!persistedNavigation?.shuttleDone);
   const navRouteDataRef = useRef(persistedNavigation?.routeData || null);
   const navStepIndexRef = useRef(persistedNavigation?.stepIndex || 0);
   const navUserPosRef = useRef(persistedNavigation?.userPos || null);
@@ -343,6 +337,8 @@ const NavigationController = forwardRef(function NavigationController(
     writePersistentState('navigation-session', {
       active: true,
       dest: navDestRef.current,
+      mode: navModeRef.current,
+      shuttleDone: shuttleDoneRef.current,
       routeData: navRouteDataRef.current,
       stepIndex: navStepIndexRef.current,
       userPos: navUserPosRef.current,
@@ -647,6 +643,13 @@ const NavigationController = forwardRef(function NavigationController(
   const lastRerouteAtRef = useRef(0);
   const offRouteTicksRef = useRef(0);
   const shortcutPaths = useMemo(() => walkablePaths(segments), [segments]);
+  // Routes planned in the background (routePlans.js), reused by Start.
+  const planCacheRef = useRef(null);
+  if (!planCacheRef.current) {
+    planCacheRef.current = createPlanCache((from, dest, profile, paths) =>
+      fetchRoute(from.lat, from.lng, dest.lat, dest.lng, profile, paths)
+    );
+  }
   useEffect(() => {
     removePersistentState(TRACE_KEY);
   }, []);
@@ -1131,6 +1134,13 @@ const NavigationController = forwardRef(function NavigationController(
       setGoDisabled(true);
       setGoLabel('Getting your location…');
 
+      // The destination was changed or cleared while this was waiting:
+      // don't start a trip to a place that's no longer picked.
+      function abortStart() {
+        setGoDisabled(!navDestRef.current);
+        setGoLabel('Start Navigation');
+      }
+
       // Smart location resolver — ported from app.js ~4991–5018.
       async function resolveStartPosition() {
         const MAX_CACHE_AGE_MS = 20000;
@@ -1166,6 +1176,7 @@ const NavigationController = forwardRef(function NavigationController(
         return;
       }
       if (!mountedRef.current) return;
+      if (navDestRef.current !== dest) return abortStart();
 
       const { latitude: lat, longitude: lng } = pos.coords;
       navUserPosRef.current = { lat, lng };
@@ -1177,11 +1188,13 @@ const NavigationController = forwardRef(function NavigationController(
       rideRef.current = createRideDetector();
       shuttleDoneRef.current = false;
       navModeRef.current = TRAVEL_MODES[travelModeRef.current];
-      // Already planned in the background from (nearly) here: use it.
-      const planned = freshPlan(previewCacheRef.current, previewKey(dest, navModeRef.current), { lat, lng });
+      // Planned in the background from (nearly) here, or still being
+      // planned: use that request rather than sending another.
+      const fetchNow = () => fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current, shortcutPathsRef.current);
+      const planned = planCacheRef.current.get(dest, navModeRef.current, { lat, lng }, shortcutPathsRef.current);
       let routeData;
       try {
-        routeData = planned || (await fetchRoute(lat, lng, dest.lat, dest.lng, navModeRef.current, shortcutPathsRef.current));
+        routeData = planned && !planned.failed ? await planned.promise.catch(fetchNow) : await fetchNow();
       } catch (e) {
         setGoDisabled(false);
         setGoLabel('Start Navigation');
@@ -1191,6 +1204,7 @@ const NavigationController = forwardRef(function NavigationController(
         return;
       }
       if (!mountedRef.current) return;
+      if (navDestRef.current !== dest) return abortStart();
       navRouteDataRef.current = routeData;
 
       setDestPanelOpen(false);
@@ -1362,35 +1376,31 @@ const NavigationController = forwardRef(function NavigationController(
   );
 
   // ── Route planned in the background as soon as there's a destination,
-  // so Start can begin straight away. Kept PREVIEW_MAX_AGE_MS per
-  // destination and mode, so switching back to a mode or pressing Start
-  // doesn't ask the server again. In Shuttle mode, also the stop to get
-  // off at (the bus stop nearest the destination), for the panel. ──
-  const [shuttleStop, setShuttleStop] = useState(null);
-  const previewCacheRef = useRef(new Map()); // previewKey → { from, at, routeData }
+  // so Start can begin straight away (routePlans.js: one request per
+  // destination, mode and start spot). Only from an accurate fix, so the
+  // route Start reuses really begins where they are. ──
+  const lastKnownPosRef = gps.lastKnownPosRef;
+  const planFrom = useCallback(() => {
+    const fix = lastKnownPosRef.current;
+    if (fix && Date.now() - fix.timestamp < PLAN_FIX_MAX_AGE_MS && fix.coords.accuracy <= MAX_USEFUL_ACCURACY_M) {
+      return { lat: fix.coords.latitude, lng: fix.coords.longitude };
+    }
+    return userCoords && userCoords.accuracy <= MAX_USEFUL_ACCURACY_M ? userCoords : null;
+  }, [lastKnownPosRef, userCoords]);
   useEffect(() => {
-    setShuttleStop(null);
-    if (!destPanelOpen || !navDest) return undefined;
-    const fix = gps.lastKnownPosRef.current;
-    const from =
-      fix && Date.now() - fix.timestamp < PREVIEW_MAX_AGE_MS ? { lat: fix.coords.latitude, lng: fix.coords.longitude } : userCoords;
-    // No location yet: Start still works, it just plans then.
-    if (!from) return undefined;
-    if (travelMode === 'shuttle') setShuttleStop(alightStop(navDest, from, candidatesRef.current)?.place.name || null);
-    const cache = previewCacheRef.current;
-    const profile = TRAVEL_MODES[travelMode];
-    const key = previewKey(navDest, profile);
-    if (freshPlan(cache, key, from)) return undefined;
-    fetchRoute(from.lat, from.lng, navDest.lat, navDest.lng, profile, shortcutPathsRef.current)
-      .then((routeData) => {
-        for (const [k, v] of cache) if (Date.now() - v.at >= PREVIEW_MAX_AGE_MS) cache.delete(k);
-        cache.set(key, { from, at: Date.now(), routeData });
-      })
-      .catch(() => {
-        // Start fetches again, and reports a failure then.
-      });
-    return undefined;
-  }, [destPanelOpen, navDest, travelMode, userCoords, gps]);
+    if (!destPanelOpen || !navDest) return;
+    const from = planFrom();
+    if (from) planCacheRef.current.plan(navDest, TRAVEL_MODES[travelMode], from, shortcutPaths).promise.catch(() => {});
+  }, [destPanelOpen, navDest, travelMode, planFrom, shortcutPaths]);
+
+  // Shuttle mode: the stop to get off at (the bus stop nearest the
+  // destination), for the panel. Updates when the stops load.
+  const shuttleStop = useMemo(() => {
+    if (travelMode !== 'shuttle' || !navDest) return null;
+    const fix = lastKnownPosRef.current;
+    const from = fix ? { lat: fix.coords.latitude, lng: fix.coords.longitude } : userCoords;
+    return from ? alightStop(navDest, from, nearbyCandidates)?.place.name || null : null;
+  }, [travelMode, navDest, userCoords, nearbyCandidates, lastKnownPosRef]);
 
   useImperativeHandle(
     ref,

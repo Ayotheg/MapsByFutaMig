@@ -23,7 +23,7 @@ export function useOneShotLocation(enabled) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         if (cancelled) return;
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy });
       },
       () => {
         /* denied/unavailable — cards just won't show a distance */

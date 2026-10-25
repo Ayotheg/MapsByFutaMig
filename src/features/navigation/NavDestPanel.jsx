@@ -11,14 +11,12 @@ import TravelModePicker from './TravelModePicker';
  * style bottom sheet (`NavDestPanel.module.css`'s `@media (max-width:
  * 768px)` block) — purely a CSS-driven layout swap, same component.
  *
- * Redesigned to v2 light tokens this session, per Figma node 1:311
- * ("Navigation Mode"). Two real functionality changes on direct user
- * instruction:
+ * v2 light tokens, per Figma node 1:311 ("Navigation Mode").
  *  - Travel mode (TravelModePicker: Walk / Bike / Ride, Ride's Shuttle /
- *    Keke / Car-Cab) after the popular places, above Start; the "tap a
- *    pin" tip is gone (the tip card is only for problems). `travelMode`,
- *    `onTravelModeChange`, `shuttleStop` come from NavigationController.
- *  - "Popular places on campus" section added — `popularPlaces` is
+ *    Keke / Car-Cab) sits after the popular places, above Start; the tip
+ *    card only shows problems. `travelMode`, `onTravelModeChange`,
+ *    `shuttleStop` come from NavigationController.
+ *  - "Popular places on campus" — `popularPlaces` is
  *    `NavigationController`'s slice of the *same* `explorePicks` array
  *    MapPage's Explore panel already renders from, not a separate
  *    list, so this always agrees with Explore about what's featured.

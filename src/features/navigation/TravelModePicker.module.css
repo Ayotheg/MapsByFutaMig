@@ -1,3 +1,11 @@
+/* Its own column, so the spacing doesn't depend on the panel around it. */
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 /* ── Travel mode: segmented control ─────────────────────────────── */
 .modePicker {
   display: grid;
@@ -33,7 +41,7 @@
 .modeOptionActive {
   background: var(--v2-on-primary);
   color: var(--v2-primary-hover);
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--v2-neutral) 10%, transparent);
 }
 
 /* Ride's options: small pills, a sub-choice under the tabs. */
@@ -41,8 +49,6 @@
   display: flex;
   justify-content: center;
   gap: 6px;
-  margin-top: -10px;
-  flex-shrink: 0;
 }
 .rideOption {
   display: flex;
@@ -78,7 +84,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin: -10px 0 0;
+  margin: 0;
   font-family: var(--font-ui);
   font-size: 13px;
   color: var(--v2-text);
