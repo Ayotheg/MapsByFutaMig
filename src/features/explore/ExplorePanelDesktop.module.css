@@ -1,11 +1,11 @@
 /* Desktop sidebar Explore panel — rebuilt to the Explore redesign
    (public/Maps By FUTA — explore Redesign-png.zip, desktop frame), scaled
-   to the shared `--sidebar-panel-w` (240px, see Sidebar.module.css's
-   `.panelExploreDesktop`). Cards/rows/segment come from
+   to `--sidebar-panel-w` (320px while Explore is open, see
+   Sidebar.module.css's `body.explore-open`). Cards/rows/segment come from
    ExploreSections.module.css; this file is only the panel's layout. */
 
 .root {
-  --explore-gutter: 14px;
+  --explore-gutter: 20px;
   display: flex;
   flex-direction: column;
   height: 100%;
