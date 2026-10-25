@@ -205,7 +205,7 @@ const NavigationController = forwardRef(function NavigationController(
   // Riding? (busStops.js) Switches routing between the vehicle's and
   // walking, and drives the shuttle "get off" prompt; alightSpokenRef is
   // which prompt was last spoken.
-  const rideRef = useRef(createRideDetector());
+  const rideRef = useRef(createRideDetector({ riding: !!persistedNavigation?.riding }));
   const alightSpokenRef = useRef('');
   const [nearby, setNearby] = useState([]);
   const nearbySigRef = useRef('');
@@ -304,10 +304,16 @@ const NavigationController = forwardRef(function NavigationController(
     writePersistentState(TRAVEL_MODE_KEY, mode);
   }, []);
   // Set once they've ridden and got off (routeProfile).
-  const gotOffRef = useRef(!!persistedNavigation?.gotOff);
+  // Sessions saved by older versions call it `shuttleDone`.
+  const gotOffRef = useRef(!!(persistedNavigation?.gotOff ?? persistedNavigation?.shuttleDone));
   // Last fix, for working out speed on phones that don't report it.
   const prevFixRef = useRef(null);
-  const navRouteDataRef = useRef(persistedNavigation?.routeData || null);
+  // The route on screen, with the OSRM `profile` it was planned for.
+  const navRouteDataRef = useRef(
+    persistedNavigation?.routeData
+      ? { profile: persistedNavigation.mode, ...persistedNavigation.routeData }
+      : null
+  );
   const navStepIndexRef = useRef(persistedNavigation?.stepIndex || 0);
   const navUserPosRef = useRef(persistedNavigation?.userPos || null);
   // Unsubscribe fn for the shared watcher (gpsWatch.js) — navigation no
@@ -341,6 +347,7 @@ const NavigationController = forwardRef(function NavigationController(
       dest: navDestRef.current,
       mode: navModeRef.current,
       gotOff: gotOffRef.current,
+      riding: rideRef.current.riding,
       routeData: navRouteDataRef.current,
       stepIndex: navStepIndexRef.current,
       userPos: navUserPosRef.current,
@@ -640,6 +647,7 @@ const NavigationController = forwardRef(function NavigationController(
   // filters most of these, but not all) can't trigger a spurious reroute.
   const OFF_ROUTE_TICKS_REQUIRED = 3;
   const MIN_REROUTE_INTERVAL_MS = 20000;
+  const MODE_SWITCH_MIN_MS = 10000;
 
   const rerouteInFlightRef = useRef(false);
   const lastRerouteAtRef = useRef(0);
@@ -674,7 +682,7 @@ const NavigationController = forwardRef(function NavigationController(
         .then((fresh) => {
           if (!navActiveRef.current || navDestRef.current !== dest) return; // nav ended/changed while fetching
           if (navModeRef.current !== mode) return; // replaced in finally
-          navRouteDataRef.current = fresh;
+          navRouteDataRef.current = { ...fresh, profile: mode };
           navStepIndexRef.current = 0;
           lastSpokenStepRef.current = -1;
           spokenTurnNowRef.current = false;
@@ -963,13 +971,16 @@ const NavigationController = forwardRef(function NavigationController(
 
       if (typeof accuracy === 'number' && accuracy > MAX_USEFUL_ACCURACY_M) return;
 
+      // Phones that don't report speed: worked out from the last fix. A
+      // late, older fix (the resume one) mustn't become the reference.
+      const fix = { lat: latitude, lng: longitude, accuracy, at: p.timestamp || Date.now() };
+      const moving = Number.isFinite(speed) ? speed : speedBetween(prevFixRef.current, fix);
+      if (!prevFixRef.current || fix.at > prevFixRef.current.at) prevFixRef.current = fix;
       // GPS heading is only meaningful while moving.
-      const walkingBearing = Number.isFinite(heading) && speed > 0.5 ? heading : null;
+      const walkingBearing = Number.isFinite(heading) && moving > 0.5 ? heading : null;
       navUserPosRef.current = { lat: latitude, lng: longitude, heading: walkingBearing };
       navGpsTicksRef.current++;
-      const fix = { lat: latitude, lng: longitude, at: p.timestamp || Date.now() };
-      const ride = rideRef.current.update(Number.isFinite(speed) ? speed : speedBetween(prevFixRef.current, fix));
-      prevFixRef.current = fix;
+      const ride = rideRef.current.update(moving, fix.at);
 
       clearTimeout(navGpsStaleTimerRef.current);
       navGpsStaleTimerRef.current = setTimeout(() => {
@@ -981,9 +992,14 @@ const NavigationController = forwardRef(function NavigationController(
       // The vehicle's routes while riding, walking once they get off —
       // fresh directions from where they're standing, without telling them.
       if (ride.alighted) gotOffRef.current = true;
-      const mode = routeProfile(travelModeRef.current, ride.riding, gotOffRef.current);
-      if (mode !== navModeRef.current) {
-        navModeRef.current = mode;
+      // Until the route on screen is in that profile, try again at most
+      // every MODE_SWITCH_MIN_MS: covers a failed request, and stop-and-go
+      // traffic can't flood the routing servers.
+      navModeRef.current = routeProfile(travelModeRef.current, ride.riding, gotOffRef.current);
+      if (
+        navModeRef.current !== navRouteDataRef.current?.profile &&
+        Date.now() - lastRerouteAtRef.current >= MODE_SWITCH_MIN_MS
+      ) {
         rerouteFrom(latitude, longitude);
       }
       if (ride.alighted) alightSpokenRef.current = '';
@@ -1200,7 +1216,7 @@ const NavigationController = forwardRef(function NavigationController(
       }
       if (!mountedRef.current) return;
       if (navDestRef.current !== dest) return abortStart();
-      navRouteDataRef.current = routeData;
+      navRouteDataRef.current = { ...routeData, profile: navModeRef.current };
 
       setDestPanelOpen(false);
       navActiveRef.current = true;

@@ -5,13 +5,15 @@ import { pickShortcuts, stitchRoute } from './shortcutRoute';
 // use), one per profile. Not OSRM's demo server: it only runs the car
 // profile whatever the URL says, so walking routes kept to main roads and
 // never used footpaths. Bike is for bicycles/okada. Car (keke, cab,
-// shuttle, car) keeps to roads cars may use, one-ways included. Free, no key, fair use
-// (https://routing.openstreetmap.de).
+// shuttle, car) keeps to roads cars may use, one-ways included. Free, no
+// key, fair use (https://routing.openstreetmap.de).
 const OSRM_SERVERS = {
   'foot-walking': 'https://routing.openstreetmap.de/routed-foot',
   'cycling-regular': 'https://routing.openstreetmap.de/routed-bike',
   'driving-car': 'https://routing.openstreetmap.de/routed-car',
 };
+// A hung request would hold up every re-plan behind it.
+const REQUEST_TIMEOUT_MS = 10000;
 
 /**
  * `paths` are approved walking paths (shortcutRoute.js `walkablePaths`).
@@ -49,8 +51,17 @@ async function requestRoute(fromLat, fromLng, toLat, toLng, server) {
     `${fromLng},${fromLat};${toLng},${toLat}` +
     `?overview=full&geometries=geojson&steps=true&annotations=false&alternatives=true`;
 
-  const res = await fetch(url);
-  const data = await res.json();
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), REQUEST_TIMEOUT_MS);
+  let data;
+  try {
+    const res = await fetch(url, { signal: abort.signal });
+    data = await res.json();
+  } catch (e) {
+    throw abort.signal.aborted ? new Error('Routing timed out') : e;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (data.code !== 'Ok' || !data.routes || !data.routes.length) {
     throw new Error('No route found');

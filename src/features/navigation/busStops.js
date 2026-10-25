@@ -13,6 +13,12 @@ const WALKING_MIN_MPS = 0.5;
 const WALKING_MAX_MPS = 2;
 const RIDE_TICKS = 2; // fast fixes in a row before we call it a ride
 const WALK_TICKS = 4; // walking-pace fixes in a row before we call the ride over
+// ...over at least this long, so a vehicle crawling through traffic or
+// over a speed bump for a few seconds isn't taken for walking.
+const WALK_MIN_MS = 12000;
+// Speed worked out from positions only from fixes this accurate: GPS
+// jitter between rougher fixes can look like a vehicle.
+export const DERIVED_SPEED_MAX_ACCURACY_M = 20;
 export const MAX_STOP_TO_DEST_M = 500;
 export const ANNOUNCE_AHEAD_M = 250;
 export const GET_OFF_NOW_M = 40;
@@ -41,31 +47,36 @@ export function routeProfile(travel, riding, gotOff) {
  */
 export function speedBetween(prev, next) {
   if (!prev || !next) return null;
+  if (!(prev.accuracy <= DERIVED_SPEED_MAX_ACCURACY_M && next.accuracy <= DERIVED_SPEED_MAX_ACCURACY_M)) return null;
   const secs = (next.at - prev.at) / 1000;
   if (!(secs >= 1 && secs <= 30)) return null;
   return haversine(prev.lat, prev.lng, next.lat, next.lng) / secs;
 }
 
 /**
- * Feed it each fix's GPS speed (m/s, may be null). `update` returns
- * { riding, alighted } — `alighted` is true once, on the fix where a ride
- * ends.
+ * Feed it each fix's GPS speed (m/s, may be null) and time (ms). `update`
+ * returns { riding, alighted } — `alighted` is true once, on the fix where
+ * a ride ends. `riding` starts a restored trip mid-ride.
  */
-export function createRideDetector() {
-  let riding = false;
+export function createRideDetector({ riding: startRiding = false } = {}) {
+  let riding = startRiding;
   let fast = 0;
   let slow = 0;
+  let slowSince = 0;
   return {
     get riding() {
       return riding;
     },
-    update(speed) {
+    update(speed, at) {
       if (!Number.isFinite(speed)) return { riding, alighted: false };
       fast = speed >= RIDING_MPS ? fast + 1 : 0;
       // Stopped fixes neither end a ride nor break a run of walking ones.
-      if (speed >= WALKING_MIN_MPS) slow = speed <= WALKING_MAX_MPS ? slow + 1 : 0;
+      if (speed >= WALKING_MIN_MPS) {
+        if (speed > WALKING_MAX_MPS) slow = 0;
+        else if (slow++ === 0) slowSince = at;
+      }
       if (!riding && fast >= RIDE_TICKS) riding = true;
-      else if (riding && slow >= WALK_TICKS) {
+      else if (riding && slow >= WALK_TICKS && at - slowSince >= WALK_MIN_MS) {
         riding = false;
         return { riding, alighted: true };
       }
