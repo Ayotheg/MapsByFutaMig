@@ -199,6 +199,9 @@ body.map-viewport {
   position: fixed;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: auto;
+  /* No browser pinch/double-tap zoom on the UI; .map sets its own
+     touch-action: none so Leaflet still gets the pinch. */
+  touch-action: pan-x pan-y;
 }
 
 #root {
