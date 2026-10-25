@@ -12,6 +12,7 @@ import { subscribeGps } from './gpsWatch';
 import { useOneShotLocation } from '../explore/useOneShotLocation';
 import { fmtDist as fmtDistAway } from '../search/chipConfig';
 import NavDestPanel from './NavDestPanel';
+import NavDestDesktop from './NavDestDesktop';
 import NavHud from './NavHud';
 import NavArrivedBanner from './NavArrivedBanner';
 import './navMapLayers.css';
@@ -437,6 +438,17 @@ const NavigationController = forwardRef(function NavigationController(
     setNavDest(initialDest);
     setDestPanelOpen(true);
   }, [initialDest, setNavDest]);
+
+  // Desktop's "Where to?" clear button.
+  const clearNavDest = useCallback(() => {
+    navDestRef.current = null;
+    setNavDestState(null);
+    removePersistentState('navigation-destination');
+    setDestInputValue('');
+    setDropdownResults([]);
+    setHint('');
+    setGoDisabled(true);
+  }, []);
 
   // ── Destination search — local index first, then debounced Nominatim ──
   const onDestInputChange = useCallback(
@@ -1339,14 +1351,13 @@ const NavigationController = forwardRef(function NavigationController(
     () =>
       (explorePicks || [])
         .filter((pick) => !pick.isPerson && !pick.isChannel && !pick.isBusiness)
-        .slice(0, 2)
-        .map((pick) => ({
-        ...pick,
-        distanceLabel:
-          userCoords && pick.lat != null && pick.lng != null
-            ? fmtDistAway(haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng))
-            : null,
-        })),
+        .slice(0, 3)
+        .map((pick) => {
+          const distance =
+            userCoords && pick.lat != null && pick.lng != null ? haversine(userCoords.lat, userCoords.lng, pick.lat, pick.lng) : null;
+          // Phones show "1.2km away" on two cards; desktop lists three with the metres.
+          return { ...pick, distance, distanceLabel: distance != null ? fmtDistAway(distance) : null };
+        }),
     [explorePicks, userCoords]
   );
 
@@ -1461,26 +1472,31 @@ const NavigationController = forwardRef(function NavigationController(
 
   return (
     <>
-      {destPanelOpen && (
-        <NavDestPanel
-          destInputValue={destInputValue}
-          onDestInputChange={onDestInputChange}
-          dropdownResults={dropdownResults}
-          onPickResult={setNavDest}
-          icon={searchIndex.icon}
-          highlight={searchIndex.highlight}
-          onGo={startNavigation}
-          goDisabled={goDisabled}
-          goLabel={goLabel}
-          hint={hint}
-          onClose={() => setDestPanelOpen(false)}
-          popularPlaces={popularPlaces}
-          onPopularPlaceSelect={(place) => setNavDest(place.waypoint)}
-          travelMode={travelMode}
-          onTravelModeChange={chooseTravelMode}
-          shuttleStop={shuttleStop}
-        />
-      )}
+      {destPanelOpen &&
+        (() => {
+          const panelProps = {
+            destInputValue,
+            onDestInputChange,
+            dropdownResults,
+            onPickResult: setNavDest,
+            icon: searchIndex.icon,
+            highlight: searchIndex.highlight,
+            onGo: startNavigation,
+            goDisabled,
+            goLabel,
+            hint,
+            onClose: () => setDestPanelOpen(false),
+            onPopularPlaceSelect: (place) => setNavDest(place.waypoint),
+            travelMode,
+            onTravelModeChange: chooseTravelMode,
+            shuttleStop,
+          };
+          return isMobile ? (
+            <NavDestPanel {...panelProps} popularPlaces={popularPlaces.slice(0, 2)} />
+          ) : (
+            <NavDestDesktop {...panelProps} popularPlaces={popularPlaces} hasDest={!!navDest} onClearDest={clearNavDest} />
+          );
+        })()}
       {navActive && (
         <NavHud
           arriving={hud.arriving}
