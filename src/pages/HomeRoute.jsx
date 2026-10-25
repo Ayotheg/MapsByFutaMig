@@ -120,8 +120,29 @@ function HomeRoute({ active = true }) {
     const meta = document.querySelector('meta[name="viewport"]');
     const original = meta?.getAttribute('content') ?? null;
     meta?.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+
+    // iOS Safari and recent Chrome ignore user-scalable=no, so block the
+    // page-level zoom gestures directly. preventDefault only cancels the
+    // browser's zoom; Leaflet still receives the events on the map.
+    const blockGesture = (e) => e.preventDefault();
+    const blockMultiTouch = (e) => {
+      if (e.touches.length > 1) e.preventDefault();
+    };
+    // Trackpad pinch / ctrl+scroll on desktop.
+    const blockCtrlWheel = (e) => {
+      if (e.ctrlKey) e.preventDefault();
+    };
+    const opts = { passive: false };
+    document.addEventListener('gesturestart', blockGesture, opts);
+    document.addEventListener('gesturechange', blockGesture, opts);
+    document.addEventListener('touchmove', blockMultiTouch, opts);
+    document.addEventListener('wheel', blockCtrlWheel, opts);
     return () => {
       if (original !== null) meta?.setAttribute('content', original);
+      document.removeEventListener('gesturestart', blockGesture, opts);
+      document.removeEventListener('gesturechange', blockGesture, opts);
+      document.removeEventListener('touchmove', blockMultiTouch, opts);
+      document.removeEventListener('wheel', blockCtrlWheel, opts);
     };
   }, [active]);
 
