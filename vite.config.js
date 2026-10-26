@@ -35,6 +35,13 @@ export default defineConfig({
   build: {
     rolldownOptions: {
       output: {
+        // CSS keeps a fixed name (no hash). Clarity recordings link to the CSS
+        // file and fetch it at playback; a hashed name is gone after the next
+        // deploy, so replays played unstyled. vercel.json revalidates *.css.
+        assetFileNames(info) {
+          const name = info.names?.[0] ?? info.name ?? ''
+          return name.endsWith('.css') ? 'assets/[name][extname]' : 'assets/[name]-[hash][extname]'
+        },
         manualChunks(id) {
           // leaflet-rotate (in the leaflet chunk) reads the global `L` as
           // soon as it runs, so the file that sets `window.L` must sit in

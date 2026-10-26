@@ -30,6 +30,10 @@ CSS Modules + Tailwind 4, Supabase (Postgres, Auth, Storage, Edge Functions), Re
 - Map corner prompts must wait while MapPage's `blocked` is true (see `whatsapp/ChannelPrompt.jsx`).
 - Landing page is prerendered: don't import the Supabase client into `src/pages/landing/`.
 - Supabase `numeric` columns arrive as strings: wrap in `Number()`.
+- Session replay (PostHog, Smartlook, Clarity) lives in `src/lib/sessionReplay.js`. Keep built CSS
+  at fixed names (`assetFileNames` in `vite.config.js`, revalidating `*.css` rule in `vercel.json`):
+  Clarity re-fetches CSS at playback, and hashed names vanish on the next deploy, so replays
+  play unstyled. Never re-add hashes to CSS or give `*.css` the year-long immutable cache.
 
 ## Backend (owned by the backend engineer; may change)
 - The database is live (Supabase `vzjlarvtssybglwzfrhi`, no staging). Ask before any change to it or any deploy.
