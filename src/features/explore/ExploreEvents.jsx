@@ -178,10 +178,13 @@ function EventRow({ event, onSelect }) {
  * rail; everything else, soonest first, is "Upcoming". With more featured
  * events than slots the rail rotates like the Places one, and Upcoming
  * then lists every event so none is only visible mid-rotation.
+ * `compact` (the half-open mobile sheet) shows just the rail, falling back
+ * to the soonest events when none are featured.
  */
-export function EventsList({ events, loading, size, onSelect, onSeeAll, sectionClassName }) {
+export function EventsList({ events, loading, size, compact, onSelect, onSeeAll, sectionClassName }) {
   const sorted = [...events].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
-  const featured = sorted.filter((e) => e.isFeatured);
+  const onlyFeatured = sorted.filter((e) => e.isFeatured);
+  const featured = compact && !onlyFeatured.length ? sorted.slice(0, FEATURED_SLOTS) : onlyFeatured;
   const rotating = featured.length > FEATURED_SLOTS;
   const sm = size === 'sm';
 
@@ -202,7 +205,7 @@ export function EventsList({ events, loading, size, onSelect, onSeeAll, sectionC
   return (
     <>
       <section className={sectionClassName}>
-        <SectionHeader title="Featured events" size={size} onSeeAll={featured.length ? onSeeAll : undefined} />
+        <SectionHeader title="Featured events" size={size} onSeeAll={featured.length || compact ? onSeeAll : undefined} />
         {/* Nothing listed yet: the rail still offers "Add your event". */}
         {!sorted.length && <p className={styles.emptyNote}>No events here yet. Be the first to list one.</p>}
         <div className={`${styles.rail} ${sm ? styles.railSm : ''}`}>
@@ -213,7 +216,7 @@ export function EventsList({ events, loading, size, onSelect, onSeeAll, sectionC
           <AddEventCard size={size} />
         </div>
       </section>
-      {upcoming.length > 0 && (
+      {!compact && upcoming.length > 0 && (
         <section className={sectionClassName}>
           <SectionHeader title="Upcoming" size={size} onSeeAll={onSeeAll} />
           <div className={`${styles.rows} ${sm ? styles.rowsSm : ''}`}>

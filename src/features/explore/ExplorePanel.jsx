@@ -17,6 +17,14 @@ const EventCard = lazy(() => import('./EventCard'));
 // interval" behavior the person asked for.
 const ROTATE_MS = 7000;
 const COMPACT_SLOTS = 2;
+// The half-open sheet cycles through the pills, Places first.
+const COMPACT_CATEGORIES = ['places', 'people', 'channels', 'events'];
+
+function categoryOf(pick) {
+  if (pick.isPerson) return 'people';
+  if (pick.isChannel) return 'channels';
+  return 'places';
+}
 
 function emptyLabel(category) {
   if (category === 'people') return 'No people featured yet.';
@@ -49,23 +57,34 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   // (rotation, "View All", the desktop panel below) behaves exactly as
   // before until someone actually taps one of the new pills.
   const [selectedCategory, setCategory] = useState('places');
-  // The half-open sheet has no switcher, so it always shows Places.
-  // Derived (not only reset in the effect below) so the first compact
-  // render after People/Channels doesn't flash the wrong category.
-  const category = variant === 'compact' ? 'places' : selectedCategory;
-  // …and going back to it resets the pick, so "See all" reopens on Places.
-  useEffect(() => {
-    if (variant === 'compact') setCategory('places');
-  }, [variant]);
-  const categorizedPicks = useMemo(
-    () =>
-      picks.filter((p) => {
-        if (category === 'people') return p.isPerson;
-        if (category === 'channels') return p.isChannel;
-        return !p.isPerson && !p.isChannel;
-      }),
-    [picks, category]
+  // Events: approved events (supabase/events.sql), fetched once the half
+  // sheet (which cycles to them) or the Events tab first shows.
+  const { events: allEvents, loading: eventsLoading } = useEvents(
+    variant === 'compact' || selectedCategory === 'events'
   );
+  // The half-open sheet has no switcher: it opens on Places, then fades
+  // through the other categories that have something, one per ROTATE_MS tick.
+  const compactCategories = useMemo(
+    () =>
+      COMPACT_CATEGORIES.filter((c) =>
+        c === 'events' ? allEvents.length > 0 : picks.some((p) => categoryOf(p) === c)
+      ),
+    [picks, allEvents]
+  );
+  const [compactTick, setCompactTick] = useState(0);
+  const compactCount = compactCategories.length || 1;
+  const compactCategory = compactCategories[compactTick % compactCount] || 'places';
+  // Derived (not only reset in the effect below) so the first compact
+  // render after the full sheet doesn't flash the wrong category.
+  const category = variant === 'compact' ? compactCategory : selectedCategory;
+  // Coming back to the half sheet starts again from Places.
+  useEffect(() => {
+    if (variant === 'compact') {
+      setCategory('places');
+      setCompactTick(0);
+    }
+  }, [variant]);
+  const categorizedPicks = useMemo(() => picks.filter((p) => categoryOf(p) === category), [picks, category]);
   const promoted = useMemo(
     () => categorizedPicks.filter((p) => p.isPromoted).sort(comparePicks),
     [categorizedPicks]
@@ -85,12 +104,25 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   const rotating = rotatingPool.length > (promoted.length ? 1 : COMPACT_SLOTS);
 
   useEffect(() => {
-    if (!rotating) return undefined;
+    if (variant === 'compact' || !rotating) return undefined;
     const id = setInterval(() => {
       setRotationIndex((i) => i + rotateStep);
     }, ROTATE_MS);
     return () => clearInterval(id);
-  }, [rotating, rotateStep]);
+  }, [variant, rotating, rotateStep]);
+
+  // Half sheet: each tick moves to the next category; a category's picks
+  // advance once per full lap, so every visit shows a fresh pair. Paused
+  // while an event card is open so it isn't swapped out from under it.
+  const compactCycles = compactCategories.length > 1;
+  const [openEvent, setOpenEvent] = useState(null);
+  useEffect(() => {
+    if (variant !== 'compact' || openEvent || (!compactCycles && !rotating)) return undefined;
+    const id = setInterval(() => setCompactTick((t) => t + 1), ROTATE_MS);
+    return () => clearInterval(id);
+  }, [variant, openEvent, compactCycles, rotating]);
+  const shownIndex =
+    variant === 'compact' ? (rotating ? Math.floor(compactTick / compactCount) * rotateStep : 0) : rotationIndex;
 
   const compactItems = useMemo(() => {
     if (!rotatingPool.length) return promoted.slice(0, COMPACT_SLOTS);
@@ -98,19 +130,15 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
     const need = Math.min(promoted.length ? COMPACT_SLOTS - 1 : COMPACT_SLOTS, rotatingPool.length);
     const items = [];
     for (let i = 0; i < need; i++) {
-      items.push(rotatingPool[(rotationIndex + i) % rotatingPool.length]);
+      items.push(rotatingPool[(shownIndex + i) % rotatingPool.length]);
     }
     return promoted.length ? [promoted[0], ...items] : items;
-  }, [promoted, rotatingPool, rotationIndex]);
+  }, [promoted, rotatingPool, shownIndex]);
 
   const fullItems = useMemo(() => [...promoted, ...organic], [promoted, organic]);
 
-  // Events tab: approved events (supabase/events.sql), fetched the first
-  // time the tab opens.
   const [eventFilter, setEventFilter] = useState('all');
-  const { events: allEvents, loading: eventsLoading } = useEvents(category === 'events');
   const events = useMemo(() => filterEvents(allEvents, eventFilter), [allEvents, eventFilter]);
-  const [openEvent, setOpenEvent] = useState(null);
   // EventCard's chunk loads on the first tap, then stays mounted so it can
   // slide out on close.
   const [eventCardLoaded, setEventCardLoaded] = useState(false);
@@ -236,14 +264,33 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
     );
   }
 
-  // Half-open sheet: just the Featured photos (still rotating). The
-  // Places/People/Channels switcher only appears once "See all" opens the
-  // full sheet.
+  // Half-open sheet: just the Featured photos, fading between categories.
+  // The switcher only appears once "See all" opens the full sheet, on
+  // whichever category was showing.
+  const seeAll = () => {
+    setCategory(category);
+    onViewAll?.();
+  };
+  if (category === 'events') {
+    return (
+      <div className={styles.panel}>
+        {header}
+        <EventsList
+          events={allEvents}
+          compact
+          sectionClassName={`${styles.section} ${styles.fadeIn}`}
+          onSelect={selectEvent}
+          onSeeAll={seeAll}
+        />
+        {eventCard}
+      </div>
+    );
+  }
   return (
     <div className={styles.panel}>
       {header}
-      <section className={styles.section}>
-        <SectionHeader title={featuredTitle(category)} onSeeAll={onViewAll} />
+      <section key={category} className={`${styles.section} ${styles.fadeIn}`}>
+        <SectionHeader title={featuredTitle(category)} onSeeAll={seeAll} />
         {compactItems.length === 0 ? (
           <div className={styles.empty}>{emptyLabel(category)}</div>
         ) : (

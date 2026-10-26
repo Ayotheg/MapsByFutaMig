@@ -41,6 +41,28 @@
   flex-direction: column;
 }
 
+/* Half sheet switching category. */
+.fadeIn {
+  animation: exploreFadeIn 0.45s var(--v2-ease-standard);
+}
+
+@keyframes exploreFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fadeIn {
+    animation: none;
+  }
+}
+
 .list {
   display: flex;
   flex-direction: column;
