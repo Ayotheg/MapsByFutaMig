@@ -15,6 +15,7 @@ import styles from './StatusAlert.module.css';
  * `autoRetryMs`: also call `onRetry({ auto: true })` on this interval while shown (skipped
  * while the browser is offline), with the icon spinning throughout —
  * people otherwise sit waiting for an alert that only retries on a tap.
+ * `yieldToOffline`: hidden while OfflineBanner's alert shows.
  */
 export default function StatusAlert({
   icon: Icon,
@@ -24,6 +25,7 @@ export default function StatusAlert({
   onRetry,
   retrySpinMs = 2000,
   autoRetryMs,
+  yieldToOffline = false,
   role = 'status',
 }) {
   const [retrying, setRetrying] = useState(false);
@@ -41,7 +43,7 @@ export default function StatusAlert({
   }, [autoRetrying, autoRetryMs]);
 
   return (
-    <div className={`${styles.alert} ${styles[tone] || ''}`} role={role}>
+    <div className={`${styles.alert} ${styles[tone] || ''} ${yieldToOffline ? styles.yields : ''}`} role={role}>
       <span className={styles.icon} aria-hidden="true">
         <Icon size={17} strokeWidth={2} />
       </span>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase, getPlaceImageUrl } from '../../lib/supabase';
 import { isTimeoutError } from '../../lib/networkTimeout';
 import { fetchAllRows } from '../../lib/fetchAllRows';
@@ -51,7 +51,12 @@ export function useSegments() {
   const [isOffline, setIsOffline] = useState(false);
   const [cachedAt, setCachedAt] = useState(null);
 
+  // Same guard as useWaypoints: an older load finishing late (a retry
+  // overlapping the 'online' refetch) mustn't overwrite a newer one.
+  const loadIdRef = useRef(0);
+
   const load = useCallback(async () => {
+    const loadId = ++loadIdRef.current;
     setLoading(true);
     setError(null);
 
@@ -64,7 +69,7 @@ export function useSegments() {
         setIsOffline(true);
         setCachedAt(cached.savedAt);
       } else {
-        setSegments([]);
+        // Keep whatever is already on screen.
         setError(new Error('offline'));
       }
       setLoading(false);
@@ -110,6 +115,8 @@ export function useSegments() {
           .order('seq', { ascending: true })
       ),
     ]);
+
+    if (loadId !== loadIdRef.current) return; // a newer load() superseded this one
 
     if (segErr || imgErr || wpErr || ptErr) {
       const timedOut = [segErr, imgErr, wpErr, ptErr].some(isTimeoutError);
@@ -180,33 +187,29 @@ export function useSegments() {
     cacheSet(CACHE_KEY, shaped);
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    load().catch((e) => {
-      if (!cancelled) {
+  // Every caller (first load, 'online', Retry) goes through this, so a
+  // throw never leaves `loading` stuck on.
+  const safeLoad = useCallback(
+    () =>
+      load().catch((e) => {
         setError(e);
         setLoading(false);
-      }
-    });
+      }),
+    [load]
+  );
 
+  useEffect(() => {
+    safeLoad();
     // Same auto-recover behavior as useWaypoints.js — refetch live data
     // the moment the browser regains connectivity, no manual refresh
     // needed.
-    const handleOnline = () => {
-      if (!cancelled) load();
-    };
-    window.addEventListener('online', handleOnline);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener('online', handleOnline);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    window.addEventListener('online', safeLoad);
+    return () => window.removeEventListener('online', safeLoad);
+  }, [safeLoad]);
 
   // Slice 5: exposed so the save flow can refresh the list after inserting
   // a new segment — the equivalent of legacy's `reloadAllWaypoints()` +
   // `drawSavedSegment(newSeg)` pair, just re-fetching instead of hand-
   // splicing the new row into local state.
-  return { segments, loading, error, isOffline, cachedAt, refetch: load };
+  return { segments, loading, error, isOffline, cachedAt, refetch: safeLoad };
 }

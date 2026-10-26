@@ -275,6 +275,7 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
           message="Retrying by itself. Check your connection."
           onRetry={({ auto } = {}) => tileWatchersRef.current.forEach((w) => w.retryNow({ force: !auto }))}
           autoRetryMs={6000}
+          yieldToOffline
         />
       )}
     </>

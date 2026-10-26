@@ -357,15 +357,24 @@ export default function MapPage({ onReadinessChange }) {
 
   // A load that failed with no saved copy to fall back on (first visit on a
   // bad network) leaves an empty map and, while the browser still says
-  // it's online, nothing retries it. Held through each retry's own loading
-  // so the alert doesn't flicker, cleared once a load succeeds.
-  const dataLoadError = waypointsError || segmentsError;
+  // it's online, nothing retries it. Only counted while that data is
+  // missing from the map, and not for the browser-offline case (the
+  // offline alert covers it). Held through each retry's own loading so the
+  // alert doesn't flicker; cleared once a load succeeds.
+  const missing = (error, list) => Boolean(error) && error.message !== 'offline' && list.length === 0;
+  const placesMissing = missing(waypointsError, waypoints);
+  const pathsMissing = missing(segmentsError, segments);
   const dataLoading = waypointsLoading || segmentsLoading;
-  const [dataLoadFailed, setDataLoadFailed] = useState(false);
+  const [dataLoadFailed, setDataLoadFailed] = useState(null); // 'places' | 'paths' | null
   useEffect(() => {
-    if (dataLoadError) setDataLoadFailed(true);
-    else if (!dataLoading) setDataLoadFailed(false);
-  }, [dataLoadError, dataLoading]);
+    if (placesMissing || pathsMissing) setDataLoadFailed(placesMissing ? 'places' : 'paths');
+    else if (!dataLoading) setDataLoadFailed(null);
+  }, [placesMissing, pathsMissing, dataLoading]);
+  // Retries only what failed, so working data isn't reloaded every time.
+  const handleRetryFailedData = useCallback(() => {
+    if (waypointsError) refetchWaypoints();
+    if (segmentsError) refetchSegments();
+  }, [waypointsError, segmentsError, refetchWaypoints, refetchSegments]);
 
   // Real boot-readiness signal for App's loading screen — the loading
   // flags this page already tracks for its own data hooks (map init,
@@ -810,6 +819,7 @@ export default function MapPage({ onReadinessChange }) {
         isOffline={isOffline}
         cachedAt={cachedAt}
         loadFailed={dataLoadFailed}
+        onRetryFailed={handleRetryFailedData}
         onRetry={handleRetryData}
       />
       {/* Pins are hidden during a trip by CSS (body.nav-active, see

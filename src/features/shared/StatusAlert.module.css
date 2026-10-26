@@ -125,7 +125,8 @@
   }
 }
 
-/* The offline card already explains a dead map; don't stack both. */
-:global(body.status-offline) .alert.warn {
+/* The offline card already explains a dead map; don't stack both. Only
+   the map alert yields (`yieldToOffline`), not the one setting the class. */
+:global(body.status-offline) .alert.yields {
   display: none;
 }

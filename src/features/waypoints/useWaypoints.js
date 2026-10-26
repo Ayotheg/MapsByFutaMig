@@ -66,7 +66,7 @@ export function useWaypoints() {
         setIsOffline(true);
         setCachedAt(cached.savedAt);
       } else {
-        setWaypoints([]);
+        // Keep whatever is already on screen.
         setError(new Error('offline'));
       }
       setLoading(false);
@@ -352,34 +352,30 @@ export function useWaypoints() {
     cacheSet(CACHE_KEY, full); // last-known-good, for next time the network's bad
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    load().catch((e) => {
-      if (!cancelled) {
+  // Every caller (first load, 'online', Retry) goes through this, so a
+  // throw never leaves `loading` stuck on.
+  const safeLoad = useCallback(
+    () =>
+      load().catch((e) => {
         setError(e);
         setLoading(false);
-      }
-    });
+      }),
+    [load]
+  );
 
+  useEffect(() => {
+    safeLoad();
     // Auto-recover: if we booted (or fell back) while offline/on a bad
     // connection, don't leave the user staring at a stale cache forever —
     // the instant the browser reports connectivity again, quietly refetch
     // live data in the background. `load()` swaps in the fresh result
     // itself (and flips isOffline back to false) once it lands, so this
     // needs no extra state here.
-    const handleOnline = () => {
-      if (!cancelled) load();
-    };
-    window.addEventListener('online', handleOnline);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener('online', handleOnline);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    window.addEventListener('online', safeLoad);
+    return () => window.removeEventListener('online', safeLoad);
+  }, [safeLoad]);
 
   // Slice 5: exposed so the save flow can refresh waypoints after inserting
   // new ones tied to a just-saved segment (legacy's `reloadAllWaypoints()`).
-  return { waypoints, loading, error, isOffline, cachedAt, refetch: load };
+  return { waypoints, loading, error, isOffline, cachedAt, refetch: safeLoad };
 }
