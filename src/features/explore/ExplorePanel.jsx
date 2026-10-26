@@ -16,6 +16,9 @@ const EventCard = lazy(() => import('./EventCard'));
 // feels alive rather than static — matches the "casual/fun, changes with
 // interval" behavior the person asked for.
 const ROTATE_MS = 7000;
+// The half sheet moves faster: people skim it, then use the pills once
+// "See all" is open.
+const COMPACT_ROTATE_MS = 5000;
 const COMPACT_SLOTS = 2;
 // The half-open sheet cycles through the pills, Places first.
 const COMPACT_CATEGORIES = ['places', 'people', 'channels', 'events'];
@@ -71,19 +74,22 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
       ),
     [picks, allEvents]
   );
-  const [compactTick, setCompactTick] = useState(0);
-  const compactCount = compactCategories.length || 1;
-  const compactCategory = compactCategories[compactTick % compactCount] || 'places';
-  // Derived (not only reset in the effect below) so the first compact
-  // render after the full sheet doesn't flash the wrong category.
-  const category = variant === 'compact' ? compactCategory : selectedCategory;
-  // Coming back to the half sheet starts again from Places.
-  useEffect(() => {
+  // Which category the half sheet is on, by key (so events or picks
+  // arriving mid-cycle don't make it jump), and how many full laps it has
+  // made (each lap shows the next picks).
+  const [cycle, setCycle] = useState({ key: 'places', lap: 0 });
+  // Coming back to the half sheet starts again from Places. Reset during
+  // render, not in an effect, so the first frame isn't the old category.
+  const [prevVariant, setPrevVariant] = useState(variant);
+  if (variant !== prevVariant) {
+    setPrevVariant(variant);
     if (variant === 'compact') {
       setCategory('places');
-      setCompactTick(0);
+      setCycle({ key: 'places', lap: 0 });
     }
-  }, [variant]);
+  }
+  const compactCategory = compactCategories.includes(cycle.key) ? cycle.key : compactCategories[0] || 'places';
+  const category = variant === 'compact' ? compactCategory : selectedCategory;
   const categorizedPicks = useMemo(() => picks.filter((p) => categoryOf(p) === category), [picks, category]);
   const promoted = useMemo(
     () => categorizedPicks.filter((p) => p.isPromoted).sort(comparePicks),
@@ -118,11 +124,17 @@ export default function ExplorePanel({ picks, loading, variant = 'compact', onVi
   const [openEvent, setOpenEvent] = useState(null);
   useEffect(() => {
     if (variant !== 'compact' || openEvent || (!compactCycles && !rotating)) return undefined;
-    const id = setInterval(() => setCompactTick((t) => t + 1), ROTATE_MS);
+    const id = setInterval(() => {
+      setCycle(({ key, lap }) => {
+        // A key that dropped out was showing as the first category.
+        const i = Math.max(0, compactCategories.indexOf(key));
+        const wraps = i + 1 >= compactCategories.length;
+        return { key: compactCategories[wraps ? 0 : i + 1] || 'places', lap: wraps ? lap + 1 : lap };
+      });
+    }, COMPACT_ROTATE_MS);
     return () => clearInterval(id);
-  }, [variant, openEvent, compactCycles, rotating]);
-  const shownIndex =
-    variant === 'compact' ? (rotating ? Math.floor(compactTick / compactCount) * rotateStep : 0) : rotationIndex;
+  }, [variant, openEvent, compactCycles, rotating, compactCategories]);
+  const shownIndex = variant === 'compact' ? (rotating ? cycle.lap * rotateStep : 0) : rotationIndex;
 
   const compactItems = useMemo(() => {
     if (!rotatingPool.length) return promoted.slice(0, COMPACT_SLOTS);

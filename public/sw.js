@@ -41,6 +41,11 @@ const MAX_PHOTO_BYTES = 800 * 1024;
 const DEFAULT_TILE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_STALE_MS = 30 * 24 * 60 * 60 * 1000;
 
+// A tile request that hangs never loads or errors, so the map stays blank
+// and the page can't tell it to retry. Give up on the CORS copy after this
+// and hand the request to the browser instead.
+const TILE_FETCH_TIMEOUT_MS = 8000;
+
 const CACHED_AT = 'x-sw-cached-at';
 const TTL_MS = 'x-sw-ttl-ms';
 
@@ -122,7 +127,7 @@ async function corsFetch(url, ms) {
 }
 
 async function refreshTile(cache, key) {
-  const res = await corsFetch(key, 0);
+  const res = await corsFetch(key, TILE_FETCH_TIMEOUT_MS);
   if (res.ok) await store(cache, key, res, MAX_TILES, 0);
 }
 
@@ -144,11 +149,19 @@ async function handleTile(event, req) {
 
   let res;
   try {
-    res = await corsFetch(key, 0);
+    res = await corsFetch(key, TILE_FETCH_TIMEOUT_MS);
   } catch {
-    // Network down. Try the browser's own no-cors request (covers hosts
-    // without CORS); it just won't be cached.
-    return cached || fetch(req);
+    // Network down or timed out. Try the browser's own no-cors request
+    // (covers hosts without CORS); it just won't be cached. Timed out too,
+    // so a stall surfaces as a tile error the page retries.
+    if (cached) return cached;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TILE_FETCH_TIMEOUT_MS);
+    try {
+      return await fetch(req, { signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
   }
   // Non-2xx (e.g. a 403/429 block tile): pass through untouched, never cache.
   if (!res.ok) return cached || res;

@@ -123,6 +123,19 @@ assert.equal(r.status, 200); assert.equal(n, 2);
 assert.equal(cacheSize('mbf-tiles-v3'), before);
 console.log('ok 5: no-CORS host falls back, not cached');
 
+// 5b. CORS request hangs → abandoned after the timeout, browser fetch used
+const T5 = 'https://tile.openstreetmap.org/16/7/7.png';
+const realSetTimeout = globalThis.setTimeout;
+globalThis.setTimeout = (fn) => realSetTimeout(fn, 0); // skip the 8s wait
+fetchImpl = (a, o) =>
+  o && o.mode === 'cors'
+    ? new Promise((_, reject) => o.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))))
+    : Promise.resolve(ok(png()));
+r = await req(T5);
+globalThis.setTimeout = realSetTimeout;
+assert.equal(r.status, 200, 'stalled tile falls back instead of hanging');
+console.log('ok 5b: stalled CORS tile request times out to browser fetch');
+
 // 6. 403 block tile passes through, never cached
 fetchImpl = async () => new Response(png(), { status: 403, headers: { 'content-type': 'image/png' } });
 r = await req('https://tile.openstreetmap.org/18/9/9.png');

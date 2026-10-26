@@ -38,8 +38,8 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
   // Shown when the tile layer is clearly not loading (see tileHealth.js).
-  // Failed tiles keep retrying in the background meanwhile; the alert's
-  // Retry button just retries them all now instead of reloading the page.
+  // Failed tiles keep retrying in the background meanwhile, and the alert
+  // retries them all every few seconds on its own (Retry does it now).
   // Stays until the failing tiles load (no close button in the design).
   const [tileAlert, setTileAlert] = useState(false);
   const tileWatchersRef = useRef(new Set());
@@ -88,6 +88,10 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
 
     // Tile retry + "map isn't loading" alert — see tileHealth.js.
     const tileWatchers = tileWatchersRef.current;
+    // Navigation waits on this (waitForMapTiles) so a trip never starts
+    // over a blank map.
+    map._tilesReady = false;
+    map._retryTiles = () => tileWatchers.forEach((w) => w.retryNow());
     const watchTiles = (layer) => {
       const watcher = watchTileLayer(layer, {
         onProblem: () => setTileAlert(true),
@@ -95,6 +99,11 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       });
       tileWatchers.add(watcher);
       layer.once('remove', () => tileWatchers.delete(watcher));
+      layer.once('tileload', () => {
+        if (map._tilesReady) return;
+        map._tilesReady = true;
+        map.fire('basetilesready');
+      });
     };
 
     // ── Base tile: built from the style catalogue in `basemaps.js` so the
@@ -154,6 +163,8 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       // "this._map is null" in `_tileReady`), while the real old layer
       // was silently leaked underneath it.
       setTileAlert(false); // fresh layer, fresh chance — its own watcher re-raises if needed
+      // The old layer goes within 300ms, so navigation waits on the new one.
+      map._tilesReady = false;
       const oldLayer = baseMapLayer;
       const nextLayer = buildBaseLayer(styleId).addTo(map);
       nextLayer.once('load', () => {
@@ -261,8 +272,9 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
           tone="warn"
           role="alert"
           title="Map isn't loading"
-          message="Still trying. Check your connection or retry."
-          onRetry={() => tileWatchersRef.current.forEach((w) => w.retryNow())}
+          message="Retrying by itself. Check your connection."
+          onRetry={({ auto } = {}) => tileWatchersRef.current.forEach((w) => w.retryNow({ force: !auto }))}
+          autoRetryMs={6000}
         />
       )}
     </>

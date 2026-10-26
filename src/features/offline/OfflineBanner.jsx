@@ -74,6 +74,9 @@ export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
       // Data hooks resolve (success or fail-again) within their own 8s
       // timeout, so the spin stops then either way.
       retrySpinMs={8000}
+      // Keeps trying on its own (only while the browser says it's online —
+      // a dropped connection already refetches on the 'online' event).
+      autoRetryMs={20000}
     />
   );
 }

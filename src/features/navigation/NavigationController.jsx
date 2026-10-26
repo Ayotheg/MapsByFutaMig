@@ -10,6 +10,7 @@ import { turnIcon, fmtDist, startDirection, TURN_ICONS } from './turnHelpers';
 import { fmtDist as fmtDistAway } from '../search/chipConfig';
 import { createPlanCache } from './routePlans';
 import { NAV_START_ZOOM } from './gpsConstants';
+import { waitForMapTiles } from '../map/tileHealth';
 import { subscribeGps } from './gpsWatch';
 import { useOneShotLocation } from '../explore/useOneShotLocation';
 import NavDestPanel from './NavDestPanel';
@@ -36,6 +37,9 @@ const END_NEAR_DEST_M = 50;
 // The "Please wait" cover after a resume gives up waiting for a usable fix
 // after this long; the HUD keeps updating once one arrives.
 const RESUME_MAX_WAIT_MS = 15000;
+// A trip doesn't start over a blank map: once GPS and the route are ready,
+// wait up to this long for the map to show, then ask them to try again.
+const MAP_TILES_WAIT_MS = 15000;
 // The old shortcut-learning trace; cleared so it doesn't linger in storage.
 const TRACE_KEY = 'navigation-trace';
 // Travel mode → OSRM profile at the start of a trip (osrmRoute.js). Ride
@@ -1144,12 +1148,13 @@ const NavigationController = forwardRef(function NavigationController(
       setGoDisabled(true);
       setGoLabel('Getting your location…');
 
-      // The destination was changed or cleared while this was waiting:
-      // don't start a trip to a place that's no longer picked.
+      // The destination was changed or cleared, or the panel closed, while
+      // this was waiting: they've changed their mind, so don't start.
       function abortStart() {
         setGoDisabled(!navDestRef.current);
         setGoLabel('Start Navigation');
       }
+      const startCancelled = () => navDestRef.current !== dest || !destPanelOpenRef.current;
 
       // Smart location resolver — ported from app.js ~4991–5018.
       async function resolveStartPosition() {
@@ -1186,7 +1191,7 @@ const NavigationController = forwardRef(function NavigationController(
         return;
       }
       if (!mountedRef.current) return;
-      if (navDestRef.current !== dest) return abortStart();
+      if (startCancelled()) return abortStart();
 
       const { latitude: lat, longitude: lng } = pos.coords;
       navUserPosRef.current = { lat, lng };
@@ -1215,7 +1220,21 @@ const NavigationController = forwardRef(function NavigationController(
         return;
       }
       if (!mountedRef.current) return;
-      if (navDestRef.current !== dest) return abortStart();
+      if (startCancelled()) return abortStart();
+
+      if (!map._tilesReady) {
+        setGoLabel('Loading the map…');
+        const tilesOk = await waitForMapTiles(map, MAP_TILES_WAIT_MS);
+        if (!mountedRef.current) return;
+        if (startCancelled()) return abortStart();
+        if (!tilesOk) {
+          setGoDisabled(false);
+          setGoLabel('Start Navigation');
+          setHint("The map isn't loading yet. Check your connection and try again.");
+          track('error_occurred', { context: 'nav_map_tiles', message: 'tiles not loaded' });
+          return;
+        }
+      }
       navRouteDataRef.current = { ...routeData, profile: navModeRef.current };
 
       setDestPanelOpen(false);

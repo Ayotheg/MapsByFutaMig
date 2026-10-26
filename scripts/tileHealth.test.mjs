@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 import {
   watchTileLayer, TILE_STALL_MS, TILE_FAIL_THRESHOLD, TILE_GIVEUP_THRESHOLD, TILE_MAX_RETRIES,
-  TILE_BG_FIRST_MS, TILE_BG_MAX_MS,
+  TILE_BG_FIRST_MS, TILE_BG_MAX_MS, TILE_REDRAW_GAP_MS,
 } from '../src/features/map/tileHealth.js';
 
 function stubLayer() {
@@ -105,6 +105,24 @@ mock.timers.enable({ apis: ['setTimeout'] });
   layer.fire('tileerror', { tile }); mock.timers.tick(60000); assert.equal(assigns, 0);
   online = true; retryNow(); assert.equal(assigns, 1);
   console.log('ok 7c: no retries while offline, all at once when back'); }
+
+// 7d. stalled map (requests hang, nothing errors or loads): a Retry tap
+//     redraws at once; automatic retries redraw at most every
+//     TILE_REDRAW_GAP_MS so slow tiles get to finish; a map that has shown
+//     tiles is never redrawn (e.g. by the online event)
+{ const { layer, retryNow } = setup(); let redraws = 0; layer.redraw = () => redraws++;
+  mock.timers.tick(TILE_STALL_MS); retryNow(); assert.equal(redraws, 0, 'auto retry waits for the gap');
+  retryNow({ force: true }); assert.equal(redraws, 1, 'Retry tap redraws now');
+  mock.timers.tick(TILE_REDRAW_GAP_MS - 1); retryNow(); assert.equal(redraws, 1);
+  mock.timers.tick(1); retryNow(); assert.equal(redraws, 2, 'auto retry redraws after the gap');
+  layer.fire('tileload', {});
+  mock.timers.tick(TILE_REDRAW_GAP_MS); retryNow(); retryNow({ force: true });
+  assert.equal(redraws, 2, 'loaded map never redrawn');
+  const tile = mkTile(); let assigns = 0; let src = tile.src;
+  Object.defineProperty(tile, 'src', { get: () => src, set: (v) => { assigns++; src = v; } });
+  layer.fire('tileerror', { tile }); retryNow();
+  assert.equal(assigns, 1, 'only the failed tile is refetched');
+  console.log('ok 7d: stalled map re-requested, slow or loaded maps left alone'); }
 
 // 8. offline → no alert (OfflineBanner covers it), and it can still fire once online
 { let online = false; const { layer, log } = setup({ isOnline: () => online });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
+import { useOnlineStatus } from '../../lib/useOnlineStatus';
 import styles from './StatusAlert.module.css';
 
 /**
@@ -11,11 +12,33 @@ import styles from './StatusAlert.module.css';
  * `tone`: 'warn' (amber map icon) | 'offline' (grey on violet tint) |
  * 'ok' (teal). `retrySpinMs`: how long the Retry icon spins after a tap,
  * since the callers don't report when their retry finishes.
+ * `autoRetryMs`: also call `onRetry({ auto: true })` on this interval while shown (skipped
+ * while the browser is offline), with the icon spinning throughout —
+ * people otherwise sit waiting for an alert that only retries on a tap.
  */
-export default function StatusAlert({ icon: Icon, tone, title, message, onRetry, retrySpinMs = 2000, role = 'status' }) {
+export default function StatusAlert({
+  icon: Icon,
+  tone,
+  title,
+  message,
+  onRetry,
+  retrySpinMs = 2000,
+  autoRetryMs,
+  role = 'status',
+}) {
   const [retrying, setRetrying] = useState(false);
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  const onRetryRef = useRef(onRetry);
+  onRetryRef.current = onRetry;
+  const online = useOnlineStatus();
+  const autoRetrying = Boolean(onRetry && autoRetryMs && online);
+  useEffect(() => {
+    if (!autoRetrying) return undefined;
+    const id = setInterval(() => onRetryRef.current?.({ auto: true }), autoRetryMs);
+    return () => clearInterval(id);
+  }, [autoRetrying, autoRetryMs]);
 
   return (
     <div className={`${styles.alert} ${styles[tone] || ''}`} role={role}>
@@ -38,7 +61,12 @@ export default function StatusAlert({ icon: Icon, tone, title, message, onRetry,
             timer.current = setTimeout(() => setRetrying(false), retrySpinMs);
           }}
         >
-          <RefreshCw size={16} strokeWidth={2.25} className={retrying ? styles.spinning : undefined} aria-hidden="true" />
+          <RefreshCw
+            size={16}
+            strokeWidth={2.25}
+            className={retrying || autoRetrying ? styles.spinning : undefined}
+            aria-hidden="true"
+          />
           Retry
         </button>
       )}
