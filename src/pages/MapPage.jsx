@@ -120,6 +120,7 @@ export default function MapPage({ onReadinessChange }) {
   const {
     waypoints,
     loading: waypointsLoading,
+    error: waypointsError,
     isOffline: waypointsOffline,
     cachedAt: waypointsCachedAt,
     refetch: refetchWaypoints,
@@ -128,6 +129,7 @@ export default function MapPage({ onReadinessChange }) {
   const {
     segments,
     loading: segmentsLoading,
+    error: segmentsError,
     isOffline: segmentsOffline,
     cachedAt: segmentsCachedAt,
     refetch: refetchSegments,
@@ -352,6 +354,18 @@ export default function MapPage({ onReadinessChange }) {
   // Without browserOnline in the mix, that second case triggers nothing.
   const isOffline = !browserOnline || waypointsOffline || segmentsOffline;
   const cachedAt = waypointsCachedAt || segmentsCachedAt || null;
+
+  // A load that failed with no saved copy to fall back on (first visit on a
+  // bad network) leaves an empty map and, while the browser still says
+  // it's online, nothing retries it. Held through each retry's own loading
+  // so the alert doesn't flicker, cleared once a load succeeds.
+  const dataLoadError = waypointsError || segmentsError;
+  const dataLoading = waypointsLoading || segmentsLoading;
+  const [dataLoadFailed, setDataLoadFailed] = useState(false);
+  useEffect(() => {
+    if (dataLoadError) setDataLoadFailed(true);
+    else if (!dataLoading) setDataLoadFailed(false);
+  }, [dataLoadError, dataLoading]);
 
   // Real boot-readiness signal for App's loading screen — the loading
   // flags this page already tracks for its own data hooks (map init,
@@ -795,6 +809,7 @@ export default function MapPage({ onReadinessChange }) {
       <OfflineBanner
         isOffline={isOffline}
         cachedAt={cachedAt}
+        loadFailed={dataLoadFailed}
         onRetry={handleRetryData}
       />
       {/* Pins are hidden during a trip by CSS (body.nav-active, see

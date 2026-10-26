@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, WifiOff } from 'lucide-react';
+import { Check, MapPinOff, WifiOff } from 'lucide-react';
 import StatusAlert from '../shared/StatusAlert';
 
 // Unlike SubmissionToast, this does NOT auto-dismiss while offline. A
@@ -27,7 +27,9 @@ function formatAge(cachedAt) {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
-export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
+// `loadFailed`: places/paths failed to load with no saved copy, while the
+// browser is online — shown as its own alert that keeps retrying.
+export default function OfflineBanner({ isOffline, cachedAt, loadFailed, onRetry }) {
   // Tracks the transition, not just the current state — going from
   // offline -> online is worth a brief "you're back" confirmation, going
   // straight to "online, nothing to say" shouldn't render anything at all.
@@ -51,10 +53,26 @@ export default function OfflineBanner({ isOffline, cachedAt, onRetry }) {
 
   // Lets the "map isn't loading" alert step aside while this one shows
   // (StatusAlert.module.css).
+  const showLoadFailed = phase === 'hidden' && loadFailed;
   useEffect(() => {
-    document.body.classList.toggle('status-offline', phase === 'offline');
+    document.body.classList.toggle('status-offline', phase === 'offline' || showLoadFailed);
     return () => document.body.classList.remove('status-offline');
-  }, [phase]);
+  }, [phase, showLoadFailed]);
+
+  if (showLoadFailed) {
+    return (
+      <StatusAlert
+        icon={MapPinOff}
+        tone="warn"
+        role="alert"
+        title="Places didn't load"
+        message="Retrying by itself. Check your connection."
+        onRetry={onRetry}
+        retrySpinMs={8000}
+        autoRetryMs={20000}
+      />
+    );
+  }
 
   if (phase === 'hidden') return null;
 
