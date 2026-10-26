@@ -1,16 +1,21 @@
-// PostHog session replay. Off when POSTHOG_PROJECT_TOKEN is unset and in
-// `vite dev`, so only real visits are recorded.
+// Session replay: PostHog and Smartlook, both off in `vite dev` so only real
+// visits are recorded. PostHog is also off when POSTHOG_PROJECT_TOKEN is unset.
 //
-// inlineStylesheet copies the CSS into each recording. Without it a replay
-// links to the hashed /assets/*.css of the build it was recorded on, and
-// every deploy to main deletes that file, so old sessions play unstyled.
-// maskAllInputs hides typed text (emails, passwords, promo codes).
+// inlineStylesheet copies the CSS into each PostHog recording. Without it a
+// replay links to the hashed /assets/*.css of the build it was recorded on,
+// and every deploy to main deletes that file, so old sessions play unstyled.
+// maskAllInputs hides typed text (emails, passwords, promo codes); Smartlook
+// masks inputs by default.
 
 const KEY = import.meta.env.POSTHOG_PROJECT_TOKEN
 const HOST = import.meta.env.POSTHOG_HOST || 'https://us.i.posthog.com'
+// Public: Smartlook's key ships in the page either way.
+const SMARTLOOK_KEY = '225c8892c116fe0b8b7c7542c3ce5a7a0bf0b87f'
 
 export function initSessionReplay() {
-  if (!KEY || !import.meta.env.PROD) return
+  if (!import.meta.env.PROD) return
+  initSmartlook()
+  if (!KEY) return
   // Own chunk, loaded after `load`, so it never delays the first paint.
   import('posthog-js')
     .then(({ default: posthog }) => {
@@ -25,4 +30,16 @@ export function initSessionReplay() {
       })
     })
     .catch(() => {})
+}
+
+function initSmartlook() {
+  if (window.smartlook) return
+  // Queues calls until recorder.js arrives.
+  const smartlook = (window.smartlook = (...args) => smartlook.api.push(args))
+  smartlook.api = []
+  const script = document.createElement('script')
+  script.async = true
+  script.src = 'https://web-sdk.smartlook.com/recorder.js'
+  document.head.appendChild(script)
+  smartlook('init', SMARTLOOK_KEY, { region: 'eu' })
 }
