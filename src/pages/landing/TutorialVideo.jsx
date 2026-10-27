@@ -15,6 +15,7 @@ function TutorialVideo() {
   const videoRef = useRef(null)
   const [pastHero, setPastHero] = useState(false)
   const [playing, setPlaying] = useState(false)
+  const [inPip, setInPip] = useState(false)
   const [dismissed, setDismissed] = useState(() => {
     try { return sessionStorage.getItem('tutorialDismissed') === '1' } catch { return false }
   })
@@ -27,8 +28,26 @@ function TutorialVideo() {
     return () => io.disconnect()
   }, [])
 
+  // React has no PiP events. Fallback for browsers that ignore
+  // disablePictureInPicture: hide the empty card while PiP is open.
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    const enter = () => setInPip(true)
+    const leave = () => setInPip(false)
+    const webkitMode = () => setInPip(v.webkitPresentationMode === 'picture-in-picture')
+    v.addEventListener('enterpictureinpicture', enter)
+    v.addEventListener('leavepictureinpicture', leave)
+    v.addEventListener('webkitpresentationmodechanged', webkitMode)
+    return () => {
+      v.removeEventListener('enterpictureinpicture', enter)
+      v.removeEventListener('leavepictureinpicture', leave)
+      v.removeEventListener('webkitpresentationmodechanged', webkitMode)
+    }
+  }, [])
+
   // Stay on screen while playing even if the user scrolls back up.
-  const shown = pastHero || playing
+  const shown = (pastHero || playing) && !inPip
 
   // Muted looping preview once the card appears (browsers only allow
   // muted autoplay). Skipped for Save-Data / reduced-motion visitors.
@@ -77,6 +96,9 @@ function TutorialVideo() {
           muted
           loop
           playsInline
+          // iOS moves the video into a PiP window on fullscreen exit,
+          // leaving this card as an empty black box.
+          disablePictureInPicture
           controls={playing}
           onEnded={() => setPlaying(false)}
         />
