@@ -592,7 +592,7 @@ export default function MapPage({ onReadinessChange }) {
 
   // Same principle as `closeOtherOverlays` above, applied to the mobile
   // sheet specifically: every path that opens it (tab taps inside
-  // `MobileSheet.jsx`, the search bar's "toggle sheet" button) goes
+  // `MobileSheet.jsx`) goes
   // through `onSheetStateChange`, so wrapping that one prop covers all of
   // them at once rather than editing each call site inside that file.
   // Collapsing the sheet (`next === 'peek'`) doesn't need to close

@@ -128,7 +128,8 @@ html {
   animation: playPulse 2.2s ease-out infinite;
 }
 
-/* Floating install tutorial (TutorialVideo.jsx) — vertical card, bottom-right. */
+/* Floating install tutorial (TutorialVideo.jsx) — vertical card, bottom-right.
+   New work, so v2 brand tokens rather than the --land-* set. */
 .tutorial-float {
   position: fixed;
   right: 24px;
@@ -152,10 +153,10 @@ html {
   position: relative;
   aspect-ratio: 9 / 16;
   overflow: hidden;
-  background: var(--land-text-primary);
-  border: 1px solid var(--land-border);
-  border-radius: var(--land-radius-card);
-  box-shadow: 0 20px 50px rgba(20,10,40,0.18);
+  background: var(--v2-neutral);
+  border: 1px solid var(--v2-divider);
+  border-radius: var(--r-lg);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
 }
 .tutorial-frame video {
   width: 100%;
@@ -174,24 +175,25 @@ html {
   border: none;
   padding: 0;
   cursor: pointer;
-  background: rgba(10,6,20,0.28);
+  background: rgba(15, 23, 42, 0.25);
 }
 .tutorial-play-icon {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: var(--land-accent);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .tutorial-label {
-  font-family: Poppins, sans-serif;
+  font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  background: rgba(10,6,20,0.45);
-  border-radius: var(--land-radius-pill);
+  color: var(--v2-on-primary);
+  background: var(--v2-scrim);
+  border-radius: var(--r-full);
   padding: 4px 12px;
 }
 .tutorial-close {
@@ -202,14 +204,14 @@ html {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 1px solid var(--land-border);
-  background: var(--land-surface);
-  color: var(--land-text-primary);
+  border: 1px solid var(--v2-divider);
+  background: var(--v2-on-primary);
+  color: var(--v2-neutral);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(20,10,40,0.12);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
 }
 @media (max-width: 720px) {
   .tutorial-float { right: 16px; bottom: 16px; width: 104px; }
@@ -232,6 +234,9 @@ html {
   }
   .play-pulse {
     animation: none !important;
+  }
+  .tutorial-float {
+    transition: none !important;
   }
   /* Slice 11 fix: TrustBar's marquee (.animate-ticker) was the one
      infinite-loop animation on the page with no reduced-motion fallback

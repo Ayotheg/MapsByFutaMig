@@ -54,7 +54,6 @@
   border: none;
   display: flex;
   align-items: center;
-  gap: 8px;
   padding: 0 4px;
   cursor: pointer;
   text-align: left;
@@ -63,7 +62,7 @@
 .placeholder {
   font-family: var(--v2-font-geist);
   font-size: 16px;
-  color: var(--v2-text-variant);
+  color: var(--v2-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

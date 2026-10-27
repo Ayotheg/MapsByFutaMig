@@ -83,7 +83,7 @@
   caret-color: var(--v2-primary);
 }
 .input::placeholder {
-  color: var(--v2-text-variant);
+  color: var(--v2-text-muted);
 }
 
 .clearBtn {
@@ -106,10 +106,6 @@
 .clearBtn:hover {
   background: var(--v2-primary-outline);
   color: var(--v2-text);
-}
-
-.actionDivider {
-  width: 0;
 }
 
 .navBtn {

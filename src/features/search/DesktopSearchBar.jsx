@@ -230,6 +230,7 @@ export default function DesktopSearchBar({
           ref={inputRef}
           className={styles.input}
           placeholder="Search FUTA campus…"
+          aria-label="Search FUTA campus"
           value={query}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
@@ -240,7 +241,6 @@ export default function DesktopSearchBar({
             <X size={14} />
           </button>
         )}
-        <div className={styles.actionDivider} />
         <button className={styles.navBtn} onClick={handleNavClick} title="Navigate" type="button">
           <Navigation size={15} />
         </button>
