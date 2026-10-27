@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, X, Navigation, Menu } from 'lucide-react';
+import { X, Navigation, Heart } from 'lucide-react';
+import { CROWDR_CAMPAIGN_URL } from '../../lib/donate';
 import { fetchNominatim } from './nominatimSearch';
 import { useSelectResult } from './useSelectResult';
 import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
@@ -37,6 +38,10 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
  * the pairing rule this reused the mobile session's fresh choices
  * rather than reinventing them.
  *
+ * The pill's left button is the donate heart (Crowdr). It replaced the
+ * old menu button, which only duplicated the sidebar rail's Explore item.
+ * No search icon: it sat right next to the heart and the two clashed.
+ *
  * Follow-up (this session, Figma node 4:249): the results `.dropdown`
  * and shared `SearchDropdownList`/`SearchResultItem` are now also v2 —
  * MobileSearchOverlay (which shares this list verbatim) got its own
@@ -50,7 +55,6 @@ export default function DesktopSearchBar({
   searchIndex,
   onSelect,
   collapsed,
-  onToggleCollapsed,
   onManualType,
   activeChipLabel,
   onNavigateClick,
@@ -194,11 +198,6 @@ export default function DesktopSearchBar({
     inputRef.current?.focus();
   }
 
-  function handleLogoClick() {
-    onToggleCollapsed?.(!collapsed);
-    setTimeout(() => map?.invalidateSize({ animate: false }), 0);
-  }
-
   function handleNavClick() {
     // Was a no-op stub left over from before Slice 9's navigation feature
     // was built (comment said "inert until Slice 9" — Slice 9 is done now,
@@ -215,11 +214,18 @@ export default function DesktopSearchBar({
   return (
     <div ref={barRef} className={styles.bar} style={collapsed ? { left: 'calc(var(--sidebar-rail-w) + 16px)' } : undefined}>
       <div className={styles.pill}>
-        <button className={styles.logoBtn} onClick={handleLogoClick} title="Explore" type="button">
-          <Menu size={16} />
-        </button>
+        <a
+          className={styles.logoBtn}
+          href={CROWDR_CAMPAIGN_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Support Maps By FUTA"
+          title="Support Maps By FUTA"
+          onClick={() => track('donate_click', { source: 'search_bar' })}
+        >
+          <Heart size={16} />
+        </a>
         <div className={styles.divider} />
-        <Search size={15} className={styles.searchIcon} />
         <input
           ref={inputRef}
           className={styles.input}

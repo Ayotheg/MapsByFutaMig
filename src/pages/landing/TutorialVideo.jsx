@@ -46,8 +46,39 @@ function TutorialVideo() {
     }
   }, [])
 
+  // Heading to the map: fade out right away instead of riding along over
+  // the map's loading screen.
+  const [leaving, setLeaving] = useState(false)
+  useEffect(() => {
+    const onClick = (e) => {
+      if (!e.target.closest?.('a[href="/map"]')) return
+      videoRef.current?.pause()
+      setLeaving(true)
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+  }, [])
+
+  // Fully stop playback when the page goes away. A video in iOS PiP or
+  // fullscreen otherwise keeps playing after its element is removed.
+  useEffect(() => {
+    const v = videoRef.current
+    return () => {
+      if (!v) return
+      v.pause()
+      try {
+        if (document.pictureInPictureElement === v) document.exitPictureInPicture()
+        if (v.webkitPresentationMode && v.webkitPresentationMode !== 'inline') v.webkitSetPresentationMode('inline')
+        if (document.fullscreenElement === v) document.exitFullscreen()
+        if (v.webkitDisplayingFullscreen) v.webkitExitFullscreen()
+      } catch { /* not in PiP/fullscreen */ }
+      v.removeAttribute('src')
+      v.load()
+    }
+  }, [])
+
   // Stay on screen while playing even if the user scrolls back up.
-  const shown = (pastHero || playing) && !inPip
+  const shown = (pastHero || playing) && !inPip && !leaving
 
   // Muted looping preview once the card appears (browsers only allow
   // muted autoplay). Skipped for Save-Data / reduced-motion visitors.
@@ -69,7 +100,7 @@ function TutorialVideo() {
     v.muted = false
     v.loop = false
     v.currentTime = 0
-    v.play()
+    v.play().catch(() => {})
   }
 
   const dismiss = () => {

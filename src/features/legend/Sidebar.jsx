@@ -68,11 +68,8 @@ export default function Sidebar({
   onExploreSelect,
   // An event card's "Navigate to venue" (Explore → Events).
   onExploreNavigate,
-  // Bumped by the search bar's menu button: acts like clicking the rail's
-  // Explore item (opens Explore, or closes it if it's already open).
-  exploreRequest = 0,
   // Bumped once the first-visit zoom hint is done: opens Explore, never
-  // closes it (unlike exploreRequest's toggle).
+  // closes it.
   exploreOpenRequest = 0,
   // Signal is a floating card beside the closed rail; MapPage owns whether
   // it's open so opening it closes other overlays and vice versa.
@@ -112,13 +109,6 @@ export default function Sidebar({
       cancelled = true;
     };
   }, [user?.id]);
-  const lastExploreRequest = useRef(exploreRequest);
-  useEffect(() => {
-    if (exploreRequest === lastExploreRequest.current) return;
-    lastExploreRequest.current = exploreRequest;
-    handleRailClick(RAIL_ITEMS.find((item) => item.key === 'explore'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exploreRequest]);
   const lastExploreOpenRequest = useRef(exploreOpenRequest);
   useEffect(() => {
     if (exploreOpenRequest === lastExploreOpenRequest.current) return;

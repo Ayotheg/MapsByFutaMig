@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, CheckCircle2, ChevronLeft, TriangleAlert, X, Mail, LogOut, Megaphone } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ChevronLeft, TriangleAlert, X, Mail, LogOut, Megaphone, Play } from 'lucide-react';
 import styles from './AuthModal.module.css';
 import AuthFlow from './AuthFlow';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +14,7 @@ import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
 import WhatsAppIcon from '../../lib/WhatsAppIcon';
 import { CONTACT_EMAIL, WHATSAPP_CHAT_URL } from '../../lib/contactInfo';
 import { track } from '../../lib/analytics';
+import { isInstalled, openInstallVideo } from '../install/installVideo';
 
 /**
  * Auth surface: sign-in flow when signed out, account card when signed in.
@@ -484,6 +485,18 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
           </label>
         )}
         {optInError && <StatusMsg status={{ text: optInError, error: true }} />}
+
+        {!isInstalled() && (
+          <button type="button" className={`${styles.prefRow} ${styles.installRow}`} onClick={() => openInstallVideo('profile_card')}>
+            <span className={styles.prefText}>
+              <span className={styles.prefTitle}>Install the app</span>
+              <span className={styles.prefSub}>36-second how-to video</span>
+            </span>
+            <span className={styles.installPlay} aria-hidden="true">
+              <Play size={12} fill="currentColor" />
+            </span>
+          </button>
+        )}
 
         {signOutError && <StatusMsg status={{ text: signOutError, error: true }} />}
         <button type="button" className={styles.signoutBtn} onClick={handleSignOut} disabled={signOutBusy}>

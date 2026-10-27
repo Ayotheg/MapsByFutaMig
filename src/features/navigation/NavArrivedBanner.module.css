@@ -145,6 +145,24 @@
   transition: opacity var(--v2-duration-quick) var(--v2-ease-standard);
 }
 
+/* Quiet grey text under Done — opens the install video. */
+.installLink {
+  margin-top: 16px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--v2-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.installLink:hover {
+  color: var(--v2-text);
+}
+
 .supportLink:hover {
   opacity: 0.75;
   text-decoration: underline;

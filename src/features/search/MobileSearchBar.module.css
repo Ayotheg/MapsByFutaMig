@@ -40,7 +40,7 @@
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  color: var(--v2-text);
+  color: var(--v2-primary); /* donate heart */
   transition: opacity var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .logoBtn:active {
@@ -60,13 +60,8 @@
   text-align: left;
 }
 
-.icon {
-  color: var(--v2-text-variant);
-  flex-shrink: 0;
-}
-
 .placeholder {
-  font-family: var(--font-ui);
+  font-family: var(--v2-font-geist);
   font-size: 16px;
   color: var(--v2-text-variant);
   white-space: nowrap;

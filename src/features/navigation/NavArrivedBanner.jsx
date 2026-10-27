@@ -1,12 +1,8 @@
 import { useEffect } from 'react';
 import { PartyPopper, Heart, Check } from 'lucide-react';
+import { CROWDR_CAMPAIGN_URL } from '../../lib/donate';
+import { isInstalled, openInstallVideo } from '../install/installVideo';
 import styles from './NavArrivedBanner.module.css';
-
-// Same campaign link used on the landing page's donate CTA
-// (src/pages/landing/CrowdrCampaignCard.jsx, Footer.jsx) — kept as its
-// own local constant here rather than importing from `pages/landing/`,
-// since Rule 5 keeps this in-app surface decoupled from that directory.
-const CROWDR_CAMPAIGN_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta';
 
 /**
  * Ported from legacy `arrivedAtDestination()` (app.js ~4949–4976) —
@@ -38,6 +34,9 @@ const CROWDR_CAMPAIGN_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
  * campaign the landing page already points at. Plain external link,
  * `target="_blank"` + `rel="noopener noreferrer"` — opens the campaign
  * page, doesn't touch `onDismiss` or any existing handler.
+ *
+ * "How to install the app" (quiet grey text under Done) opens the install
+ * video; only shown to people still using the map in a browser.
  */
 export default function NavArrivedBanner({ destName, onDismiss }) {
   useEffect(() => {
@@ -72,6 +71,19 @@ export default function NavArrivedBanner({ destName, onDismiss }) {
           Done
           <Check size={18} />
         </button>
+
+        {!isInstalled() && (
+          <button
+            type="button"
+            className={styles.installLink}
+            onClick={() => {
+              onDismiss();
+              openInstallVideo('arrived_banner');
+            }}
+          >
+            How to install the app
+          </button>
+        )}
       </div>
     </div>
   );

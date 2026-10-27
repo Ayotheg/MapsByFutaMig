@@ -4,6 +4,8 @@ import MapShell from '../features/map/MapShell';
 import ZoomHint from '../features/map/ZoomHint';
 import ChannelPrompt from '../features/whatsapp/ChannelPrompt';
 import MarketingOptInPrompt from '../features/auth/MarketingOptInPrompt';
+import InstallVideoHost from '../features/install/InstallVideoHost';
+import { useInstallVideoOpen } from '../features/install/installVideo';
 import { setTawkHidden } from '../lib/tawk';
 import { useLocation } from 'react-router-dom';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
@@ -149,8 +151,6 @@ export default function MapPage({ onReadinessChange }) {
   // Explore pop up by itself on every later visit.
   const [sheetState, setSheetState] = useState('peek');
   const [sheetActiveTab, setSheetActiveTab] = useState(() => readPersistentState('mobile-sheet-tab', 'layers'));
-  // Desktop search bar's menu button → Sidebar opens/closes Explore.
-  const [exploreRequest, setExploreRequest] = useState(0);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [activeChip, setActiveChip] = useState(null);
   const [mapView, setMapView] = useState(() => readPersistentState('map-view', null));
@@ -527,6 +527,7 @@ export default function MapPage({ onReadinessChange }) {
   // Same corner as ChannelPrompt — the WhatsApp nudge waits while it's up.
   const [optInPromptOpen, setOptInPromptOpen] = useState(false);
   const [reviewPromptOpen, setReviewPromptOpen] = useState(false);
+  const installVideoOpen = useInstallVideoOpen();
   const suggestClickHandlerRef = useRef(null);
   const [suggestPicking, setSuggestPicking] = useState(false);
 
@@ -785,6 +786,7 @@ export default function MapPage({ onReadinessChange }) {
     suggestModalOpen ||
     mySubmissionsOpen ||
     !!submissionToast ||
+    installVideoOpen ||
     (isMobile && sheetState !== 'peek');
   mapBusyRef.current = mapBusy;
   const onMapRoute = useLocation().pathname === '/map';
@@ -895,7 +897,6 @@ export default function MapPage({ onReadinessChange }) {
           explorePicksLoading={waypointsLoading}
           onExploreSelect={handleSelectPlace}
           onExploreNavigate={handlePlaceCardNavigate}
-          exploreRequest={exploreRequest}
           exploreOpenRequest={exploreOpenRequest}
           gpsOpen={gpsCardOpen}
           onGpsOpenChange={handleGpsCardChange}
@@ -912,16 +913,6 @@ export default function MapPage({ onReadinessChange }) {
               closeOtherOverlays('search');
               setMobileSearchOpen(true);
               presence.updatePresence('searching');
-            }}
-            onToggleSheet={() => {
-              // Menu button opens the sheet on Explore (the 'layers' tab);
-              // pressed again while Explore is showing, it closes the sheet.
-              if (sheetActiveTab === 'layers' && sheetState !== 'peek') {
-                handleSheetStateChange('peek');
-                return;
-              }
-              setSheetActiveTab('layers');
-              if (sheetState === 'peek') handleSheetStateChange('half');
             }}
             onNavigate={handleNavLaunch}
             activeChipLabel={activeChip?.label}
@@ -940,7 +931,6 @@ export default function MapPage({ onReadinessChange }) {
           searchIndex={searchIndex}
           onSelect={handleSelectPlace}
           collapsed={collapsed}
-          onToggleCollapsed={() => setExploreRequest((n) => n + 1)}
           dismissKey={searchDismissKey}
           onDropdownOpen={() => closeOtherOverlays('search')}
           onManualType={() => setActiveChip(null)}
@@ -1128,6 +1118,7 @@ export default function MapPage({ onReadinessChange }) {
         userId={auth.loading ? null : auth.user?.id || null}
         blocked={mapBusy || isOffline || optInPromptOpen || reviewPromptOpen}
       />
+      <InstallVideoHost />
     </>
   );
 }

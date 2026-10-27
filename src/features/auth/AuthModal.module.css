@@ -404,6 +404,23 @@
   padding: 2px 2px;
   cursor: pointer;
 }
+.installRow {
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+}
+.installPlay {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary);
+}
 .prefText {
   flex: 1;
   min-width: 0;

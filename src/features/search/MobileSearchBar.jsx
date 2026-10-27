@@ -1,4 +1,6 @@
-import { Menu, Search, Navigation } from 'lucide-react';
+import { Heart, Navigation } from 'lucide-react';
+import { CROWDR_CAMPAIGN_URL } from '../../lib/donate';
+import { track } from '../../lib/analytics';
 import styles from './MobileSearchBar.module.css';
 
 /**
@@ -8,11 +10,9 @@ import styles from './MobileSearchBar.module.css';
  * that opens MobileSearchOverlay, matching legacy exactly (the mobile
  * search *experience* only exists inside the full-screen overlay).
  *
- * `mobMenuBtn`'s wiring (app.js ~5961–5998) is a comment-flagged legacy fix
- * — "mobMenuBtn was never captured or wired — this fixes it" — toggling
- * the bottom sheet between peek/half. Reproduced here via `onToggleSheet`,
- * since MobileSheet.jsx's `sheetState` had to be lifted to MapPage anyway
- * for this slice (its own header comment anticipated this).
+ * The left button is the donate heart (Crowdr). It replaced the old menu
+ * button, which only duplicated the sheet's own Explore tab. No search
+ * icon: it sat right next to the heart and the two clashed.
  *
  * `onNavigate` (Slice 9): legacy's `mobNavTrig` click handler (app.js
  * ~5560ish, wired alongside the other mobile FABs) just switches the
@@ -34,14 +34,21 @@ import styles from './MobileSearchBar.module.css';
  * resolved; only the icon size and the pill's background/border
  * moved to match 31:243's opaque white treatment (see .module.css).
  */
-export default function MobileSearchBar({ onOpenSearch, onToggleSheet, onNavigate, activeChipLabel }) {
+export default function MobileSearchBar({ onOpenSearch, onNavigate, activeChipLabel }) {
   return (
     <div className={styles.bar}>
-      <button className={styles.logoBtn} onClick={onToggleSheet} title="Explore" type="button">
-        <Menu size={18} />
-      </button>
+      <a
+        className={styles.logoBtn}
+        href={CROWDR_CAMPAIGN_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Support Maps By FUTA"
+        title="Support Maps By FUTA"
+        onClick={() => track('donate_click', { source: 'search_bar' })}
+      >
+        <Heart size={18} />
+      </a>
       <button className={styles.inputBtn} onClick={onOpenSearch} type="button">
-        <Search size={16} className={styles.icon} />
         <span className={styles.placeholder}>{activeChipLabel || 'Search FUTA campus…'}</span>
       </button>
       <button className={styles.navBtn} title="Navigate" type="button" onClick={onNavigate}>

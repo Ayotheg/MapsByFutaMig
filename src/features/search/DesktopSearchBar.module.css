@@ -55,7 +55,7 @@
   padding: 0;
   border-radius: var(--r-full) 0 0 var(--r-full);
   transition: background var(--v2-duration-quick) var(--v2-ease-standard);
-  color: var(--v2-text);
+  color: var(--v2-primary); /* donate heart */
 }
 .logoBtn:hover {
   background: var(--v2-primary-glow);
@@ -68,18 +68,6 @@
   background: var(--v2-primary-outline);
 }
 
-.searchIcon {
-  position: absolute;
-  left: 66px;
-  color: var(--v2-text-variant);
-  pointer-events: none;
-  transition: color var(--v2-duration-standard) var(--v2-ease-standard);
-  z-index: 1;
-}
-.pill:focus-within .searchIcon {
-  color: var(--v2-primary);
-}
-
 .input {
   flex: 1;
   height: 100%;
@@ -88,10 +76,10 @@
   border: none;
   outline: none;
   color: var(--v2-text);
-  font-family: var(--font-ui);
+  font-family: var(--v2-font-geist);
   font-size: 16px;
   font-weight: 400;
-  padding: 0 8px 0 40px;
+  padding: 0 8px 0 16px;
   caret-color: var(--v2-primary);
 }
 .input::placeholder {
@@ -156,7 +144,6 @@
 @media (prefers-reduced-motion: reduce) {
   .pill,
   .logoBtn,
-  .searchIcon,
   .clearBtn,
   .navBtn {
     transition: none;
