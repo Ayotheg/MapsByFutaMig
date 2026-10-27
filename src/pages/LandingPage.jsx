@@ -13,6 +13,7 @@ import FinalCTA from './landing/FinalCTA'
 import FAQ from './landing/FAQ'
 import BTSSection from './landing/BTSSection'
 import Footer from './landing/Footer'
+import TutorialVideo from './landing/TutorialVideo'
 
 function LandingPage() {
   // Matches the static <title>/meta robots already baked into
@@ -59,6 +60,7 @@ function LandingPage() {
       {/* <BTSSection /> */}
         <FAQ />
       <Footer />
+      <TutorialVideo />
     </>
   )
 }
