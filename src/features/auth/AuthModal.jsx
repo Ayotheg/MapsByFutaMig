@@ -7,7 +7,8 @@ import { supabase } from '../../lib/supabase';
 import { displayName, initials } from './useAuth';
 import { fetchProfileStats, statTileValue } from './profileStats';
 import { fetchActivePromotion } from '../promote/activePromotion';
-import { fetchMyEvents, removeMyUnpaidEvent } from '../events/myEvents';
+import { fetchMyEvents, removeMyUnpaidEvent, MAX_EVENT_CARDS } from '../events/myEvents';
+import { eventNoticeKey, loadClearedNotices, saveClearedNotices } from './clearedNotices';
 import { shortDate } from '../explore/eventsData';
 import { fetchMarketingConsent, saveMarketingConsent } from './marketingConsent';
 import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
@@ -106,6 +107,23 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
       setRemovingId(null);
     }
   }
+
+  // "Clear" on a declined event: hidden on this device (clearedNotices.js).
+  // Running ads and live events stay; they drop off on their own when they end.
+  const [clearedKeys, setClearedKeys] = useState([]);
+  useEffect(() => {
+    setClearedKeys(loadClearedNotices(userId));
+  }, [userId]);
+  function clearNotice(key) {
+    setClearedKeys((keys) => {
+      const next = keys.includes(key) ? keys : [...keys, key];
+      saveClearedNotices(userId, next);
+      return next;
+    });
+  }
+  const visibleEvents = myEvents
+    .filter((ev) => !clearedKeys.includes(eventNoticeKey(ev)))
+    .slice(0, MAX_EVENT_CARDS);
 
   // "Email updates" switch (profiles.marketing_opt_in). Turning it off
   // marks the Resend contact unsubscribed (marketing_optin.sql). Hidden
@@ -390,7 +408,7 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
           </div>
         )}
 
-        {myEvents.map((ev) => {
+        {visibleEvents.map((ev) => {
           const day = shortDate(ev.startsAt);
           return (
             <div key={ev.id} className={styles.adCard}>
@@ -454,6 +472,13 @@ export default function AuthModal({ initialTab, user, onClose, signInWithGoogle,
                       </button>
                     </div>
                   ))}
+                {ev.state === 'rejected' && (
+                  <div className={styles.adActions}>
+                    <button type="button" className={styles.adButton} onClick={() => clearNotice(eventNoticeKey(ev))}>
+                      Clear
+                    </button>
+                  </div>
+                )}
                 {removeError?.id === ev.id && (
                   <div className={styles.adError} role="alert">
                     {removeError.message}

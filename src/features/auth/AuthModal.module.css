@@ -360,7 +360,7 @@
   text-underline-offset: 2px;
 }
 .adAction:hover { color: var(--v2-primary-hover); }
-/* Pay now · Remove row on an unpaid event card, and its confirm step. */
+/* Pay now · Remove row on an unpaid event card, its confirm step, and Clear on a declined one. */
 .adActions {
   display: flex;
   flex-wrap: wrap;

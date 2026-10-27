@@ -15,7 +15,9 @@ import { lagosEndOfDay } from '../explore/eventsData';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REJECTED_SHOW_DAYS = 7;
-const MAX_CARDS = 3;
+// Applied by the profile card after hiding cleared notices, so the next one
+// moves up (clearedNotices.js).
+export const MAX_EVENT_CARDS = 3;
 const ORDER = { unpaid: 0, review: 1, live: 2, rejected: 3 };
 
 // End of the event's day in Lagos, matching public_events().
@@ -68,7 +70,6 @@ export async function fetchMyEvents(userId) {
     .map((e) => ({ e, state: classify(e, now) }))
     .filter(({ e, state }) => state && (state === 'live' || state === 'rejected' || new Date(e.starts_at) > now))
     .sort((a, b) => ORDER[a.state] - ORDER[b.state] || new Date(a.e.starts_at) - new Date(b.e.starts_at))
-    .slice(0, MAX_CARDS)
     .map(({ e, state }) => ({
       id: e.id,
       title: e.title,
