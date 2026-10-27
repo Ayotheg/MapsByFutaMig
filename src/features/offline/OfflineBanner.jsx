@@ -27,9 +27,9 @@ function formatAge(cachedAt) {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
-// `loadFailed` ('places' | 'paths' | null): that data failed to load with
-// no saved copy while the browser is online — shown as its own alert that
-// keeps retrying through `onRetryFailed`.
+// `loadFailed`: no places on the map at all after a failed load while the
+// browser is online — shown as its own alert that keeps retrying through
+// `onRetryFailed`.
 export default function OfflineBanner({ isOffline, cachedAt, loadFailed, onRetryFailed, onRetry }) {
   // Tracks the transition, not just the current state — going from
   // offline -> online is worth a brief "you're back" confirmation, going
@@ -66,7 +66,7 @@ export default function OfflineBanner({ isOffline, cachedAt, loadFailed, onRetry
         icon={MapPinOff}
         tone="warn"
         role="alert"
-        title={loadFailed === 'paths' ? "Paths didn't load" : "Places didn't load"}
+        title="Places didn't load"
         message="Retrying by itself. Check your connection."
         onRetry={onRetryFailed}
         retrySpinMs={8000}

@@ -37,10 +37,6 @@ export const TILE_BG_MAX_MS = 30000;
 export const TILE_STALL_MS = 10000;
 export const TILE_FAIL_THRESHOLD = 4;
 export const TILE_GIVEUP_THRESHOLD = 4;
-// A stalled map (nothing loaded, nothing erroring) is re-requested whole at
-// most this often: a redraw cancels requests in flight, so retrying it any
-// faster would never let a slow tile finish.
-export const TILE_REDRAW_GAP_MS = 20000;
 
 // 0.8s, 1.6s for the quick retries, then 5s, 10s, 20s, 30s, 30s, …
 export function retryDelay(tries) {
@@ -145,40 +141,10 @@ export function watchTileLayer(layer, { onProblem, onRecovered, isOnline } = {})
     if (stuck.size >= TILE_GIVEUP_THRESHOLD) raise(false);
   };
 
-  let redrawAllowed = false;
-  let redrawTimer;
-  const holdRedraw = () => {
-    redrawAllowed = false;
-    clearTimeout(redrawTimer);
-    timers.delete(redrawTimer);
-    redrawTimer = later(() => {
-      redrawAllowed = true;
-    }, TILE_REDRAW_GAP_MS);
-  };
-  holdRedraw();
-
   // Every failed tile, right now — for the alert's Retry button and for the
-  // moment the browser comes back online. A stalled request never errors,
-  // so while nothing has loaded at all the whole layer is re-requested
-  // instead (`force`: a Retry tap; otherwise at most every
-  // TILE_REDRAW_GAP_MS). A map that has shown tiles is never redrawn.
-  const retryNow = ({ force = false } = {}) => {
+  // moment the browser comes back online.
+  const retryNow = () => {
     if (disposed) return;
-    if (loaded === 0 && (force || redrawAllowed) && typeof layer.redraw === 'function') {
-      pending.forEach((t) => {
-        if (t !== undefined) {
-          clearTimeout(t);
-          timers.delete(t);
-        }
-      });
-      pending.clear();
-      stuck.clear();
-      // Nothing left to clear a "grey holes" alert, so let the next load do it.
-      autoWithdraw = true;
-      holdRedraw();
-      layer.redraw();
-      return;
-    }
     [...pending.keys()].forEach((tile) => {
       const t = pending.get(tile);
       if (t !== undefined) {
@@ -190,8 +156,7 @@ export function watchTileLayer(layer, { onProblem, onRecovered, isOnline } = {})
   };
 
   const hasWindow = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
-  const onOnline = () => retryNow();
-  if (hasWindow) window.addEventListener('online', onOnline);
+  if (hasWindow) window.addEventListener('online', retryNow);
 
   layer.on('tileload', onTileLoad);
   layer.on('tileerror', onTileError);
@@ -204,7 +169,7 @@ export function watchTileLayer(layer, { onProblem, onRecovered, isOnline } = {})
     disposed = true;
     layer.off('tileload', onTileLoad);
     layer.off('tileerror', onTileError);
-    if (hasWindow) window.removeEventListener('online', onOnline);
+    if (hasWindow) window.removeEventListener('online', retryNow);
     timers.forEach(clearTimeout);
     timers.clear();
     pending.clear();
@@ -217,8 +182,7 @@ export function watchTileLayer(layer, { onProblem, onRecovered, isOnline } = {})
 /**
  * Resolves true once the map's base layer has shown a tile (MapShell sets
  * `map._tilesReady` and fires 'basetilesready'), or false after `ms`.
- * Nudges MapShell's retry while it waits (a stalled map only — tiles still
- * on their way aren't cancelled).
+ * Retries any failed tiles straight away while it waits.
  */
 export function waitForMapTiles(map, ms) {
   if (!map || map._tilesReady) return Promise.resolve(true);

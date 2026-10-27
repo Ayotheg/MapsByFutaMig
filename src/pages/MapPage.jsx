@@ -356,25 +356,32 @@ export default function MapPage({ onReadinessChange }) {
   const cachedAt = waypointsCachedAt || segmentsCachedAt || null;
 
   // A load that failed with no saved copy to fall back on (first visit on a
-  // bad network) leaves an empty map and, while the browser still says
-  // it's online, nothing retries it. Only counted while that data is
-  // missing from the map, and not for the browser-offline case (the
-  // offline alert covers it). Held through each retry's own loading so the
-  // alert doesn't flicker; cleared once a load succeeds.
-  const missing = (error, list) => Boolean(error) && error.message !== 'offline' && list.length === 0;
-  const placesMissing = missing(waypointsError, waypoints);
-  const pathsMissing = missing(segmentsError, segments);
-  const dataLoading = waypointsLoading || segmentsLoading;
-  const [dataLoadFailed, setDataLoadFailed] = useState(null); // 'places' | 'paths' | null
+  // bad network) and, while the browser still says it's online, nothing
+  // retries it. Only worth an alert when the map has no places at all;
+  // anything less (some places, or just paths) retries silently below.
+  // Not for the browser-offline case (the offline alert covers it). Held
+  // through each retry's own loading so the alert doesn't flicker.
+  const placesMissing = Boolean(waypointsError) && waypointsError.message !== 'offline' && waypoints.length === 0;
+  const [dataLoadFailed, setDataLoadFailed] = useState(false);
   useEffect(() => {
-    if (placesMissing || pathsMissing) setDataLoadFailed(placesMissing ? 'places' : 'paths');
-    else if (!dataLoading) setDataLoadFailed(null);
-  }, [placesMissing, pathsMissing, dataLoading]);
+    if (placesMissing) setDataLoadFailed(true);
+    else if (!waypointsLoading) setDataLoadFailed(false);
+  }, [placesMissing, waypointsLoading]);
   // Retries only what failed, so working data isn't reloaded every time.
   const handleRetryFailedData = useCallback(() => {
     if (waypointsError) refetchWaypoints();
     if (segmentsError) refetchSegments();
   }, [waypointsError, segmentsError, refetchWaypoints, refetchSegments]);
+  // Silent background retry for failures the person isn't told about.
+  const silentRetry =
+    browserOnline &&
+    !dataLoadFailed &&
+    [waypointsError, segmentsError].some((e) => e && e.message !== 'offline');
+  useEffect(() => {
+    if (!silentRetry) return undefined;
+    const t = setTimeout(handleRetryFailedData, 20000);
+    return () => clearTimeout(t);
+  }, [silentRetry, handleRetryFailedData]);
 
   // Real boot-readiness signal for App's loading screen — the loading
   // flags this page already tracks for its own data hooks (map init,
