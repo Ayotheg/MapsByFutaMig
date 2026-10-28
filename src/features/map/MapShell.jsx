@@ -38,8 +38,8 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
   // Shown when the tile layer is clearly not loading (see tileHealth.js).
-  // Failed tiles keep retrying in the background meanwhile; the alert's
-  // Retry button just retries them all now instead of reloading the page.
+  // Failed tiles keep retrying in the background meanwhile, and the alert
+  // retries them all every few seconds on its own (Retry does it now).
   // Stays until the failing tiles load (no close button in the design).
   const [tileAlert, setTileAlert] = useState(false);
   const tileWatchersRef = useRef(new Set());
@@ -272,8 +272,9 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
           tone="warn"
           role="alert"
           title="Map isn't loading"
-          message="Still trying. Check your connection or retry."
-          onRetry={() => tileWatchersRef.current.forEach((w) => w.retryNow())}
+          message="Retrying by itself. Check your connection."
+          onRetry={({ auto } = {}) => tileWatchersRef.current.forEach((w) => w.retryNow({ force: !auto }))}
+          autoRetryMs={6000}
           yieldToOffline
         />
       )}
