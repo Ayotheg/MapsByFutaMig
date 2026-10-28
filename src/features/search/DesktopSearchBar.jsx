@@ -113,6 +113,13 @@ export default function DesktopSearchBar({
     setActiveIdx(-1);
   }
 
+  // A pick from the dropdown (click or arrow keys + Enter) is a search
+  // too; Enter with nothing highlighted is tracked in doFullSearch below.
+  function handlePick(entry) {
+    track('search_query', { query: query.trim(), result_count: flatResults.length });
+    handleSelect(entry);
+  }
+
   function handleInputChange(e) {
     const q = e.target.value;
     onManualType?.();
@@ -182,7 +189,7 @@ export default function DesktopSearchBar({
       setActiveIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (activeIdx >= 0 && flatResults[activeIdx]) handleSelect(flatResults[activeIdx]);
+      if (activeIdx >= 0 && flatResults[activeIdx]) handlePick(flatResults[activeIdx]);
       else doFullSearch();
     } else if (e.key === 'Escape') {
       setOpen(false);
@@ -258,7 +265,7 @@ export default function DesktopSearchBar({
               loading={loadingOsm}
               icon={searchIndex.icon}
               highlight={searchIndex.highlight}
-              onSelect={handleSelect}
+              onSelect={handlePick}
               activeIdx={activeIdx}
             />
           )}

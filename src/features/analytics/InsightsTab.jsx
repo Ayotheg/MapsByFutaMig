@@ -1,61 +1,84 @@
-import { useState } from 'react';
-import adminStyles from '../admin/AdminPanel.module.css';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './InsightsTab.module.css';
-import LiveTab from './LiveTab';
-import OverviewTab from './OverviewTab';
-import FeatureUsageTab from './FeatureUsageTab';
-import SearchRoutesTab from './SearchRoutesTab';
-import JourneysTab from './JourneysTab';
-import DatabaseTab from './DatabaseTab';
+import { fetchInsights, fetchRollup, describeError } from './analyticsApi';
+import TodayTab from './TodayTab';
+import TrendsTab from './TrendsTab';
+import PlacesTab from './PlacesTab';
+import UsageTab from './UsageTab';
+import DataTab from './DataTab';
 
-// ── Slice 14 — "Insights" tab, AdminPanel.jsx's 6th tab ─────────────────
-// New feature, no legacy source (ANALYTICS_BUILD_PLAN.md §0). Lazy-loaded
-// from AdminPanel.jsx per CLAUDE.md's bundle-size policy — this is
-// explicitly the heaviest tab (recharts + presence + several queries), a
-// textbook lazy-load candidate, same as AdminPanel itself is for
-// MapPage.jsx.
+// Admin → Insights: how people use the app, in plain words. Lazy-loaded
+// from AdminPanel.jsx (recharts is the heaviest thing in admin).
 //
-// Own inner sub-tab bar (Live/Overview/Feature Usage/Search & Routes/
-// Journeys/Database) rather than adding 5 more top-level entries to
-// AdminPanel's own TABS array — this mirrors how the build plan describes
-// "InsightsTab.jsx (sub-tab shell) + sub-views", keeping AdminPanel's own
-// tab bar exactly as it was (still just the one new "Insights" entry).
-const SUB_TABS = [
-  { key: 'live', label: 'Live' },
-  { key: 'overview', label: 'Overview' },
-  { key: 'features', label: 'Features' },
-  { key: 'search', label: 'Search' },
-  { key: 'journeys', label: 'Journeys' },
-  { key: 'database', label: 'Database' },
+// The daily rollup (supabase/analytics.sql) is fetched once here and shared
+// by every tab. The extra numbers (supabase/analytics_insights.sql) are
+// fetched per time range and cached; they're null until that file has been
+// run, and the cards that need them stay hidden.
+const TABS = [
+  { key: 'today', label: 'Today' },
+  { key: 'trends', label: 'Trends' },
+  { key: 'places', label: 'Places' },
+  { key: 'usage', label: 'Usage' },
+  { key: 'data', label: 'Data' },
 ];
 
 export default function InsightsTab() {
-  // Live is first — matches the stated priority (unique counting + live
-  // view is priority #1 in the build plan).
-  const [subTab, setSubTab] = useState('live');
+  const [tab, setTab] = useState('today');
+  const [rollup, setRollup] = useState(null);
+  const [rollupError, setRollupError] = useState(null);
+  const [insights, setInsights] = useState({}); // days → data | null
+  const requested = useRef(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRollup(30)
+      // Newest-first from the RPC; charts read oldest-first.
+      .then((rows) => !cancelled && setRollup([...rows].reverse()))
+      .catch((e) => !cancelled && setRollupError(describeError(e)));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loadInsights = useCallback((days) => {
+    if (requested.current.has(days)) return;
+    requested.current.add(days);
+    fetchInsights(days)
+      .then((data) => setInsights((m) => ({ ...m, [days]: data })))
+      // Extras are optional: a failure just leaves their cards hidden.
+      .catch(() => setInsights((m) => ({ ...m, [days]: null })));
+  }, []);
+
+  const shared = { rollup, rollupError, insights, loadInsights };
 
   return (
-    <div className={adminStyles.tabContent}>
-      <div className={styles.subTabbar}>
-        {SUB_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            className={`${styles.subTab} ${subTab === t.key ? styles.subTabActive : ''}`}
-            onClick={() => setSubTab(t.key)}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <div className={styles.root}>
+      <div className={styles.scroll}>
+        <div>
+          <h2 className={styles.title}>Insights</h2>
+          <p className={styles.subtitle}>How people are using MapsByFUTA</p>
+        </div>
 
-      <div className={styles.subTabBody}>
-        {subTab === 'live' && <LiveTab />}
-        {subTab === 'overview' && <OverviewTab />}
-        {subTab === 'features' && <FeatureUsageTab />}
-        {subTab === 'search' && <SearchRoutesTab />}
-        {subTab === 'journeys' && <JourneysTab />}
-        {subTab === 'database' && <DatabaseTab />}
+        <div className={styles.segment} role="tablist" aria-label="Insights sections">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              className={`${styles.segmentBtn} ${tab === t.key ? styles.segmentBtnActive : ''}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'today' && <TodayTab {...shared} />}
+        {tab === 'trends' && <TrendsTab {...shared} />}
+        {tab === 'places' && <PlacesTab {...shared} />}
+        {tab === 'usage' && <UsageTab {...shared} />}
+        {tab === 'data' && <DataTab />}
       </div>
     </div>
   );

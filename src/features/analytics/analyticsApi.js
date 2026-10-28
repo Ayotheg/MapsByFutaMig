@@ -39,6 +39,26 @@ export async function fetchRecentSignups(limit = 10) {
   return data || [];
 }
 
+/** Extra numbers from supabase/analytics_insights.sql. Resolves null when
+ * that function hasn't been run yet, so the cards that need it just hide. */
+export async function fetchInsights(daysBack = 30) {
+  const { data, error } = await supabase.rpc('analytics_insights', { days_back: daysBack });
+  if (error) {
+    if (/function .* does not exist|could not find the function/i.test(error.message || '')) return null;
+    throw error;
+  }
+  return data || null;
+}
+
+export async function fetchPendingCount() {
+  const { count, error } = await supabase
+    .from('waypoints')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending');
+  if (error) throw error;
+  return count ?? 0;
+}
+
 /** Same "NetworkError with no HTTP status" → "table/migration not run
  * yet" heuristic quickChipsApi.js already established, reused here so
  * every Insights sub-tab surfaces the same plain-English message instead

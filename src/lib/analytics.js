@@ -45,6 +45,16 @@ function readOrCreate(storage, key) {
   }
 }
 
+// Read once at load, before anything creates the id: no id yet means this
+// browser has never visited before.
+const FIRST_VISIT = (() => {
+  try {
+    return !window.localStorage.getItem(ANON_ID_KEY);
+  } catch {
+    return false;
+  }
+})();
+
 export function getAnonId() {
   return readOrCreate(window.localStorage, ANON_ID_KEY);
 }
@@ -105,6 +115,19 @@ function ensureFlushTimer() {
   window.addEventListener('pagehide', () => {
     flush();
   });
+}
+
+/** One 'app_opened' per tab visit (a reload in the same tab doesn't count
+ * again), for the admin Insights tab's visits and new-vs-returning numbers. */
+export function trackVisitStart() {
+  const KEY = 'futa_visit_tracked';
+  try {
+    if (window.sessionStorage.getItem(KEY)) return;
+    window.sessionStorage.setItem(KEY, '1');
+  } catch {
+    // No storage: still count it once for this page load.
+  }
+  track('app_opened', { returning: !FIRST_VISIT });
 }
 
 /** Queues one event; flushed in a batch every ~5s or on tab-hide/close.

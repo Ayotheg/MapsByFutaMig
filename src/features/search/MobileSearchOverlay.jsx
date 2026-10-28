@@ -6,6 +6,7 @@ import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
 import SearchDropdownList from './SearchDropdownList';
 import styles from './MobileSearchOverlay.module.css';
 import { readPersistentState, writePersistentState } from '../../lib/persistentState';
+import { track } from '../../lib/analytics';
 
 /**
  * Ported from legacy's dynamically-built `#mobSearchOverlay` (app.js
@@ -63,8 +64,20 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
     if (open) writePersistentState('mobile-search-query', query);
   }, [open, query]);
 
+  const resultCount = localResults.length + (osmResults?.length || 0);
+
   function handleSelect(entry) {
+    track('search_query', { query: query.trim(), result_count: resultCount });
     selectResult(entry);
+    onClose();
+  }
+
+  // Leaving with a query that found nothing is the "searched but found
+  // nothing" signal. Only on close, not while typing, so half-typed words
+  // aren't counted.
+  function handleClose() {
+    const q = query.trim();
+    if (q && resultCount === 0 && !loadingOsm) track('search_query', { query: q, result_count: 0 });
     onClose();
   }
 
@@ -100,7 +113,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
       const local = searchIndex.resolve(q);
       if (local) handleSelect(local);
     } else if (e.key === 'Escape') {
-      onClose();
+      handleClose();
     }
   }
 
@@ -113,7 +126,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   return (
     <div className={`${styles.overlay} ${open ? styles.active : ''}`}>
       <div className={styles.ovBar}>
-        <button className={styles.back} onClick={onClose} aria-label="Back" type="button">
+        <button className={styles.back} onClick={handleClose} aria-label="Back" type="button">
           <ArrowLeft size={20} />
         </button>
         <input

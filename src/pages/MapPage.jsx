@@ -36,7 +36,7 @@ import { useOnlineStatus } from '../lib/useOnlineStatus';
 import SubmissionToast from '../features/waypoint-submissions/SubmissionToast';
 import OfflineBanner from '../features/offline/OfflineBanner';
 import { usePresenceTracking } from '../features/analytics/usePresenceTracking';
-import { setAnalyticsUser } from '../lib/analytics';
+import { setAnalyticsUser, track, trackVisitStart } from '../lib/analytics';
 import { readPersistentState, writePersistentState } from '../lib/persistentState';
 import { markMapActive, reloadIfIdle, resetIdleMapSession } from '../features/navigation/mapSession';
 import DetailModal from '../features/segments/DetailModal';
@@ -314,6 +314,9 @@ export default function MapPage({ onReadinessChange }) {
   useEffect(() => {
     setAnalyticsUser(auth.user?.id ?? null);
   }, [auth.user]);
+  useEffect(() => {
+    trackVisitStart();
+  }, []);
   const presence = usePresenceTracking(auth.user);
 
   // ── Guest navigation limit ────────────────────────────────────────
@@ -663,15 +666,25 @@ export default function MapPage({ onReadinessChange }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSelectPlace = useCallback(
-    (wp) => {
+  // `source` says where the place was opened from, for the admin Insights
+  // tab ("How people found them"); null (the admin panel) isn't counted.
+  const openPlace = useCallback(
+    (wp, source) => {
       // Allowed mid-trip (people check what's around them); PlaceCard's
       // `duringNav` layout keeps it clear of the HUD.
       closeOtherOverlays('selected');
       setSelected(wp);
+      if (wp && source) {
+        track('place_opened', { id: wp.id ?? null, name: wp.name || null, type: wp.type || null, source });
+      }
     },
     [closeOtherOverlays]
   );
+  const handleSelectPlace = useCallback((wp) => openPlace(wp, null), [openPlace]);
+  const selectFromSearch = useCallback((wp) => openPlace(wp, 'search'), [openPlace]);
+  const selectFromExplore = useCallback((wp) => openPlace(wp, 'explore'), [openPlace]);
+  const selectFromList = useCallback((wp) => openPlace(wp, 'list'), [openPlace]);
+  const selectFromNearby = useCallback((wp) => openPlace(wp, 'nearby'), [openPlace]);
 
   // Map pins: while "Where to?" is open, a pin tap picks the destination
   // (the panel's own hint says to) instead of opening a place card.
@@ -681,9 +694,9 @@ export default function MapPage({ onReadinessChange }) {
         setNavSeedDest({ lat: wp.lat, lng: wp.lng, name: wp.name, id: wp.id, type: wp.type });
         return;
       }
-      handleSelectPlace(wp);
+      openPlace(wp, 'map');
     },
-    [handleSelectPlace]
+    [openPlace]
   );
 
   function handleSuggestPlaceClick() {
@@ -880,7 +893,7 @@ export default function MapPage({ onReadinessChange }) {
           onAuthClick={() => openAuthModal('login')}
           explorePicks={explorePicksState.picks}
           explorePicksLoading={waypointsLoading}
-          onExploreSelect={handleSelectPlace}
+          onExploreSelect={selectFromExplore}
           onExploreNavigate={handlePlaceCardNavigate}
         />
       ) : (
@@ -902,7 +915,7 @@ export default function MapPage({ onReadinessChange }) {
           guestNavRemaining={auth.user ? null : guestUsage.remaining}
           explorePicks={explorePicksState.picks}
           explorePicksLoading={waypointsLoading}
-          onExploreSelect={handleSelectPlace}
+          onExploreSelect={selectFromExplore}
           onExploreNavigate={handlePlaceCardNavigate}
           exploreOpenRequest={exploreOpenRequest}
           gpsOpen={gpsCardOpen}
@@ -928,7 +941,7 @@ export default function MapPage({ onReadinessChange }) {
             open={mobileSearchOpen}
             map={map}
             searchIndex={searchIndex}
-            onSelect={handleSelectPlace}
+            onSelect={selectFromSearch}
             onClose={() => setMobileSearchOpen(false)}
           />
         </>
@@ -936,7 +949,7 @@ export default function MapPage({ onReadinessChange }) {
         <DesktopSearchBar
           map={map}
           searchIndex={searchIndex}
-          onSelect={handleSelectPlace}
+          onSelect={selectFromSearch}
           collapsed={collapsed}
           dismissKey={searchDismissKey}
           onDropdownOpen={() => closeOtherOverlays('search')}
@@ -966,7 +979,7 @@ export default function MapPage({ onReadinessChange }) {
         waypointsLoaded={!waypointsLoading}
         searchIndex={searchIndex}
         map={map}
-        onSelect={handleSelectPlace}
+        onSelect={selectFromList}
         onNavigate={handlePlaceCardNavigate}
         onClose={() => setActiveChip(null)}
         isMobile={isMobile}
@@ -995,7 +1008,7 @@ export default function MapPage({ onReadinessChange }) {
           placeCardOpen={!!selected}
           nearbyCandidates={nearbyCandidates}
           selectedPlace={selected}
-          onNearbySelect={(place) => handleSelectPlace(place.card)}
+          onNearbySelect={(place) => selectFromNearby(place.card)}
           isMobile={isMobile}
           onStartingChange={(starting) => {
             navStartingRef.current = starting;
