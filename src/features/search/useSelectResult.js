@@ -97,7 +97,8 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
       const marker = markerRef.current;
       marker.on('click', (ev) => {
         L.DomEvent.stopPropagation(ev);
-        onSelect?.(cardOpts);
+        // A later tap on this pin is a map tap, not another search (Insights).
+        onSelect?.(cardOpts, { fromMarker: true });
       });
       // Auto-open after the fly-to animation settles, matching legacy's
       // 400ms setTimeout.

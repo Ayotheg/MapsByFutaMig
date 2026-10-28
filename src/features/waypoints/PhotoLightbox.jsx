@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 import { X, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from './PhotoLightbox.module.css';
+import { fullSizePhotoUrl } from '../../lib/supabase';
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 5;
@@ -36,7 +37,8 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
  * `transform` (which would otherwise trap `position: fixed`) can't clip it.
  */
 export default function PhotoLightbox({ photos, index, onIndexChange, onClose, title }) {
-  const src = photos[index];
+  // Card photos are sized for the card; full screen gets the full width.
+  const src = fullSizePhotoUrl(photos[index]);
 
   const stageRef = useRef(null);
   const imgRef = useRef(null);

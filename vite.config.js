@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -27,12 +27,20 @@ import tailwindcss from '@tailwindcss/vite'
 //     function form, unlike classic Rollup which accepts either. Ported
 //     the same intent (group leaflet / supabase / react+router into
 //     stable long-term-cacheable vendor chunks) as a function instead.
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // The ImageKit address (lib/supabase.js) may be set as IMAGE_PROXY_URL or
+  // VITE_IMAGE_PROXY_URL. Only that one value is passed to the app — not a
+  // whole IMAGE_PROXY_ prefix, so a future ImageKit secret can't leak in.
+  const env = loadEnv(mode, process.cwd(), '')
+  const imageProxyUrl = env.IMAGE_PROXY_URL || env.VITE_IMAGE_PROXY_URL || ''
+  return {
   plugins: [react(),
     tailwindcss()],
   // POSTHOG_* are public (project token + host), read by lib/sessionReplay.js.
-  // IMAGE_PROXY_* is the public ImageKit address, read by lib/supabase.js.
-  envPrefix: ['VITE_', 'POSTHOG_', 'IMAGE_PROXY_'],
+  envPrefix: ['VITE_', 'POSTHOG_'],
+  define: {
+    'import.meta.env.IMAGE_PROXY_URL': JSON.stringify(imageProxyUrl),
+  },
   build: {
     rolldownOptions: {
       output: {
@@ -62,4 +70,5 @@ export default defineConfig({
       },
     },
   },
+  }
 })

@@ -34,13 +34,12 @@ export default function TrendsTab({ rollup, rollupError, insights, loadInsights 
 
   return (
     <>
-      <div className={styles.pills} role="tablist" aria-label="Time range">
+      <div className={styles.pills} role="group" aria-label="Time range">
         {RANGES.map((r) => (
           <button
             key={r.days}
             type="button"
-            role="tab"
-            aria-selected={days === r.days}
+            aria-pressed={days === r.days}
             className={`${styles.pill} ${days === r.days ? styles.pillActive : ''}`}
             onClick={() => setDays(r.days)}
           >

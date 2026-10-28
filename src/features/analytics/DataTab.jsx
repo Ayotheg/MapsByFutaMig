@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Activity, Inbox, MapPin, Route, Star, Users } from 'lucide-react';
 import styles from './InsightsTab.module.css';
-import { describeError, fetchPendingCount, fetchRecentSignups, fetchTableCounts } from './analyticsApi';
+import { describeError, fetchRecentSignups, fetchTableCounts } from './analyticsApi';
 import { fmt, shortDate } from './insightsWords';
 
 // Data: what's waiting for review, what's saved, and who signed up lately.
@@ -19,23 +19,22 @@ export default function DataTab() {
   const [countsError, setCountsError] = useState(null);
   const [signups, setSignups] = useState(null);
   const [signupsError, setSignupsError] = useState(null);
-  const [pending, setPending] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
+    // One query: the counts include the pending suggestions too.
     fetchTableCounts()
-      .then((rows) => !cancelled && setCounts(Object.fromEntries(rows.map((r) => [r.table_name, r.row_count]))))
+      .then((rows) => !cancelled && setCounts(Object.fromEntries(rows.map((r) => [r.table_name, Number(r.row_count) || 0]))))
       .catch((e) => !cancelled && setCountsError(describeError(e)));
     fetchRecentSignups(10)
       .then((rows) => !cancelled && setSignups(rows))
       .catch((e) => !cancelled && setSignupsError(describeError(e)));
-    fetchPendingCount()
-      .then((n) => !cancelled && setPending(n))
-      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const pending = counts ? counts.waypoint_submissions_pending ?? null : null;
 
   return (
     <>

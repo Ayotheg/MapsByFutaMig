@@ -314,9 +314,11 @@ export default function MapPage({ onReadinessChange }) {
   useEffect(() => {
     setAnalyticsUser(auth.user?.id ?? null);
   }, [auth.user]);
+  // After sign-in has loaded (the effect above has then set the user), so a
+  // signed-in visit isn't recorded under the browser id and counted twice.
   useEffect(() => {
-    trackVisitStart();
-  }, []);
+    if (!auth.loading) trackVisitStart();
+  }, [auth.loading]);
   const presence = usePresenceTracking(auth.user);
 
   // ── Guest navigation limit ────────────────────────────────────────
@@ -681,7 +683,10 @@ export default function MapPage({ onReadinessChange }) {
     [closeOtherOverlays]
   );
   const handleSelectPlace = useCallback((wp) => openPlace(wp, null), [openPlace]);
-  const selectFromSearch = useCallback((wp) => openPlace(wp, 'search'), [openPlace]);
+  const selectFromSearch = useCallback(
+    (wp, opts) => openPlace(wp, opts?.fromMarker ? 'map' : 'search'),
+    [openPlace]
+  );
   const selectFromExplore = useCallback((wp) => openPlace(wp, 'explore'), [openPlace]);
   const selectFromList = useCallback((wp) => openPlace(wp, 'list'), [openPlace]);
   const selectFromNearby = useCallback((wp) => openPlace(wp, 'nearby'), [openPlace]);

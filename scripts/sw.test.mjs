@@ -146,12 +146,28 @@ fetchImpl = async () => { throw new Error('should not hit network'); };
 r = await req(P('small')); assert.equal(r.status, 200);
 console.log('ok 7: photo size rules + cache hit');
 
-// 7b. photos via the ImageKit proxy are cached the same way
-const K = (f) => `https://ik.imagekit.io/abc123/waypoint/1/${f}.jpg?tr=w-900,q-75,f-auto`;
-fetchImpl = async () => ok(png(200_000));
-await req(K('ik'));
+// 7b. photos via this app's ImageKit account are cached the same way, and
+//     the browser's Accept header is passed on (f-auto picks WebP from it)
+const K = (f) => `https://ik.imagekit.io/pk5x5zal3/waypoint/1/${f}.jpg?tr=w-900,c-at_max,q-75,f-auto`;
+let sentAccept = null;
+fetchImpl = async (a, o) => { sentAccept = o?.headers?.Accept ?? null; return ok(png(200_000)); };
+await req(K('ik'), { headers: { accept: 'image/webp,image/*' } });
 assert.ok(store.get('mbf-photos-v3').has(K('ik')));
-console.log('ok 7b: ImageKit proxy photos cached');
+assert.equal(sentAccept, 'image/webp,image/*');
+console.log('ok 7b: ImageKit proxy photos cached, Accept passed on');
+
+// 7c. another ImageKit account's images are left alone
+assert.equal(await req('https://ik.imagekit.io/someoneelse/a.jpg'), null);
+console.log('ok 7c: other ImageKit accounts not intercepted');
+
+// 7d. all cached photos together stay under 5 MB, oldest dropped first
+fetchImpl = async () => ok(png(900_000));
+for (let i = 0; i < 8; i++) await req(K('big' + i));
+const photoBytes = [...store.get('mbf-photos-v3').values()].reduce((s, r) => s + (Number(r.headers.get('x-sw-bytes')) || 0), 0);
+assert.ok(photoBytes <= 5 * 1024 * 1024, 'total photo bytes: ' + photoBytes);
+assert.ok(store.get('mbf-photos-v3').has(K('big7')), 'newest kept');
+assert.ok(!store.get('mbf-photos-v3').has(K('big0')), 'oldest dropped');
+console.log('ok 7d: photo cache held to 5 MB total');
 
 // 8. photo cap
 fetchImpl = async () => ok(png(1000));

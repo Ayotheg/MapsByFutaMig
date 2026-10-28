@@ -116,7 +116,11 @@ export default function DesktopSearchBar({
   // A pick from the dropdown (click or arrow keys + Enter) is a search
   // too; Enter with nothing highlighted is tracked in doFullSearch below.
   function handlePick(entry) {
-    track('search_query', { query: query.trim(), result_count: flatResults.length });
+    // Only when it actually opens something (handleSelect skips results
+    // with no position).
+    if (entry.lat && entry.lng && query.trim()) {
+      track('search_query', { query: query.trim(), result_count: flatResults.length });
+    }
     handleSelect(entry);
   }
 

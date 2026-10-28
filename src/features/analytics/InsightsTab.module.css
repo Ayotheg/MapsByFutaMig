@@ -19,6 +19,13 @@
   gap: 14px;
 }
 
+/* The tab's cards, spaced like the rest of the scroll column. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 /* ── Heading + tab switcher ────────────────────────────────────────── */
 .title {
   margin: 0;

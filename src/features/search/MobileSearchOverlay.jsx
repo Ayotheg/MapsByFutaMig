@@ -46,12 +46,23 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
   const lastOsmQRef = useRef('');
+  // For Insights' search tracking: whether this query was typed since the
+  // overlay opened (a restored one isn't a new search), which query the
+  // current OSM results belong to, and which query's OSM fetch failed.
+  const typedRef = useRef(false);
+  const osmForRef = useRef('');
+  const osmFailedForRef = useRef('');
 
   const { selectResult } = useSelectResult({ map, searchIndex, onSelect });
   const localResults = query.trim() ? searchIndex.query(query, 6) : [];
 
   useEffect(() => {
     if (open) {
+      typedRef.current = false;
+      // Results were cleared on close, so a retyped query must fetch again.
+      lastOsmQRef.current = '';
+      osmForRef.current = '';
+      osmFailedForRef.current = '';
       setQuery(readPersistentState('mobile-search-query', ''));
       const t = setTimeout(() => inputRef.current?.focus(), 80);
       return () => clearTimeout(t);
@@ -64,25 +75,34 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
     if (open) writePersistentState('mobile-search-query', query);
   }, [open, query]);
 
-  const resultCount = localResults.length + (osmResults?.length || 0);
+  // OSM results only count for the query they were fetched for.
+  function resultCount() {
+    const osm = osmForRef.current === query && osmResults ? osmResults.length : 0;
+    return localResults.length + osm;
+  }
 
   function handleSelect(entry) {
-    track('search_query', { query: query.trim(), result_count: resultCount });
+    if (query.trim()) track('search_query', { query: query.trim(), result_count: resultCount() });
     selectResult(entry);
     onClose();
   }
 
   // Leaving with a query that found nothing is the "searched but found
   // nothing" signal. Only on close, not while typing, so half-typed words
-  // aren't counted.
+  // aren't counted; and only for a query typed this time whose OSM search
+  // actually finished (not still loading, not failed).
   function handleClose() {
     const q = query.trim();
-    if (q && resultCount === 0 && !loadingOsm) track('search_query', { query: q, result_count: 0 });
+    const osmSettled = q.length < 3 || (osmForRef.current === query && !loadingOsm);
+    if (q && typedRef.current && osmSettled && osmFailedForRef.current !== query && resultCount() === 0) {
+      track('search_query', { query: q, result_count: 0 });
+    }
     onClose();
   }
 
   function handleInputChange(e) {
     const q = e.target.value;
+    typedRef.current = true;
     setQuery(q);
     if (!q.trim()) {
       setOsmResults(null);
@@ -96,9 +116,11 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
         try {
           const raw = await fetchNominatim(q, { limit: 4 });
           const filtered = raw.filter((r) => !findDuplicate(r.lat, r.lng, r.name, searchIndex.indexRef.current));
+          osmForRef.current = q;
           setOsmResults(filtered.length ? filtered : null);
         } catch {
           // matches legacy's silent .catch(() => {})
+          osmFailedForRef.current = q;
         } finally {
           setLoadingOsm(false);
         }

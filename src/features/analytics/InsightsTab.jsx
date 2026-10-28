@@ -45,9 +45,29 @@ export default function InsightsTab() {
     requested.current.add(days);
     fetchInsights(days)
       .then((data) => setInsights((m) => ({ ...m, [days]: data })))
-      // Extras are optional: a failure just leaves their cards hidden.
-      .catch(() => setInsights((m) => ({ ...m, [days]: null })));
+      // Extras are optional: a failure leaves their cards hidden, and the
+      // next tab that needs them asks again.
+      .catch(() => {
+        requested.current.delete(days);
+        setInsights((m) => ({ ...m, [days]: null }));
+      });
   }, []);
+
+  const tabRefs = useRef({});
+  // Left/Right/Home/End move between tabs, as tab bars do.
+  function onTabKeyDown(e) {
+    const i = TABS.findIndex((t) => t.key === tab);
+    const next =
+      e.key === 'ArrowRight' ? (i + 1) % TABS.length
+      : e.key === 'ArrowLeft' ? (i - 1 + TABS.length) % TABS.length
+      : e.key === 'Home' ? 0
+      : e.key === 'End' ? TABS.length - 1
+      : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    setTab(TABS[next].key);
+    tabRefs.current[TABS[next].key]?.focus();
+  }
 
   const shared = { rollup, rollupError, insights, loadInsights };
 
@@ -59,13 +79,17 @@ export default function InsightsTab() {
           <p className={styles.subtitle}>How people are using MapsByFUTA</p>
         </div>
 
-        <div className={styles.segment} role="tablist" aria-label="Insights sections">
+        <div className={styles.segment} role="tablist" aria-label="Insights sections" onKeyDown={onTabKeyDown}>
           {TABS.map((t) => (
             <button
               key={t.key}
+              ref={(el) => (tabRefs.current[t.key] = el)}
+              id={`insights-tab-${t.key}`}
               type="button"
               role="tab"
               aria-selected={tab === t.key}
+              aria-controls="insights-panel"
+              tabIndex={tab === t.key ? 0 : -1}
               className={`${styles.segmentBtn} ${tab === t.key ? styles.segmentBtnActive : ''}`}
               onClick={() => setTab(t.key)}
             >
@@ -74,11 +98,18 @@ export default function InsightsTab() {
           ))}
         </div>
 
-        {tab === 'today' && <TodayTab {...shared} />}
-        {tab === 'trends' && <TrendsTab {...shared} />}
-        {tab === 'places' && <PlacesTab {...shared} />}
-        {tab === 'usage' && <UsageTab {...shared} />}
-        {tab === 'data' && <DataTab />}
+        <div
+          id="insights-panel"
+          role="tabpanel"
+          aria-labelledby={`insights-tab-${tab}`}
+          className={styles.panel}
+        >
+          {tab === 'today' && <TodayTab {...shared} />}
+          {tab === 'trends' && <TrendsTab {...shared} />}
+          {tab === 'places' && <PlacesTab {...shared} />}
+          {tab === 'usage' && <UsageTab {...shared} />}
+          {tab === 'data' && <DataTab />}
+        </div>
       </div>
     </div>
   );

@@ -30,9 +30,13 @@ const PHOTO_CACHE = `mbf-photos-${VERSION}`;
 const MAX_TILES = 300; // ~10–25 KB each → ~3–7 MB
 const MAX_PHOTOS = 25;
 // Photos above this are passed through uncached. Full-size iPhone originals
-// (multi-MB) would eat the quota; once the backend serves resized variants
-// they fit under this and start being cached automatically.
-const MAX_PHOTO_BYTES = 1024 * 1024; // above the 800 KB upload target, so every compressed photo is cached
+// (multi-MB) would eat the quota; compressed uploads (~800 KB) fit.
+const MAX_PHOTO_BYTES = 1024 * 1024;
+// And all cached photos together stay under this, oldest dropped first.
+// Through ImageKit (IMAGE_PROXY_URL) a photo is ~30–150 KB, so this rarely
+// bites; straight from Supabase it stops 25 big photos adding up to ~20 MB.
+const MAX_PHOTO_CACHE_BYTES = 5 * 1024 * 1024;
+const BYTES = 'x-sw-bytes';
 // Tile freshness follows the server's Cache-Control max-age (OSM's tile
 // policy asks clients to honour caching headers for re-visits), falling
 // back to 7 days when none is readable. Past that, a stale tile is still
@@ -55,11 +59,14 @@ function isTile(url) {
   return TILE_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith('.' + h));
 }
 
-// ImageKit proxy in front of Supabase Storage (IMAGE_PROXY_URL).
+// ImageKit proxy in front of Supabase Storage (IMAGE_PROXY_URL). Only this
+// app's own ImageKit account, not any image on ik.imagekit.io. Change it
+// here too if IMAGE_PROXY_URL ever points at a different account.
 const PHOTO_PROXY_HOST = 'ik.imagekit.io';
+const PHOTO_PROXY_PATH = '/pk5x5zal3/';
 
 function isPhoto(url) {
-  if (url.hostname === PHOTO_PROXY_HOST) return true;
+  if (url.hostname === PHOTO_PROXY_HOST) return url.pathname.startsWith(PHOTO_PROXY_PATH);
   return (
     url.hostname.endsWith('.supabase.co') &&
     /\/storage\/v1\/(object|render\/image)\/public\/place-images\//.test(url.pathname)
@@ -90,14 +97,27 @@ self.addEventListener('fetch', (event) => {
 
 // Oldest-first eviction. Cache.keys() is in insertion order, and re-putting
 // a URL moves it to the end, so this is "least recently (re)stored" first.
-async function trim(cache, max) {
+async function trim(cache, max, maxTotalBytes) {
   const keys = await cache.keys();
-  for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
+  let start = 0;
+  for (; start < keys.length - max; start++) await cache.delete(keys[start]);
+  if (!maxTotalBytes) return;
+  // Then drop oldest until the rest fit the total budget.
+  const sizes = [];
+  for (let i = start; i < keys.length; i++) {
+    const r = await cache.match(keys[i]);
+    sizes.push(Number(r?.headers.get(BYTES)) || 0);
+  }
+  let total = sizes.reduce((a, b) => a + b, 0);
+  for (let i = 0; total > maxTotalBytes && i < sizes.length - 1; i++) {
+    await cache.delete(keys[start + i]);
+    total -= sizes[i];
+  }
 }
 
 // Store a CORS response with real size + a timestamp header. Returns
 // without storing if it's too big or has no reliable size.
-async function store(cache, key, res, max, maxBytes) {
+async function store(cache, key, res, max, maxBytes, maxTotalBytes) {
   if (maxBytes) {
     const len = Number(res.headers.get('content-length'));
     if (!len || len > maxBytes) return; // unknown or too big: don't even read the body
@@ -108,18 +128,19 @@ async function store(cache, key, res, max, maxBytes) {
   headers.delete('content-encoding'); // body is already decoded
   headers.delete('content-length');
   headers.set(CACHED_AT, String(Date.now()));
+  headers.set(BYTES, String(body.size));
   const m = /max-age=(\d+)/i.exec(res.headers.get('cache-control') || '');
   headers.set(TTL_MS, String(m ? Number(m[1]) * 1000 : DEFAULT_TILE_TTL_MS));
   await cache.put(key, new Response(body, { status: res.status, statusText: res.statusText, headers }));
-  await trim(cache, max);
+  await trim(cache, max, maxTotalBytes);
 }
 
 // CORS-mode fetch, optionally abandoned after `ms`.
-async function corsFetch(url, ms) {
+async function corsFetch(url, ms, headers) {
   const ctrl = ms ? new AbortController() : null;
   const timer = ms ? setTimeout(() => ctrl.abort(), ms) : null;
   try {
-    return await fetch(url, { mode: 'cors', credentials: 'omit', signal: ctrl ? ctrl.signal : undefined });
+    return await fetch(url, { mode: 'cors', credentials: 'omit', headers, signal: ctrl ? ctrl.signal : undefined });
   } finally {
     if (timer) clearTimeout(timer);
   }
@@ -170,7 +191,10 @@ async function handlePhoto(event, req) {
 
   let res;
   try {
-    res = await corsFetch(key, 0);
+    // Pass on the browser's Accept header: ImageKit's f-auto picks WebP/AVIF
+    // from it, and a bare fetch would get (and cache) the bigger JPEG.
+    const accept = req.headers.get('accept');
+    res = await corsFetch(key, 0, accept ? { Accept: accept } : undefined);
   } catch {
     return fetch(req);
   }
@@ -179,7 +203,9 @@ async function handlePhoto(event, req) {
   // body would just sit buffered in memory.
   const len = Number(res.headers.get('content-length'));
   if (len > 0 && len <= MAX_PHOTO_BYTES) {
-    event.waitUntil(store(cache, key, res.clone(), MAX_PHOTOS, MAX_PHOTO_BYTES).catch(() => {}));
+    event.waitUntil(
+      store(cache, key, res.clone(), MAX_PHOTOS, MAX_PHOTO_BYTES, MAX_PHOTO_CACHE_BYTES).catch(() => {})
+    );
   }
   return res;
 }

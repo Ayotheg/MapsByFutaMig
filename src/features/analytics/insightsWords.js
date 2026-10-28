@@ -16,12 +16,12 @@ const TAP_LABELS = {
   nav_rerouted: 'Went off route',
   feature_panel_open: 'Opened a menu',
   review_submitted: 'Left a review',
-  review_prompt_shown: 'Asked for a review',
+  review_prompt_shown: null,
   review_prompt_rate: 'Tapped "rate"',
   review_prompt_dismissed: 'Said no to a review',
   waypoint_suggested: 'Suggested a place',
   whatsapp_channel_click: 'Opened WhatsApp channel',
-  whatsapp_prompt_shown: 'Saw WhatsApp invite',
+  whatsapp_prompt_shown: null,
   whatsapp_prompt_dismissed: 'Closed WhatsApp invite',
   explore_channel_click: 'Opened a channel',
   business_link_click: 'Opened a business link',
@@ -43,6 +43,8 @@ const TAP_LABELS = {
 
 export function tapLabel(eventName) {
   if (eventName in TAP_LABELS) return TAP_LABELS[eventName];
+  // Things the app showed or checked by itself aren't taps.
+  if (/_(shown|check)$/.test(eventName)) return null;
   return humanize(eventName);
 }
 

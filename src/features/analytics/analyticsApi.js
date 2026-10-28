@@ -50,15 +50,6 @@ export async function fetchInsights(daysBack = 30) {
   return data || null;
 }
 
-export async function fetchPendingCount() {
-  const { count, error } = await supabase
-    .from('waypoints')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'pending');
-  if (error) throw error;
-  return count ?? 0;
-}
-
 /** Same "NetworkError with no HTTP status" → "table/migration not run
  * yet" heuristic quickChipsApi.js already established, reused here so
  * every Insights sub-tab surfaces the same plain-English message instead

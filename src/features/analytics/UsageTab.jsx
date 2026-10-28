@@ -11,18 +11,25 @@ export default function UsageTab({ rollup, rollupError, insights, loadInsights }
   useEffect(() => loadInsights(DAYS), [loadInsights]);
   const extra = insights[DAYS];
 
-  // Per-day top-10 event counts, added up. Labels are plain words; admin
-  // actions and errors aren't visitor taps, so they're dropped.
+  // Exact counts from supabase/analytics_insights.sql when it's been run.
+  // Otherwise each day's top 10 from the rollup, added up — an undercount
+  // for anything that isn't in a day's top 10, so it's labelled as such.
+  // Labels are plain words; admin actions, errors and things merely shown
+  // aren't visitor taps, so they're dropped.
   const events = useMemo(() => {
+    if (extra?.event_counts) {
+      return new Map(Object.entries(extra.event_counts).map(([k, v]) => [k, Number(v) || 0]));
+    }
     const sum = new Map();
     for (const day of rollup || []) {
       for (const e of day.top_events || []) sum.set(e.event_name, (sum.get(e.event_name) || 0) + (Number(e.count) || 0));
     }
     return sum;
-  }, [rollup]);
+  }, [rollup, extra]);
+  const exact = !!extra?.event_counts;
 
-  if (rollupError) return <div className={styles.errorNote}>{rollupError}</div>;
-  if (!rollup) return <div className={styles.muted}>Loading…</div>;
+  if (rollupError && !exact) return <div className={styles.errorNote}>{rollupError}</div>;
+  if (!rollup && !exact) return <div className={styles.muted}>Loading…</div>;
 
   const started = events.get('nav_started') || 0;
   const arrived = events.get('nav_completed') || 0;
@@ -39,7 +46,9 @@ export default function UsageTab({ rollup, rollupError, insights, loadInsights }
       <div className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>Directions</h3>
-          <p className={styles.cardSub}>Of everyone who started, how many got there</p>
+          <p className={styles.cardSub}>
+            Of everyone who started, how many got there{exact ? '' : ' (rough count)'}
+          </p>
         </div>
         {started === 0 ? (
           <div className={styles.muted}>No directions yet.</div>
@@ -72,7 +81,13 @@ export default function UsageTab({ rollup, rollupError, insights, loadInsights }
         )}
       </div>
 
-      <RankedCard title="What people tapped" sub={`Last ${DAYS} days`} rows={taps} empty="Nothing yet." teal />
+      <RankedCard
+        title="What people tapped"
+        sub={exact ? `Last ${DAYS} days` : `Last ${DAYS} days, each day's top 10 only`}
+        rows={taps}
+        empty="Nothing yet."
+        teal
+      />
     </>
   );
 }

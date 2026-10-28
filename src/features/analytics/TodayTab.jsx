@@ -11,24 +11,31 @@ import { clockTime, describeStep, fmt, shortDate, statusLabel, timeAgo, whereLab
 const POLL_MS = 2000;
 const PAGE = 10;
 
-export default function TodayTab({ rollup, rollupError }) {
+export default function TodayTab({ rollup, rollupError, insights, loadInsights }) {
+  // The extra numbers count "today" from midnight on campus; the daily
+  // rollup's days are UTC, an hour behind. Prefer the former.
+  useEffect(() => loadInsights(7), [loadInsights]);
+  const extra = insights[7];
   const today = rollup?.[rollup.length - 1];
   const isToday = today && today.day === new Date().toISOString().slice(0, 10);
+  const peopleToday = extra ? extra.today_people : isToday ? today.unique_visitors : 0;
+  const visitsToday = extra ? extra.today_visits : isToday ? today.total_sessions : 0;
+  const ready = extra || rollup;
 
   return (
     <>
       <LiveCard />
-      {rollupError ? (
+      {rollupError && !extra ? (
         <div className={styles.errorNote}>{rollupError}</div>
       ) : (
         <div className={styles.grid2}>
           <div className={styles.card}>
             <div className={styles.statLabel}>People today</div>
-            <div className={styles.statValue}>{rollup ? fmt(isToday ? today.unique_visitors : 0) : '—'}</div>
+            <div className={styles.statValue}>{ready ? fmt(peopleToday) : '—'}</div>
           </div>
           <div className={styles.card}>
             <div className={styles.statLabel}>Visits today</div>
-            <div className={styles.statValue}>{rollup ? fmt(isToday ? today.total_sessions : 0) : '—'}</div>
+            <div className={styles.statValue}>{ready ? fmt(visitsToday) : '—'}</div>
           </div>
         </div>
       )}

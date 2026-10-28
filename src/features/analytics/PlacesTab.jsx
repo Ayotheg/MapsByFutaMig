@@ -11,11 +11,17 @@ export default function PlacesTab({ rollup, rollupError, insights, loadInsights 
   useEffect(() => loadInsights(DAYS), [loadInsights]);
   const extra = insights[DAYS];
 
-  const destinations = useMemo(() => totals(rollup, 'top_routes', (r) => r.to), [rollup]);
+  // Exact (trips started) when the extra numbers exist. The rollup's
+  // top_routes counts a trip once when started and again when finished,
+  // so its fallback is labelled rough.
+  const destinations = useMemo(
+    () => (extra?.top_destinations ? extra.top_destinations : totals(rollup, 'top_routes', (r) => r.to)),
+    [rollup, extra]
+  );
   const searches = useMemo(() => totals(rollup, 'top_searches', (r) => r.query?.trim().toLowerCase()), [rollup]);
 
-  if (rollupError) return <div className={styles.errorNote}>{rollupError}</div>;
-  if (!rollup) return <div className={styles.muted}>Loading…</div>;
+  if (rollupError && !extra) return <div className={styles.errorNote}>{rollupError}</div>;
+  if (!rollup && !extra) return <div className={styles.muted}>Loading…</div>;
 
   const sources = extra
     ? Object.entries(extra.place_sources || {})
@@ -50,7 +56,7 @@ export default function PlacesTab({ rollup, rollupError, insights, loadInsights 
 
       <RankedCard
         title="Top destinations"
-        sub={`Where people got directions to, last ${DAYS} days`}
+        sub={`Where people got directions to, last ${DAYS} days${extra?.top_destinations ? '' : ' (rough count)'}`}
         rows={destinations}
         empty="No directions yet."
       />
@@ -98,7 +104,14 @@ export default function PlacesTab({ rollup, rollupError, insights, loadInsights 
 }
 
 function RankedCard({ title, sub, rows, empty, teal }) {
-  const top = rows.slice(0, 8);
+  // Two raw values can read the same in plain words ("Other", or a type
+  // saved in two spellings): one row each, counts added.
+  const merged = new Map();
+  for (const r of rows) merged.set(r.name, (merged.get(r.name) || 0) + (Number(r.count) || 0));
+  const top = [...merged.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
   const max = Math.max(1, ...top.map((r) => r.count));
   return (
     <div className={styles.card}>

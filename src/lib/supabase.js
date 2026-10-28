@@ -53,13 +53,28 @@ const PLACE_IMAGES_BUCKET = 'place-images';
 // place-images bucket. Photos are fetched from Supabase once, then resized
 // and served from ImageKit's cache, so repeat views stop costing Supabase
 // egress. Uploads still go to Supabase. Empty = straight from Supabase.
+// Set as IMAGE_PROXY_URL (or VITE_IMAGE_PROXY_URL) — see vite.config.js.
 const IMAGE_PROXY_URL = (import.meta.env.IMAGE_PROXY_URL || '').trim().replace(/\/+$/, '');
 // w-900: plenty for a place card on a phone; q-75 + f-auto keep it small.
-const IMAGE_PROXY_TRANSFORM = 'tr=w-900,q-75,f-auto';
+// c-at_max: never enlarge a photo smaller than that.
+const IMAGE_PROXY_TRANSFORM = 'tr=w-900,c-at_max,q-75,f-auto';
+// The full-screen viewer (PhotoLightbox) gets the upload's full width.
+const IMAGE_PROXY_FULL_TRANSFORM = 'tr=w-1600,c-at_max,q-80,f-auto';
 
 export function getPlaceImageUrl(storagePath) {
   if (!storagePath) return null;
-  if (IMAGE_PROXY_URL) return `${IMAGE_PROXY_URL}/${storagePath}?${IMAGE_PROXY_TRANSFORM}`;
+  if (IMAGE_PROXY_URL) {
+    // Same clean-up getPublicUrl does: no leading slash, special characters escaped.
+    const path = encodeURI(String(storagePath).replace(/^\/+/, ''));
+    return `${IMAGE_PROXY_URL}/${path}?${IMAGE_PROXY_TRANSFORM}`;
+  }
   const { data } = supabase.storage.from(PLACE_IMAGES_BUCKET).getPublicUrl(storagePath);
   return data?.publicUrl ?? null;
+}
+
+/** The full-size version of a photo URL from getPlaceImageUrl, for viewing
+ * full screen. Unchanged when photos come straight from Supabase. */
+export function fullSizePhotoUrl(url) {
+  if (!url || !IMAGE_PROXY_URL || !url.startsWith(`${IMAGE_PROXY_URL}/`)) return url;
+  return url.replace(IMAGE_PROXY_TRANSFORM, IMAGE_PROXY_FULL_TRANSFORM);
 }
