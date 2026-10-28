@@ -1,4 +1,6 @@
 import { supabase } from '../../lib/supabase';
+import { compressImageFile } from '../../lib/imageCompression';
+import { putImage } from '../../lib/imageHost';
 
 /**
  * segmentSave.js — Supabase insert logic for the save flow.
@@ -46,20 +48,17 @@ import { supabase } from '../../lib/supabase';
  * is missing, rather than silently failing.
  */
 
-const PLACE_IMAGES_BUCKET = 'place-images';
-
 /**
  * Uploads a File to Supabase Storage and returns its storage path (not a
  * public URL — same convention waypoint_images/segment_images already use,
  * resolved to a URL on read via getPlaceImageUrl).
  */
-async function uploadSegmentImage(segmentId, file, position) {
+async function uploadSegmentImage(segmentId, rawFile, position) {
+  // Same compression as every other photo upload (lib/imageCompression.js).
+  const file = await compressImageFile(rawFile);
   const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
   const path = `segments/${segmentId}/${position}.${ext}`;
-  const { error } = await supabase.storage
-    .from(PLACE_IMAGES_BUCKET)
-    .upload(path, file, { contentType: file.type, upsert: true });
-  if (error) throw error;
+  await putImage(path, file, { upsert: true });
   return path;
 }
 

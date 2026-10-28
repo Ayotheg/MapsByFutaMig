@@ -48,8 +48,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // full download URLs directly). Every read site needs to resolve it.
 const PLACE_IMAGES_BUCKET = 'place-images';
 
+// When set, photos are served from this origin (Cloudflare R2 behind a custom
+// domain) instead of Supabase Storage. See lib/imageHost.js and
+// IMAGE_MIGRATION.md.
+const IMAGE_CDN_URL = (import.meta.env.VITE_IMAGE_CDN_URL || '').trim().replace(/\/+$/, '');
+
+// Read-only image proxy (ImageKit) in front of Supabase Storage. Photos are
+// fetched from Supabase once, then resized and served from the proxy's cache,
+// so repeat views stop costing Supabase egress. Uploads still go to Supabase.
+const IMAGE_PROXY_URL = (import.meta.env.VITE_IMAGE_PROXY_URL || '').trim().replace(/\/+$/, '');
+// w-900: plenty for a place card on a phone; q-75 + f-auto keep it small.
+const IMAGE_PROXY_TRANSFORM = 'tr=w-900,q-75,f-auto';
+
 export function getPlaceImageUrl(storagePath) {
   if (!storagePath) return null;
+  if (IMAGE_CDN_URL) return `${IMAGE_CDN_URL}/${storagePath}`;
+  if (IMAGE_PROXY_URL) return `${IMAGE_PROXY_URL}/${storagePath}?${IMAGE_PROXY_TRANSFORM}`;
   const { data } = supabase.storage.from(PLACE_IMAGES_BUCKET).getPublicUrl(storagePath);
   return data?.publicUrl ?? null;
 }

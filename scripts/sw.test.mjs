@@ -146,6 +146,20 @@ fetchImpl = async () => { throw new Error('should not hit network'); };
 r = await req(P('small')); assert.equal(r.status, 200);
 console.log('ok 7: photo size rules + cache hit');
 
+// 7b. photos on the R2 custom domain are cached the same way
+const C = (f) => `https://img.mapsbyfuta.xyz/waypoint/1/${f}.jpg`;
+fetchImpl = async () => ok(png(200_000));
+await req(C('cdn'));
+assert.ok(store.get('mbf-photos-v3').has(C('cdn')));
+console.log('ok 7b: R2 custom-domain photos cached');
+
+// 7c. photos via the ImageKit proxy are cached the same way
+const K = (f) => `https://ik.imagekit.io/abc123/waypoints/1/${f}.jpg?tr=w-900,q-75,f-auto`;
+fetchImpl = async () => ok(png(200_000));
+await req(K('ik'));
+assert.ok(store.get('mbf-photos-v3').has(K('ik')));
+console.log('ok 7c: ImageKit proxy photos cached');
+
 // 8. photo cap
 fetchImpl = async () => ok(png(1000));
 for (let i = 0; i < 60; i++) await req(P('p' + i));
