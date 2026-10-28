@@ -1,5 +1,5 @@
 import { Heart, Navigation } from 'lucide-react';
-import { CROWDR_CAMPAIGN_URL } from '../../lib/donate';
+import { DONATE_URL } from '../../lib/donate';
 import { track } from '../../lib/analytics';
 import styles from './MobileSearchBar.module.css';
 
@@ -10,7 +10,7 @@ import styles from './MobileSearchBar.module.css';
  * that opens MobileSearchOverlay, matching legacy exactly (the mobile
  * search *experience* only exists inside the full-screen overlay).
  *
- * The left button is the donate heart (Crowdr). It replaced the old menu
+ * The left button is the donate heart (Buy Me a Malt). It replaced the old menu
  * button, which only duplicated the sheet's own Explore tab. No search
  * icon: it sat right next to the heart and the two clashed.
  *
@@ -39,7 +39,7 @@ export default function MobileSearchBar({ onOpenSearch, onNavigate, activeChipLa
     <div className={styles.bar}>
       <a
         className={styles.logoBtn}
-        href={CROWDR_CAMPAIGN_URL}
+        href={DONATE_URL}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Support Maps By FUTA"

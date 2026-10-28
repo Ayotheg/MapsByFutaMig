@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { PartyPopper, Heart, Check } from 'lucide-react';
-import { CROWDR_CAMPAIGN_URL } from '../../lib/donate';
+import { DONATE_URL } from '../../lib/donate';
 import { isInstalled, openInstallVideo } from '../install/installVideo';
 import styles from './NavArrivedBanner.module.css';
 
@@ -30,7 +30,7 @@ import styles from './NavArrivedBanner.module.css';
  * copy.
  *
  * "Support FUTA Maps" is new content, not in the pre-redesign version —
- * added per explicit instruction, linking out to the same Crowdr
+ * added per explicit instruction, linking out to the same Buy Me a Malt
  * campaign the landing page already points at. Plain external link,
  * `target="_blank"` + `rel="noopener noreferrer"` — opens the campaign
  * page, doesn't touch `onDismiss` or any existing handler.
@@ -58,7 +58,7 @@ export default function NavArrivedBanner({ destName, onDismiss }) {
           <div className={styles.divider} />
           <a
             className={styles.supportLink}
-            href={CROWDR_CAMPAIGN_URL}
+            href={DONATE_URL}
             target="_blank"
             rel="noopener noreferrer"
           >

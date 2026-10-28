@@ -1,6 +1,6 @@
 import { Heart, Map, Zap, Satellite, Gift } from 'lucide-react'
 import { useReveal } from './landingHooks'
-import CrowdrCampaignCard from './CrowdrCampaignCard'
+import DonateCard from './DonateCard'
 
 /* ─── Support section ─── */
 function SupportSection() {
@@ -32,7 +32,7 @@ function SupportSection() {
               </div>
             ))}
           </div>
-          <CrowdrCampaignCard />
+          <DonateCard />
           <p style={{ fontFamily: 'Poppins', fontSize: 13, color: 'var(--muted)', marginTop: 20 }}>
             Every contribution, no matter how small, makes a difference.
           </p>

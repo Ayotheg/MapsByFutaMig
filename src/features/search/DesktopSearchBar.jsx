@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Navigation, Heart } from 'lucide-react';
-import { CROWDR_CAMPAIGN_URL } from '../../lib/donate';
+import { DONATE_URL } from '../../lib/donate';
 import { fetchNominatim } from './nominatimSearch';
 import { useSelectResult } from './useSelectResult';
 import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
@@ -38,7 +38,7 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
  * the pairing rule this reused the mobile session's fresh choices
  * rather than reinventing them.
  *
- * The pill's left button is the donate heart (Crowdr). It replaced the
+ * The pill's left button is the donate heart (Buy Me a Malt). It replaced the
  * old menu button, which only duplicated the sidebar rail's Explore item.
  * No search icon: it sat right next to the heart and the two clashed.
  *
@@ -227,7 +227,7 @@ export default function DesktopSearchBar({
       <div className={styles.pill}>
         <a
           className={styles.logoBtn}
-          href={CROWDR_CAMPAIGN_URL}
+          href={DONATE_URL}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Support Maps By FUTA"

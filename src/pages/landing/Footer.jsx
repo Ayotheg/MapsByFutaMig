@@ -1,10 +1,34 @@
 import { Link } from 'react-router-dom'
-import { Heart, ArrowRight, HeartHandshake, Mail, MapPin, MessageCircle } from 'lucide-react'
+import { Heart, ArrowRight, Mail, MapPin, MessageCircle } from 'lucide-react'
 import { MapLink } from './shared'
 import WhatsAppIcon from '../../lib/WhatsAppIcon'
 import { WHATSAPP_CHANNEL_URL, markChannelJoined } from '../../lib/whatsappChannel'
 
-const CROWDR_DONATE_URL = 'https://www.oncrowdr.com/explore/c/fund-mapsbyfuta'
+const DONATE_URL = 'https://buymeamalt.com/@ayotheg'
+
+// A drinks can, for the Buy Me a Malt pill. lucide has no can, so it's drawn
+// here on lucide's grid and stroke (24px, 2px, round ends) to sit with the
+// other icons.
+function CanIcon({ size = 24, color = 'currentColor' }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 4h8l1 2v13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6z" />
+      <path d="M7 9h10" />
+      <path d="M7 16h10" />
+      <path d="M11 2h3" />
+    </svg>
+  )
+}
 const CONTACT_EMAIL = 'hello@mapsbyfuta.xyz'
 // wa.me click-to-chat API — full international number, no "+" or leading zero.
 const WHATSAPP_NUMBER = '2348101734037'
@@ -13,7 +37,7 @@ const WHATSAPP_NUMBER = '2348101734037'
  * Light-theme rebuild (Slice 3). Trimmed from the previous 3 link
  * columns (12 links total) + separate CTA column down to 2 short
  * columns, per the redesign plan. Real links preserved throughout
- * (Crowdr donate URL, contact email, /map route). The legal links
+ * (donate URL, contact email, /map route). The legal links
  * below originally pointed at "#" because /privacy, /terms, /cookies
  * weren't wired into App.jsx's <Routes> yet even though the page
  * components (PrivacyPolicy.jsx etc.) existed — that routing gap was
@@ -120,14 +144,14 @@ function Footer() {
           </div>
         </div>
 
-        {/* Pill row: Crowdr support + WhatsApp channel. Wraps onto two lines
-            on narrow screens. */}
+        {/* Pill row: Buy Me a Malt support + WhatsApp channel. Wraps onto
+            two lines on narrow screens. */}
         <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 10, padding: '24px 0' }}>
           <a
-            href={CROWDR_DONATE_URL}
+            href={DONATE_URL}
             target="_blank"
             rel="noreferrer"
-            aria-label="Support Maps By FUTA — donate via Crowdr"
+            aria-label="Support Maps By FUTA — buy me a malt"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '8px 18px', borderRadius: 999,
@@ -137,9 +161,8 @@ function Footer() {
             onMouseEnter={e => { e.currentTarget.style.background = '#e9d9ff' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--land-accent-tint-bg)' }}
           >
-            <HeartHandshake size={15} strokeWidth={2} color="var(--land-accent)" />
-            <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: 12, color: 'var(--land-text-secondary)' }}>Support us on</span>
-            <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 14, color: 'var(--land-text-primary)' }}>Crowdr</span>
+            <CanIcon size={15} color="var(--land-accent)" />
+            <span style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontWeight: 800, fontSize: 14, letterSpacing: '0.02em', color: 'var(--land-text-primary)' }}>BUY ME A MALT</span>
           </a>
           {/* WhatsApp channel (announcements + new features). Distinct from
               the mail/chat icons in "Get started" above, which reach a
