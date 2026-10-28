@@ -31,7 +31,8 @@ export default defineConfig({
   plugins: [react(),
     tailwindcss()],
   // POSTHOG_* are public (project token + host), read by lib/sessionReplay.js.
-  envPrefix: ['VITE_', 'POSTHOG_'],
+  // IMAGE_PROXY_* is the public ImageKit address, read by lib/supabase.js.
+  envPrefix: ['VITE_', 'POSTHOG_', 'IMAGE_PROXY_'],
   build: {
     rolldownOptions: {
       output: {

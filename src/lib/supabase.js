@@ -48,8 +48,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // full download URLs directly). Every read site needs to resolve it.
 const PLACE_IMAGES_BUCKET = 'place-images';
 
+// Read-only image proxy (ImageKit) in front of Supabase Storage, e.g.
+// https://ik.imagekit.io/<id>, whose origin is this project's public
+// place-images bucket. Photos are fetched from Supabase once, then resized
+// and served from ImageKit's cache, so repeat views stop costing Supabase
+// egress. Uploads still go to Supabase. Empty = straight from Supabase.
+const IMAGE_PROXY_URL = (import.meta.env.IMAGE_PROXY_URL || '').trim().replace(/\/+$/, '');
+// w-900: plenty for a place card on a phone; q-75 + f-auto keep it small.
+const IMAGE_PROXY_TRANSFORM = 'tr=w-900,q-75,f-auto';
+
 export function getPlaceImageUrl(storagePath) {
   if (!storagePath) return null;
+  if (IMAGE_PROXY_URL) return `${IMAGE_PROXY_URL}/${storagePath}?${IMAGE_PROXY_TRANSFORM}`;
   const { data } = supabase.storage.from(PLACE_IMAGES_BUCKET).getPublicUrl(storagePath);
   return data?.publicUrl ?? null;
 }

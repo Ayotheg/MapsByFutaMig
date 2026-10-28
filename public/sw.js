@@ -32,7 +32,7 @@ const MAX_PHOTOS = 25;
 // Photos above this are passed through uncached. Full-size iPhone originals
 // (multi-MB) would eat the quota; once the backend serves resized variants
 // they fit under this and start being cached automatically.
-const MAX_PHOTO_BYTES = 800 * 1024;
+const MAX_PHOTO_BYTES = 1024 * 1024; // above the 800 KB upload target, so every compressed photo is cached
 // Tile freshness follows the server's Cache-Control max-age (OSM's tile
 // policy asks clients to honour caching headers for re-visits), falling
 // back to 7 days when none is readable. Past that, a stale tile is still
@@ -55,7 +55,11 @@ function isTile(url) {
   return TILE_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith('.' + h));
 }
 
+// ImageKit proxy in front of Supabase Storage (IMAGE_PROXY_URL).
+const PHOTO_PROXY_HOST = 'ik.imagekit.io';
+
 function isPhoto(url) {
+  if (url.hostname === PHOTO_PROXY_HOST) return true;
   return (
     url.hostname.endsWith('.supabase.co') &&
     /\/storage\/v1\/(object|render\/image)\/public\/place-images\//.test(url.pathname)
