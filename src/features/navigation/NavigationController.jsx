@@ -1449,6 +1449,14 @@ const NavigationController = forwardRef(function NavigationController(
         }
         setDestPanelOpen((v) => !v);
       },
+      // Where the trip (or the "Where to?" panel) is heading, if anywhere.
+      getDest() {
+        return navDestRef.current;
+      },
+      // Ends a running trip without asking (a race or meetup ended).
+      stop() {
+        if (navActiveRef.current) stopNavigation();
+      },
       // The destination moved (Meet me: the friend you're walking to).
       // Mid-trip: move the flag and plan a fresh route from here.
       retarget(entry, announcement) {

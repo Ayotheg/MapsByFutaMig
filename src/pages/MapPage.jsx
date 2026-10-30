@@ -259,7 +259,8 @@ export default function MapPage({ onReadinessChange }) {
 
   const persistMapView = useCallback((view) => {
     const center = view?.center;
-    if (!center) return;
+    // A bad position saved once would reopen the map there on every load.
+    if (!center || !Number.isFinite(center.lat) || !Number.isFinite(center.lng) || !Number.isFinite(view.zoom)) return;
     const next = { center: [center.lat, center.lng], zoom: view.zoom };
     setMapView(next);
     writePersistentState('map-view', next);
@@ -805,7 +806,7 @@ export default function MapPage({ onReadinessChange }) {
     closeOtherOverlays('friends');
     setFriendsStart(mode);
     setFriendsOn(true);
-    presence.updatePresence(mode === 'race' ? 'starting a race' : 'starting a meetup');
+    presence.updatePresence(mode === 'race' ? 'starting a race' : mode === 'meet' ? 'starting a meetup' : 'joining with a code');
   }
 
   // A race heading to its finish, or a friend walking to the host: the
@@ -821,7 +822,33 @@ export default function MapPage({ onReadinessChange }) {
     [closeOtherOverlays]
   );
   // Meet me: the friend being walked to moved on.
-  const retargetForFriends = useCallback((dest, announcement) => navControllerRef.current?.retarget(dest, announcement), []);
+  // False (and nothing changes) once the trip goes somewhere they picked.
+  const retargetForFriends = useCallback((dest, announcement) => {
+    const nav = navControllerRef.current;
+    if (nav?.getDest?.()?.type !== 'friend') return false;
+    nav.retarget(dest, announcement);
+    return true;
+  }, []);
+  // A race or meetup ended: close its trip without asking. Only a trip it
+  // started (heading to the finish line / meeting place, or to the friend),
+  // never one the person set up themselves.
+  const pendingTripEndRef = useRef(undefined);
+  const endTripForFriends = useCallback((finish) => {
+    // Mid-start (fetching GPS and the route) the panel must stay mounted;
+    // close it once starting finishes.
+    if (navStartingRef.current) {
+      pendingTripEndRef.current = finish ?? null;
+      return;
+    }
+    const nav = navControllerRef.current;
+    const dest = nav?.getDest?.();
+    if (!dest) return;
+    const same = (a, b) => !!a && !!b && Math.abs(a.lat - b.lat) < 1e-5 && Math.abs(a.lng - b.lng) < 1e-5;
+    if (dest.type !== 'friend' && !same(dest, finish)) return;
+    nav.stop();
+    setNavOpen(false);
+    setNavSeedDest(null);
+  }, []);
   const handleFriendsIdle = useCallback(() => {
     setFriendsOn(false);
     setFriendsStart(null);
@@ -1101,6 +1128,11 @@ export default function MapPage({ onReadinessChange }) {
           isMobile={isMobile}
           onStartingChange={(starting) => {
             navStartingRef.current = starting;
+            if (!starting && pendingTripEndRef.current !== undefined) {
+              const finish = pendingTripEndRef.current;
+              pendingTripEndRef.current = undefined;
+              endTripForFriends(finish);
+            }
           }}
           onArrival={(dest) => {
             // Not reviewed on arrival (they haven't had the service yet):
@@ -1131,6 +1163,7 @@ export default function MapPage({ onReadinessChange }) {
             }}
             onMeet={() => openFriends('meet')}
             onRace={() => openFriends('race')}
+            onJoinCode={() => openFriends('code')}
           />
         </Suspense>
       )}
@@ -1152,6 +1185,7 @@ export default function MapPage({ onReadinessChange }) {
             onSignIn={handleFriendsSignIn}
             onNavigateTo={navigateForFriends}
             onRetarget={retargetForFriends}
+            onEndTrip={endTripForFriends}
             onLayout={handleFriendsLayout}
             onModeChange={setFriendsMode}
             onIdle={handleFriendsIdle}

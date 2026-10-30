@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Navigation, Users, Flag } from 'lucide-react';
+import { Navigation, Users, Flag, KeyRound } from 'lucide-react';
 import styles from './Friends.module.css';
 
 /**
@@ -7,7 +7,7 @@ import styles from './Friends.module.css';
  * plain navigation, or one of the two friends modes. `anchor` is the
  * desktop rail button's rect; mobile centres the menu over the Nav tab.
  */
-export default function NavMenu({ anchor, isMobile, activeMode, onClose, onNavigate, onMeet, onRace }) {
+export default function NavMenu({ anchor, isMobile, activeMode, onClose, onNavigate, onMeet, onRace, onJoinCode }) {
   const firstRef = useRef(null);
   useEffect(() => {
     firstRef.current?.focus();
@@ -19,7 +19,7 @@ export default function NavMenu({ anchor, isMobile, activeMode, onClose, onNavig
   }, [onClose]);
 
   const style =
-    !isMobile && anchor ? { left: anchor.right + 12, top: Math.max(12, anchor.top + anchor.height / 2 - 76) } : undefined;
+    !isMobile && anchor ? { left: anchor.right + 12, top: Math.max(12, anchor.top + anchor.height / 2 - 98) } : undefined;
 
   return (
     <>
@@ -38,6 +38,10 @@ export default function NavMenu({ anchor, isMobile, activeMode, onClose, onNavig
           <Flag size={18} strokeWidth={2} className={styles.teal} />
           Race to a place
           {activeMode === 'race' && <span className={styles.menuBadge}>Live</span>}
+        </button>
+        <button type="button" role="menuitem" className={styles.menuItem} onClick={onJoinCode}>
+          <KeyRound size={18} strokeWidth={2} />
+          Join with a code
         </button>
       </div>
     </>

@@ -15,17 +15,49 @@ export const SEND_EVERY_MS = 4000;
 // No update for this long reads as "Paused" (app closed / screen locked).
 export const PAUSED_AFTER_MS = 60 * 1000;
 export const COUNTDOWN_MS = 3000;
+// A racer gone this long (left, phone died, no signal) is out of the race.
+export const DROP_AFTER_MS = 2 * 60 * 1000;
+// The race's host gone this long: the next player takes over refereeing.
+export const HOST_GONE_MS = 30 * 1000;
+
+// Who referees next: the earliest player in `order` still connected.
+// Every phone works it out the same way, so they agree without talking.
+export function nextHost(order, presentIds, excludeId) {
+  return (order || []).find((id) => id !== excludeId && presentIds.has(id)) || null;
+}
+
+// Every player has either finished or dropped out.
+export function raceDone(roster, finishers, dropped) {
+  if (!roster?.length) return false;
+  const done = new Set([...(finishers || []).map((f) => f.id), ...(dropped || [])]);
+  return roster.every((id) => done.has(id));
+}
 
 // No 0/O/1/I so a code read aloud can't be misheard.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
+// 6 characters (about a billion codes), read out as two halves: K7Q-29F.
 export function createCode() {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
   const chars = Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join('');
-  return `${chars.slice(0, 4)}-${chars.slice(4)}`;
+  return `${chars.slice(0, 3)}-${chars.slice(3)}`;
 }
 
-const CODE_RE = /^[A-Z2-9]{4}-[A-Z2-9]{4}$/;
+const CODE_RE = /^[A-HJ-NP-Z2-9]{3}-[A-HJ-NP-Z2-9]{3}$/;
+
+// A typed code: any case, with or without the dash or spaces. Null until
+// it's six valid characters.
+export function normalizeCode(input) {
+  const chars = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const code = `${chars.slice(0, 3)}-${chars.slice(3)}`;
+  return chars.length === 6 && CODE_RE.test(code) ? code : null;
+}
+
+// What the code box shows while typing: capitals, dash after three.
+export function formatCodeInput(input) {
+  const chars = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  return chars.length > 3 ? `${chars.slice(0, 3)}-${chars.slice(3)}` : chars;
+}
 
 export function inviteUrl(mode, code) {
   return `${window.location.origin}/map?${mode}=${code}`;

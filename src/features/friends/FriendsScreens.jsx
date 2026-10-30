@@ -6,6 +6,7 @@ import {
   Clock,
   Copy,
   Flag,
+  KeyRound,
   Link2,
   LocateFixed,
   Lock,
@@ -18,6 +19,7 @@ import {
   Smartphone,
   Trophy,
   UserPlus,
+  Users,
   X,
 } from 'lucide-react';
 import styles from './Friends.module.css';
@@ -30,8 +32,10 @@ import {
   firstName,
   formatClock,
   formatDistance,
+  formatCodeInput,
   formatDuration,
   inviteUrl,
+  normalizeCode,
   ordinal,
   walkMinutes,
 } from './friendsSession';
@@ -130,8 +134,61 @@ function PlacePicker({ id, label, searchIndex, onPick }) {
   );
 }
 
+// ── Join with a code (instead of tapping the link) ──────────────────
+export function JoinCode({ isMobile, onJoin, onClose }) {
+  const [value, setValue] = useState('');
+  const inputRef = useRef(null);
+  const code = normalizeCode(value);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+  return (
+    <Panel isMobile={isMobile} label="Join with a code" onScrim={onClose}>
+      <div className={styles.headRow}>
+        <div className={styles.headText}>
+          <span className={cx(styles.overline, styles.overlineViolet)}>Meet me or race</span>
+          <h2 className={styles.title}>Join with a code</h2>
+          <p className={styles.sub}>Type the 6-character code your friend shared.</p>
+        </div>
+        <CloseBtn onClick={onClose} />
+      </div>
+      <form
+        className={styles.col}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (code) onJoin(code);
+        }}
+      >
+        <label className={styles.overline} htmlFor="friends-code">
+          Code
+        </label>
+        <input
+          id="friends-code"
+          ref={inputRef}
+          className={cx(styles.search, styles.codeInput)}
+          value={value}
+          onChange={(e) => setValue(formatCodeInput(e.target.value))}
+          placeholder="K7Q-29F"
+          autoCapitalize="characters"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+        />
+        <button type="submit" className={cx(styles.btn, styles.btnPrimary)} disabled={!code}>
+          <KeyRound size={18} />
+          Join
+        </button>
+      </form>
+      <span className={styles.note}>
+        <Lock size={14} />
+        Everyone needs to be signed in to join.
+      </span>
+    </Panel>
+  );
+}
+
 // ── 1 · Race to a place: pick the finish line ────────────────────────
-export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreate, onClose }) {
+export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreate, onHaveCode, onClose }) {
   const [editing, setEditing] = useState(!place);
 
   return (
@@ -172,6 +229,10 @@ export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreat
           <Link2 size={18} />
           Create invite link
         </button>
+        <button type="button" className={cx(styles.btn, styles.btnGhost)} onClick={onHaveCode}>
+          <KeyRound size={16} />
+          Have a code? Join a friend’s race
+        </button>
         <span className={styles.note}>
           <Lock size={14} />
           Everyone needs to be signed in to join.
@@ -184,13 +245,13 @@ export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreat
 // ── 2 · Lobby (host shares the link, guests wait) ────────────────────
 function shareText(session) {
   const url = inviteUrl(session.mode, session.code);
-  return session.mode === 'race'
-    ? `Race me to ${session.place?.name} on Maps By FUTA: ${url}`
-    : `Meet me on Maps By FUTA. See where I am and walk to me: ${url}`;
+  const intro = session.mode === 'race' ? `Race me to ${session.place?.name} on Maps By FUTA` : 'Meet me on Maps By FUTA';
+  return `${intro}: ${url}\nOr open Nav › Join with a code: ${session.code}`;
 }
 
-export function Lobby({ isMobile, session, members, progress, myId, isHost, now, searchIndex, onMeetPlaceChange, onStart, onLeave }) {
+export function Lobby({ isMobile, session, members, progress, myId, isHost, now, notice, searchIndex, onMeetPlaceChange, onHaveCode, onStart, onLeave }) {
   const [copied, setCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [pickingPlace, setPickingPlace] = useState(false);
   const race = session.mode === 'race';
   const cap = CAPACITY[session.mode];
@@ -212,6 +273,15 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
   function share() {
     if (navigator.share) navigator.share({ title: 'Maps By FUTA', text: shareText(session) }).catch(() => {});
     else copy();
+  }
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(session.code);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch {
+      // The code is on screen to read out instead.
+    }
   }
 
   const linkBlock = isHost && (
@@ -239,7 +309,11 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
           <Share2 size={18} />
         </button>
       </div>
-      <span className={styles.sub}>The link stops working in {minsLeft} min, or once you start.</span>
+      <button type="button" className={styles.codeBox} onClick={copyCode} aria-label={`Copy code ${session.code}`}>
+        <span className={styles.overline}>{codeCopied ? 'Code copied' : 'Or share the code'}</span>
+        <span className={styles.codeText}>{session.code}</span>
+      </button>
+      <span className={styles.sub}>The link and code stop working in {minsLeft} min, or once you start.</span>
     </div>
   );
 
@@ -260,7 +334,7 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
               {m.id === myId ? ' (you)' : ''}
             </span>
             <span className={styles.personMeta}>
-              {m.role === 'host' ? (
+              {m.id === session.hostId ? (
                 'Host'
               ) : (
                 <>
@@ -336,6 +410,14 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
             ? 'Everyone gets a 3-second countdown.'
             : `You and ${firstName(list[1]?.name)} will see each other live until one of you ends it.`}
       </span>
+      {/* "Meet a friend" opens this lobby straight away, so someone who
+          was sent a code needs a way to the code box from here. */}
+      {!race && list.length < 2 && (
+        <button type="button" className={cx(styles.btn, styles.btnGhost)} onClick={onHaveCode}>
+          <KeyRound size={16} />
+          Have a friend’s code? Join theirs
+        </button>
+      )}
     </div>
   ) : (
     <div className={styles.col}>
@@ -363,6 +445,7 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
     return (
       <Panel isMobile={false} wide label={title}>
         {head}
+        {notice && <div className={styles.notice} role="status"><Users size={18} />{notice}</div>}
         <div className={styles.split}>
           <div className={styles.splitMain}>
             {placeStrip}
@@ -377,6 +460,7 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
   return (
     <Panel isMobile label={title}>
       {head}
+      {notice && <div className={styles.notice} role="status"><Users size={18} />{notice}</div>}
       {placeStrip}
       {linkBlock}
       {isHost && <div className={styles.divider} />}
@@ -392,11 +476,14 @@ export function Invite({ isMobile, session, peek, user, members, myDistance, onS
   const hostFirst = firstName(session.hostName);
 
   if (peek !== 'ready') {
+    // `mode` is unknown until the host answers (a typed code).
+    const what = session.mode === 'race' ? 'race' : session.mode === 'meet' ? 'meetup' : null;
     const copy = {
       loading: ['Opening invite…', 'Connecting to your friend.'],
-      closed: ['This invite has ended', 'Ask your friend to send a new link.'],
-      full: [race ? 'This race is full' : 'This meetup is full', race ? 'A race takes up to 4 people.' : 'Meet me is for 2 people.'],
-      started: [race ? 'This race already started' : 'This meetup already started', 'Ask your friend to send a new link next time.'],
+      closed: ['This invite has ended', 'Ask your friend to send a new link or code.'],
+      notfound: ['No race or meetup with that code', 'Check the code with your friend. Codes stop working after 30 minutes.'],
+      full: [what ? `This ${what} is full` : 'This is full', race ? 'A race takes up to 4 people.' : 'Meet me is for 2 people.'],
+      started: [what ? `This ${what} already started` : 'This already started', 'Ask your friend to send a new link or code next time.'],
     }[peek] || ['Opening invite…', ''];
     return (
       <Panel isMobile={isMobile} centered label={copy[0]} onScrim={peek === 'loading' ? undefined : onDecline}>
@@ -538,7 +625,7 @@ export function Countdown({ session, now }) {
 // ── 6 · Racing: live ranking ─────────────────────────────────────────
 function RankRow({ row, now }) {
   const pct = row.finish ? 100 : row.start && row.dist != null ? Math.round(Math.min(1, Math.max(0, 1 - row.dist / row.start)) * 100) : 0;
-  const paused = !row.finish && row.paused;
+  const paused = !row.finish && (row.paused || row.dropped);
   return (
     <div className={cx(styles.rank, row.me && styles.rankMe)}>
       <span className={cx(styles.rankBadge, row.rank <= 2 && styles.rankBadgeTop)}>{row.rank}</span>
@@ -551,14 +638,15 @@ function RankRow({ row, now }) {
         <div className={styles.bar}>
           <div className={cx(styles.barFill, paused && styles.barFillMuted)} style={{ width: `${pct}%` }} />
         </div>
-        {paused && row.at && <span className={styles.rankNote}>Paused · last update {ago(now - row.at)} ago</span>}
-        {paused && !row.at && <span className={styles.rankNote}>Waiting for their location</span>}
+        {row.dropped && !row.finish && <span className={styles.rankNote}>Left the race · finishes still count if they come back</span>}
+        {paused && !row.dropped && row.at && <span className={styles.rankNote}>Paused · last update {ago(now - row.at)} ago</span>}
+        {paused && !row.dropped && !row.at && <span className={styles.rankNote}>Waiting for their location</span>}
       </div>
     </div>
   );
 }
 
-export function RaceBoard({ session, rows, now, navOpen, onDirections, onLeave, isHost }) {
+export function RaceBoard({ session, rows, now, navOpen, notice, onDirections, onLeave }) {
   const [collapsed, setCollapsed] = useState(false);
   const me = rows.find((r) => r.me);
   const elapsed = session.goAt ? now - session.goAt : 0;
@@ -573,6 +661,12 @@ export function RaceBoard({ session, rows, now, navOpen, onDirections, onLeave, 
           {collapsed ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
       </div>
+      {notice && (
+        <div className={styles.notice} role="status">
+          <Users size={18} />
+          {notice}
+        </div>
+      )}
       {!collapsed && (
         <div className={styles.boardStats}>
           <div className={styles.stat}>
@@ -597,7 +691,7 @@ export function RaceBoard({ session, rows, now, navOpen, onDirections, onLeave, 
       {!collapsed && (
         <div className={styles.row}>
           <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onLeave}>
-            {isHost ? 'End race' : 'Leave'}
+            Leave
           </button>
           {!navOpen && !me?.finish && (
             <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, styles.grow2)} onClick={onDirections}>

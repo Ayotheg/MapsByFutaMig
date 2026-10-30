@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import { useFriendsSession } from './useFriendsSession';
-import { Countdown, Ended, Finished, Invite, Lobby, MeetBoard, RaceBoard, RaceSetup, Results } from './FriendsScreens';
+import { Countdown, Ended, Finished, Invite, JoinCode, Lobby, MeetBoard, RaceBoard, RaceSetup, Results } from './FriendsScreens';
 import { PAUSED_AFTER_MS, distanceM, firstName } from './friendsSession';
 import { getLastFix } from '../navigation/gpsWatch';
 
@@ -67,6 +67,7 @@ export default function FriendsHub({
   onRetarget,
   onLayout,
   onModeChange,
+  onEndTrip,
   onIdle,
 }) {
   const f = useFriendsSession(user);
@@ -74,10 +75,20 @@ export default function FriendsHub({
   const [place, setPlace] = useState(() => asPlace(selectedPlace));
 
   // An invite link is opened once, then MapPage forgets it.
+  // Opening one while in another race or meetup asks first: leaving as the
+  // host would otherwise strand the others.
   useEffect(() => {
     if (!invite) return;
-    f.openInvite(invite);
     onInviteHandled();
+    const s = session;
+    const busy = s?.joined && s.phase !== 'ended' && s.code !== invite.code;
+    if (busy) {
+      const what = s.mode === 'race' ? 'race' : 'meetup';
+      // eslint-disable-next-line no-alert
+      if (!confirm(`Leave your current ${what} to open this invite?`)) return;
+      f.leave();
+    }
+    f.openInvite(invite);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invite?.code]);
 
@@ -93,7 +104,7 @@ export default function FriendsHub({
 
   const mode = session?.mode || null;
   const phase = session?.phase || null;
-  const isHost = session?.role === 'host';
+  const isHost = f.isHost;
   const joined = !!session?.joined;
   const race = mode === 'race';
   useEffect(() => onModeChange(joined && phase !== 'ended' ? mode : null), [joined, phase, mode, onModeChange]);
@@ -130,10 +141,13 @@ export default function FriendsHub({
         at: p?.at ?? null,
         start: startDist[id] ?? null,
         paused: !p?.at || now - p.at > PAUSED_AFTER_MS,
+        // Left, or gone long enough to be counted out (Did not finish).
+        dropped: !order.has(id) && (session.dropped || []).includes(id),
       };
     });
     list.sort((a, b) => {
       if (a.finish || b.finish) return (a.finish?.place ?? 99) - (b.finish?.place ?? 99);
+      if (a.dropped !== b.dropped) return a.dropped ? 1 : -1;
       return (a.dist ?? Infinity) - (b.dist ?? Infinity);
     });
     return list.map((r, i) => ({ ...r, rank: r.finish ? r.finish.place : i + 1 }));
@@ -195,21 +209,24 @@ export default function FriendsHub({
   // Walking to a person (not a place): when they've moved 30 m from where
   // the route ends, move the destination to them and plan again — at most
   // every 15 s so the route doesn't jump while they shuffle about.
-  const followRef = useRef(null); // { lat, lng, at } the route currently ends at
+  // `session.follow` ({ lat, lng, at }) is where the route ends; it's saved
+  // with the session so a reload keeps following.
+  const follow = session?.follow || null;
+  const { setFollow } = f;
   useEffect(() => {
-    if (!navOpen) followRef.current = null;
-  }, [navOpen]);
+    if (!navOpen && follow) setFollow(null);
+  }, [navOpen, follow, setFollow]);
   const otherLat = other?.lat;
   const otherLng = other?.lng;
   useEffect(() => {
-    const target = followRef.current;
-    if (!meetLive || !navActive || !target || session?.place || otherLat == null) return;
+    if (!meetLive || !navActive || !follow || session?.place || otherLat == null) return;
     const here = { lat: otherLat, lng: otherLng };
-    if (distanceM(target, here) < FOLLOW_MOVE_M || now - target.at < FOLLOW_EVERY_MS) return;
-    followRef.current = { ...here, at: now };
+    if (distanceM(follow, here) < FOLLOW_MOVE_M || now - follow.at < FOLLOW_EVERY_MS) return;
     const name = firstName(otherName);
-    onRetarget({ ...here, name: `${name}’s location`, type: 'friend' }, `${name} moved. Route updated.`);
-  }, [meetLive, navActive, session?.place, otherLat, otherLng, otherName, onRetarget, now]);
+    // False when the trip now goes somewhere they chose themselves.
+    const moved = onRetarget({ ...here, name: `${name}’s location`, type: 'friend' }, `${name} moved. Route updated.`);
+    setFollow(moved ? { ...here, at: now } : null);
+  }, [meetLive, navActive, follow, session?.place, otherLat, otherLng, otherName, onRetarget, setFollow, now]);
 
   function meetDirections() {
     if (session.place) {
@@ -217,9 +234,18 @@ export default function FriendsHub({
       return;
     }
     if (other?.lat == null) return;
-    followRef.current = { lat: other.lat, lng: other.lng, at: Date.now() };
+    setFollow({ lat: other.lat, lng: other.lng, at: Date.now() });
     onNavigateTo({ lat: other.lat, lng: other.lng, name: `${firstName(otherName)}’s location`, type: 'friend' });
   }
+
+  // "Tolu left. Dami is now the host." for a few seconds after a handover.
+  const handover = session?.handover;
+  const notice =
+    handover && now - handover.at < 10 * 1000
+      ? isHost
+        ? `${firstName(handover.from)} left. You’re now the host.`
+        : `${firstName(handover.from)} left. ${firstName(handover.to)} is now the host.`
+      : null;
 
   function showBoth() {
     if (!map || other?.lat == null) return;
@@ -250,8 +276,35 @@ export default function FriendsHub({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, startMode, user]);
 
+  // The trip ends with the race or meetup (finished, ended by someone, or
+  // left). Starts set from a reload that lands on an already-ended session.
+  const tripRef = useRef(phase === 'ended' ? { place: session?.place || null } : null);
+  useEffect(() => {
+    if (joined && (phase === 'live' || phase === 'countdown')) {
+      tripRef.current = { place: session?.place || null };
+      return;
+    }
+    if (!tripRef.current) return;
+    const { place: finish } = tripRef.current;
+    tripRef.current = null;
+    onEndTrip(finish);
+  }, [joined, phase, session?.place, onEndTrip]);
+
   // ── Screens ────────────────────────────────────────────────────────
   if (!session) {
+    if (startMode === 'code') {
+      return (
+        <JoinCode
+          isMobile={isMobile}
+          onClose={() => onStartModeChange(null)}
+          onJoin={(code) => {
+            // The host's reply says whether it's a race or a meetup.
+            f.openInvite({ mode: null, code }, { fromCode: true });
+            onStartModeChange(null);
+          }}
+        />
+      );
+    }
     if (startMode !== 'race') return null;
     return (
       <RaceSetup
@@ -259,6 +312,7 @@ export default function FriendsHub({
         place={place}
         onPlaceChange={setPlace}
         searchIndex={searchIndex}
+        onHaveCode={() => onStartModeChange('code')}
         onClose={() => onStartModeChange(null)}
         onCreate={() => {
           if (!user) {
@@ -305,7 +359,12 @@ export default function FriendsHub({
         isHost={isHost}
         now={now}
         searchIndex={searchIndex}
+        notice={notice}
         onMeetPlaceChange={f.setMeetPlace}
+        onHaveCode={() => {
+          f.leave();
+          onStartModeChange('code');
+        }}
         onStart={f.start}
         onLeave={f.leave}
       />
@@ -357,10 +416,11 @@ export default function FriendsHub({
         now={now}
         navOpen={navOpen}
         isHost={isHost}
+        notice={notice}
         onDirections={() => onNavigateTo(session.place)}
         onLeave={() => {
           // eslint-disable-next-line no-alert
-          if (confirm(isHost ? 'End the race for everyone?' : 'Leave the race?')) f.leave();
+          if (confirm(isHost ? 'Leave the race? The next player takes over as host.' : 'Leave the race?')) f.leave();
         }}
       />
     );
