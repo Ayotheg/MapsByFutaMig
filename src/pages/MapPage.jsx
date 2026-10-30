@@ -51,8 +51,13 @@ import MapPickBanner from '../features/map/MapPickBanner';
 import { osmCardData, waypointCardData } from '../features/waypoints/placeCardData';
 import { rememberVisit } from '../features/reviews/pendingReview';
 
+import { parseInvite } from '../features/friends/friendsSession';
+
 // Only shown an hour after a visit — not needed for first paint.
 const ReviewPrompt = lazy(() => import('../features/reviews/ReviewPrompt'));
+// Meet me / Race to a place: only once the Nav menu or an invite link asks.
+const NavMenu = lazy(() => import('../features/friends/NavMenu'));
+const FriendsHub = lazy(() => import('../features/friends/FriendsHub'));
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
 // data — see the comment where it's used below for why this stays a
@@ -239,6 +244,18 @@ export default function MapPage({ onReadinessChange }) {
   const [reviewsVersion, setReviewsVersion] = useState(0);
   const navControllerRef = useRef(null);
   const prevViewModeRef = useRef(null);
+
+  // Nav menu (Navigate / Meet a friend / Race to a place): null when shut,
+  // else the desktop rail button's rect it opens beside.
+  const [navMenu, setNavMenu] = useState(null);
+  // Meet me / Race to a place. `friendsOn` mounts FriendsHub: a `/map?race=`
+  // or `?meet=` invite, a session saved before a reload, or the Nav menu.
+  const [friendsInvite, setFriendsInvite] = useState(() => parseInvite(window.location.search));
+  const [friendsOn, setFriendsOn] = useState(() => !!friendsInvite || !!readPersistentState('friends-session', null));
+  const [friendsStart, setFriendsStart] = useState(null);
+  const [friendsSeedPlace, setFriendsSeedPlace] = useState(null);
+  const [friendsMode, setFriendsMode] = useState(null);
+  const [friendsLayout, setFriendsLayout] = useState({ board: false, quietArrival: false });
 
   const persistMapView = useCallback((view) => {
     const center = view?.center;
@@ -599,6 +616,9 @@ export default function MapPage({ onReadinessChange }) {
     if (keep !== 'admin') setAdminPanelOpen(false);
     if (keep !== 'auth') setAuthModalOpen(false);
     if (keep !== 'gps') setGpsCardOpen(false);
+    if (keep !== 'navmenu') setNavMenu(null);
+    // Only the start sheet closes; a running meetup or race stays.
+    if (keep !== 'friends') setFriendsStart(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -763,6 +783,66 @@ export default function MapPage({ onReadinessChange }) {
     presence.updatePresence(`navigating to ${entry?.name || 'a destination'}`);
   }
 
+  // The Nav tab / Navigate rail item. With "Where to?" already open (or a
+  // trip running) it keeps its old toggle; otherwise it offers the menu.
+  function handleNavMenuToggle(anchorEl) {
+    if (navOpen || navActiveRef.current) {
+      handleNavLaunch();
+      return;
+    }
+    if (navMenu) {
+      setNavMenu(null);
+      return;
+    }
+    closeOtherOverlays('navmenu');
+    setNavMenu({ rect: anchorEl?.getBoundingClientRect?.() || null });
+  }
+  const closeNavMenu = useCallback(() => setNavMenu(null), []);
+
+  function openFriends(mode) {
+    // The open place card (if any) becomes the race's finish line.
+    setFriendsSeedPlace(selected);
+    closeOtherOverlays('friends');
+    setFriendsStart(mode);
+    setFriendsOn(true);
+    presence.updatePresence(mode === 'race' ? 'starting a race' : 'starting a meetup');
+  }
+
+  // A race heading to its finish, or a friend walking to the host: the
+  // usual "Where to?" panel, filled in. Their own tap on Start Navigation
+  // turns on voice and GPS, which browsers only allow from a tap.
+  const navigateForFriends = useCallback(
+    (dest) => {
+      if (navActiveRef.current) return;
+      closeOtherOverlays('nav');
+      setNavSeedDest(dest);
+      setNavOpen(true);
+    },
+    [closeOtherOverlays]
+  );
+  // Meet me: the friend being walked to moved on.
+  const retargetForFriends = useCallback((dest, announcement) => navControllerRef.current?.retarget(dest, announcement), []);
+  const handleFriendsIdle = useCallback(() => {
+    setFriendsOn(false);
+    setFriendsStart(null);
+  }, []);
+  const handleFriendsInviteHandled = useCallback(() => setFriendsInvite(null), []);
+  const handleFriendsLayout = useCallback((next) => {
+    setFriendsLayout((prev) => (prev.board === next.board && prev.quietArrival === next.quietArrival ? prev : next));
+  }, []);
+  const openAuthModalRef = useRef(openAuthModal);
+  openAuthModalRef.current = openAuthModal;
+  const handleFriendsSignIn = useCallback((tab, message) => openAuthModalRef.current(tab, message), []);
+
+  // An invite link is read once; drop it from the address bar so a reload
+  // or a shared screenshot doesn't carry it on.
+  useEffect(() => {
+    if (!friendsInvite) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(friendsInvite.mode);
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [friendsInvite]);
+
   // Legacy: `map.on('click', function() { if (_activeChip) closeResultsPanel(); })`
   // (app.js ~6857–6859) — a map click also dismisses the place card
   // (handled by the effect just below); both listen independently, same
@@ -812,6 +892,8 @@ export default function MapPage({ onReadinessChange }) {
     mySubmissionsOpen ||
     !!submissionToast ||
     installVideoOpen ||
+    !!navMenu ||
+    friendsOn ||
     (isMobile && sheetState !== 'peek');
   mapBusyRef.current = mapBusy;
   const onMapRoute = useLocation().pathname === '/map';
@@ -891,7 +973,7 @@ export default function MapPage({ onReadinessChange }) {
           onActiveTabChange={setSheetActiveTab}
           gps={gps}
           navActive={navActive}
-          onNavLaunch={handleNavLaunch}
+          onNavLaunch={handleNavMenuToggle}
           onAdminClick={handleAdminClick}
           onSuggestPlaceClick={handleSuggestPlaceClick}
           user={auth.user}
@@ -912,7 +994,7 @@ export default function MapPage({ onReadinessChange }) {
           onCollapsedChange={handleCollapsedChange}
           gps={gps}
           navActive={navActive}
-          onNavLaunch={handleNavLaunch}
+          onNavLaunch={handleNavMenuToggle}
           user={auth.user}
           onAuthClick={() => openAuthModal('login')}
           onAdminClick={handleAdminClick}
@@ -1011,6 +1093,8 @@ export default function MapPage({ onReadinessChange }) {
           }}
           onActiveChange={setNavActive}
           placeCardOpen={!!selected}
+          bottomTaken={friendsLayout.board}
+          hideArrivedBanner={friendsLayout.quietArrival}
           nearbyCandidates={nearbyCandidates}
           selectedPlace={selected}
           onNearbySelect={(place) => selectFromNearby(place.card)}
@@ -1033,6 +1117,46 @@ export default function MapPage({ onReadinessChange }) {
             else reportNavigationCompletion(auth.user.id, tripId);
           }}
         />
+      )}
+      {navMenu && (
+        <Suspense fallback={null}>
+          <NavMenu
+            anchor={navMenu.rect}
+            isMobile={isMobile}
+            activeMode={friendsMode}
+            onClose={closeNavMenu}
+            onNavigate={() => {
+              setNavMenu(null);
+              handleNavLaunch();
+            }}
+            onMeet={() => openFriends('meet')}
+            onRace={() => openFriends('race')}
+          />
+        </Suspense>
+      )}
+      {map && friendsOn && (
+        <Suspense fallback={null}>
+          <FriendsHub
+            map={map}
+            user={auth.loading ? null : auth.user}
+            isMobile={isMobile}
+            searchIndex={searchIndex}
+            selectedPlace={friendsSeedPlace}
+            startMode={friendsStart}
+            onStartModeChange={setFriendsStart}
+            invite={friendsInvite}
+            onInviteHandled={handleFriendsInviteHandled}
+            navOpen={navOpen}
+            navActive={navActive}
+            covered={!!selected || (isMobile && (sheetState !== 'peek' || mobileSearchOpen))}
+            onSignIn={handleFriendsSignIn}
+            onNavigateTo={navigateForFriends}
+            onRetarget={retargetForFriends}
+            onLayout={handleFriendsLayout}
+            onModeChange={setFriendsMode}
+            onIdle={handleFriendsIdle}
+          />
+        </Suspense>
       )}
       {reviewTarget && (
         <ReviewModal

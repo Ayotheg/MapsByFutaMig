@@ -151,7 +151,7 @@ export default function Sidebar({
     return () => document.body.classList.remove('explore-open');
   }, [exploreOpen]);
 
-  function handleRailClick(item) {
+  function handleRailClick(item, event) {
     // Signal opens a floating card beside the closed rail (like PlaceCard),
     // so the map and search bar don't shift. Opening anything else closes
     // it via MapPage's closeOtherOverlays.
@@ -170,7 +170,8 @@ export default function Sidebar({
     // agree. `NavPanel` is no longer reachable from here either.
     if (item.key === 'navigate') {
       onCollapsedChange(true);
-      onNavLaunch?.();
+      // The button anchors the Navigate / Meet / Race menu beside the rail.
+      onNavLaunch?.(event?.currentTarget);
       return;
     }
     const isAlreadyActive = activeKey === item.key && !collapsed;
@@ -212,7 +213,7 @@ export default function Sidebar({
                 className={`${styles.railBtn} ${active ? styles.railBtnActive : ''}`}
                 title={item.title}
                 aria-current={active ? 'page' : undefined}
-                onClick={() => handleRailClick(item)}
+                onClick={(e) => handleRailClick(item, e)}
               >
                 <item.Icon size={22} strokeWidth={1.8} />
                 <span>{item.label}</span>

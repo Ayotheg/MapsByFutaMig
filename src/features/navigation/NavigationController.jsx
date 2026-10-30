@@ -130,7 +130,7 @@ const SVG_FLAG = (size, color = 'currentColor') =>
  * on Start.
  */
 const NavigationController = forwardRef(function NavigationController(
-  { map, gps, searchIndex, segments, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile },
+  { map, gps, searchIndex, segments, initialDest, onRequestClose, onActiveChange, onStartingChange, onArrival, guestNavBlocked, onGuestBlocked, onNavigationSuccess, explorePicks, placeCardOpen, nearbyCandidates, onNearbySelect, selectedPlace, isMobile, bottomTaken = false, hideArrivedBanner = false },
   ref
 ) {
   // startNavigation() awaits GPS + routing; if this controller unmounts in
@@ -698,10 +698,11 @@ const NavigationController = forwardRef(function NavigationController(
         .catch((e) => console.warn('Reroute failed:', e.message))
         .finally(() => {
           rerouteInFlightRef.current = false;
-          // Started or stopped riding while this was in flight: route again
-          // in the new mode from where they are now.
+          // Started or stopped riding, or the destination moved (a friend
+          // walking), while this was in flight: route again from here.
           const pos = navUserPosRef.current;
-          if (navModeRef.current !== mode && navActiveRef.current && pos) rerouteFromRef.current?.(pos.lat, pos.lng);
+          const changed = navModeRef.current !== mode || (navDestRef.current && navDestRef.current !== dest);
+          if (changed && navActiveRef.current && pos) rerouteFromRef.current?.(pos.lat, pos.lng);
         });
     },
     [drawRoute, persistNavigation]
@@ -785,6 +786,11 @@ const NavigationController = forwardRef(function NavigationController(
       onArrivalRef.current?.(dest);
     }
   }, []);
+
+  // A race shows its own finish screen, so the trip just closes.
+  useEffect(() => {
+    if (arrivedBannerDest && hideArrivedBanner) dismissArrivedBanner();
+  }, [arrivedBannerDest, hideArrivedBanner, dismissArrivedBanner]);
 
   // ── HUD update — ported from `updateHUD()` (app.js ~4800–4927) ────────
   const updateHUD = useCallback(() => {
@@ -1443,8 +1449,28 @@ const NavigationController = forwardRef(function NavigationController(
         }
         setDestPanelOpen((v) => !v);
       },
+      // The destination moved (Meet me: the friend you're walking to).
+      // Mid-trip: move the flag and plan a fresh route from here.
+      retarget(entry, announcement) {
+        if (!navActiveRef.current) {
+          setNavDest(entry);
+          return;
+        }
+        const dest = { lat: Number(entry.lat), lng: Number(entry.lng), name: entry.name, id: entry.id || null, type: entry.type || null };
+        navDestRef.current = dest;
+        setNavDestState(dest);
+        writePersistentState('navigation-destination', dest);
+        placeDestMarker(dest.lat, dest.lng, dest.name);
+        navArrivalCountRef.current = 0;
+        nearArrivalSpokenRef.current = false;
+        setHud((h) => ({ ...h, destName: dest.name }));
+        if (announcement) speak(announcement);
+        const pos = navUserPosRef.current;
+        if (pos) rerouteFrom(pos.lat, pos.lng);
+        persistNavigation();
+      },
     }),
-    [stopNavigation]
+    [stopNavigation, setNavDest, placeDestMarker, speak, rerouteFrom, persistNavigation]
   );
 
   // ── Nearby places / compass handlers ──────────────────────────────
@@ -1561,7 +1587,8 @@ const NavigationController = forwardRef(function NavigationController(
             });
           }}
           onClose={handleHudClose}
-          hideDistance={placeCardOpen}
+          // A race's ranking card takes the distance card's slot too.
+          hideDistance={placeCardOpen || bottomTaken}
         />
       )}
       {navActive && (
@@ -1572,10 +1599,10 @@ const NavigationController = forwardRef(function NavigationController(
           onToggleRouteUp={handleToggleRouteUp}
           mapBearing={compassAngle}
           // On phones the place card takes the bottom slot these sit in.
-          hidden={placeCardOpen && isMobile}
+          hidden={(placeCardOpen || bottomTaken) && isMobile}
         />
       )}
-      {arrivedBannerDest && (
+      {arrivedBannerDest && !hideArrivedBanner && (
         <NavArrivedBanner destName={arrivedBannerDest} onDismiss={dismissArrivedBanner} />
       )}
       {navActive && resuming && <NavResumeOverlay map={map} />}
