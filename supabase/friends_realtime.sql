@@ -38,8 +38,8 @@
 -- signed-in user holding the link can still join (that's how invites
 -- work). Capacity (2 / 4) is enforced by the app.
 
--- RLS is on for realtime.messages by default; kept explicit.
-alter table realtime.messages enable row level security;
+-- RLS is already on for realtime.messages (Supabase owns that table, so
+-- it can't be altered from here; only policies can be added).
 
 drop policy if exists "friends channels: signed-in can receive" on realtime.messages;
 create policy "friends channels: signed-in can receive"
