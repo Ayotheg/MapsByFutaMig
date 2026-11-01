@@ -704,3 +704,50 @@
   color: var(--v2-neutral);
   font-variant-numeric: tabular-nums;
 }
+
+/* Live cards minimised (like the Signal card's compact view): one summary
+   line, the main action, and Details to open the rest. */
+.boardMin {
+  gap: 10px;
+  padding: 12px 14px;
+}
+.boardMin .boardTitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.detailsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 4px 0 10px;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v2-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Cards are capped in height and scroll; their rows must keep their own
+   size rather than being squashed to fit (the Directions button was). */
+.sheet > *,
+.modal > *,
+.board > * {
+  flex-shrink: 0;
+}
+.btn {
+  min-width: 0;
+  max-width: 100%;
+}
+/* Long labels ("Directions to Senate Building") end in … instead of
+   spilling out of the button. */
+.btnLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

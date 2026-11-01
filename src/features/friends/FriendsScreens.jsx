@@ -231,7 +231,7 @@ export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreat
         </button>
         <button type="button" className={cx(styles.btn, styles.btnGhost)} onClick={onHaveCode}>
           <KeyRound size={16} />
-          Have a code? Join a friend’s race
+          <span className={styles.btnLabel}>Have a code? Join a friend’s race</span>
         </button>
         <span className={styles.note}>
           <Lock size={14} />
@@ -415,7 +415,7 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
       {!race && list.length < 2 && (
         <button type="button" className={cx(styles.btn, styles.btnGhost)} onClick={onHaveCode}>
           <KeyRound size={16} />
-          Have a friend’s code? Join theirs
+          <span className={styles.btnLabel}>Have a friend’s code? Join theirs</span>
         </button>
       )}
     </div>
@@ -646,67 +646,98 @@ function RankRow({ row, now }) {
   );
 }
 
-export function RaceBoard({ session, rows, now, navOpen, notice, onDirections, onLeave }) {
-  const [collapsed, setCollapsed] = useState(false);
+// Minimise / expand, same as the Signal card: a chevron when full, a
+// "Details" button when small.
+function MinimiseBtn({ onClick }) {
+  return (
+    <button type="button" className={styles.iconBtn} aria-label="Minimise" onClick={onClick}>
+      <ChevronDown size={18} />
+    </button>
+  );
+}
+function DetailsBtn({ onClick }) {
+  return (
+    <button type="button" className={styles.detailsBtn} aria-label="Show details" onClick={onClick}>
+      Details
+      <ChevronUp size={16} />
+    </button>
+  );
+}
+
+export function RaceBoard({ session, rows, now, navOpen, notice, minimized, onMinimizedChange, onDirections, onLeave }) {
   const me = rows.find((r) => r.me);
   const elapsed = session.goAt ? now - session.goAt : 0;
+  const directions = !navOpen && !me?.finish && (
+    <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, minimized ? null : styles.grow2)} onClick={onDirections}>
+      <Navigation size={16} />
+      Directions
+    </button>
+  );
+  const noticeEl = notice && (
+    <div className={styles.notice} role="status">
+      <Users size={18} />
+      {notice}
+    </div>
+  );
+
+  if (minimized) {
+    const summary = me?.finish
+      ? `You finished ${ordinal(me.rank)} · ${formatClock(elapsed)}`
+      : `You’re ${me ? ordinal(me.rank) : '—'} · ${formatDistance(me?.dist)} left · ${formatClock(elapsed)}`;
+    return (
+      <section className={cx(styles.board, styles.boardMin)} aria-label="Live ranking">
+        <div className={styles.boardHead}>
+          <div className={styles.headText} style={{ gap: 2, minWidth: 0 }}>
+            <span className={styles.boardTitle}>Race to {session.place?.name}</span>
+            <span className={styles.rankVal} style={{ color: 'var(--v2-text)' }}>{summary}</span>
+          </div>
+          <DetailsBtn onClick={() => onMinimizedChange(false)} />
+        </div>
+        {noticeEl}
+        {directions}
+      </section>
+    );
+  }
+
   return (
-    <section className={cx(styles.board, collapsed && styles.boardCollapsed)} aria-label="Live ranking">
+    <section className={styles.board} aria-label="Live ranking">
       <div className={styles.boardHead}>
         <div className={styles.headText} style={{ gap: 2 }}>
           <span className={styles.overline}>Live ranking</span>
           <span className={styles.boardTitle}>Race to {session.place?.name}</span>
         </div>
-        <button type="button" className={styles.iconBtn} aria-label={collapsed ? 'Show everyone' : 'Show only me'} onClick={() => setCollapsed((v) => !v)}>
-          {collapsed ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-        </button>
+        <MinimiseBtn onClick={() => onMinimizedChange(true)} />
       </div>
-      {notice && (
-        <div className={styles.notice} role="status">
-          <Users size={18} />
-          {notice}
+      {noticeEl}
+      <div className={styles.boardStats}>
+        <div className={styles.stat}>
+          <span className={styles.overline}>Time</span>
+          <span className={styles.statVal}>{formatClock(elapsed)}</span>
         </div>
-      )}
-      {!collapsed && (
-        <div className={styles.boardStats}>
-          <div className={styles.stat}>
-            <span className={styles.overline}>Time</span>
-            <span className={styles.statVal}>{formatClock(elapsed)}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.overline}>You</span>
-            <span className={styles.statVal}>{me ? ordinal(me.rank) : '—'}</span>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.overline}>Left</span>
-            <span className={styles.statVal}>{me?.finish ? 'Done' : formatDistance(me?.dist)}</span>
-          </div>
+        <div className={styles.stat}>
+          <span className={styles.overline}>You</span>
+          <span className={styles.statVal}>{me ? ordinal(me.rank) : '—'}</span>
         </div>
-      )}
+        <div className={styles.stat}>
+          <span className={styles.overline}>Left</span>
+          <span className={styles.statVal}>{me?.finish ? 'Done' : formatDistance(me?.dist)}</span>
+        </div>
+      </div>
       <div className={styles.col} style={{ gap: 4 }}>
         {rows.map((row) => (
           <RankRow key={row.id} row={row} now={now} />
         ))}
       </div>
-      {!collapsed && (
-        <div className={styles.row}>
-          <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onLeave}>
-            Leave
-          </button>
-          {!navOpen && !me?.finish && (
-            <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, styles.grow2)} onClick={onDirections}>
-              <Navigation size={16} />
-              Directions
-            </button>
-          )}
-        </div>
-      )}
-      {!collapsed && (
-        <span className={styles.note} style={{ justifyContent: 'flex-start', textAlign: 'left' }}>
-          <Smartphone size={14} />
-          Keep the app open so the others see you moving.
-        </span>
-      )}
+      <div className={styles.row}>
+        <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onLeave}>
+          Leave
+        </button>
+        {directions}
+      </div>
+      <span className={styles.note} style={{ justifyContent: 'flex-start', textAlign: 'left' }}>
+        <Smartphone size={14} />
+        Keep the app open so the others see you moving.
+      </span>
     </section>
   );
 }
@@ -834,7 +865,7 @@ export function Results({ isMobile, session, rows, isHost, onDone, onRaceAgain }
 }
 
 // ── 9/10 · Meet me, live (the same card on both phones) ──────────────
-export function MeetBoard({ otherName, distance, updatedAt, now, arrived, navOpen, place, placeDistance, onEnd, onShowBoth, onDirections }) {
+export function MeetBoard({ otherName, distance, updatedAt, now, arrived, navOpen, place, placeDistance, minimized, onMinimizedChange, onEnd, onShowBoth, onDirections }) {
   const name = firstName(otherName);
   const paused = !arrived && (!updatedAt || now - updatedAt > PAUSED_AFTER_MS);
   const headline = arrived
@@ -851,6 +882,42 @@ export function MeetBoard({ otherName, distance, updatedAt, now, arrived, navOpe
       : paused && updatedAt
         ? `Last seen ${ago(now - updatedAt)} ago`
         : 'Walk towards each other, or wait where you are.';
+  const canDirect = !navOpen && !arrived;
+  const pill = (
+    <span className={cx(styles.pill, paused && styles.pillMuted)}>
+      <span className={cx(styles.liveDot, paused && styles.liveDotMuted)} />
+      {arrived ? 'Met' : paused ? 'Paused' : 'Live'}
+    </span>
+  );
+  const directionsBtn = (
+    <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall)} disabled={!place && !updatedAt} onClick={onDirections}>
+      <Navigation size={16} />
+      <span className={styles.btnLabel}>{place ? `Directions to ${place.name}` : `Directions to ${name}`}</span>
+    </button>
+  );
+  const showBothBtn = (grow) => (
+    <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall, grow && styles.grow)} disabled={!updatedAt} onClick={onShowBoth}>
+      <LocateFixed size={16} />
+      Show both
+    </button>
+  );
+
+  if (minimized) {
+    return (
+      <section className={cx(styles.board, styles.boardMin)} aria-label="Meetup">
+        <div className={styles.person}>
+          <Avatar name={otherName} index={1} size="avatarSm" />
+          <div className={styles.headText} style={{ gap: 2, flex: 1, minWidth: 0 }}>
+            <span className={styles.boardTitle}>{headline}</span>
+          </div>
+          {pill}
+          <DetailsBtn onClick={() => onMinimizedChange(false)} />
+        </div>
+        {canDirect ? directionsBtn : showBothBtn(false)}
+      </section>
+    );
+  }
+
   return (
     <section className={styles.board} aria-label="Meetup">
       <div className={styles.person}>
@@ -859,10 +926,8 @@ export function MeetBoard({ otherName, distance, updatedAt, now, arrived, navOpe
           <span className={styles.boardTitle}>{headline}</span>
           <span className={styles.sub}>{subline}</span>
         </div>
-        <span className={cx(styles.pill, paused && styles.pillMuted)}>
-          <span className={cx(styles.liveDot, paused && styles.liveDotMuted)} />
-          {arrived ? 'Met' : paused ? 'Paused' : 'Live'}
-        </span>
+        {pill}
+        <MinimiseBtn onClick={() => onMinimizedChange(true)} />
       </div>
       <div className={styles.boardStats}>
         <div className={styles.stat}>
@@ -888,17 +953,9 @@ export function MeetBoard({ otherName, distance, updatedAt, now, arrived, navOpe
         <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onEnd}>
           End meetup
         </button>
-        <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall, styles.grow)} disabled={!updatedAt} onClick={onShowBoth}>
-          <LocateFixed size={16} />
-          Show both
-        </button>
+        {showBothBtn(true)}
       </div>
-      {!navOpen && !arrived && (
-        <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall)} disabled={!place && !updatedAt} onClick={onDirections}>
-          <Navigation size={16} />
-          {place ? `Directions to ${place.name}` : `Directions to ${name}`}
-        </button>
-      )}
+      {canDirect && directionsBtn}
       <span className={styles.note} style={{ justifyContent: 'flex-start', textAlign: 'left' }}>
         <Smartphone size={14} />
         Keep this screen open so {name} can see you.

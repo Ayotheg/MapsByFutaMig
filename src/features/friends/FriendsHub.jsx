@@ -155,6 +155,10 @@ export default function FriendsHub({
 
   const meFinished = race && (session?.finishers || []).some((fin) => fin.id === myId);
   const [watchingCode, setWatchingCode] = useState(null);
+  // The live card, minimised like the Signal card; kept while it's briefly
+  // hidden (place card, sheet), reset for a new race or meetup.
+  const [boardMin, setBoardMin] = useState(false);
+  useEffect(() => setBoardMin(false), [session?.code]);
 
   // ── Trip: the racer heads to the finish once the countdown ends ────
   const launchedRef = useRef(null);
@@ -417,6 +421,8 @@ export default function FriendsHub({
         navOpen={navOpen}
         isHost={isHost}
         notice={notice}
+        minimized={boardMin}
+        onMinimizedChange={setBoardMin}
         onDirections={() => onNavigateTo(session.place)}
         onLeave={() => {
           // eslint-disable-next-line no-alert
@@ -437,6 +443,8 @@ export default function FriendsHub({
       navOpen={navOpen}
       place={session.place}
       placeDistance={session.place ? distanceM(f.myFix, session.place) : null}
+      minimized={boardMin}
+      onMinimizedChange={setBoardMin}
       onShowBoth={showBoth}
       onDirections={meetDirections}
       onEnd={() => {
