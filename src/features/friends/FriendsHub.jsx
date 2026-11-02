@@ -157,8 +157,8 @@ export default function FriendsHub({
   const [watchingCode, setWatchingCode] = useState(null);
   // The live card, minimised like the Signal card; kept while it's briefly
   // hidden (place card, sheet), reset for a new race or meetup.
-  const [boardMin, setBoardMin] = useState(false);
-  useEffect(() => setBoardMin(false), [session?.code]);
+  const [boardMin, setBoardMin] = useState(true);
+  useEffect(() => setBoardMin(true), [session?.code]);
 
   // ── Trip: the racer heads to the finish once the countdown ends ────
   const launchedRef = useRef(null);
