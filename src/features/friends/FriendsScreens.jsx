@@ -20,6 +20,7 @@ import {
   Trophy,
   UserPlus,
   Users,
+  WifiOff,
   X,
 } from 'lucide-react';
 import styles from './Friends.module.css';
@@ -249,7 +250,7 @@ function shareText(session) {
   return `${intro}: ${url}\nOr open Nav › Join with a code: ${session.code}`;
 }
 
-export function Lobby({ isMobile, session, members, progress, myId, isHost, now, notice, searchIndex, onMeetPlaceChange, onHaveCode, onStart, onLeave }) {
+export function Lobby({ isMobile, session, members, progress, myId, isHost, now, notice, connected, everConnected, searchIndex, onMeetPlaceChange, onHaveCode, onStart, onLeave }) {
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [pickingPlace, setPickingPlace] = useState(false);
@@ -314,6 +315,21 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
         <span className={styles.codeText}>{session.code}</span>
       </button>
       <span className={styles.sub}>The link and code stop working in {minsLeft} min, or once you start.</span>
+      {list.length < cap && (
+        <div className={styles.notice}>
+          <Smartphone size={18} />
+          Keep this screen open until your friends join. After sharing, come back here: they can only join while it’s open.
+        </div>
+      )}
+    </div>
+  );
+
+  // The code is on screen either way, so say when nobody can reach it.
+  const offline = !connected && (
+    <div className={styles.notice} role="status">
+      <WifiOff size={18} />
+      {everConnected ? 'Reconnecting…' : 'Connecting…'}
+      {isHost && everConnected ? ' Friends can’t join until this is back.' : ''}
     </div>
   );
 
@@ -446,6 +462,7 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
       <Panel isMobile={false} wide label={title}>
         {head}
         {notice && <div className={styles.notice} role="status"><Users size={18} />{notice}</div>}
+        {offline}
         <div className={styles.split}>
           <div className={styles.splitMain}>
             {placeStrip}
@@ -461,6 +478,7 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
     <Panel isMobile label={title}>
       {head}
       {notice && <div className={styles.notice} role="status"><Users size={18} />{notice}</div>}
+      {offline}
       {placeStrip}
       {linkBlock}
       {isHost && <div className={styles.divider} />}
@@ -479,9 +497,12 @@ export function Invite({ isMobile, session, peek, user, members, myDistance, onS
     // `mode` is unknown until the host answers (a typed code).
     const what = session.mode === 'race' ? 'race' : session.mode === 'meet' ? 'meetup' : null;
     const copy = {
-      loading: ['Opening invite…', 'Connecting to your friend.'],
+      loading: ['Looking for your friend…', 'Ask them to open Maps By FUTA. You can only join while the app is open on their phone.'],
       closed: ['This invite has ended', 'Ask your friend to send a new link or code.'],
-      notfound: ['No race or meetup with that code', 'Check the code with your friend. Codes stop working after 30 minutes.'],
+      unreachable: [
+        'Couldn’t reach the host',
+        `${session.fromCode ? 'Check the code, and ask' : 'Ask'} your friend to open Maps By FUTA. We’ll keep trying while this screen is open.`,
+      ],
       full: [what ? `This ${what} is full` : 'This is full', race ? 'A race takes up to 4 people.' : 'Meet me is for 2 people.'],
       started: [what ? `This ${what} already started` : 'This already started', 'Ask your friend to send a new link or code next time.'],
     }[peek] || ['Opening invite…', ''];

@@ -9,6 +9,7 @@ import {
   CAPACITY,
   COUNTDOWN_MS,
   DROP_AFTER_MS,
+  HOST_GONE_LOBBY_MS,
   HOST_GONE_MS,
   LOBBY_TTL_MS,
   MEET_ARRIVED_M,
@@ -28,8 +29,14 @@ const STORE_KEY = 'friends-session';
 // where) from a separate public `friends-invite:*` channel that never
 // carries positions.
 const PRIVATE = import.meta.env.VITE_FRIENDS_PRIVATE_CHANNELS === 'true';
-// No reply from a host this long after peeking: the link is dead.
-const PEEK_TIMEOUT_MS = 9000;
+// Codes aren't stored anywhere: an invite is only answered by the host's
+// phone, which pauses while they're in another app (sharing the code, say).
+// So keep asking, and only after this long say we can't reach them. A late
+// answer still opens the invite.
+const PEEK_TIMEOUT_MS = 60 * 1000;
+const PEEK_ASK_EVERY_MS = 3000;
+// A channel the server closed is reopened after this.
+const RECONNECT_AFTER_MS = 3000;
 // A finished meetup closes on its own after this.
 const MEET_CLOSE_AFTER_MS = 60 * 1000;
 
@@ -68,13 +75,14 @@ const union = (list, ids) => Array.from(new Set([...(list || []), ...ids]));
  * clock and sends the order out, so a phone with a wrong clock can't win.
  * In a race the role passes on: a leaving host hands it to the next player,
  * and if the host just vanishes the next player takes it after
- * HOST_GONE_MS. `hostTerm` counts handovers, so a returning old host's
+ * HOST_GONE_MS (longer in the lobby, where the host is likely just away
+ * sharing the code). `hostTerm` counts handovers, so a returning old host's
  * stale messages are ignored and it steps down. A race shares only each
  * player's distance to the finish; a meetup shares coordinates.
  *
  * `session.phase`: 'invite' (looking at a link, not joined yet), 'lobby',
  * 'countdown', 'live', 'ended'. `peek`: what the invite screen knows
- * ('loading' | 'ready' | 'closed' | 'notfound' | 'full' | 'started').
+ * ('loading' | 'ready' | 'closed' | 'unreachable' | 'full' | 'started').
  */
 export function useFriendsSession(user) {
   const [session, setSessionState] = useState(() => readPersistentState(STORE_KEY, null));
@@ -94,7 +102,16 @@ export function useFriendsSession(user) {
   const [progress, setProgress] = useState({});
   const [peek, setPeek] = useState('loading');
   const [connected, setConnected] = useState(false);
+  // Has this session's channel ever been up ("Connecting…" vs "Reconnecting…").
+  const [everConnected, setEverConnected] = useState(false);
+  const connectedRef = useRef(false);
+  connectedRef.current = connected;
+  const [reopenKey, setReopenKey] = useState(0);
   const channelRef = useRef(null);
+  // Asks the host for the invite's details, once a channel is up.
+  const askHostRef = useRef(null);
+  // My latest position, sent as soon as a connection is (back) up.
+  const lastPosRef = useRef(null);
   const myId = user?.id || null;
   const myName = user ? displayName(user) : null;
   const myIdRef = useRef(myId);
@@ -240,7 +257,8 @@ export function useFriendsSession(user) {
         } else fields.phase = payload.phase;
       } else if (payload.phase === 'ended') setPeek('closed');
       else if (payload.phase !== 'lobby' && !inRoster) setPeek('started');
-      else setPeek('ready');
+      // Turned away for being over capacity: stays so until a spot opens.
+      else setPeek((prev) => (prev === 'full' && (payload.count ?? 0) >= CAPACITY[payload.mode] ? 'full' : 'ready'));
       patch(fields);
       resendArrival();
     },
@@ -278,6 +296,7 @@ export function useFriendsSession(user) {
     // Without private channels a signed-out visitor reads the invite here,
     // but isn't in presence and can't join.
     const key = myId || `peek-${Math.random().toString(36).slice(2)}`;
+    let retry = null;
     const close = openChannel(
       `friends:${code}`,
       { private: PRIVATE, broadcast: { self: false }, presence: { key } },
@@ -391,24 +410,77 @@ export function useFriendsSession(user) {
           });
         });
 
+        // Fires again after every automatic rejoin, so a phone coming back
+        // re-announces itself here.
         channel.subscribe((status) => {
+          // A late message from a channel we've since replaced.
+          if (channelRef.current !== channel) return;
           if (status === 'SUBSCRIBED') {
             setConnected(true);
-            send('hello', {});
+            setEverConnected(true);
+            askHostRef.current = () => send('hello', {});
+            askHostRef.current();
+            const s = sessionRef.current;
+            if (s?.joined && myIdRef.current) {
+              channel.track({ id: myIdRef.current, name: myNameRef.current, joinedAt: s.joinedAt || Date.now() });
+            }
             if (amHost()) send('state', stateFor());
+            if (lastPosRef.current) send('pos', lastPosRef.current);
+            resendArrival();
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             setConnected(false);
+            askHostRef.current = null;
+            // The library retries errors and timeouts itself, but a channel
+            // the server closed stays closed.
+            if (status === 'CLOSED') retry = setTimeout(() => setReopenKey((k) => k + 1), RECONNECT_AFTER_MS);
           }
         });
       }
     );
     return () => {
-      close();
+      clearTimeout(retry);
+      // First, so the close this triggers counts as a replaced channel's.
       channelRef.current = null;
+      askHostRef.current = null;
+      close();
       setConnected(false);
       setMembers([]);
     };
-  }, [code, myId, patch, send, amHost, stateFor, applyState, recordFinish, dropPlayers, resendArrival, endSession]);
+  }, [code, myId, reopenKey, patch, send, amHost, stateFor, applyState, recordFinish, dropPlayers, resendArrival, endSession]);
+
+  // Kept across reconnects of the same session; a stationary phone has no
+  // new fix to send when it comes back.
+  useEffect(() => {
+    lastPosRef.current = null;
+    setEverConnected(false);
+  }, [code, myId]);
+
+  // Back in the app (or back online): get the connection up now rather than
+  // whenever its retry timer next fires, and answer anyone waiting.
+  useEffect(() => {
+    if (!code) return undefined;
+    const wake = () => {
+      if (document.visibilityState === 'hidden') return;
+      supabase.realtime.connect();
+      const channel = channelRef.current;
+      if (!channel) return;
+      if (channel.state === 'joined') {
+        send('hello', {});
+        if (amHost()) send('state', stateFor());
+        if (lastPosRef.current) send('pos', lastPosRef.current);
+      } else if (channel.state !== 'joining') {
+        setReopenKey((k) => k + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('pageshow', wake);
+    window.addEventListener('online', wake);
+    return () => {
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('pageshow', wake);
+      window.removeEventListener('online', wake);
+    };
+  }, [code, send, amHost, stateFor]);
 
   // In the lobby (or racing) = in presence. Done on the open channel, so
   // joining never reconnects.
@@ -451,14 +523,21 @@ export function useFriendsSession(user) {
       channel.on('broadcast', { event: 'hello' }, () => isHost && reply());
       channel.on('broadcast', { event: 'state' }, ({ payload }) => peeking && applyState(payload));
       channel.subscribe((status) => {
-        if (status !== 'SUBSCRIBED') return;
+        if (status !== 'SUBSCRIBED') {
+          if (peeking) askHostRef.current = null;
+          return;
+        }
         if (isHost) reply();
-        else channel.send({ type: 'broadcast', event: 'hello', payload: {} });
+        else {
+          askHostRef.current = () => channel.send({ type: 'broadcast', event: 'hello', payload: {} });
+          askHostRef.current();
+        }
       });
     });
     return () => {
       close();
       inviteReplyRef.current = null;
+      if (peeking) askHostRef.current = null;
     };
   }, [code, isHost, peeking, stateFor, applyState]);
   // Signed-out viewers learn when the lobby starts, ends or fills.
@@ -466,10 +545,16 @@ export function useFriendsSession(user) {
     inviteReplyRef.current?.();
   }, [phase, members.length]);
 
-  // A link (or typed code) with no host behind it never gets a reply.
+  // Waiting on an invite: keep asking, since the host may be back any moment.
+  const waitingForHost = !!code && !joined && !isHost && (peek === 'loading' || peek === 'unreachable');
+  useEffect(() => {
+    if (!waitingForHost) return undefined;
+    const t = setInterval(() => askHostRef.current?.(), PEEK_ASK_EVERY_MS);
+    return () => clearInterval(t);
+  }, [waitingForHost]);
   useEffect(() => {
     if (!code || joined || isHost || peek !== 'loading') return undefined;
-    const t = setTimeout(() => setPeek(sessionRef.current?.fromCode ? 'notfound' : 'closed'), PEEK_TIMEOUT_MS);
+    const t = setTimeout(() => setPeek('unreachable'), PEEK_TIMEOUT_MS);
     return () => clearTimeout(t);
   }, [code, joined, isHost, peek]);
 
@@ -525,15 +610,20 @@ export function useFriendsSession(user) {
       if (!s || present.has(s.hostId)) return;
       const order = s.roster || membersRef.current.map((m) => m.id);
       if (nextHost(order, present, s.hostId) === myIdRef.current) becomeHost(s.hostId);
-    }, HOST_GONE_MS);
+    }, phase === 'lobby' ? HOST_GONE_LOBBY_MS : HOST_GONE_MS);
     return () => clearTimeout(t);
-  }, [raceOpen, isHost, connected, meInPresence, hostPresent, becomeHost, presentIds]);
+  }, [raceOpen, phase, isHost, connected, meInPresence, hostPresent, becomeHost, presentIds]);
 
   // ── Race: the host drops racers who have been gone a while ──────────
   const absentSinceRef = useRef({});
   useEffect(() => {
     if (!isHost || mode !== 'race' || phase !== 'live') return undefined;
     const t = setInterval(() => {
+      // Our own connection is down, so the list says nothing about them.
+      if (!connectedRef.current) {
+        absentSinceRef.current = {};
+        return;
+      }
       const s = sessionRef.current;
       const present = presentIds();
       const now = Date.now();
@@ -578,6 +668,10 @@ export function useFriendsSession(user) {
           send('arrived', { id: myId });
         }
       }
+      lastPosRef.current = payload;
+      // Not while the connection is down: each would go over HTTP instead,
+      // and the latest one goes out as soon as it's back.
+      if (!connectedRef.current) return;
       const now = Date.now();
       if (now - lastSentRef.current < SEND_EVERY_MS && !arrived) return;
       lastSentRef.current = now;
@@ -631,7 +725,7 @@ export function useFriendsSession(user) {
     [myId, myName, setSession, patch]
   );
 
-  // `fromCode`: typed into the code box, so a dead one reads "no such code".
+  // `fromCode`: typed into the code box, so "can't reach" also says to check it.
   const openInvite = useCallback(
     (invite, { fromCode = false } = {}) => {
       const s = sessionRef.current;
@@ -725,6 +819,7 @@ export function useFriendsSession(user) {
     progress,
     peek,
     connected,
+    everConnected,
     myId,
     myFix,
     isHost,

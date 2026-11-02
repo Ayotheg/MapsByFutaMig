@@ -364,6 +364,8 @@ export default function FriendsHub({
         now={now}
         searchIndex={searchIndex}
         notice={notice}
+        connected={f.connected}
+        everConnected={f.everConnected}
         onMeetPlaceChange={f.setMeetPlace}
         onHaveCode={() => {
           f.leave();

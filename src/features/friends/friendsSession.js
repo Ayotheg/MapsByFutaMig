@@ -19,6 +19,9 @@ export const COUNTDOWN_MS = 3000;
 export const DROP_AFTER_MS = 2 * 60 * 1000;
 // The race's host gone this long: the next player takes over refereeing.
 export const HOST_GONE_MS = 30 * 1000;
+// In the lobby nothing needs refereeing and the host is probably in another
+// app sharing the code, so wait longer before taking over.
+export const HOST_GONE_LOBBY_MS = 3 * 60 * 1000;
 
 // Who referees next: the earliest player in `order` still connected.
 // Every phone works it out the same way, so they agree without talking.
