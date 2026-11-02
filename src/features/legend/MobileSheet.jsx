@@ -101,6 +101,8 @@ export default function MobileSheet({
   gps,
   navActive,
   onNavLaunch,
+  // Marks Nav while there's something new under it (useFriendsIntro).
+  navDot = false,
   onAdminClick,
   onSuggestPlaceClick,
   user,
@@ -274,6 +276,7 @@ export default function MobileSheet({
               <tab.Icon className={styles.tabIcon} size={18} strokeWidth={1.8} />
               <span className={styles.tabLabel}>{tab.label}</span>
               {tab.key === 'profile' && user && <span className={styles.signedInDot} />}
+              {tab.key === 'navigate' && navDot && <span className={`${styles.signedInDot} ${styles.navDot}`} />}
             </button>
           ))}
         </div>

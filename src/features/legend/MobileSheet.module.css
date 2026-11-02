@@ -219,3 +219,11 @@
 .body {
   padding: 12px 0 calc(16px + var(--mob-safe-bottom));
 }
+
+/* Something new under Nav: sits on the icon's corner. */
+.navDot {
+  top: 7px;
+  right: calc(50% - 15px);
+  width: 9px;
+  height: 9px;
+}

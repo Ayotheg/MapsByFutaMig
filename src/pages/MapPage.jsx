@@ -6,7 +6,7 @@ import ChannelPrompt from '../features/whatsapp/ChannelPrompt';
 import MarketingOptInPrompt from '../features/auth/MarketingOptInPrompt';
 import InstallVideoHost from '../features/install/InstallVideoHost';
 import { useInstallVideoOpen } from '../features/install/installVideo';
-import { setTawkHidden } from '../lib/tawk';
+import { setTawkHidden, useTawkChatOpen } from '../lib/tawk';
 import { useLocation } from 'react-router-dom';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
@@ -52,12 +52,14 @@ import { osmCardData, waypointCardData } from '../features/waypoints/placeCardDa
 import { rememberVisit } from '../features/reviews/pendingReview';
 
 import { parseInvite } from '../features/friends/friendsSession';
+import { useFriendsIntro } from '../features/friends/useFriendsIntro';
 
 // Only shown an hour after a visit — not needed for first paint.
 const ReviewPrompt = lazy(() => import('../features/reviews/ReviewPrompt'));
 // Meet me / Race to a place: only once the Nav menu or an invite link asks.
 const NavMenu = lazy(() => import('../features/friends/NavMenu'));
 const FriendsHub = lazy(() => import('../features/friends/FriendsHub'));
+const FriendsIntro = lazy(() => import('../features/friends/FriendsIntro'));
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
 // data — see the comment where it's used below for why this stays a
@@ -256,6 +258,10 @@ export default function MapPage({ onReadinessChange }) {
   const [friendsSeedPlace, setFriendsSeedPlace] = useState(null);
   const [friendsMode, setFriendsMode] = useState(null);
   const [friendsLayout, setFriendsLayout] = useState({ board: false, quietArrival: false });
+  // The first-visit zoom hint is out of the way / the WhatsApp card is up:
+  // the feature intro waits on both.
+  const [zoomHintDone, setZoomHintDone] = useState(false);
+  const [channelPromptOpen, setChannelPromptOpen] = useState(false);
 
   const persistMapView = useCallback((view) => {
     const center = view?.center;
@@ -646,6 +652,7 @@ export default function MapPage({ onReadinessChange }) {
   const [exploreOpenRequest, setExploreOpenRequest] = useState(0);
   const mapBusyRef = useRef(false);
   const handleZoomHintDone = useCallback(() => {
+    setZoomHintDone(true);
     if (navActiveRef.current || mapBusyRef.current) return;
     if (isMobile) {
       setSheetActiveTab('layers');
@@ -787,6 +794,7 @@ export default function MapPage({ onReadinessChange }) {
   // The Nav tab / Navigate rail item. With "Where to?" already open (or a
   // trip running) it keeps its old toggle; otherwise it offers the menu.
   function handleNavMenuToggle(anchorEl) {
+    friendsIntro.clearNavDot();
     if (navOpen || navActiveRef.current) {
       handleNavLaunch();
       return;
@@ -904,7 +912,7 @@ export default function MapPage({ onReadinessChange }) {
   // Something is open on the map. The WhatsApp prompt waits for this to
   // clear, and the Tawk chat bubble steps aside meanwhile so it doesn't sit
   // on top of panels/the expanded mobile sheet.
-  const mapBusy =
+  const mapBusyWithoutIntro =
     gpsCardOpen ||
     !!selected ||
     !!selectedSegment ||
@@ -922,8 +930,33 @@ export default function MapPage({ onReadinessChange }) {
     !!navMenu ||
     friendsOn ||
     (isMobile && sheetState !== 'peek');
-  mapBusyRef.current = mapBusy;
   const onMapRoute = useLocation().pathname === '/map';
+  const chatOpen = useTawkChatOpen();
+  // Feature intro: waits for anything else on screen or in progress, and
+  // everything above waits for it (it's part of mapBusy while open).
+  const friendsIntro = useFriendsIntro({
+    onMap: onMapRoute,
+    blocked:
+      mapBusyWithoutIntro ||
+      navActive ||
+      isOffline ||
+      !map ||
+      waypointsLoading ||
+      auth.loading ||
+      !zoomHintDone ||
+      reviewPromptOpen ||
+      optInPromptOpen ||
+      channelPromptOpen ||
+      chatOpen,
+  });
+  const { close: closeFriendsIntroAs, retire: retireFriendsIntro } = friendsIntro;
+  const closeFriendsIntro = useCallback(() => closeFriendsIntroAs('later'), [closeFriendsIntroAs]);
+  // Found it on their own (or came in through an invite).
+  useEffect(() => {
+    if (friendsOn) retireFriendsIntro();
+  }, [friendsOn, retireFriendsIntro]);
+  const mapBusy = mapBusyWithoutIntro || friendsIntro.open;
+  mapBusyRef.current = mapBusy;
   useEffect(() => {
     setTawkHidden('map-busy', onMapRoute && mapBusy);
     return () => setTawkHidden('map-busy', false);
@@ -1001,6 +1034,7 @@ export default function MapPage({ onReadinessChange }) {
           gps={gps}
           navActive={navActive}
           onNavLaunch={handleNavMenuToggle}
+          navDot={friendsIntro.navDot}
           onAdminClick={handleAdminClick}
           onSuggestPlaceClick={handleSuggestPlaceClick}
           user={auth.user}
@@ -1022,6 +1056,7 @@ export default function MapPage({ onReadinessChange }) {
           gps={gps}
           navActive={navActive}
           onNavLaunch={handleNavMenuToggle}
+          navDot={friendsIntro.navDot}
           user={auth.user}
           onAuthClick={() => openAuthModal('login')}
           onAdminClick={handleAdminClick}
@@ -1149,6 +1184,18 @@ export default function MapPage({ onReadinessChange }) {
             else reportNavigationCompletion(auth.user.id, tripId);
           }}
         />
+      )}
+      {friendsIntro.open && (
+        <Suspense fallback={null}>
+          <FriendsIntro
+            onClose={closeFriendsIntro}
+            onTry={() => {
+              closeFriendsIntroAs('try');
+              // Opens where the card says to look.
+              handleNavMenuToggle(document.querySelector('[data-nav-launch]'));
+            }}
+          />
+        </Suspense>
       )}
       {navMenu && (
         <Suspense fallback={null}>
@@ -1279,7 +1326,7 @@ export default function MapPage({ onReadinessChange }) {
         <ReviewPrompt
           ready={!!map && !waypointsLoading}
           isMobile={isMobile}
-          blocked={mapBusy || isOffline}
+          blocked={mapBusy || isOffline || friendsIntro.holdPrompts}
           onVisibleChange={setReviewPromptOpen}
           onRate={(dest) => {
             closeOtherOverlays('review');
@@ -1292,14 +1339,15 @@ export default function MapPage({ onReadinessChange }) {
         user={auth.loading ? null : auth.user}
         ready={!!map && !waypointsLoading}
         isMobile={isMobile}
-        blocked={mapBusy || isOffline || reviewPromptOpen}
+        blocked={mapBusy || isOffline || reviewPromptOpen || friendsIntro.holdPrompts}
         onVisibleChange={setOptInPromptOpen}
       />
       <ChannelPrompt
         ready={!!map && !waypointsLoading && !auth.loading}
         isMobile={isMobile}
         userId={auth.loading ? null : auth.user?.id || null}
-        blocked={mapBusy || isOffline || optInPromptOpen || reviewPromptOpen}
+        blocked={mapBusy || isOffline || optInPromptOpen || reviewPromptOpen || friendsIntro.holdPrompts}
+        onVisibleChange={setChannelPromptOpen}
       />
       <InstallVideoHost />
     </>

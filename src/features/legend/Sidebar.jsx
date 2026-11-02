@@ -58,6 +58,8 @@ export default function Sidebar({
   // has one, see MobileSheet.module.css's `.navbarNavActive`).
   navActive,
   onNavLaunch,
+  // Marks Navigate while there's something new under it (useFriendsIntro).
+  navDot = false,
   user,
   onAuthClick,
   onAdminClick,
@@ -214,9 +216,11 @@ export default function Sidebar({
                 title={item.title}
                 aria-current={active ? 'page' : undefined}
                 onClick={(e) => handleRailClick(item, e)}
+                data-nav-launch={item.key === 'navigate' ? '' : undefined}
               >
                 <item.Icon size={22} strokeWidth={1.8} />
                 <span>{item.label}</span>
+                {item.key === 'navigate' && navDot && <span className={styles.navDot} />}
               </button>
             );
           })}

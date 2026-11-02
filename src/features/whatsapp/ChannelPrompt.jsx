@@ -54,7 +54,7 @@ function syncJoinToAccount(userId) {
   });
 }
 
-export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
+export default function ChannelPrompt({ ready, blocked, isMobile, userId, onVisibleChange }) {
   const { pathname } = useLocation();
   const onMap = pathname === '/map';
   const [eligible] = useState(isEligible);
@@ -102,6 +102,10 @@ export default function ChannelPrompt({ ready, blocked, isMobile, userId }) {
   }, [eligible, due, ready, onMap]);
 
   const visible = eligible && accountAllows && due && !closed && !blocked && !chatOpen && onMap;
+
+  useEffect(() => {
+    onVisibleChange?.(visible);
+  }, [visible, onVisibleChange]);
 
   // Same corner as the Tawk chat bubble — hide the bubble while this is up.
   useEffect(() => {
