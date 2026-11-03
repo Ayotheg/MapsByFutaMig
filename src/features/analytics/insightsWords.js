@@ -109,7 +109,7 @@ export function describeStep(e) {
     case 'friends_ended':
       return p.mode === 'race' ? 'A race ended' : 'A meetup ended';
     case 'friends_handover':
-      return 'Took over as race host';
+      return p.reason === 'host_left' ? 'Handed the race to another player' : 'Took over as race host';
     case 'friends_intro':
       if (p.action === 'shown') return 'Saw the Meet me / Race pop-up';
       return p.action === 'try' ? 'Tapped "Try it now" on the pop-up' : 'Closed the Meet me / Race pop-up';

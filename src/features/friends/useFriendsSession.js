@@ -569,6 +569,17 @@ export function useFriendsSession(user) {
     }
   }, [members, myId, setSession]);
 
+  // Counted once they're really in the room, not when they tap Join: someone
+  // turned away above never counts, however many times they retry.
+  useEffect(() => {
+    const s = sessionRef.current;
+    if (!s?.joined || s.joinCounted || s.hostId === myId || !myId) return;
+    const index = members.findIndex((m) => m.id === myId);
+    if (index < 0 || index >= CAPACITY[s.mode]) return;
+    patch({ joinCounted: true });
+    track('friends_joined', { mode: s.mode, via: s.fromCode ? 'code' : 'link' });
+  }, [members, myId, patch]);
+
   // Host timers: the invite expires, a race has a time limit. A new host
   // picks these up from the same createdAt / goAt.
   useEffect(() => {
@@ -742,7 +753,6 @@ export function useFriendsSession(user) {
     const s = sessionRef.current;
     const phaseNow = s.roster?.includes(myId) ? 'live' : 'lobby';
     patch({ joined: true, joinedAt: Date.now(), phase: phaseNow });
-    track('friends_joined', { mode: s.mode, via: s.fromCode ? 'code' : 'link' });
   }, [myId, patch]);
 
   const start = useCallback(() => {

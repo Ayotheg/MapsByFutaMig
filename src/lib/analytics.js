@@ -30,8 +30,13 @@ const ANON_ID_KEY = 'futa_anon_id';
 const SESSION_ID_KEY = 'futa_session_id';
 const FLUSH_INTERVAL_MS = 5000;
 
-function readOrCreate(storage, key) {
+const memoryIds = {};
+
+// `getStorage` is a function because merely reading window.localStorage can
+// throw when storage is blocked.
+function readOrCreate(getStorage, key) {
   try {
+    const storage = getStorage();
     let v = storage.getItem(key);
     if (!v) {
       v = crypto.randomUUID();
@@ -40,8 +45,10 @@ function readOrCreate(storage, key) {
     return v;
   } catch {
     // Storage unavailable (private mode, disabled storage, etc.) — fall
-    // back to an in-memory id for this page load rather than throwing.
-    return crypto.randomUUID();
+    // back to an in-memory id for this page load rather than throwing. The
+    // same one each time, so one person's events still belong together.
+    memoryIds[key] ||= crypto.randomUUID();
+    return memoryIds[key];
   }
 }
 
@@ -56,11 +63,11 @@ const FIRST_VISIT = (() => {
 })();
 
 export function getAnonId() {
-  return readOrCreate(window.localStorage, ANON_ID_KEY);
+  return readOrCreate(() => window.localStorage, ANON_ID_KEY);
 }
 
 export function getSessionId() {
-  return readOrCreate(window.sessionStorage, SESSION_ID_KEY);
+  return readOrCreate(() => window.sessionStorage, SESSION_ID_KEY);
 }
 
 function detectDeviceType() {

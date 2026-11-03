@@ -50,15 +50,23 @@ export async function fetchInsights(daysBack = 30) {
   return data || null;
 }
 
-/** Meet me / Race numbers from supabase/analytics_friends.sql. Resolves null
- * when that function hasn't been run yet. */
+/** Meet me / Race numbers from supabase/analytics_friends.sql. `{ notInstalled:
+ * true }` when that function hasn't been run yet. It returns no data for
+ * anyone who isn't a signed-in admin, e.g. after a login expires. */
 export async function fetchFriendsStats(daysBack = 30) {
-  const { data, error } = await supabase.rpc('analytics_friends', { days_back: daysBack });
-  if (error) {
-    if (/function .* does not exist|could not find the function/i.test(error.message || '')) return null;
-    throw error;
+  let result;
+  try {
+    result = await supabase.rpc('analytics_friends', { days_back: daysBack });
+  } catch {
+    throw new Error('Couldn’t reach the database. Check your connection and open this tab again.');
   }
-  return data || null;
+  const { data, error } = result;
+  if (error) {
+    if (/function .* does not exist|could not find the function/i.test(error.message || '')) return { notInstalled: true };
+    throw new Error('Couldn’t load these numbers. Open this tab again in a moment.');
+  }
+  if (!data) throw new Error('Sign in again as an admin to see these numbers.');
+  return data;
 }
 
 /** Same "NetworkError with no HTTP status" → "table/migration not run

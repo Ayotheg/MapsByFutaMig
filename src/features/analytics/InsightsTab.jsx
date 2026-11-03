@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './InsightsTab.module.css';
-import { fetchInsights, fetchRollup, describeError } from './analyticsApi';
+import { fetchFriendsStats, fetchInsights, fetchRollup, describeError } from './analyticsApi';
 import TodayTab from './TodayTab';
 import TrendsTab from './TrendsTab';
 import PlacesTab from './PlacesTab';
@@ -28,6 +28,9 @@ export default function InsightsTab() {
   const [rollupError, setRollupError] = useState(null);
   const [insights, setInsights] = useState({}); // days → data | null
   const requested = useRef(new Set());
+  // Kept here so switching tabs doesn't reload them or shift the page.
+  const [friendsStats, setFriendsStats] = useState(null); // { data } | { error }
+  const friendsRequested = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +56,18 @@ export default function InsightsTab() {
       });
   }, []);
 
+  const loadFriendsStats = useCallback((days) => {
+    if (friendsRequested.current) return;
+    friendsRequested.current = true;
+    fetchFriendsStats(days)
+      .then((data) => setFriendsStats({ data }))
+      .catch((e) => {
+        // Asks again next time the tab opens.
+        friendsRequested.current = false;
+        setFriendsStats({ error: e.message });
+      });
+  }, []);
+
   const tabRefs = useRef({});
   // Left/Right/Home/End move between tabs, as tab bars do.
   function onTabKeyDown(e) {
@@ -69,7 +84,7 @@ export default function InsightsTab() {
     tabRefs.current[TABS[next].key]?.focus();
   }
 
-  const shared = { rollup, rollupError, insights, loadInsights };
+  const shared = { rollup, rollupError, insights, loadInsights, friendsStats, loadFriendsStats };
 
   return (
     <div className={styles.root}>

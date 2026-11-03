@@ -8,13 +8,15 @@
 -- show a note saying so; nothing else is affected.
 --
 -- Reads analytics_events only. Events it relies on (all sent by the app):
---   friends_created {mode}, friends_joined {mode, via},
---   friends_started {mode}, friends_ended {mode, reason},
+--   friends_joined {mode, via}, friends_started {mode},
+--   friends_ended {mode, reason, finishers},
 --   friends_intro {action: shown | try | later | close | outside | esc | interrupted}
 --
 -- Who counts as one person:
 --   Feature use: the account, or the browser if signed out, like the rest of
---   Insights. Hosting and joining both count as using it.
+--   Insights. A host counts once they start (tapping "Meet a friend" opens a
+--   lobby by itself, so opening one isn't use); a guest counts once they're
+--   in the room.
 --   The pop-up: the browser (anon_id). It's shown once per device, often
 --   before sign-in, and signing in changes the account id but not this.
 --
@@ -43,12 +45,13 @@ begin
            props->>'action' as action,
            props->>'via' as via,
            props->>'reason' as reason,
+           case when props->>'finishers' ~ '^[0-9]+$' then (props->>'finishers')::int else 0 end as finishers,
            coalesce(user_id::text, anon_id) as who,
            anon_id,
            created_at
     from analytics_events
     where created_at >= v_from
-      and event_name in ('friends_created', 'friends_joined', 'friends_started', 'friends_ended', 'friends_intro')
+      and event_name in ('friends_joined', 'friends_started', 'friends_ended', 'friends_intro')
   ),
   -- One row per browser that was shown the pop-up.
   intro as (
@@ -61,24 +64,23 @@ begin
     group by anon_id
     having min(created_at) filter (where action = 'shown') is not null
   ),
-  -- ...and whether that browser then hosted or joined something.
+  -- ...and whether that browser then started or joined something.
   intro_used as (
     select i.*,
            exists (
              select 1 from ev u
              where u.anon_id = i.anon_id
-               and u.event_name in ('friends_created', 'friends_joined')
+               and u.event_name in ('friends_started', 'friends_joined')
                and u.created_at > i.shown_at
            ) as used
     from intro i
   )
   select jsonb_build_object(
     'days', days_back,
-    'people', (select count(distinct who) from ev where event_name in ('friends_created', 'friends_joined')),
+    'people', (select count(distinct who) from ev where event_name in ('friends_started', 'friends_joined')),
     'meet', (
       select jsonb_build_object(
-        'people', count(distinct who) filter (where event_name in ('friends_created', 'friends_joined')),
-        'created', count(*) filter (where event_name = 'friends_created'),
+        'people', count(distinct who) filter (where event_name in ('friends_started', 'friends_joined')),
         'joined', count(*) filter (where event_name = 'friends_joined'),
         'started', count(*) filter (where event_name = 'friends_started'),
         'finished', count(*) filter (where event_name = 'friends_ended' and reason = 'met')
@@ -87,11 +89,12 @@ begin
     ),
     'race', (
       select jsonb_build_object(
-        'people', count(distinct who) filter (where event_name in ('friends_created', 'friends_joined')),
-        'created', count(*) filter (where event_name = 'friends_created'),
+        'people', count(distinct who) filter (where event_name in ('friends_started', 'friends_joined')),
         'joined', count(*) filter (where event_name = 'friends_joined'),
         'started', count(*) filter (where event_name = 'friends_started'),
-        'finished', count(*) filter (where event_name = 'friends_ended' and reason = 'done')
+        -- Ended with at least one person across the line: everyone finished,
+        -- the time limit ran out, or the last host left.
+        'finished', count(*) filter (where event_name = 'friends_ended' and reason in ('done', 'timeout', 'host-left') and finishers > 0)
       )
       from ev where mode = 'race'
     ),

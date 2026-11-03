@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import styles from './InsightsTab.module.css';
 import { token } from './chartTheme';
 import { RankedCard } from './PlacesTab';
-import { fetchFriendsStats } from './analyticsApi';
 import { fmt, minutesLabel, tapLabel } from './insightsWords';
 
 // Usage: how directions go, and what people tap, last 30 days.
 const DAYS = 30;
 
-export default function UsageTab({ rollup, rollupError, insights, loadInsights }) {
+export default function UsageTab({ rollup, rollupError, insights, loadInsights, friendsStats, loadFriendsStats }) {
   useEffect(() => loadInsights(DAYS), [loadInsights]);
   const extra = insights[DAYS];
 
@@ -29,8 +28,24 @@ export default function UsageTab({ rollup, rollupError, insights, loadInsights }
   }, [rollup, extra]);
   const exact = !!extra?.event_counts;
 
-  if (rollupError && !exact) return <div className={styles.errorNote}>{rollupError}</div>;
-  if (!rollup && !exact) return <div className={styles.muted}>Loading…</div>;
+  // These load separately, so they show whatever happens to the others.
+  const friendsCards = <FriendsCards friendsStats={friendsStats} loadFriendsStats={loadFriendsStats} />;
+  if (rollupError && !exact) {
+    return (
+      <>
+        <div className={styles.errorNote}>{rollupError}</div>
+        {friendsCards}
+      </>
+    );
+  }
+  if (!rollup && !exact) {
+    return (
+      <>
+        <div className={styles.muted}>Loading…</div>
+        {friendsCards}
+      </>
+    );
+  }
 
   const started = events.get('nav_started') || 0;
   const arrived = events.get('nav_completed') || 0;
@@ -82,7 +97,7 @@ export default function UsageTab({ rollup, rollupError, insights, loadInsights }
         )}
       </div>
 
-      <FriendsCards />
+      {friendsCards}
 
       <RankedCard
         title="What people tapped"
@@ -95,28 +110,35 @@ export default function UsageTab({ rollup, rollupError, insights, loadInsights }
   );
 }
 
-// Who used Meet me / Race, and how the pop-up introducing them did.
-function FriendsCards() {
-  // undefined = loading, null = supabase/analytics_friends.sql not run yet.
-  const [stats, setStats] = useState(undefined);
-  const [error, setError] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetchFriendsStats(DAYS)
-      .then((data) => {
-        if (!cancelled) setStats(data);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e?.message || 'Could not load these numbers.');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+// A count and its word: "1 person", "5 people".
+function Count({ n, one, many }) {
+  const value = Number(n) || 0;
+  return (
+    <>
+      <span className={styles.legendValue}>{fmt(value)}</span> {value === 1 ? one : many}
+    </>
+  );
+}
 
-  if (error) return <div className={styles.errorNote}>{error}</div>;
-  if (stats === undefined) return null;
-  if (stats === null) {
+// Who used Meet me / Race, and how the pop-up introducing them did.
+function FriendsCards({ friendsStats, loadFriendsStats }) {
+  useEffect(() => loadFriendsStats(DAYS), [loadFriendsStats]);
+
+  // Nothing back yet: a card rather than nothing, so the page doesn't jump.
+  if (!friendsStats) {
+    return (
+      <div className={styles.card}>
+        <div className={styles.cardHead}>
+          <h3 className={styles.cardTitle}>Meet me and Race</h3>
+        </div>
+        <div className={styles.muted}>Loading…</div>
+      </div>
+    );
+  }
+  if (friendsStats.error) return <div className={styles.errorNote}>{friendsStats.error}</div>;
+
+  const stats = friendsStats.data;
+  if (stats.notInstalled) {
     return (
       <div className={styles.card}>
         <div className={styles.cardHead}>
@@ -135,21 +157,23 @@ function FriendsCards() {
       <div className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>Meet me and Race</h3>
-          <p className={styles.cardSub}>People who hosted or joined one, last {DAYS} days</p>
+          <p className={styles.cardSub}>People who started or joined one, last {DAYS} days</p>
         </div>
         {!stats.people ? (
           <div className={styles.muted}>Nobody yet.</div>
         ) : (
           <ul className={styles.legend}>
             <li>
-              <span className={styles.legendValue}>{fmt(stats.people)}</span> people used them
+              <span>
+                <Count n={stats.people} one="person" many="people" /> used them
+              </span>
             </li>
             <FriendsMode name="Meet me" stats={stats.meet} finishedWord="ended with them meeting" />
             <FriendsMode name="Race" stats={stats.race} finishedWord="finished" />
             <li>
               <span>
-                Joined with <span className={styles.legendValue}>{fmt(stats.joined_by_code)}</span> codes and{' '}
-                <span className={styles.legendValue}>{fmt(stats.joined_by_link)}</span> links
+                Joined with <Count n={stats.joined_by_code} one="code" many="codes" /> and{' '}
+                <Count n={stats.joined_by_link} one="link" many="links" />
               </span>
             </li>
           </ul>
@@ -185,7 +209,11 @@ function FriendsCards() {
               </li>
               {intro.no_answer > 0 && (
                 <li>
-                  <span className={styles.legendValue}>{fmt(intro.no_answer)}</span> of those left without answering
+                  {/* Approximate: closing the tab right after answering can
+                      lose the answer, since events go out in batches. */}
+                  <span>
+                    About <span className={styles.legendValue}>{fmt(intro.no_answer)}</span> of those left without answering
+                  </span>
                 </li>
               )}
             </ul>
@@ -201,7 +229,7 @@ function FriendsMode({ name, stats, finishedWord }) {
   return (
     <li>
       <span>
-        {name}: <span className={styles.legendValue}>{fmt(s.people)}</span> people,{' '}
+        {name}: <Count n={s.people} one="person" many="people" />,{' '}
         <span className={styles.legendValue}>{fmt(s.started)}</span> started,{' '}
         <span className={styles.legendValue}>{fmt(s.finished)}</span> {finishedWord}
       </span>
