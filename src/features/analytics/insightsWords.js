@@ -37,6 +37,13 @@ const TAP_LABELS = {
   donate_click: 'Tapped donate',
   contact_click: 'Tapped contact',
   marketing_optin_answer: 'Answered the updates question',
+  friends_created: 'Created a meetup or race',
+  friends_joined: 'Joined a meetup or race',
+  friends_started: 'Started a meetup or race',
+  // The app's own bookkeeping, and counted on their own card.
+  friends_ended: null,
+  friends_handover: null,
+  friends_intro: null,
   admin_action: null,
   error_occurred: null,
 };
@@ -93,6 +100,19 @@ export function describeStep(e) {
       return 'Went off route, got new directions';
     case 'feature_panel_open':
       return `Opened ${PANEL_NAMES[p.panel] || humanize(p.panel || 'a')} menu`;
+    case 'friends_created':
+      return p.mode === 'race' ? `Created a race to ${p.place || 'a place'}` : 'Created a meetup';
+    case 'friends_joined':
+      return `Joined a ${p.mode === 'race' ? 'race' : 'meetup'}${p.via === 'code' ? ' with a code' : p.via === 'link' ? ' from a link' : ''}`;
+    case 'friends_started':
+      return p.mode === 'race' ? `Started a race with ${p.players || 'some'} people` : 'Started a meetup';
+    case 'friends_ended':
+      return p.mode === 'race' ? 'A race ended' : 'A meetup ended';
+    case 'friends_handover':
+      return 'Took over as race host';
+    case 'friends_intro':
+      if (p.action === 'shown') return 'Saw the Meet me / Race pop-up';
+      return p.action === 'try' ? 'Tapped "Try it now" on the pop-up' : 'Closed the Meet me / Race pop-up';
     case 'error_occurred':
       return 'Something went wrong';
     case 'admin_action':

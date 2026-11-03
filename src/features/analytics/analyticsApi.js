@@ -50,6 +50,17 @@ export async function fetchInsights(daysBack = 30) {
   return data || null;
 }
 
+/** Meet me / Race numbers from supabase/analytics_friends.sql. Resolves null
+ * when that function hasn't been run yet. */
+export async function fetchFriendsStats(daysBack = 30) {
+  const { data, error } = await supabase.rpc('analytics_friends', { days_back: daysBack });
+  if (error) {
+    if (/function .* does not exist|could not find the function/i.test(error.message || '')) return null;
+    throw error;
+  }
+  return data || null;
+}
+
 /** Same "NetworkError with no HTTP status" → "table/migration not run
  * yet" heuristic quickChipsApi.js already established, reused here so
  * every Insights sub-tab surfaces the same plain-English message instead

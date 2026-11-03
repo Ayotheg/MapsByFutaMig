@@ -959,7 +959,6 @@ export default function MapPage({ onReadinessChange }) {
   });
   const { close: closeFriendsIntroAs, retire: retireFriendsIntro } = friendsIntro;
   interruptFriendsIntroRef.current = friendsIntro.interrupt;
-  const closeFriendsIntro = useCallback(() => closeFriendsIntroAs('later'), [closeFriendsIntroAs]);
   // Found it on their own (or came in through an invite).
   useEffect(() => {
     if (friendsOn) retireFriendsIntro();
@@ -1197,7 +1196,7 @@ export default function MapPage({ onReadinessChange }) {
       )}
       {friendsIntro.open && (
         <FriendsIntro
-          onClose={closeFriendsIntro}
+          onClose={closeFriendsIntroAs}
           onTry={() => {
             closeFriendsIntroAs('try');
             // Opens where the card says to look.

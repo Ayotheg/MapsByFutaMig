@@ -742,7 +742,7 @@ export function useFriendsSession(user) {
     const s = sessionRef.current;
     const phaseNow = s.roster?.includes(myId) ? 'live' : 'lobby';
     patch({ joined: true, joinedAt: Date.now(), phase: phaseNow });
-    track('friends_joined', { mode: s.mode });
+    track('friends_joined', { mode: s.mode, via: s.fromCode ? 'code' : 'link' });
   }, [myId, patch]);
 
   const start = useCallback(() => {

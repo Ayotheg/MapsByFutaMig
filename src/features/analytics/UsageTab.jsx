@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import styles from './InsightsTab.module.css';
 import { token } from './chartTheme';
 import { RankedCard } from './PlacesTab';
+import { fetchFriendsStats } from './analyticsApi';
 import { fmt, minutesLabel, tapLabel } from './insightsWords';
 
 // Usage: how directions go, and what people tap, last 30 days.
@@ -81,6 +82,8 @@ export default function UsageTab({ rollup, rollupError, insights, loadInsights }
         )}
       </div>
 
+      <FriendsCards />
+
       <RankedCard
         title="What people tapped"
         sub={exact ? `Last ${DAYS} days` : `Last ${DAYS} days, each day's top 10 only`}
@@ -92,12 +95,126 @@ export default function UsageTab({ rollup, rollupError, insights, loadInsights }
   );
 }
 
-// Ring: teal is the share who got there, pale violet the rest.
-function Donut({ share }) {
+// Who used Meet me / Race, and how the pop-up introducing them did.
+function FriendsCards() {
+  // undefined = loading, null = supabase/analytics_friends.sql not run yet.
+  const [stats, setStats] = useState(undefined);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchFriendsStats(DAYS)
+      .then((data) => {
+        if (!cancelled) setStats(data);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e?.message || 'Could not load these numbers.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (error) return <div className={styles.errorNote}>{error}</div>;
+  if (stats === undefined) return null;
+  if (stats === null) {
+    return (
+      <div className={styles.card}>
+        <div className={styles.cardHead}>
+          <h3 className={styles.cardTitle}>Meet me and Race</h3>
+        </div>
+        <div className={styles.muted}>Run supabase/analytics_friends.sql to see who uses these and how the pop-up did.</div>
+      </div>
+    );
+  }
+
+  const intro = stats.intro || {};
+  const shown = Number(intro.shown) || 0;
+  const tried = Number(intro.tried) || 0;
+  return (
+    <>
+      <div className={styles.card}>
+        <div className={styles.cardHead}>
+          <h3 className={styles.cardTitle}>Meet me and Race</h3>
+          <p className={styles.cardSub}>People who hosted or joined one, last {DAYS} days</p>
+        </div>
+        {!stats.people ? (
+          <div className={styles.muted}>Nobody yet.</div>
+        ) : (
+          <ul className={styles.legend}>
+            <li>
+              <span className={styles.legendValue}>{fmt(stats.people)}</span> people used them
+            </li>
+            <FriendsMode name="Meet me" stats={stats.meet} finishedWord="ended with them meeting" />
+            <FriendsMode name="Race" stats={stats.race} finishedWord="finished" />
+            <li>
+              <span>
+                Joined with <span className={styles.legendValue}>{fmt(stats.joined_by_code)}</span> codes and{' '}
+                <span className={styles.legendValue}>{fmt(stats.joined_by_link)}</span> links
+              </span>
+            </li>
+          </ul>
+        )}
+      </div>
+
+      <div className={styles.card}>
+        <div className={styles.cardHead}>
+          <h3 className={styles.cardTitle}>Meet me and Race pop-up</h3>
+          <p className={styles.cardSub}>Of everyone shown it, how many tapped Try it now. Last {DAYS} days</p>
+        </div>
+        {shown === 0 ? (
+          <div className={styles.muted}>Nobody has seen it yet.</div>
+        ) : (
+          <div className={styles.donutRow}>
+            <Donut share={Math.min(1, tried / shown)} label="tapped Try it now" />
+            <ul className={styles.legend}>
+              <li>
+                <span className={styles.legendValue}>{fmt(shown)}</span> saw it
+              </li>
+              <li>
+                <span className={styles.swatch} style={{ background: 'var(--v2-secondary)' }} aria-hidden="true" />
+                <span>
+                  <span className={styles.legendValue}>{fmt(tried)}</span> tapped Try it now
+                  {intro.tried_used > 0 && ` (${fmt(intro.tried_used)} then used it)`}
+                </span>
+              </li>
+              <li>
+                <span>
+                  <span className={styles.legendValue}>{fmt(intro.ignored)}</span> ignored it
+                  {intro.ignored_used > 0 && ` (${fmt(intro.ignored_used)} used it later anyway)`}
+                </span>
+              </li>
+              {intro.no_answer > 0 && (
+                <li>
+                  <span className={styles.legendValue}>{fmt(intro.no_answer)}</span> of those left without answering
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function FriendsMode({ name, stats, finishedWord }) {
+  const s = stats || {};
+  return (
+    <li>
+      <span>
+        {name}: <span className={styles.legendValue}>{fmt(s.people)}</span> people,{' '}
+        <span className={styles.legendValue}>{fmt(s.started)}</span> started,{' '}
+        <span className={styles.legendValue}>{fmt(s.finished)}</span> {finishedWord}
+      </span>
+    </li>
+  );
+}
+
+// Ring: teal is the share, pale violet the rest.
+function Donut({ share, label = 'got there' }) {
   const r = 34;
   const c = 2 * Math.PI * r;
   return (
-    <div className={styles.donut} role="img" aria-label={`${Math.round(share * 100)}% got there`}>
+    <div className={styles.donut} role="img" aria-label={`${Math.round(share * 100)}% ${label}`}>
       <svg width="84" height="84" viewBox="0 0 84 84">
         <circle cx="42" cy="42" r={r} fill="none" stroke={token('--v2-primary-tint')} strokeWidth="9" />
         <circle

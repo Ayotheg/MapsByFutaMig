@@ -31,7 +31,7 @@ export default function FriendsIntro({ onTry, onClose }) {
     const previous = document.activeElement;
     tryRef.current?.focus({ preventScroll: true });
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onClose('esc');
       if (e.key !== 'Tab') return;
       // Tab stays inside the card, away from the dimmed map behind it.
       const buttons = cardRef.current?.querySelectorAll('button');
@@ -55,7 +55,7 @@ export default function FriendsIntro({ onTry, onClose }) {
   }, [onClose]);
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onClick={() => onClose('outside')}>
       <section
         ref={cardRef}
         className={styles.card}
@@ -67,7 +67,7 @@ export default function FriendsIntro({ onTry, onClose }) {
         <div className={styles.hero}>
           <HeroMap />
           <span className={styles.newBadge}>New</span>
-          <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
+          <button type="button" className={styles.close} aria-label="Close" onClick={() => onClose('close')}>
             <X size={16} strokeWidth={2.2} />
           </button>
           <span className={`${styles.stop} ${styles.stopA}`} aria-hidden="true">
@@ -99,7 +99,7 @@ export default function FriendsIntro({ onTry, onClose }) {
           <button ref={tryRef} type="button" className={styles.tryBtn} onClick={onTry}>
             Try it now
           </button>
-          <button type="button" className={styles.laterBtn} onClick={onClose}>
+          <button type="button" className={styles.laterBtn} onClick={() => onClose('later')}>
             Maybe later
           </button>
         </div>
