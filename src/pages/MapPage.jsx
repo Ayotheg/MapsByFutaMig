@@ -53,13 +53,15 @@ import { rememberVisit } from '../features/reviews/pendingReview';
 
 import { parseInvite } from '../features/friends/friendsSession';
 import { useFriendsIntro } from '../features/friends/useFriendsIntro';
+// Not lazy: it opens by itself on a timer, and a failed download then (bad
+// signal, or a deploy since the page loaded) would take the whole map down.
+import FriendsIntro from '../features/friends/FriendsIntro';
 
 // Only shown an hour after a visit — not needed for first paint.
 const ReviewPrompt = lazy(() => import('../features/reviews/ReviewPrompt'));
 // Meet me / Race to a place: only once the Nav menu or an invite link asks.
 const NavMenu = lazy(() => import('../features/friends/NavMenu'));
 const FriendsHub = lazy(() => import('../features/friends/FriendsHub'));
-const FriendsIntro = lazy(() => import('../features/friends/FriendsIntro'));
 
 // Stable empty reference for the retired StaticKmlLayer's `kmlAnnotations`
 // data — see the comment where it's used below for why this stays a
@@ -262,6 +264,9 @@ export default function MapPage({ onReadinessChange }) {
   // the feature intro waits on both.
   const [zoomHintDone, setZoomHintDone] = useState(false);
   const [channelPromptOpen, setChannelPromptOpen] = useState(false);
+  const [allPlacesOpen, setAllPlacesOpen] = useState(false);
+  // Anything that opens over the map closes the intro (closeOtherOverlays).
+  const interruptFriendsIntroRef = useRef(null);
 
   const persistMapView = useCallback((view) => {
     const center = view?.center;
@@ -624,6 +629,7 @@ export default function MapPage({ onReadinessChange }) {
     if (keep !== 'auth') setAuthModalOpen(false);
     if (keep !== 'gps') setGpsCardOpen(false);
     if (keep !== 'navmenu') setNavMenu(null);
+    interruptFriendsIntroRef.current?.();
     // Only the start sheet closes; a running meetup or race stays.
     if (keep !== 'friends') setFriendsStart(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -947,9 +953,12 @@ export default function MapPage({ onReadinessChange }) {
       reviewPromptOpen ||
       optInPromptOpen ||
       channelPromptOpen ||
+      allPlacesOpen ||
+      dataLoadFailed ||
       chatOpen,
   });
   const { close: closeFriendsIntroAs, retire: retireFriendsIntro } = friendsIntro;
+  interruptFriendsIntroRef.current = friendsIntro.interrupt;
   const closeFriendsIntro = useCallback(() => closeFriendsIntroAs('later'), [closeFriendsIntroAs]);
   // Found it on their own (or came in through an invite).
   useEffect(() => {
@@ -1112,6 +1121,7 @@ export default function MapPage({ onReadinessChange }) {
           chips={quickChips.chips}
           activeChip={activeChip}
           onChipClick={handleChipClick}
+          onAllPlacesChange={setAllPlacesOpen}
           onAllPlacesOpen={() => {
             setActiveChip(null);
             // All places opens in the Signal card's spot.
@@ -1186,16 +1196,14 @@ export default function MapPage({ onReadinessChange }) {
         />
       )}
       {friendsIntro.open && (
-        <Suspense fallback={null}>
-          <FriendsIntro
-            onClose={closeFriendsIntro}
-            onTry={() => {
-              closeFriendsIntroAs('try');
-              // Opens where the card says to look.
-              handleNavMenuToggle(document.querySelector('[data-nav-launch]'));
-            }}
-          />
-        </Suspense>
+        <FriendsIntro
+          onClose={closeFriendsIntro}
+          onTry={() => {
+            closeFriendsIntroAs('try');
+            // Opens where the card says to look.
+            handleNavMenuToggle(document.querySelector('[data-nav-launch]'));
+          }}
+        />
       )}
       {navMenu && (
         <Suspense fallback={null}>

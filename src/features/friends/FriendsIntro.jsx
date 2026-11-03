@@ -25,12 +25,27 @@ function HeroMap() {
  */
 export default function FriendsIntro({ onTry, onClose }) {
   const tryRef = useRef(null);
+  const cardRef = useRef(null);
 
   useEffect(() => {
     const previous = document.activeElement;
     tryRef.current?.focus({ preventScroll: true });
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
+      if (e.key !== 'Tab') return;
+      // Tab stays inside the card, away from the dimmed map behind it.
+      const buttons = cardRef.current?.querySelectorAll('button');
+      if (!buttons?.length) return;
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      const inside = cardRef.current.contains(document.activeElement);
+      if (!inside || (e.shiftKey && document.activeElement === first)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     return () => {
@@ -42,6 +57,7 @@ export default function FriendsIntro({ onTry, onClose }) {
   return (
     <div className={styles.overlay} onClick={onClose}>
       <section
+        ref={cardRef}
         className={styles.card}
         role="dialog"
         aria-modal="true"

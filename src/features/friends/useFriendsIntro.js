@@ -17,11 +17,17 @@ const QUIET_MS = 2000;
 // closes, so one pop-up isn't followed straight away by another.
 const HOLD_PROMPTS_MS = 60 * 1000;
 
-const INTERACTIONS = ['pointerdown', 'keydown', 'wheel', 'touchstart'];
+// Moves too, so a long pan or drag doesn't look idle part-way through.
+const INTERACTIONS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'touchmove'];
 
 function typing() {
   const el = document.activeElement;
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+}
+
+// An event card opened from the Explore panel floats over the map area.
+function eventCardOpen() {
+  return document.body.classList.contains('event-card-open');
 }
 
 /**
@@ -35,6 +41,8 @@ export function useFriendsIntro({ blocked, onMap }) {
   const [open, setOpen] = useState(false);
   const [navDot, setNavDot] = useState(() => readPersistentState(DOT_KEY, false));
   const [holdPrompts, setHoldPrompts] = useState(false);
+  const openRef = useRef(false);
+  openRef.current = open;
   const blockedRef = useRef(blocked);
   blockedRef.current = blocked;
 
@@ -50,7 +58,7 @@ export function useFriendsIntro({ blocked, onMap }) {
       if (document.visibilityState !== 'visible') return;
       const since = Date.now() - lastTouch;
       if (since <= ACTIVE_WINDOW_MS) active += 1;
-      if (active < ACTIVE_SECONDS || blockedRef.current || since < QUIET_MS || typing()) return;
+      if (active < ACTIVE_SECONDS || blockedRef.current || since < QUIET_MS || typing() || eventCardOpen()) return;
       // Counted as seen once it opens, so a reload can't show it twice.
       writePersistentState(SEEN_KEY, true);
       writePersistentState(DOT_KEY, true);
@@ -72,10 +80,16 @@ export function useFriendsIntro({ blocked, onMap }) {
   }, [holdPrompts]);
 
   const close = useCallback((action) => {
+    openRef.current = false;
     setOpen(false);
     setHoldPrompts(true);
     track('friends_intro', { action });
   }, []);
+
+  // Something else opened over the map.
+  const interrupt = useCallback(() => {
+    if (openRef.current) close('interrupted');
+  }, [close]);
 
   // They opened the Nav menu: the dot has done its job.
   const clearNavDot = useCallback(() => {
@@ -91,5 +105,5 @@ export function useFriendsIntro({ blocked, onMap }) {
     clearNavDot();
   }, [clearNavDot]);
 
-  return { open, navDot, holdPrompts, close, clearNavDot, retire };
+  return { open, navDot, holdPrompts, close, interrupt, clearNavDot, retire };
 }

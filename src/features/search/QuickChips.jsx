@@ -25,7 +25,7 @@ const chipKey = (chip) => chip.id || chip.label;
  * so the visible row never flashes full-then-clipped, and re-measures on
  * resize / sidebar collapse / chip-list edits / a new active chip.
  */
-export default function QuickChips({ chips, activeChip, onChipClick, onAllPlacesOpen, collapsed, isMobile }) {
+export default function QuickChips({ chips, activeChip, onChipClick, onAllPlacesOpen, onAllPlacesChange, collapsed, isMobile }) {
   const allChips = useMemo(() => chips || [], [chips]);
   // The bar shows the chips pinned to it (`barOrder`, set from the admin
   // Chips tab) in that order — Lecture halls · Food · Printing · POS / ATM
@@ -41,6 +41,9 @@ export default function QuickChips({ chips, activeChip, onChipClick, onAllPlaces
   // How many of the bar's non-active chips fit next to the active one.
   const [visibleCount, setVisibleCount] = useState(list.length);
   const [overflowOpen, setOverflowOpen] = useState(false);
+  useEffect(() => {
+    onAllPlacesChange?.(overflowOpen);
+  }, [overflowOpen, onAllPlacesChange]);
 
   const isActive = useCallback(
     (chip) => (activeChip?.id ? activeChip.id === chip.id : activeChip?.label === chip.label),

@@ -41,6 +41,13 @@ function linkify(text) {
  * for "Join online". The action buttons call their props when given.
  */
 export default function EventCard({ event, onClose, isMobile, onNavigate, onJoinOnline, onAddToCalendar, onShare }) {
+  // Lets the feature intro (useFriendsIntro) see this card is open.
+  useEffect(() => {
+    if (!event) return undefined;
+    document.body.classList.add('event-card-open');
+    return () => document.body.classList.remove('event-card-open');
+  }, [event]);
+
   const [dragY, setDragY] = useState(0);
   const dragStartY = useRef(null);
   const cardRef = useRef(null);

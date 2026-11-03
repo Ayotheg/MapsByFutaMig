@@ -27,6 +27,16 @@
     padding: 16px 30px;
   }
 }
+/* Desktop: over the map area only. The rail and any open panel (Explore
+   widens the same variable) stay visible and usable beside it. */
+@media (min-width: 769px) {
+  .overlay {
+    left: var(--sidebar-total-w);
+  }
+  :global(.sidebar-collapsed) .overlay {
+    left: var(--sidebar-rail-w);
+  }
+}
 
 @keyframes fadeIn {
   from { opacity: 0; }

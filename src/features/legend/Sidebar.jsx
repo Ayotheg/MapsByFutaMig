@@ -219,8 +219,9 @@ export default function Sidebar({
                 data-nav-launch={item.key === 'navigate' ? '' : undefined}
               >
                 <item.Icon size={22} strokeWidth={1.8} />
-                <span>{item.label}</span>
+                {/* Before the label: the label is styled as the last span. */}
                 {item.key === 'navigate' && navDot && <span className={styles.navDot} />}
+                <span>{item.label}</span>
               </button>
             );
           })}
