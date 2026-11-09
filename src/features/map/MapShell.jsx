@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Map as MapIcon } from 'lucide-react';
 import L from 'leaflet';
 import { LeafletTouchZoom } from './leafletGlobal';
@@ -13,7 +13,11 @@ import StatusAlert from '../shared/StatusAlert';
 
 import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
 import { BASEMAP_STYLES, DEFAULT_BASEMAP_ID, getBasemapStyle } from './basemaps';
-import { watchTileLayer } from './tileHealth';
+import { watchTileLayer, reloadMapTiles } from './tileHealth';
+import { isInstalled } from '../install/installVideo';
+
+// Installed app only: it has no browser bar to reload from.
+const MapReloadButton = lazy(() => import('./MapReloadButton'));
 
 const CAMPUS_CENTER = [7.2980, 5.1380];
 
@@ -43,6 +47,8 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
   // Stays until the failing tiles load (no close button in the design).
   const [tileAlert, setTileAlert] = useState(false);
   const tileWatchersRef = useRef(new Set());
+  const [shellMap, setShellMap] = useState(null);
+  const [installed] = useState(isInstalled);
 
   useEffect(() => {
     if (mapRef.current) return; // guard against StrictMode double-invoke
@@ -144,6 +150,7 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
 
     let baseMapLayer = buildBaseLayer(DEFAULT_BASEMAP_ID).addTo(map);
     map._basemapId = DEFAULT_BASEMAP_ID;
+    map._reloadTiles = () => reloadMapTiles(map, baseMapLayer, tileWatchers);
 
     // Exposed for the Layers panel's "Base Map Style" picker — same
     // imperative-Leaflet, hang-it-off-the-map-instance pattern already
@@ -243,7 +250,9 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
     // mount → cleanup → mount double-invoke never hands consumers a map
     // instance that's about to be removed.
     const readyTimer = setTimeout(() => {
-      if (mapRef.current === map) onMapReady?.(map);
+      if (mapRef.current !== map) return;
+      setShellMap(map);
+      onMapReady?.(map);
     }, 0);
 
     return () => {
@@ -266,6 +275,11 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
   return (
     <>
       <div ref={containerRef} className={styles.map} />
+      {installed && shellMap && (
+        <Suspense fallback={null}>
+          <MapReloadButton map={shellMap} />
+        </Suspense>
+      )}
       {tileAlert && (
         <StatusAlert
           icon={MapIcon}

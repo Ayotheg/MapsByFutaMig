@@ -161,10 +161,12 @@ export function watchTileLayer(layer, { onProblem, onRecovered, isOnline } = {})
   // moment the browser comes back online. A stalled request never errors,
   // so while nothing has loaded at all the whole layer is re-requested
   // instead (`force`: a Retry tap; otherwise at most every
-  // TILE_REDRAW_GAP_MS). A map that has shown tiles is never redrawn.
-  const retryNow = ({ force = false } = {}) => {
+  // TILE_REDRAW_GAP_MS). A map that has shown tiles is only redrawn on
+  // `redraw` (the Reload map button): tiles that "loaded" can still be
+  // blank, which this watcher can't see.
+  const retryNow = ({ force = false, redraw = false } = {}) => {
     if (disposed) return;
-    if (loaded === 0 && (force || redrawAllowed) && typeof layer.redraw === 'function') {
+    if ((redraw || (loaded === 0 && (force || redrawAllowed))) && typeof layer.redraw === 'function') {
       pending.forEach((t) => {
         if (t !== undefined) {
           clearTimeout(t);
@@ -212,6 +214,45 @@ export function watchTileLayer(layer, { onProblem, onRecovered, isOnline } = {})
   };
   layer.once('remove', dispose);
   return { dispose, retryNow };
+}
+
+/**
+ * Reload map button: for a map that went blank although its tiles
+ * "loaded" (a bad tile saved by public/sw.js or the browser cache, or an
+ * installed app that stopped painting after being in the background).
+ * Drops the service worker's saved tiles, re-downloads the tiles on screen
+ * past the browser cache, then redraws. Resolves true once a fresh tile
+ * shows, false if none does within `ms`.
+ */
+export async function reloadMapTiles(map, layer, watchers, ms = 5000) {
+  if (typeof caches !== 'undefined') {
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.filter((n) => n.startsWith('mbf-tiles-')).map((n) => caches.delete(n)));
+    } catch {
+      // Storage blocked: the redraw below still helps.
+    }
+  }
+  const urls = [...new Set([...(layer.getContainer?.()?.querySelectorAll('img') || [])].map((img) => img.src).filter(Boolean))];
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const stop = setTimeout(() => ctrl?.abort(), 4000);
+  await Promise.allSettled(
+    urls.map((u) => fetch(u, { mode: 'cors', credentials: 'omit', cache: 'reload', signal: ctrl?.signal }))
+  );
+  clearTimeout(stop);
+
+  return new Promise((resolve) => {
+    const done = (ok) => {
+      clearTimeout(timer);
+      layer.off('tileload', onLoad);
+      resolve(ok);
+    };
+    const onLoad = () => done(true);
+    const timer = setTimeout(() => done(false), ms);
+    layer.on('tileload', onLoad);
+    map.invalidateSize({ pan: false });
+    watchers.forEach((w) => w.retryNow({ redraw: true }));
+  });
 }
 
 /**
