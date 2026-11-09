@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { mock } from 'node:test';
 import {
-  watchTileLayer, TILE_STALL_MS, TILE_FAIL_THRESHOLD, TILE_GIVEUP_THRESHOLD, TILE_MAX_RETRIES,
+  watchTileLayer, reloadMapTiles, TILE_STALL_MS, TILE_FAIL_THRESHOLD, TILE_GIVEUP_THRESHOLD, TILE_MAX_RETRIES,
   TILE_BG_FIRST_MS, TILE_BG_MAX_MS, TILE_REDRAW_GAP_MS,
 } from '../src/features/map/tileHealth.js';
 
@@ -123,6 +123,30 @@ mock.timers.enable({ apis: ['setTimeout'] });
   layer.fire('tileerror', { tile }); retryNow();
   assert.equal(assigns, 1, 'only the failed tile is refetched');
   console.log('ok 7d: stalled map re-requested, slow or loaded maps left alone'); }
+
+// 7e. Reload map button on a map that has shown tiles: `redraw` redraws it
+//     anyway (blank tiles count as loaded), clears the grey holes, and the
+//     next tile load withdraws the "patchy" alert
+{ const { layer, log, retryNow } = setup(); let redraws = 0; layer.redraw = () => redraws++;
+  layer.fire('tileload', {});
+  for (let i = 0; i < TILE_GIVEUP_THRESHOLD; i++) {
+    layer.fire('tileerror', { tile: { ...mkTile(`https://t/${i}.png`), __retries: TILE_MAX_RETRIES } });
+  }
+  assert.deepEqual(log, ['problem']);
+  retryNow({ redraw: true }); assert.equal(redraws, 1, 'loaded map redrawn on request');
+  mock.timers.tick(TILE_BG_MAX_MS * 2); assert.deepEqual(log, ['problem'], 'old holes not retried after redraw');
+  layer.fire('tileload', {}); assert.deepEqual(log, ['problem', 'recovered']);
+  console.log('ok 7e: Reload map redraws a loaded map and clears its alert'); }
+
+// 7f. reloadMapTiles redraws every watched layer, and does nothing once the
+//     map has been removed
+{ const calls = []; const watchers = new Set([{ retryNow: (o) => calls.push(o) }]);
+  const map = { _loaded: true, invalidateSize: () => calls.push('resize') };
+  await reloadMapTiles(map, watchers);
+  assert.deepEqual(calls, ['resize', { redraw: true }]);
+  calls.length = 0; map._loaded = false;
+  await reloadMapTiles(map, watchers); assert.deepEqual(calls, []);
+  console.log('ok 7f: reloadMapTiles redraws, skips a removed map'); }
 
 // 8. offline → no alert (OfflineBanner covers it), and it can still fire once online
 { let online = false; const { layer, log } = setup({ isOnline: () => online });

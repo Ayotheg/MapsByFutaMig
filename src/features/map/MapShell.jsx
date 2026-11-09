@@ -150,7 +150,7 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
 
     let baseMapLayer = buildBaseLayer(DEFAULT_BASEMAP_ID).addTo(map);
     map._basemapId = DEFAULT_BASEMAP_ID;
-    map._reloadTiles = () => reloadMapTiles(map, baseMapLayer, tileWatchers);
+    map._reloadTiles = () => reloadMapTiles(map, tileWatchers);
 
     // Exposed for the Layers panel's "Base Map Style" picker — same
     // imperative-Leaflet, hang-it-off-the-map-instance pattern already
@@ -277,7 +277,7 @@ export default function MapShell({ onMapReady, initialView, onViewChange }) {
       <div ref={containerRef} className={styles.map} />
       {installed && shellMap && (
         <Suspense fallback={null}>
-          <MapReloadButton map={shellMap} />
+          <MapReloadButton map={shellMap} hidden={tileAlert} />
         </Suspense>
       )}
       {tileAlert && (

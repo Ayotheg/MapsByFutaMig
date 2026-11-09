@@ -217,14 +217,15 @@ export function watchTileLayer(layer, { onProblem, onRecovered, isOnline } = {})
 }
 
 /**
- * Reload map button: for a map that went blank although its tiles
- * "loaded" (a bad tile saved by public/sw.js or the browser cache, or an
- * installed app that stopped painting after being in the background).
- * Drops the service worker's saved tiles, re-downloads the tiles on screen
- * past the browser cache, then redraws. Resolves true once a fresh tile
- * shows, false if none does within `ms`.
+ * Reload map button, first tap: for a map that went blank although its
+ * tiles "loaded" (a bad tile saved by public/sw.js, or an installed app
+ * that stopped painting after being in the background). Drops the service
+ * worker's saved tiles and redraws whatever layers are on the map now. No
+ * forced re-download: OSM's tile policy asks clients not to bypass caching.
+ * A tile the browser still holds in memory can come back blank, so the
+ * button's second tap reloads the app instead.
  */
-export async function reloadMapTiles(map, layer, watchers, ms = 5000) {
+export async function reloadMapTiles(map, watchers) {
   if (typeof caches !== 'undefined') {
     try {
       const names = await caches.keys();
@@ -233,26 +234,9 @@ export async function reloadMapTiles(map, layer, watchers, ms = 5000) {
       // Storage blocked: the redraw below still helps.
     }
   }
-  const urls = [...new Set([...(layer.getContainer?.()?.querySelectorAll('img') || [])].map((img) => img.src).filter(Boolean))];
-  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const stop = setTimeout(() => ctrl?.abort(), 4000);
-  await Promise.allSettled(
-    urls.map((u) => fetch(u, { mode: 'cors', credentials: 'omit', cache: 'reload', signal: ctrl?.signal }))
-  );
-  clearTimeout(stop);
-
-  return new Promise((resolve) => {
-    const done = (ok) => {
-      clearTimeout(timer);
-      layer.off('tileload', onLoad);
-      resolve(ok);
-    };
-    const onLoad = () => done(true);
-    const timer = setTimeout(() => done(false), ms);
-    layer.on('tileload', onLoad);
-    map.invalidateSize({ pan: false });
-    watchers.forEach((w) => w.retryNow({ redraw: true }));
-  });
+  if (!map._loaded) return; // map removed while we waited
+  map.invalidateSize({ pan: false });
+  watchers.forEach((w) => w.retryNow({ redraw: true }));
 }
 
 /**

@@ -25,7 +25,7 @@
   z-index: 1080;
   width: 34px;
   height: 34px;
-  border-radius: var(--r-full, 999px);
+  border-radius: var(--r-full);
   border: 1px solid var(--v2-divider);
   background: var(--v2-on-primary);
   opacity: 0.78;
