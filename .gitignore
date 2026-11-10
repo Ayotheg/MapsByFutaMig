@@ -35,3 +35,5 @@ supabase/.temp/
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+/place-images-backup
