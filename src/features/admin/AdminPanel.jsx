@@ -8,6 +8,7 @@ import PendingTab from './PendingTab';
 import PromotionsTab from './PromotionsTab';
 import EventsTab from './EventsTab';
 import NotifyTab from './NotifyTab';
+import ApiTab from './ApiTab';
 import L from 'leaflet';
 import { Footprints, MapPin, Undo2 } from 'lucide-react';
 import AdminEditModal from './AdminEditModal';
@@ -42,6 +43,7 @@ const TABS = [
   { key: 'pending', label: 'Pending' },
   { key: 'promotions', label: 'Promotions' },
   { key: 'events', label: 'Events' },
+  { key: 'api', label: 'API' },
   { key: 'insights', label: 'Insights' },
   // Push: this week's announcement for the Sunday round-up, and a test ping.
   { key: 'notify', label: 'Notify' },
@@ -81,6 +83,8 @@ export default function AdminPanel({
   const [pendingCount, setPendingCount] = useState(0);
   const [promoCount, setPromoCount] = useState(0);
   const [eventCount, setEventCount] = useState(0);
+  // Open Public API credit requests (ApiTab.jsx).
+  const [apiCount, setApiCount] = useState(0);
   const clickHandlerRef = useRef(null);
 
   const adminKml = useAdminKml({ map, onSelect, searchRegister });
@@ -348,6 +352,7 @@ export default function AdminPanel({
                   {t.key === 'events' && eventCount > 0 && (
                     <span className={styles.atabCount}>{eventCount}</span>
                   )}
+                  {t.key === 'api' && apiCount > 0 && <span className={styles.atabCount}>{apiCount}</span>}
                 </button>
               );
             })}
@@ -413,6 +418,7 @@ export default function AdminPanel({
           {activeTab === 'promotions' && <PromotionsTab onCountChange={setPromoCount} onRefreshWaypoints={onWaypointsChanged} />}
           {activeTab === 'events' && <EventsTab onCountChange={setEventCount} />}
           {activeTab === 'notify' && <NotifyTab />}
+          {activeTab === 'api' && <ApiTab onCountChange={setApiCount} />}
           {activeTab === 'insights' && (
             <InsightsErrorBoundary>
               <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: '#94a3b8', fontSize: 11 }}>Loading insights…</div>}>
