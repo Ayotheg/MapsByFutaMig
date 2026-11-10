@@ -54,6 +54,26 @@ export function decide(row, { now, prefs = {}, lastReviewSentAt = null }) {
   return 'send';
 }
 
+// The next 07:00 Lagos at or after `ms`.
+function nextMorning(ms) {
+  const lagos = new Date(ms + HOUR);
+  let at = Date.UTC(lagos.getUTCFullYear(), lagos.getUTCMonth(), lagos.getUTCDate(), 7) - HOUR;
+  if (at < ms) at += DAY;
+  return at;
+}
+
+/**
+ * When a row that decide() said 'wait' for is next worth trying, so the
+ * sender isn't woken every minute through the night.
+ */
+export function nextTryAt(row, { now, lastReviewSentAt = null }) {
+  const kind = KINDS[row.kind] || {};
+  let at = now;
+  if (row.kind === 'review' && lastReviewSentAt) at = Math.max(at, Date.parse(lastReviewSentAt) + DAY);
+  if (kind.quiet && inQuietHours(at)) at = nextMorning(at);
+  return at;
+}
+
 // iPhones show no icons or pictures, so the title carries an emoji there.
 export function isApplePush(endpoint) {
   try {

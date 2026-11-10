@@ -1,6 +1,6 @@
 // Run: node scripts/pushRules.test.mjs
 import assert from 'node:assert/strict';
-import { buildPayload, decide, inQuietHours, isApplePush, lagosHour, urgencyFor } from '../supabase/functions/_shared/pushRules.js';
+import { buildPayload, decide, inQuietHours, isApplePush, lagosHour, nextTryAt, urgencyFor } from '../supabase/functions/_shared/pushRules.js';
 
 const HOUR = 3600 * 1000;
 // 10 Nov 2026, 12:00 Lagos (11:00 UTC).
@@ -62,5 +62,15 @@ assert.equal(urgencyFor('weekly'), 'normal');
 assert.equal(urgencyFor('admin'), 'normal');
 assert.equal(urgencyFor('preview'), 'high');
 assert.equal(urgencyFor('test'), 'high');
+
+// A held row sleeps until it can actually go, not one minute.
+// 23:00 Lagos → next day 07:00 Lagos (06:00 UTC).
+assert.equal(nextTryAt(review, { now: Date.UTC(2026, 10, 10, 22) }), Date.UTC(2026, 10, 11, 6));
+// 02:00 Lagos → same morning 07:00.
+assert.equal(nextTryAt(review, { now: Date.UTC(2026, 10, 11, 1) }), Date.UTC(2026, 10, 11, 6));
+// Daily cap: 24 h after the last reminder (here 15:00 Lagos tomorrow).
+assert.equal(nextTryAt(review, { now: noon, lastReviewSentAt: iso(Date.UTC(2026, 10, 10, 14)) }), Date.UTC(2026, 10, 11, 14));
+// Cap ends at night → that morning instead.
+assert.equal(nextTryAt(review, { now: noon, lastReviewSentAt: iso(Date.UTC(2026, 10, 9, 22)) }), Date.UTC(2026, 10, 11, 6));
 
 console.log('pushRules tests passed');

@@ -100,9 +100,26 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ── Push notifications (supabase/push_notifications.sql → send-push) ──
-// When the app is open and on screen, the page shows its own banner
-// (PushBanner.jsx) instead of a system notification. Chrome doesn't
-// require a system notification while a page of the site is visible.
+// When the map is open and on screen, the page shows its own banner
+// (PushBanner.jsx, which only the map has) instead of a system
+// notification. Never on Apple: WebKit requires a visible notification
+// for every push and drops the subscription after a few silent ones.
+const isMapUrl = (url) => {
+  try {
+    return new URL(url).pathname === '/map';
+  } catch {
+    return false;
+  }
+};
+async function isApplePushHere() {
+  try {
+    const sub = await self.registration.pushManager.getSubscription();
+    return !!sub && new URL(sub.endpoint).hostname.endsWith('push.apple.com');
+  } catch {
+    return false;
+  }
+}
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -114,9 +131,9 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     (async () => {
       const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const visible = wins.find((c) => c.visibilityState === 'visible');
-      if (visible) {
-        visible.postMessage({ type: 'push-show', notification: data });
+      const mapOnScreen = wins.find((c) => c.visibilityState === 'visible' && isMapUrl(c.url));
+      if (mapOnScreen && !(await isApplePushHere())) {
+        mapOnScreen.postMessage({ type: 'push-show', notification: data });
         return;
       }
       await self.registration.showNotification(data.title, {
@@ -143,11 +160,23 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     (async () => {
       const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const open = wins.find((c) => new URL(c.url).origin === self.location.origin);
-      if (open) {
-        await open.focus();
-        open.postMessage({ type: 'push-open', url: target });
+      // An open map handles the link itself (no reload).
+      const map = wins.find((c) => isMapUrl(c.url));
+      if (map) {
+        await map.focus();
+        map.postMessage({ type: 'push-open', url: target });
         return;
+      }
+      // Another page of the site: take that tab to the link.
+      const other = wins.find((c) => new URL(c.url).origin === self.location.origin);
+      if (other && 'navigate' in other) {
+        try {
+          const nav = await other.navigate(target);
+          await (nav || other).focus();
+          return;
+        } catch {
+          // Not controlled by this worker: fall through to a new window.
+        }
       }
       await self.clients.openWindow(target);
     })()

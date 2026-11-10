@@ -189,13 +189,17 @@ let w; await handlers.activate({ waitUntil: (p) => (w = p) }); await w;
 assert.ok(!store.has('mbf-tiles-v0')); assert.ok(store.has('other-app')); assert.ok(store.has('mbf-tiles-v3'));
 console.log('ok 10: activate cleans old mbf-* caches only');
 
-// 11. push: system notification when no page is on screen
+// 11. push: system notification unless the map itself is on screen
 {
   const shown = [];
   const posted = [];
   let wins = [];
+  let endpoint = 'https://fcm.googleapis.com/fcm/send/abc';
   self.location = { origin: 'https://mapsbyfuta.xyz' };
-  self.registration = { showNotification: async (t, o) => shown.push([t, o]) };
+  self.registration = {
+    showNotification: async (t, o) => shown.push([t, o]),
+    pushManager: { getSubscription: async () => ({ endpoint }) },
+  };
   self.clients.matchAll = async () => wins;
   self.clients.openWindow = async (u) => posted.push(['open', u]);
   const push = async (data) => {
@@ -204,35 +208,55 @@ console.log('ok 10: activate cleans old mbf-* caches only');
     await w;
   };
   const note = { title: 'How was Campus Cuts?', body: 'b', url: '/map?open=review:9', tag: 'review', actions: [{ action: 'rate', title: 'Rate now', url: '/map?open=review:9' }, { action: 'later', title: 'Not now' }] };
+  const win = (path, visibilityState, extra = {}) => ({ url: `https://mapsbyfuta.xyz${path}`, visibilityState, postMessage: (m) => posted.push(m), focus: async () => {}, ...extra });
 
+  // Nothing open → system notification with both buttons.
   await push(note);
   assert.equal(shown.length, 1);
   assert.equal(shown[0][0], 'How was Campus Cuts?');
   assert.deepEqual(shown[0][1].actions, [{ action: 'rate', title: 'Rate now' }, { action: 'later', title: 'Not now' }]);
 
-  // App open on screen → banner message instead.
-  const visible = { url: 'https://mapsbyfuta.xyz/map', visibilityState: 'visible', postMessage: (m) => posted.push(m), focus: async () => {} };
-  wins = [visible];
+  // Map on screen → in-app banner instead.
+  wins = [win('/map', 'visible')];
   await push(note);
   assert.equal(shown.length, 1);
   assert.equal(posted.at(-1).type, 'push-show');
 
-  // Tapping: focuses the open app and tells it where to go.
+  // Another page on screen (no banner there) → still a system notification.
+  wins = [win('/promote', 'visible')];
+  await push(note);
+  assert.equal(shown.length, 2);
+
+  // iPhone: always a system notification, even on the map.
+  endpoint = 'https://web.push.apple.com/xyz';
+  wins = [win('/map', 'visible')];
+  await push(note);
+  assert.equal(shown.length, 3);
+  endpoint = 'https://fcm.googleapis.com/fcm/send/abc';
+
   const click = async (action, data) => {
     let w;
     handlers.notificationclick({ action, notification: { close() {}, data }, waitUntil: (p) => (w = p) });
     await w;
   };
-  wins = [{ ...visible, visibilityState: 'hidden' }];
+
+  // Tap with the map open in the background → it handles the link.
+  wins = [win('/map', 'hidden')];
   await click('', { url: '/map?open=review:9', actions: note.actions });
   assert.deepEqual(posted.at(-1), { type: 'push-open', url: 'https://mapsbyfuta.xyz/map?open=review:9' });
 
-  // "Not now" just closes; no app open → opens a window.
+  // Tap while only another page is open → that tab goes to the link.
+  const navigated = [];
+  wins = [win('/promote', 'hidden', { navigate: async (u) => { navigated.push(u); return null; } })];
+  await click('', { url: '/map?open=review:9', actions: note.actions });
+  assert.deepEqual(navigated, ['https://mapsbyfuta.xyz/map?open=review:9']);
+
+  // "Not now" just closes; nothing open → opens a window.
   const before = posted.length;
   handlers.notificationclick({ action: 'later', notification: { close() {}, data: { url: '/map', actions: note.actions } }, waitUntil: () => {} });
   assert.equal(posted.length, before);
   wins = [];
   await click('rate', { url: '/map', actions: note.actions });
   assert.deepEqual(posted.at(-1), ['open', 'https://mapsbyfuta.xyz/map?open=review:9']);
-  console.log('ok 11: push shows, defers to an open page, and taps open the right place');
+  console.log('ok 11: banner only on the map (never iPhone), taps reach the link from any page');
 }

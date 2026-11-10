@@ -128,10 +128,43 @@ as $$
   delete from public.push_subscriptions where endpoint = p_endpoint and user_id = auth.uid();
 $$;
 
+-- After sign-in: is this browser's subscription this person's? 'mine'
+-- (keys refreshed), 'released' (it belonged to someone else — a shared
+-- phone — so it's removed; this person must turn notifications on
+-- themselves), or 'none'. Never moves a device to a new account.
+create or replace function public.check_push_subscription(p_endpoint text, p_p256dh text, p_auth text)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_owner uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in first';
+  end if;
+  select user_id into v_owner from public.push_subscriptions where endpoint = p_endpoint;
+  if v_owner is null then
+    return 'none';
+  end if;
+  if v_owner = auth.uid() then
+    update public.push_subscriptions
+       set p256dh = coalesce(nullif(p_p256dh, ''), p256dh), auth = coalesce(nullif(p_auth, ''), auth), last_seen_at = now()
+     where endpoint = p_endpoint;
+    return 'mine';
+  end if;
+  delete from public.push_subscriptions where endpoint = p_endpoint;
+  return 'released';
+end;
+$$;
+
 revoke all on function public.save_push_subscription(text, text, text, text) from public, anon;
 revoke all on function public.delete_push_subscription(text) from public, anon;
+revoke all on function public.check_push_subscription(text, text, text) from public, anon;
 grant execute on function public.save_push_subscription(text, text, text, text) to authenticated;
 grant execute on function public.delete_push_subscription(text) to authenticated;
+grant execute on function public.check_push_subscription(text, text, text) to authenticated;
 
 
 -- ── 3. When a place went live ───────────────────────────────────────────
@@ -230,9 +263,13 @@ revoke all on function public.has_push_device(uuid) from public, anon, authentic
 -- ── 5. Rate your visit ──────────────────────────────────────────────────
 -- Called by the app when a signed-in person arrives at a rateable place
 -- (MapPage onArrival). One pending reminder per person: a new visit
--- replaces the last. Reviewing first cancels it (trigger below).
+-- replaces the last, a repeat visit to the same place re-arms it.
+-- Reviewing first cancels it (trigger below). Returns true when the visit
+-- is taken care of (a push will ask, or they already reviewed it), so the
+-- app doesn't also show its in-app "Rate your visit" card.
+drop function if exists public.queue_review_reminder(text);
 create or replace function public.queue_review_reminder(p_waypoint_id text)
-returns void
+returns boolean
 language plpgsql
 security definer
 set search_path = ''
@@ -241,21 +278,35 @@ declare
   v_name  text;
   v_image text;
 begin
-  if auth.uid() is null or not public.has_push_device(auth.uid()) then
-    return;
+  if auth.uid() is null then
+    return false;
+  end if;
+  -- Already reviewed this place: nothing to ask, anywhere.
+  if exists (select 1 from public.reviews r where r.user_id = auth.uid() and r.waypoint_id = p_waypoint_id) then
+    return true;
+  end if;
+  if not public.has_push_device(auth.uid()) then
+    return false;
   end if;
   select w.name into v_name from public.waypoints w
    where w.id = p_waypoint_id and w.status = 'approved';
   if v_name is null then
-    return;
+    return false;
+  end if;
+  -- Back at the same place: keep the one reminder, an hour from now.
+  update public.push_queue set send_after = now() + interval '1 hour'
+   where user_id = auth.uid() and kind = 'review' and ref = p_waypoint_id and status = 'pending';
+  if found then
+    return true;
   end if;
   select i.storage_path into v_image from public.waypoint_images i
    where i.waypoint_id = p_waypoint_id order by i.position limit 1;
 
+  -- A visit somewhere else replaces the earlier reminder.
   update public.push_queue set status = 'cancelled', status_note = 'newer visit'
    where user_id = auth.uid() and kind = 'review' and status = 'pending';
 
-  insert into public.push_queue (user_id, kind, title, body, url, image_path, tag, actions, ref, send_after, dedupe_key)
+  insert into public.push_queue (user_id, kind, title, body, url, image_path, tag, actions, ref, send_after)
   values (
     auth.uid(), 'review',
     'How was ' || v_name || '?',
@@ -267,10 +318,9 @@ begin
       jsonb_build_object('action', 'rate', 'title', 'Rate now', 'url', '/map?open=review:' || p_waypoint_id),
       jsonb_build_object('action', 'later', 'title', 'Not now')),
     p_waypoint_id,
-    now() + interval '1 hour',
-    'review:' || auth.uid() || ':' || p_waypoint_id || ':' || (now() at time zone 'Africa/Lagos')::date
-  )
-  on conflict (dedupe_key) do nothing;
+    now() + interval '1 hour'
+  );
+  return true;
 end;
 $$;
 
@@ -328,8 +378,10 @@ create policy push_announcements_admin on public.push_announcements
   using (public.is_admin(auth.uid()))
   with check (public.is_admin(auth.uid()));
 
--- Places counted as "new this week" (also listed in the Notify tab).
-create or replace function public.weekly_new_places()
+-- Places counted as "new" in the 7 days before `p_until` (a round-up's
+-- send time; now() when called without it, as the Notify tab does).
+drop function if exists public.weekly_new_places();
+create or replace function public.weekly_new_places(p_until timestamptz default now())
 returns table (id text, name text, live_at timestamptz)
 language sql
 stable
@@ -340,11 +392,12 @@ as $$
     from public.waypoints w
    where w.status = 'approved'
      and coalesce(w.source_type, '') <> 'osm_import'
-     and coalesce(w.approved_at, w.created_at) >= now() - interval '7 days'
+     and coalesce(w.approved_at, w.created_at) >= p_until - interval '7 days'
+     and coalesce(w.approved_at, w.created_at) <= p_until
    order by live_at desc;
 $$;
-revoke all on function public.weekly_new_places() from public, anon;
-grant execute on function public.weekly_new_places() to authenticated;
+revoke all on function public.weekly_new_places(timestamptz) from public, anon;
+grant execute on function public.weekly_new_places(timestamptz) to authenticated;
 
 -- The round-up's words and picture for the Sunday `p_week`, or null in a
 -- quiet week. Shared by the real send and the admins' preview, so the
@@ -367,12 +420,23 @@ declare
   v_url     text := '/map?open=explore';
   v_image   text;
   v_parts   text[] := '{}';
+  -- Counted as at the real send (Sunday 18:00 Lagos), so a midweek
+  -- preview says the same as Sunday will.
+  v_send    timestamptz := (p_week + time '18:00') at time zone 'Africa/Lagos';
 begin
-  select count(*) into v_places from public.weekly_new_places();
+  select count(*) into v_places from public.weekly_new_places(v_send);
   select count(*) into v_events from public.events
-   where status = 'approved' and starts_at >= now() and starts_at < now() + interval '7 days';
+   where status = 'approved' and starts_at >= v_send and starts_at < v_send + interval '7 days';
   select * into v_ann from public.push_announcements
    where send_week = p_week and sent_at is null limit 1;
+
+  -- A lead place still counts if it was added a bit more than a week ago.
+  if v_ann.id is not null and v_ann.lead_waypoint_id is not null then
+    select name into v_lead from public.waypoints where id = v_ann.lead_waypoint_id and status = 'approved';
+    if v_lead is not null and not exists (select 1 from public.weekly_new_places(v_send) p where p.id = v_ann.lead_waypoint_id) then
+      v_places := v_places + 1;
+    end if;
+  end if;
 
   if v_places = 0 and v_events = 0 and v_ann.title is null then
     return null; -- quiet week: nothing goes out
@@ -383,10 +447,6 @@ begin
   end if;
   if v_events > 0 then
     v_parts := v_parts || (v_events || case when v_events = 1 then ' event this week' else ' events this week' end);
-  end if;
-
-  if v_ann.id is not null and v_ann.lead_waypoint_id is not null then
-    select name into v_lead from public.waypoints where id = v_ann.lead_waypoint_id and status = 'approved';
   end if;
 
   if v_ann.id is not null and v_ann.lead then
@@ -417,7 +477,7 @@ begin
   -- Picture: the lead place's photo, else the newest new place with one.
   select i.storage_path into v_image
     from public.waypoint_images i
-    left join public.weekly_new_places() p on p.id = i.waypoint_id
+    left join public.weekly_new_places(v_send) p on p.id = i.waypoint_id
    where i.waypoint_id = v_ann.lead_waypoint_id or p.id is not null
    order by (i.waypoint_id = v_ann.lead_waypoint_id) desc nulls last, p.live_at desc nulls last, i.position
    limit 1;

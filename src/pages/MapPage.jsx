@@ -1242,10 +1242,16 @@ export default function MapPage({ onReadinessChange }) {
           }}
           onArrival={(dest) => {
             // Not reviewed on arrival (they haven't had the service yet):
-            // ReviewPrompt asks an hour later.
-            rememberVisit(dest);
-            // Signed in with notifications on: also a push an hour later.
-            if (auth.user) queueReviewReminder(dest?.id);
+            // asked an hour later, once — by push when they have
+            // notifications on (or already reviewed it), otherwise by
+            // the in-app ReviewPrompt card.
+            if (auth.user) {
+              queueReviewReminder(dest?.id).then((handled) => {
+                if (!handled) rememberVisit(dest);
+              });
+            } else {
+              rememberVisit(dest);
+            }
           }}
           guestNavBlocked={guestNavBlocked}
           onGuestBlocked={handleGuestNavBlocked}

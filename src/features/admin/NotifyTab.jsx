@@ -27,15 +27,17 @@ export default function NotifyTab() {
     setLoading(true);
     setError(null);
     try {
-      const now = new Date();
-      const weekOut = new Date(now.getTime() + 7 * 24 * 3600 * 1000);
+      // Counted as at the real send, Sunday 18:00 Lagos (17:00 UTC), the
+      // same window compose_weekly_digest() uses.
+      const sendAt = new Date(`${sendWeek}T17:00:00Z`);
+      const weekOut = new Date(sendAt.getTime() + 7 * 24 * 3600 * 1000);
       const [places, events, ann] = await Promise.all([
-        supabase.rpc('weekly_new_places'),
+        supabase.rpc('weekly_new_places', { p_until: sendAt.toISOString() }),
         supabase
           .from('events')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'approved')
-          .gte('starts_at', now.toISOString())
+          .gte('starts_at', sendAt.toISOString())
           .lt('starts_at', weekOut.toISOString()),
         supabase.from('push_announcements').select('*').eq('send_week', sendWeek).maybeSingle(),
       ]);
@@ -186,7 +188,7 @@ export default function NotifyTab() {
               <div className={styles.itemMeta}>Nothing new this week yet, so no round-up will be sent unless you add an announcement.</div>
             )}
             <div className={styles.itemMeta}>
-              {newPlaces.length} new place{newPlaces.length === 1 ? '' : 's'} · {eventCount} event{eventCount === 1 ? '' : 's'} in the next 7 days
+              {newPlaces.length} new place{newPlaces.length === 1 ? '' : 's'} · {eventCount} event{eventCount === 1 ? '' : 's'} in the week from Sunday
             </div>
             {preview && (
               <div className={styles.formActions} style={{ justifyContent: 'flex-start' }}>

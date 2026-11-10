@@ -112,24 +112,41 @@ export async function turnOffPush() {
 }
 
 /**
- * After signing in: if this browser already has a subscription, attach it
- * to the account now signed in (a shared device follows its last user).
+ * After signing in: keep this browser's subscription only if it already
+ * belongs to this account (keys refreshed). One left by someone else on a
+ * shared phone is released, never moved over: the new person turns
+ * notifications on themselves.
  */
 export async function syncThisDevice() {
   try {
     if (pushPermission() !== 'granted' || (await pushSupport()) !== 'ok') return;
     const sub = await currentSubscription();
-    if (sub) await saveSubscription(sub);
+    if (!sub) return;
+    const json = sub.toJSON();
+    const { data, error } = await supabase.rpc('check_push_subscription', {
+      p_endpoint: json.endpoint,
+      p_p256dh: json.keys?.p256dh,
+      p_auth: json.keys?.auth,
+    });
+    if (error) return;
+    if (data !== 'mine') await sub.unsubscribe();
   } catch {
-    // Next sign-in or profile visit tries again.
+    // Next sign-in tries again.
   }
 }
 
-/** Before signing out: stop this device getting the account's notifications. */
+/**
+ * Before signing out: this device stops getting the account's
+ * notifications, on the server and in the browser, so the next person to
+ * sign in here doesn't inherit them.
+ */
 export async function forgetThisDevice() {
   try {
     const sub = await currentSubscription();
-    if (sub) await supabase.rpc('delete_push_subscription', { p_endpoint: sub.endpoint });
+    if (!sub) return;
+    const { error } = await supabase.rpc('delete_push_subscription', { p_endpoint: sub.endpoint });
+    if (error) console.warn('delete_push_subscription failed:', error.message);
+    await sub.unsubscribe();
   } catch {
     // Signing out still goes ahead.
   }
@@ -158,11 +175,22 @@ export async function savePushPref(key, on) {
   }
 }
 
-/** "How was …?" an hour after arriving. Fire-and-forget. */
-export function queueReviewReminder(waypointId) {
-  if (!waypointId) return;
-  supabase.rpc('queue_review_reminder', { p_waypoint_id: String(waypointId) }).then(
-    ({ error }) => error && console.warn('queue_review_reminder failed:', error.message),
-    () => {}
-  );
+/**
+ * "How was …?" an hour after arriving, as a push. Resolves true when that
+ * takes care of the visit (a reminder is queued for one of their devices,
+ * or they've already reviewed it), false when the in-app card should ask
+ * instead (no device with notifications on, offline, …).
+ */
+export async function queueReviewReminder(waypointId) {
+  if (!waypointId) return false;
+  try {
+    const { data, error } = await supabase.rpc('queue_review_reminder', { p_waypoint_id: String(waypointId) });
+    if (error) {
+      console.warn('queue_review_reminder failed:', error.message);
+      return false;
+    }
+    return data === true;
+  } catch {
+    return false;
+  }
 }

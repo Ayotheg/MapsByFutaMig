@@ -17,7 +17,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { sendWebPush } from '../_shared/webpush.js';
-import { buildPayload, decide, urgencyFor } from '../_shared/pushRules.js';
+import { buildPayload, decide, nextTryAt, urgencyFor } from '../_shared/pushRules.js';
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -109,9 +109,12 @@ Deno.serve(async (req) => {
   const counts = { sent: 0, waiting: 0, skipped: 0, failed: 0 };
 
   for (const row of rows) {
-    const verdict = decide(row, { now, prefs: prefsBy.get(row.user_id), lastReviewSentAt: lastReviewBy.get(row.user_id) || null });
+    const ctx = { now, prefs: prefsBy.get(row.user_id), lastReviewSentAt: lastReviewBy.get(row.user_id) || null };
+    const verdict = decide(row, ctx);
     if (verdict === 'wait') {
-      await admin.from('push_queue').update({ status: 'pending', claimed_at: null }).eq('id', row.id);
+      // Sleep until it can go (07:00, or 24 h after the last reminder).
+      const sendAfter = new Date(nextTryAt(row, ctx)).toISOString();
+      await admin.from('push_queue').update({ status: 'pending', claimed_at: null, send_after: sendAfter }).eq('id', row.id);
       counts.waiting++;
       continue;
     }
