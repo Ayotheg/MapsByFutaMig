@@ -7,6 +7,7 @@ import QuickChipsTab from './QuickChipsTab';
 import PendingTab from './PendingTab';
 import PromotionsTab from './PromotionsTab';
 import EventsTab from './EventsTab';
+import NotifyTab from './NotifyTab';
 import L from 'leaflet';
 import { Footprints, MapPin, Undo2 } from 'lucide-react';
 import AdminEditModal from './AdminEditModal';
@@ -42,6 +43,8 @@ const TABS = [
   { key: 'promotions', label: 'Promotions' },
   { key: 'events', label: 'Events' },
   { key: 'insights', label: 'Insights' },
+  // Push: this week's announcement for the Sunday round-up, and a test ping.
+  { key: 'notify', label: 'Notify' },
 ];
 
 /**
@@ -409,6 +412,7 @@ export default function AdminPanel({
           )}
           {activeTab === 'promotions' && <PromotionsTab onCountChange={setPromoCount} onRefreshWaypoints={onWaypointsChanged} />}
           {activeTab === 'events' && <EventsTab onCountChange={setEventCount} />}
+          {activeTab === 'notify' && <NotifyTab />}
           {activeTab === 'insights' && (
             <InsightsErrorBoundary>
               <Suspense fallback={<div className={styles.tabContent} style={{ padding: 12, color: '#94a3b8', fontSize: 11 }}>Loading insights…</div>}>

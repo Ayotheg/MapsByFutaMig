@@ -50,6 +50,9 @@ import MyWaypointSubmissionsPanel from '../features/waypoint-submissions/MyWaypo
 import MapPickBanner from '../features/map/MapPickBanner';
 import { osmCardData, waypointCardData } from '../features/waypoints/placeCardData';
 import { rememberVisit } from '../features/reviews/pendingReview';
+import PushBanner from '../features/notifications/PushBanner';
+import { queueReviewReminder, syncThisDevice } from '../features/notifications/pushClient';
+import { openTargetFromUrl, withoutOpenParam } from '../features/notifications/deepLink';
 
 import { parseInvite } from '../features/friends/friendsSession';
 import { useFriendsIntro } from '../features/friends/useFriendsIntro';
@@ -57,6 +60,8 @@ import { useFriendsIntro } from '../features/friends/useFriendsIntro';
 // signal, or a deploy since the page loaded) would take the whole map down.
 import FriendsIntro from '../features/friends/FriendsIntro';
 
+// The signed-in profile: only once someone opens it.
+const ProfilePage = lazy(() => import('../features/auth/ProfilePage'));
 // Only shown an hour after a visit — not needed for first paint.
 const ReviewPrompt = lazy(() => import('../features/reviews/ReviewPrompt'));
 // Meet me / Race to a place: only once the Nav menu or an invite link asks.
@@ -374,6 +379,10 @@ export default function MapPage({ onReadinessChange }) {
   useEffect(() => {
     if (signedInUserId) flushPendingNavCompletions(signedInUserId);
   }, [signedInUserId]);
+  // A browser that already allowed notifications follows whoever signs in.
+  useEffect(() => {
+    if (signedInUserId) syncThisDevice();
+  }, [signedInUserId]);
 
   const handleRetryData = useCallback(() => {
     refetchWaypoints();
@@ -453,12 +462,22 @@ export default function MapPage({ onReadinessChange }) {
   const [authModalMessage, setAuthModalMessage] = useState(null);
   // Legacy's `openModal(tab)` (app.js ~7185–7189): always lands on the
   // profile tab if already signed in, regardless of the tab requested.
+  // Signed in, the same buttons open the profile page instead.
+  const [profileOpen, setProfileOpen] = useState(false);
   function openAuthModal(tab, message = null) {
+    if (auth.user) {
+      closeOtherOverlays('profile');
+      setProfileOpen(true);
+      return;
+    }
     closeOtherOverlays('auth');
-    setAuthModalTab(auth.user ? 'profile' : (tab || 'login'));
+    setAuthModalTab(tab || 'login');
     setAuthModalMessage(message);
     setAuthModalOpen(true);
   }
+  useEffect(() => {
+    if (!auth.user) setProfileOpen(false);
+  }, [auth.user]);
 
   // Shown whenever a guest tries to navigate after using up their free
   // tries — lands on Create Account since that's the likely next step,
@@ -627,6 +646,7 @@ export default function MapPage({ onReadinessChange }) {
     if (keep !== 'review') setReviewTarget(null);
     if (keep !== 'admin') setAdminPanelOpen(false);
     if (keep !== 'auth') setAuthModalOpen(false);
+    if (keep !== 'profile') setProfileOpen(false);
     if (keep !== 'gps') setGpsCardOpen(false);
     if (keep !== 'navmenu') setNavMenu(null);
     interruptFriendsIntroRef.current?.();
@@ -724,6 +744,47 @@ export default function MapPage({ onReadinessChange }) {
   const selectFromExplore = useCallback((wp) => openPlace(wp, 'explore'), [openPlace]);
   const selectFromList = useCallback((wp) => openPlace(wp, 'list'), [openPlace]);
   const selectFromNearby = useCallback((wp) => openPlace(wp, 'nearby'), [openPlace]);
+
+  // ── Notification taps: /map?open=… (features/notifications/deepLink.js) ──
+  // From a cold start the target waits until the map, places and sign-in
+  // have loaded; a tap while the app is already open (PushBanner relays
+  // the service worker's message) goes straight there.
+  const [openRequest, setOpenRequest] = useState(() => openTargetFromUrl(window.location.search));
+  const handleOpenUrl = useCallback((url) => {
+    const target = openTargetFromUrl(url);
+    if (target) setOpenRequest(target);
+  }, []);
+  useEffect(() => {
+    if (!openRequest || !map || waypointsLoading || auth.loading) return;
+    const target = openRequest;
+    setOpenRequest(null);
+    if (window.location.search.includes('open=')) {
+      window.history.replaceState(window.history.state, '', withoutOpenParam(window.location.href));
+    }
+    track('push_opened', { target: target.kind });
+    const wp = target.id ? waypoints.find((w) => String(w.id) === target.id) : null;
+    if (target.kind === 'review' && wp) {
+      closeOtherOverlays('review');
+      setReviewTarget({ id: wp.id, name: wp.name, type: wp.type });
+    } else if ((target.kind === 'place' || target.kind === 'review') && wp) {
+      const key = `waypoint:${wp.id}`;
+      openPlace(waypointCardData(wp, osmSnaps?.[key], osmBadgeMerges?.[key]), 'notification');
+    } else if (target.kind === 'explore') {
+      if (isMobile) {
+        setSheetActiveTab('layers');
+        handleSheetStateChange('half');
+      } else {
+        closeOtherOverlays('sidebar');
+        setExploreOpenRequest((n) => n + 1);
+      }
+    } else if (target.kind === 'profile') {
+      openAuthModal('login');
+    } else if (target.kind === 'admin') {
+      if (auth.user) handleAdminClick();
+      else openAuthModal('login');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest, map, waypointsLoading, auth.loading]);
 
   // Map pins: while "Where to?" is open, a pin tap picks the destination
   // (the panel's own hint says to) instead of opening a place card.
@@ -927,6 +988,7 @@ export default function MapPage({ onReadinessChange }) {
     navOpen ||
     !!reviewTarget ||
     authModalOpen ||
+    profileOpen ||
     adminPin.pinOpen ||
     adminPanelOpen ||
     suggestModalOpen ||
@@ -1182,6 +1244,8 @@ export default function MapPage({ onReadinessChange }) {
             // Not reviewed on arrival (they haven't had the service yet):
             // ReviewPrompt asks an hour later.
             rememberVisit(dest);
+            // Signed in with notifications on: also a push an hour later.
+            if (auth.user) queueReviewReminder(dest?.id);
           }}
           guestNavBlocked={guestNavBlocked}
           onGuestBlocked={handleGuestNavBlocked}
@@ -1276,6 +1340,19 @@ export default function MapPage({ onReadinessChange }) {
           message={authModalMessage}
         />
       )}
+      {profileOpen && auth.user && (
+        <Suspense fallback={null}>
+          <ProfilePage
+            user={auth.user}
+            onClose={() => setProfileOpen(false)}
+            signOut={auth.signOut}
+            requestEmailChange={auth.requestEmailChange}
+            confirmEmailChange={auth.confirmEmailChange}
+            friendlyError={friendlyError}
+          />
+        </Suspense>
+      )}
+      <PushBanner onOpen={handleOpenUrl} />
       {adminPin.pinOpen && (
         <AdminPinGate
           open={adminPin.pinOpen}

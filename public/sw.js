@@ -1,5 +1,9 @@
 /* Maps By FUTA — service worker.
  *
+ * Two jobs: shows push notifications (handlers below the fetch listener;
+ * see supabase/push_notifications.sql), and caches tiles and photos as
+ * described here.
+ *
  * Scope is deliberately narrow: it caches ONLY map tiles and place photos
  * that a person has actually viewed. It does not cache the app shell, JS,
  * HTML or API calls (Supabase REST/auth) — so a deploy is never stuck
@@ -93,6 +97,61 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (isTile(url)) event.respondWith(handleTile(event, req));
   else if (isPhoto(url)) event.respondWith(handlePhoto(event, req));
+});
+
+// ── Push notifications (supabase/push_notifications.sql → send-push) ──
+// When the app is open and on screen, the page shows its own banner
+// (PushBanner.jsx) instead of a system notification. Chrome doesn't
+// require a system notification while a page of the site is visible.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    return;
+  }
+  if (!data.title) return;
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const visible = wins.find((c) => c.visibilityState === 'visible');
+      if (visible) {
+        visible.postMessage({ type: 'push-show', notification: data });
+        return;
+      }
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: data.icon,
+        badge: data.badge,
+        image: data.image,
+        tag: data.tag,
+        renotify: !!data.tag,
+        data: { url: data.url || '/map', actions: data.actions || [] },
+        actions: (data.actions || []).map((a) => ({ action: a.action, title: a.title })),
+      });
+    })()
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const { url = '/map', actions = [] } = event.notification.data || {};
+  const picked = event.action ? actions.find((a) => a.action === event.action) : null;
+  // A button without its own link (e.g. "Not now") just dismisses.
+  if (event.action && !picked?.url) return;
+  const target = new URL(picked?.url || url, self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const open = wins.find((c) => new URL(c.url).origin === self.location.origin);
+      if (open) {
+        await open.focus();
+        open.postMessage({ type: 'push-open', url: target });
+        return;
+      }
+      await self.clients.openWindow(target);
+    })()
+  );
 });
 
 // Oldest-first eviction. Cache.keys() is in insertion order, and re-putting

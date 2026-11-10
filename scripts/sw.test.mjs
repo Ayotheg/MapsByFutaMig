@@ -188,3 +188,51 @@ store.set('mbf-tiles-v0', new Map()); store.set('other-app', new Map());
 let w; await handlers.activate({ waitUntil: (p) => (w = p) }); await w;
 assert.ok(!store.has('mbf-tiles-v0')); assert.ok(store.has('other-app')); assert.ok(store.has('mbf-tiles-v3'));
 console.log('ok 10: activate cleans old mbf-* caches only');
+
+// 11. push: system notification when no page is on screen
+{
+  const shown = [];
+  const posted = [];
+  let wins = [];
+  self.location = { origin: 'https://mapsbyfuta.xyz' };
+  self.registration = { showNotification: async (t, o) => shown.push([t, o]) };
+  self.clients.matchAll = async () => wins;
+  self.clients.openWindow = async (u) => posted.push(['open', u]);
+  const push = async (data) => {
+    let w;
+    handlers.push({ data: { json: () => data }, waitUntil: (p) => (w = p) });
+    await w;
+  };
+  const note = { title: 'How was Campus Cuts?', body: 'b', url: '/map?open=review:9', tag: 'review', actions: [{ action: 'rate', title: 'Rate now', url: '/map?open=review:9' }, { action: 'later', title: 'Not now' }] };
+
+  await push(note);
+  assert.equal(shown.length, 1);
+  assert.equal(shown[0][0], 'How was Campus Cuts?');
+  assert.deepEqual(shown[0][1].actions, [{ action: 'rate', title: 'Rate now' }, { action: 'later', title: 'Not now' }]);
+
+  // App open on screen → banner message instead.
+  const visible = { url: 'https://mapsbyfuta.xyz/map', visibilityState: 'visible', postMessage: (m) => posted.push(m), focus: async () => {} };
+  wins = [visible];
+  await push(note);
+  assert.equal(shown.length, 1);
+  assert.equal(posted.at(-1).type, 'push-show');
+
+  // Tapping: focuses the open app and tells it where to go.
+  const click = async (action, data) => {
+    let w;
+    handlers.notificationclick({ action, notification: { close() {}, data }, waitUntil: (p) => (w = p) });
+    await w;
+  };
+  wins = [{ ...visible, visibilityState: 'hidden' }];
+  await click('', { url: '/map?open=review:9', actions: note.actions });
+  assert.deepEqual(posted.at(-1), { type: 'push-open', url: 'https://mapsbyfuta.xyz/map?open=review:9' });
+
+  // "Not now" just closes; no app open → opens a window.
+  const before = posted.length;
+  handlers.notificationclick({ action: 'later', notification: { close() {}, data: { url: '/map', actions: note.actions } }, waitUntil: () => {} });
+  assert.equal(posted.length, before);
+  wins = [];
+  await click('rate', { url: '/map', actions: note.actions });
+  assert.deepEqual(posted.at(-1), ['open', 'https://mapsbyfuta.xyz/map?open=review:9']);
+  console.log('ok 11: push shows, defers to an open page, and taps open the right place');
+}
