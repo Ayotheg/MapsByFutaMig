@@ -7,6 +7,8 @@ other apps (delivery, lodging, campus guides, student tools).
 - Auth: send your key in the `x-api-key` header on every request.
 - Format: JSON. Read-only: `GET` only.
 - Call it from your server. A key placed in a mobile app or web page can be copied.
+- Interactive Swagger UI: `https://mapsbyfuta.xyz/api-docs`. The OpenAPI document
+  is available at `https://mapsbyfuta.xyz/openapi.json`.
 
 ```bash
 curl https://mapsbyfuta.xyz/api/v1/places?limit=5 \

@@ -299,7 +299,7 @@
   padding: 6px 4px;
   border: none;
   background: none;
-  color: var(--v2-text-muted);
+  color: var(--v2-error-text);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 600;
