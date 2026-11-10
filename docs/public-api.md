@@ -245,6 +245,11 @@ add it to the view **and** to `PLACE_COLUMNS` / `toPlace()` in
   make a key (shown once), see credits and the last 14 days of calls, roll a
   leaked key (same plan and credits, old one stops at once), revoke a key, and
   ask for an upgrade or one-off credits.
+- **`/developers/docs`** (`DocsPage.jsx`): the full public reference for
+  developers. Its examples live in `docsSamples.js` and are checked against
+  the real API code by `scripts/docsSamples.test.mjs`, so a change to the API
+  that isn't reflected in the docs fails `npm test`. Prices on it come from
+  the live price list.
 - **Admin panel → API tab** (`src/features/admin/ApiTab.jsx`): open requests
   ("Upgrade + close" / "Grant + close" once payment has arrived), and every
   key with grant, change plan and revoke.

@@ -149,6 +149,14 @@
   background: var(--v2-nav-active-accent);
   color: var(--v2-neutral);
 }
+.heroPillLink {
+  background: var(--v2-on-primary);
+  color: var(--v2-primary);
+  text-decoration: none;
+}
+.heroPillLink:hover {
+  background: var(--v2-primary-tint);
+}
 
 /* ── Layout ───────────────────────────────────────────────────────── */
 .layout {
@@ -323,6 +331,7 @@
 }
 .smallBtn {
   flex-shrink: 0;
+  text-decoration: none;
   min-height: 36px;
   padding: 0 14px;
   border: none;
@@ -1069,7 +1078,14 @@
 /* ── Code ─────────────────────────────────────────────────────────── */
 /* A bar above the code holds the copy button, so long lines can scroll
    sideways without running under it. */
+.codeTabs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
 .codeWrap {
+  min-width: 0;
   overflow: hidden;
   border-radius: 16px;
   background: var(--v2-neutral);

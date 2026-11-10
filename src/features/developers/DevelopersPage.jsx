@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -19,6 +19,8 @@ import {
 import { useSeo } from '../../lib/useSeo';
 import { useAuth, friendlyError } from '../auth/useAuth';
 import DevKeyCard from './DevKeyCard';
+import { CodeTabs } from './DevCode';
+import { useCopy } from './useCopy';
 import { createKey, fetchOverview, fetchPricing } from './developerApi';
 import {
   API_BASE_URL,
@@ -95,6 +97,9 @@ export default function DevelopersPage() {
             </span>
             <span className={styles.heroPill}>REST · JSON</span>
             <span className={styles.heroPill}>Read-only</span>
+            <Link to="/developers/docs" className={`${styles.heroPill} ${styles.heroPillLink}`}>
+              Read the docs →
+            </Link>
           </div>
         </div>
       </header>
@@ -402,46 +407,7 @@ function SecretReveal({ secret, onDone }) {
   );
 }
 
-function useCopy() {
-  return useCallback(async (text) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-}
-
-function CodeBlock({ code, label }) {
-  const [copied, setCopied] = useState(false);
-  const copy = useCopy();
-  return (
-    <div className={styles.codeWrap}>
-      <div className={styles.codeBar}>
-        <span className={styles.codeLabel}>{label}</span>
-        <button
-          type="button"
-          className={styles.codeCopy}
-          onClick={async () => {
-            const ok = await copy(code);
-            setCopied(ok);
-            if (ok) setTimeout(() => setCopied(false), 1600);
-          }}
-        >
-          {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
-      <pre className={styles.code}>
-        <code>{code}</code>
-      </pre>
-    </div>
-  );
-}
-
 function QuickStart() {
-  const [lang, setLang] = useState('curl');
   return (
     <section className={styles.card}>
       <SectionHead
@@ -449,24 +415,12 @@ function QuickStart() {
         title="Quick start"
         subtitle="Send your key in the x-api-key header. Every answer is JSON."
       />
-      <div className={styles.segmented} role="tablist" aria-label="Language">
-        {[
-          ['curl', 'curl'],
-          ['js', 'JavaScript'],
-        ].map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={lang === id}
-            className={`${styles.segment} ${lang === id ? styles.segmentActive : ''}`}
-            onClick={() => setLang(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {lang === 'curl' ? <CodeBlock code={sampleCurl()} label="Terminal" /> : <CodeBlock code={sampleJs()} label="Node.js 18+" />}
+      <CodeTabs
+        samples={[
+          { id: 'curl', label: 'curl', blockLabel: 'Terminal', code: sampleCurl() },
+          { id: 'js', label: 'JavaScript', blockLabel: 'Node.js 18+', code: sampleJs() },
+        ]}
+      />
       <p className={styles.helper}>
         Success looks like <code className={styles.inlineCode}>{'{ data, meta: { credits_charged, credits_remaining, rate_limit_remaining } }'}</code>
         . Errors look like <code className={styles.inlineCode}>{'{ error: { code, message } }'}</code>.
@@ -479,7 +433,16 @@ function Reference({ costs }) {
   const [open, setOpen] = useState(null);
   return (
     <section className={styles.card} id="reference">
-      <SectionHead icon={<BookOpen size={18} />} title="Endpoints" subtitle={`Base URL ${API_BASE_URL}`} />
+      <SectionHead
+        icon={<BookOpen size={18} />}
+        title="Endpoints"
+        subtitle={`Base URL ${API_BASE_URL}`}
+        action={
+          <Link to="/developers/docs" className={styles.smallBtn}>
+            Full docs
+          </Link>
+        }
+      />
       <ul className={styles.endpointList}>
         {ENDPOINTS.map((ep) => {
           const cost = costFor(costs, ep.pattern);

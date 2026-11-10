@@ -16,6 +16,7 @@ import { useTawkOnRoutes } from './lib/tawk'
 
 const EventListingPage = lazy(() => import('./features/events/EventListingPage'))
 const DevelopersPage = lazy(() => import('./features/developers/DevelopersPage'))
+const DocsPage = lazy(() => import('./features/developers/DocsPage'))
 
 // React Router doesn't reset scroll position on navigation by default —
 // without this, clicking e.g. the footer's "Privacy Policy" link (or any
@@ -112,6 +113,15 @@ function App() {
           element={
             <Suspense fallback={null}>
               <DevelopersPage />
+            </Suspense>
+          }
+        />
+        {/* Full API reference for developers using the Public API. */}
+        <Route
+          path="/developers/docs"
+          element={
+            <Suspense fallback={null}>
+              <DocsPage />
             </Suspense>
           }
         />
