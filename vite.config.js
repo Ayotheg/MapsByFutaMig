@@ -33,6 +33,9 @@ export default defineConfig(({ mode }) => {
   // whole IMAGE_PROXY_ prefix, so a future ImageKit secret can't leak in.
   const env = loadEnv(mode, process.cwd(), '')
   const imageProxyUrl = env.IMAGE_PROXY_URL || env.VITE_IMAGE_PROXY_URL || ''
+  // Push: only the PUBLIC VAPID key reaches the app (VAPID_PUBLIC_KEY or
+  // VITE_VAPID_PUBLIC_KEY). VAPID_PRIVATE_KEY is never read here.
+  const vapidPublicKey = env.VITE_VAPID_PUBLIC_KEY || env.VAPID_PUBLIC_KEY || ''
   return {
   plugins: [react(),
     tailwindcss()],
@@ -40,6 +43,7 @@ export default defineConfig(({ mode }) => {
   envPrefix: ['VITE_', 'POSTHOG_'],
   define: {
     'import.meta.env.IMAGE_PROXY_URL': JSON.stringify(imageProxyUrl),
+    'import.meta.env.VITE_VAPID_PUBLIC_KEY': JSON.stringify(vapidPublicKey),
   },
   build: {
     rolldownOptions: {
