@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertCircle, ChartColumn, Coins, KeyRound, Loader2, RotateCw, Trash2, X } from 'lucide-react';
+import { AlertCircle, ChartColumn, Coins, Loader2, RotateCw, Trash2, X } from 'lucide-react';
 import {
   NOTE_MAX,
   TOPUP_OPTIONS,
@@ -86,9 +86,6 @@ export default function DevKeyCard({ apiKey: k, plans, requests, email, onChange
     return (
       <article className={`${styles.keyCard} ${styles.keyCardRevoked}`}>
         <div className={styles.keyHead}>
-          <span className={`${styles.keyIcon} ${styles.keyIconMuted}`} aria-hidden="true">
-            <KeyRound size={18} />
-          </span>
           <div className={styles.keyTitleBlock}>
             <h3 className={styles.keyName}>{k.name}</h3>
             <code className={styles.keyPrefix}>{maskedPrefix(k.prefix)}</code>
@@ -105,9 +102,6 @@ export default function DevKeyCard({ apiKey: k, plans, requests, email, onChange
   return (
     <article className={styles.keyCard}>
       <div className={styles.keyHead}>
-        <span className={styles.keyIcon} aria-hidden="true">
-          <KeyRound size={18} />
-        </span>
         <div className={styles.keyTitleBlock}>
           <h3 className={styles.keyName}>{k.name}</h3>
           <code className={styles.keyPrefix}>{maskedPrefix(k.prefix)}</code>

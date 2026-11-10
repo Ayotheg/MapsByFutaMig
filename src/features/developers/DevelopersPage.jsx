@@ -1,25 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  AlertCircle,
-  ArrowLeft,
-  BookOpen,
-  Braces,
-  Check,
-  ChevronDown,
-  Copy,
-  KeyRound,
-  Loader2,
-  LogIn,
-  Plus,
-  ShieldCheck,
-  Terminal,
-  TriangleAlert,
-} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertCircle, ArrowRight, Check, ChevronDown, Copy, KeyRound, Loader2, LogIn, Plus, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { useSeo } from '../../lib/useSeo';
+import { CONTACT_EMAIL } from '../../lib/contactInfo';
 import { useAuth, friendlyError } from '../auth/useAuth';
 import DevKeyCard from './DevKeyCard';
-import { CodeTabs } from './DevCode';
+import DevTopBar from './DevTopBar';
+import { CodeBlock, CodeTabs } from './DevCode';
 import { useCopy } from './useCopy';
 import { createKey, fetchOverview, fetchPricing } from './developerApi';
 import {
@@ -41,16 +28,26 @@ import styles from './DevelopersPage.module.css';
 // Only mounts when a signed-out person asks for a key.
 const AuthModal = lazy(() => import('../auth/AuthModal'));
 
+// What a successful call sends back, trimmed to fit beside the hero.
+const SAMPLE_RESPONSE = JSON.stringify(
+  {
+    data: [{ id: '00a4f5d3-6e65…', name: 'Tosmof Villa', type: 'hostel', area: 'South Gate', lat: 7.288927, lng: 5.147786 }],
+    meta: { credits_charged: 1, credits_remaining: 999 },
+  },
+  null,
+  2
+);
+
 /**
- * /developers — the Public API's home: what it offers and costs, a quick
- * start and reference, and, once signed in, the developer's own keys.
- * Same look as /event (violet hero, white step cards, Satoshi titles,
- * Manrope numbers). Data comes from supabase/public_api_dashboard.sql;
- * the API itself is supabase/functions/public-api (docs/public-api.md).
+ * /developers — the Public API's home: what it offers and costs, the
+ * developer's own keys once signed in, the endpoints, plans and errors.
+ * A white, quiet page: Satoshi titles, Inter text, Manrope numbers, with
+ * each section's title in a left column at 960px+. Data comes from
+ * supabase/public_api_dashboard.sql; the API itself is
+ * supabase/functions/public-api (docs/public-api.md).
  */
 export default function DevelopersPage() {
   useSeo({ title: 'Developers – Maps By FUTA API' });
-  const navigate = useNavigate();
   const auth = useAuth();
   const [pricing, setPricing] = useState(FALLBACK_PRICING);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -68,64 +65,95 @@ export default function DevelopersPage() {
   }, []);
 
   const free = pricing.plans.find((p) => p.id === 'free');
+  const photoCost = costFor(pricing.costs, 'GET /v1/places/:id/images') ?? 5;
 
   return (
     <div className={styles.page}>
-      <header className={styles.hero}>
-        <span className={styles.heroCircle} aria-hidden="true" />
-        <span className={styles.heroCircleLow} aria-hidden="true" />
-        <svg className={styles.heroPath} viewBox="0 0 200 420" fill="none" aria-hidden="true">
-          <path d="M150 40 C 175 120, 170 230, 120 300 S 40 400, 10 415" />
-        </svg>
-        <Braces className={styles.heroMark} size={40} strokeWidth={2.25} aria-hidden="true" />
+      <DevTopBar current="overview" />
 
-        <div className={styles.heroInner}>
-          <div className={styles.topBar}>
-            <button type="button" className={styles.backBtn} onClick={() => navigate(-1)} aria-label="Go back">
-              <ArrowLeft size={20} />
-            </button>
-            <span className={styles.heroTag}>Maps By FUTA API</span>
-          </div>
-          <h1 className={styles.title}>Build on the campus map</h1>
+      <header className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <span className={styles.eyebrow}>
+            <span className={styles.eyebrowDot} aria-hidden="true" />
+            Public API · v1
+          </span>
+          <h1 className={styles.title}>Build on the campus map.</h1>
           <p className={styles.heroLead}>
-            Places, categories and photos of FUTA, mapped by students. One key, simple JSON, pay only for calls that
+            Places, categories and photos of FUTA, mapped by students. One key, simple JSON, and you only pay for calls that
             return data.
           </p>
-          <div className={styles.pills}>
-            <span className={`${styles.heroPill} ${styles.heroPillMint}`}>
-              {free ? `${formatNumber(free.monthly_credits)} free credits a month` : 'Free plan'}
-            </span>
-            <span className={styles.heroPill}>REST · JSON</span>
-            <span className={styles.heroPill}>Read-only</span>
-            <Link to="/developers/docs" className={`${styles.heroPill} ${styles.heroPillLink}`}>
-              Read the docs →
+          <div className={styles.heroActions}>
+            <a href="#keys" className={styles.primaryBtn}>
+              <KeyRound size={16} aria-hidden="true" />
+              {auth.user ? 'Manage your keys' : 'Get your API key'}
+            </a>
+            <Link to="/developers/docs" className={styles.outlineBtn}>
+              Read the docs
+              <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
+          <p className={styles.heroNote}>
+            {free ? `${formatNumber(free.monthly_credits)} free credits every month.` : 'Free to start.'} No card needed.
+          </p>
+        </div>
+
+        <div className={styles.heroCode}>
+          <CodeTabs
+            samples={[
+              { id: 'curl', label: 'curl', code: sampleCurl() },
+              { id: 'js', label: 'JavaScript', code: sampleJs() },
+            ]}
+          />
+          <CodeBlock code={SAMPLE_RESPONSE} label="200 OK" />
         </div>
       </header>
 
-      <div className={styles.layout}>
-        <main className={styles.mainCol}>
+      <dl className={styles.facts}>
+        <Fact value={free ? formatNumber(free.monthly_credits) : 'Free'} label="free credits a month" />
+        <Fact value={String(ENDPOINTS.length)} label="read-only endpoints" />
+        <Fact value="1" label={`credit a call, ${photoCost} for photos`} />
+        <Fact value="0" label="charged for errors" />
+      </dl>
+
+      <main className={styles.main}>
+        <Section
+          id="keys"
+          title={auth.user ? 'Your keys' : 'Get your API key'}
+          lead={
+            auth.user
+              ? 'Credits, usage and the things you can do with each key.'
+              : 'Sign in, name a key after your app and start calling the API.'
+          }
+        >
           {auth.loading ? (
-            <section className={styles.card}>
-              <p className={styles.muted}>
-                <Loader2 size={15} className={styles.spinner} aria-hidden="true" /> Checking your account…
-              </p>
-            </section>
+            <p className={styles.muted}>
+              <Loader2 size={15} className={styles.spinner} aria-hidden="true" /> Checking your account…
+            </p>
           ) : auth.user ? (
             <KeysSection user={auth.user} pricing={pricing} />
           ) : (
             <SignInCard free={free} onSignIn={() => setAuthModalOpen(true)} />
           )}
+        </Section>
 
-          <QuickStart />
-          <Reference costs={pricing.costs} />
-        </main>
+        <Reference costs={pricing.costs} />
+        <Plans plans={pricing.plans} photoCost={photoCost} />
+        <Errors />
 
-        <aside className={styles.sideCol}>
-          <PlansCard plans={pricing.plans} />
-        </aside>
-      </div>
+        <section className={styles.closing}>
+          <div>
+            <h2 className={styles.closingTitle}>Everything else is in the docs.</h2>
+            <p className={styles.closingText}>
+              Every endpoint with examples in curl, JavaScript and Python, the objects, recipes and best practices. Stuck?{' '}
+              <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+            </p>
+          </div>
+          <Link to="/developers/docs" className={styles.inkBtn}>
+            Read the docs
+            <ArrowRight size={16} aria-hidden="true" />
+          </Link>
+        </section>
+      </main>
 
       {authModalOpen && (
         <Suspense fallback={null}>
@@ -150,25 +178,34 @@ export default function DevelopersPage() {
   );
 }
 
-function SectionHead({ icon, title, subtitle, action }) {
+function Fact({ value, label }) {
   return (
-    <div className={styles.sectionHead}>
-      <span className={styles.sectionIcon} aria-hidden="true">
-        {icon}
-      </span>
-      <div className={styles.sectionText}>
-        <h2 className={styles.sectionTitle}>{title}</h2>
-        {subtitle && <p className={styles.sectionSub}>{subtitle}</p>}
-      </div>
-      {action}
+    <div className={styles.fact}>
+      <dt className={styles.factLabel}>{label}</dt>
+      <dd className={styles.factValue}>{value}</dd>
     </div>
+  );
+}
+
+/** A page section: title and lead on the left at 960px+, content beside it. */
+function Section({ id, title, lead, action, children }) {
+  return (
+    <section id={id} className={styles.section} aria-labelledby={`${id}-title`}>
+      <div className={styles.sectionHead}>
+        <h2 id={`${id}-title`} className={styles.sectionTitle}>
+          {title}
+        </h2>
+        {lead && <p className={styles.sectionLead}>{lead}</p>}
+        {action}
+      </div>
+      <div className={styles.sectionBody}>{children}</div>
+    </section>
   );
 }
 
 function SignInCard({ free, onSignIn }) {
   return (
-    <section className={styles.card}>
-      <SectionHead icon={<KeyRound size={18} />} title="Get your API key" subtitle="Free to start. No card needed." />
+    <div className={styles.signIn}>
       <ul className={styles.ticks}>
         <li>
           <Check size={16} aria-hidden="true" />
@@ -183,11 +220,11 @@ function SignInCard({ free, onSignIn }) {
           See your credits and every call here
         </li>
       </ul>
-      <button type="button" className={`${styles.primaryBtn} ${styles.primaryBtnWide}`} onClick={onSignIn}>
-        <LogIn size={17} aria-hidden="true" />
+      <button type="button" className={styles.primaryBtn} onClick={onSignIn}>
+        <LogIn size={16} aria-hidden="true" />
         Sign in to get a key
       </button>
-    </section>
+    </div>
   );
 }
 
@@ -257,13 +294,13 @@ function KeysSection({ user, pricing }) {
   );
 
   return (
-    <section className={styles.card}>
-      <SectionHead
-        icon={<KeyRound size={18} />}
-        title="Your keys"
-        subtitle={`Signed in as ${user.email || 'you'}`}
-        action={newKeyButton}
-      />
+    <div className={styles.keysBlock}>
+      <div className={styles.keysBar}>
+        <p className={styles.keysAccount}>
+          Signed in as <b>{user.email || 'you'}</b>
+        </p>
+        {newKeyButton}
+      </div>
 
       {overview.status === 'ready' && keys.length > 0 && !creating && !gate.allowed && (
         <p className={styles.helper}>{gate.reason}</p>
@@ -289,7 +326,7 @@ function KeysSection({ user, pricing }) {
       {overview.status === 'ready' && (creating || (keys.length === 0 && !secret)) && (
         <form className={styles.newKeyForm} onSubmit={handleCreate}>
           {keys.length === 0 && (
-            <p className={styles.sectionLead}>Name your first key after the app it&apos;s for. You can make more later.</p>
+            <p className={styles.formLead}>Name your first key after the app it&apos;s for. You can make more later.</p>
           )}
           <label className={styles.field}>
             <span className={styles.label}>App or project name</span>
@@ -360,7 +397,7 @@ function KeysSection({ user, pricing }) {
           )}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -407,42 +444,29 @@ function SecretReveal({ secret, onDone }) {
   );
 }
 
-function QuickStart() {
-  return (
-    <section className={styles.card}>
-      <SectionHead
-        icon={<Terminal size={18} />}
-        title="Quick start"
-        subtitle="Send your key in the x-api-key header. Every answer is JSON."
-      />
-      <CodeTabs
-        samples={[
-          { id: 'curl', label: 'curl', blockLabel: 'Terminal', code: sampleCurl() },
-          { id: 'js', label: 'JavaScript', blockLabel: 'Node.js 18+', code: sampleJs() },
-        ]}
-      />
-      <p className={styles.helper}>
-        Success looks like <code className={styles.inlineCode}>{'{ data, meta: { credits_charged, credits_remaining, rate_limit_remaining } }'}</code>
-        . Errors look like <code className={styles.inlineCode}>{'{ error: { code, message } }'}</code>.
-      </p>
-    </section>
-  );
-}
-
 function Reference({ costs }) {
   const [open, setOpen] = useState(null);
   return (
-    <section className={styles.card} id="reference">
-      <SectionHead
-        icon={<BookOpen size={18} />}
-        title="Endpoints"
-        subtitle={`Base URL ${API_BASE_URL}`}
-        action={
-          <Link to="/developers/docs" className={styles.smallBtn}>
-            Full docs
-          </Link>
-        }
-      />
+    <Section
+      id="reference"
+      title="Endpoints"
+      lead={
+        <>
+          Six GET endpoints. Send your key in the <code className={styles.inlineCode}>x-api-key</code> header; every answer
+          is JSON.
+        </>
+      }
+      action={
+        <Link to="/developers/docs#endpoints" className={styles.textLink}>
+          Full reference
+          <ArrowRight size={15} aria-hidden="true" />
+        </Link>
+      }
+    >
+      <p className={styles.baseUrl}>
+        <span className={styles.baseUrlLabel}>Base URL</span>
+        <code>{API_BASE_URL}</code>
+      </p>
       <ul className={styles.endpointList}>
         {ENDPOINTS.map((ep) => {
           const cost = costFor(costs, ep.pattern);
@@ -459,12 +483,16 @@ function Reference({ costs }) {
               >
                 <span className={styles.method}>GET</span>
                 <code className={styles.endpointPath}>{ep.path}</code>
+                <span className={styles.endpointSummary}>{ep.summary}</span>
                 <span className={`${styles.costPill} ${cost === 0 ? styles.costFree : ''}`}>
                   {cost == null ? '–' : cost === 0 ? 'Free' : `${cost} credit${cost === 1 ? '' : 's'}`}
                 </span>
-                {expandable && <ChevronDown size={16} className={`${styles.endpointChevron} ${isOpen ? styles.chevronOpen : ''}`} aria-hidden="true" />}
+                <ChevronDown
+                  size={16}
+                  className={`${styles.endpointChevron} ${isOpen ? styles.chevronOpen : ''} ${expandable ? '' : styles.endpointChevronOff}`}
+                  aria-hidden="true"
+                />
               </button>
-              <p className={styles.endpointSummary}>{ep.summary}</p>
               {isOpen && (
                 <dl className={styles.params}>
                   {ep.params.map(([name, text]) => (
@@ -481,69 +509,70 @@ function Reference({ costs }) {
           );
         })}
       </ul>
-
-      <h3 className={styles.subTitle}>When you&apos;re charged</h3>
-      <p className={styles.bodyText}>
-        Only for calls that succeed and return data. An empty list from a valid search counts; a 404, a bad parameter, a
-        rate-limited call or our own error never does.
+      <p className={styles.helper}>
+        Success looks like{' '}
+        <code className={styles.inlineCode}>{'{ data, meta: { credits_charged, credits_remaining, rate_limit_remaining } }'}</code>.
+        Errors look like <code className={styles.inlineCode}>{'{ error: { code, message } }'}</code>.
       </p>
+    </Section>
+  );
+}
 
-      <h3 className={styles.subTitle}>Errors</h3>
+function Plans({ plans, photoCost }) {
+  return (
+    <Section
+      id="pricing"
+      title="Plans"
+      lead={`1 credit is 1 call. Photos cost ${photoCost}. You are only charged for calls that succeed and return data.`}
+    >
+      <ul className={styles.planList}>
+        {plans.map((p) => (
+          <li key={p.id} className={styles.plan}>
+            <span className={styles.planName}>{p.name}</span>
+            <span className={styles.planPrice}>
+              {formatNaira(p.price_ngn)}
+              {Number(p.price_ngn) > 0 && <span className={styles.planPer}>/month</span>}
+            </span>
+            <dl className={styles.planMeta}>
+              <div>
+                <dt>Credits a month</dt>
+                <dd>{formatNumber(p.monthly_credits)}</dd>
+              </div>
+              <div>
+                <dt>Calls a minute</dt>
+                <dd>{p.rate_limit}</dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+      <p className={styles.helper}>
+        Every key starts on Free. Need more? Open <b>More credits</b> on a key. One-off credits never expire.
+      </p>
+    </Section>
+  );
+}
+
+function Errors() {
+  return (
+    <Section id="errors" title="Errors and limits" lead="Errors are never charged. An empty list from a valid search is a success, so it counts.">
       <dl className={styles.errorTable}>
         {ERROR_CODES.map(([http, code, meaning]) => (
           <div key={http} className={styles.errorRow}>
             <dt className={styles.errorHttp}>{http}</dt>
             <dd>
-              <code className={styles.inlineCode}>{code}</code>
+              <code className={styles.errorCode}>{code}</code>
               <span className={styles.errorMeaning}>{meaning}</span>
             </dd>
           </div>
         ))}
       </dl>
-
       <h3 className={styles.subTitle}>Rate limits</h3>
       <p className={styles.bodyText}>
         Per key, per clock minute, set by your plan. Responses carry <code className={styles.inlineCode}>X-RateLimit-Limit</code>{' '}
         and <code className={styles.inlineCode}>X-RateLimit-Remaining</code>; a 429 adds{' '}
         <code className={styles.inlineCode}>Retry-After</code> in seconds.
       </p>
-    </section>
-  );
-}
-
-function PlansCard({ plans }) {
-  return (
-    <section className={styles.plansCard}>
-      <div className={styles.plansBand}>
-        <span className={styles.bandRing} aria-hidden="true" />
-        <span className={styles.bandRingSmall} aria-hidden="true" />
-        <span className={styles.overline}>Plans</span>
-        <span className={styles.plansLead}>1 credit = 1 call. Photos cost 5.</span>
-      </div>
-      <ul className={styles.planList}>
-        {plans.map((p) => (
-          <li key={p.id} className={styles.plan}>
-            <div className={styles.planTop}>
-              <span className={styles.planName}>{p.name}</span>
-              <span className={styles.planPrice}>
-                {formatNaira(p.price_ngn)}
-                {Number(p.price_ngn) > 0 && <span className={styles.planPer}>/mo</span>}
-              </span>
-            </div>
-            <div className={styles.planMeta}>
-              <span>
-                <b className={styles.num}>{formatNumber(p.monthly_credits)}</b> credits a month
-              </span>
-              <span>
-                <b className={styles.num}>{p.rate_limit}</b> calls a minute
-              </span>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <p className={styles.plansFoot}>
-        Every key starts on Free. Need more? Open <b>More credits</b> on a key. One-off credits never expire.
-      </p>
-    </section>
+    </Section>
   );
 }

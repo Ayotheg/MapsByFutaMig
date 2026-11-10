@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, Info, KeyRound, ShieldAlert, TriangleAlert } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { ArrowRight, ChevronDown, Info, KeyRound, Menu, ShieldAlert, X } from 'lucide-react';
 import { useSeo } from '../../lib/useSeo';
 import { CONTACT_EMAIL, WHATSAPP_CHAT_URL } from '../../lib/contactInfo';
 import { CodeBlock, CodeTabs } from './DevCode';
+import DevTopBar from './DevTopBar';
 import { fetchPricing } from './developerApi';
 import { API_BASE_URL, FALLBACK_PRICING, costFor, formatNaira, formatNumber } from './developerData';
 import { ENDPOINT_SAMPLES, ERROR_GUIDE, EXAMPLE_ERROR, RECIPES, json } from './docsSamples';
@@ -11,43 +12,65 @@ import dev from './DevelopersPage.module.css';
 import styles from './DocsPage.module.css';
 
 /**
- * /developers/docs — the Public API's full reference for developers using
- * it: getting started, auth, credits, limits, errors, every endpoint with
- * curl / JavaScript / Python examples, the objects, recipes and FAQ.
+ * /developers/docs — the Public API's full reference, in five parts:
+ * Getting started, Core concepts, API reference, Guides and Help. The same
+ * parts group the contents list (a sticky column at 1024px+, a menu on
+ * phones). Each endpoint puts its explanation beside its code at 1200px+.
  *
  * Examples live in docsSamples.js and are checked against the API's real
  * output by scripts/developerData.test.mjs. Prices come from the live price
  * list (api_pricing), so they never go stale.
  */
 
-const TOC = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'get-started', label: 'Get started' },
-  { id: 'authentication', label: 'Authentication' },
-  { id: 'requests', label: 'Requests and responses' },
-  { id: 'credits', label: 'Credits and plans' },
-  { id: 'rate-limits', label: 'Rate limits' },
-  { id: 'errors', label: 'Errors' },
+const GROUPS = [
   {
-    id: 'endpoints',
-    label: 'Endpoints',
-    children: [
-      { id: 'list-places', label: 'List places' },
-      { id: 'get-place', label: 'Get a place' },
-      { id: 'nearby-places', label: 'Places nearby' },
-      { id: 'categories', label: 'Categories' },
-      { id: 'place-photos', label: 'Place photos' },
-      { id: 'usage', label: 'Your usage' },
+    label: 'Getting started',
+    items: [
+      { id: 'overview', label: 'Overview' },
+      { id: 'get-started', label: 'Quickstart' },
+      { id: 'authentication', label: 'Authentication' },
     ],
   },
-  { id: 'objects', label: 'Objects' },
-  { id: 'recipes', label: 'Recipes' },
-  { id: 'best-practices', label: 'Best practices' },
-  { id: 'keys', label: 'Managing keys' },
-  { id: 'faq', label: 'FAQ and troubleshooting' },
-  { id: 'changelog', label: 'Changelog and support' },
+  {
+    label: 'Core concepts',
+    items: [
+      { id: 'requests', label: 'Requests and responses' },
+      { id: 'credits', label: 'Credits and plans' },
+      { id: 'rate-limits', label: 'Rate limits' },
+      { id: 'errors', label: 'Errors' },
+    ],
+  },
+  {
+    label: 'API reference',
+    items: [
+      { id: 'endpoints', label: 'Introduction' },
+      { id: 'list-places', label: 'List places', method: 'GET' },
+      { id: 'get-place', label: 'Get a place', method: 'GET' },
+      { id: 'nearby-places', label: 'Places nearby', method: 'GET' },
+      { id: 'categories', label: 'Categories', method: 'GET' },
+      { id: 'place-photos', label: 'Place photos', method: 'GET' },
+      { id: 'usage', label: 'Your usage', method: 'GET' },
+      { id: 'objects', label: 'Objects' },
+    ],
+  },
+  {
+    label: 'Guides',
+    items: [
+      { id: 'recipes', label: 'Recipes' },
+      { id: 'best-practices', label: 'Best practices' },
+      { id: 'keys', label: 'Managing keys' },
+    ],
+  },
+  {
+    label: 'Help',
+    items: [
+      { id: 'faq', label: 'FAQ and troubleshooting' },
+      { id: 'changelog', label: 'Changelog and support' },
+    ],
+  },
 ];
-const ALL_IDS = TOC.flatMap((t) => [t.id, ...(t.children || []).map((c) => c.id)]);
+const ALL_ITEMS = GROUPS.flatMap((g) => g.items);
+const ALL_IDS = ALL_ITEMS.map((t) => t.id);
 
 const LANGS = [
   { id: 'curl', label: 'curl', blockLabel: 'Terminal' },
@@ -57,7 +80,6 @@ const LANGS = [
 
 export default function DocsPage() {
   useSeo({ title: 'API documentation – Maps By FUTA' });
-  const navigate = useNavigate();
   const { hash } = useLocation();
   const [pricing, setPricing] = useState(FALLBACK_PRICING);
   const [lang, setLang] = useState('curl');
@@ -106,71 +128,41 @@ export default function DocsPage() {
     return LANGS.map((l) => ({ ...l, code: s[l.id] }));
   };
 
+  const activeLabel = ALL_ITEMS.find((t) => t.id === active)?.label;
+
   const toc = (
-    <nav aria-label="On this page">
-      <ul className={styles.tocList}>
-        {TOC.map((t) => (
-          <li key={t.id}>
-            <a
-              href={`#${t.id}`}
-              className={`${styles.tocLink} ${active === t.id ? styles.tocLinkActive : ''}`}
-              onClick={() => setTocOpen(false)}
-            >
-              {t.label}
-            </a>
-            {t.children && (
-              <ul className={styles.tocChildren}>
-                {t.children.map((c) => (
-                  <li key={c.id}>
-                    <a
-                      href={`#${c.id}`}
-                      className={`${styles.tocLink} ${styles.tocChild} ${active === c.id ? styles.tocLinkActive : ''}`}
-                      onClick={() => setTocOpen(false)}
-                    >
-                      {c.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
+    <nav aria-label="Documentation">
+      {GROUPS.map((g) => (
+        <div key={g.label} className={styles.tocGroup}>
+          <p className={styles.tocGroupLabel}>{g.label}</p>
+          <ul className={styles.tocList}>
+            {g.items.map((t) => (
+              <li key={t.id}>
+                <a
+                  href={`#${t.id}`}
+                  className={`${styles.tocLink} ${active === t.id ? styles.tocLinkActive : ''}`}
+                  aria-current={active === t.id ? 'location' : undefined}
+                  onClick={() => setTocOpen(false)}
+                >
+                  <span>{t.label}</span>
+                  {t.method && <span className={styles.tocMethod}>{t.method}</span>}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </nav>
   );
 
   return (
     <div className={styles.page}>
-      <header className={styles.hero}>
-        <span className={styles.heroCircle} aria-hidden="true" />
-        <div className={styles.heroInner}>
-          <div className={styles.topBar}>
-            <button type="button" className={dev.backBtn} onClick={() => navigate('/developers')} aria-label="Back to the developer page">
-              <ArrowLeft size={20} />
-            </button>
-            <span className={dev.heroTag}>Maps By FUTA API · v1</span>
-          </div>
-          <h1 className={styles.title}>API documentation</h1>
-          <p className={styles.lead}>
-            Everything you need to use FUTA&apos;s campus places, categories and photos in your app, from your first call to
-            running it in production.
-          </p>
-          <div className={styles.heroActions}>
-            <Link to="/developers" className={styles.heroBtn}>
-              <KeyRound size={16} aria-hidden="true" />
-              Get an API key
-            </Link>
-            <a href="#endpoints" className={`${styles.heroBtn} ${styles.heroBtnGhost}`}>
-              <BookOpen size={16} aria-hidden="true" />
-              Jump to endpoints
-            </a>
-          </div>
-        </div>
-      </header>
+      <DevTopBar current="docs" />
 
       <div className={styles.mobileToc}>
         <button type="button" className={styles.mobileTocBtn} aria-expanded={tocOpen} onClick={() => setTocOpen((v) => !v)}>
-          On this page
+          {tocOpen ? <X size={16} aria-hidden="true" /> : <Menu size={16} aria-hidden="true" />}
+          <span className={styles.mobileTocLabel}>{tocOpen ? 'Contents' : activeLabel || 'Contents'}</span>
           <ChevronDown size={16} className={tocOpen ? dev.chevronOpen : ''} aria-hidden="true" />
         </button>
         {tocOpen && <div className={styles.mobileTocPanel}>{toc}</div>}
@@ -180,8 +172,27 @@ export default function DocsPage() {
         <aside className={styles.sidebar}>{toc}</aside>
 
         <main className={styles.content}>
+          <header className={styles.intro}>
+            <span className={styles.introTag}>Documentation · v1</span>
+            <h1 className={styles.title}>Maps By FUTA API</h1>
+            <p className={styles.lead}>
+              Everything you need to use FUTA&apos;s campus places, categories and photos in your app, from your first call to
+              running it in production.
+            </p>
+            <div className={styles.introActions}>
+              <Link to="/developers" className={dev.primaryBtn}>
+                <KeyRound size={16} aria-hidden="true" />
+                Get an API key
+              </Link>
+              <a href="#endpoints" className={dev.outlineBtn}>
+                API reference
+                <ArrowRight size={16} aria-hidden="true" />
+              </a>
+            </div>
+          </header>
+
           {/* ── Overview ─────────────────────────────────────────────── */}
-          <Section id="overview" title="Overview">
+          <Section id="overview" title="Overview" group="Getting started">
             <P>
               The Maps By FUTA API gives your app read-only access to the places on our campus map of the Federal University
               of Technology, Akure: lecture halls, faculties, hostels and off-campus lodges, food spots, banks, clinics, gates,
@@ -199,7 +210,7 @@ export default function DocsPage() {
           </Section>
 
           {/* ── Get started ──────────────────────────────────────────── */}
-          <Section id="get-started" title="Get started">
+          <Section id="get-started" title="Quickstart">
             <Steps>
               <Step n="1" title="Get a key">
                 Go to the <Link to="/developers">developer page</Link>, sign in, name your key after your app and press
@@ -253,7 +264,7 @@ export default function DocsPage() {
           </Section>
 
           {/* ── Requests and responses ───────────────────────────────── */}
-          <Section id="requests" title="Requests and responses">
+          <Section id="requests" title="Requests and responses" group="Core concepts">
             <H3>Successful responses</H3>
             <P>
               Every success is HTTP <C>200</C> with the same shape: your results in <C>data</C> (an array or an object,
@@ -496,7 +507,7 @@ export default function DocsPage() {
           </Section>
 
           {/* ── Endpoints ────────────────────────────────────────────── */}
-          <Section id="endpoints" title="Endpoints">
+          <Section id="endpoints" title="Endpoints" group="API reference">
             <P>
               All paths are relative to <C>{API_BASE_URL}</C>. The language you pick applies to every example.
             </P>
@@ -729,7 +740,7 @@ export default function DocsPage() {
           </Section>
 
           {/* ── Recipes ──────────────────────────────────────────────── */}
-          <Section id="recipes" title="Recipes">
+          <Section id="recipes" title="Recipes" group="Guides">
             <P>Copy-paste starting points for the jobs most apps need.</P>
 
             <H3 id="recipe-paginate">Fetch every place</H3>
@@ -839,7 +850,7 @@ export default function DocsPage() {
           </Section>
 
           {/* ── FAQ ──────────────────────────────────────────────────── */}
-          <Section id="faq" title="FAQ and troubleshooting">
+          <Section id="faq" title="FAQ and troubleshooting" group="Help">
             <Faq q="I get 401 but my key looks right.">
               Check the header is called <C>x-api-key</C> (not <C>Authorization</C>), has no <C>Bearer</C> in front, and has
               no space or line break copied with the key. If you rolled the key, the old one no longer works.
@@ -913,9 +924,10 @@ export default function DocsPage() {
 
 // ── Building blocks ──────────────────────────────────────────────────────
 
-function Section({ id, title, children }) {
+function Section({ id, title, group, children }) {
   return (
-    <section id={id} className={styles.section} aria-labelledby={`${id}-title`}>
+    <section id={id} className={`${styles.section} ${group ? styles.sectionFirst : ''}`} aria-labelledby={`${id}-title`}>
+      {group && <p className={styles.groupLabel}>{group}</p>}
       <h2 id={`${id}-title`} className={styles.h2}>
         <a href={`#${id}`} className={styles.anchor}>
           {title}
@@ -1013,31 +1025,30 @@ function Endpoint({ id, title, path, cost, intro, params, samples, response, lan
   const responseCode = useMemo(() => json(response), [response]);
   return (
     <section id={id} className={`${styles.section} ${styles.endpoint}`} aria-labelledby={`${id}-title`}>
-      <h2 id={`${id}-title`} className={styles.h2}>
-        <a href={`#${id}`} className={styles.anchor}>
-          {title}
-        </a>
-      </h2>
-      <div className={styles.endpointLine}>
-        <span className={dev.method}>GET</span>
-        <code className={styles.endpointPath}>/v1{path}</code>
-        <span className={`${dev.costPill} ${cost === 0 ? dev.costFree : ''}`}>
-          {cost == null ? '–' : cost === 0 ? 'Free' : `${cost} credit${cost === 1 ? '' : 's'}`}
-        </span>
-      </div>
-      <P>{intro}</P>
+      <div className={styles.endpointText}>
+        <h2 id={`${id}-title`} className={styles.h2}>
+          <a href={`#${id}`} className={styles.anchor}>
+            {title}
+          </a>
+        </h2>
+        <div className={styles.endpointLine}>
+          <span className={dev.method}>GET</span>
+          <code className={styles.endpointPath}>/v1{path}</code>
+          <span className={`${dev.costPill} ${cost === 0 ? dev.costFree : ''}`}>
+            {cost == null ? '–' : cost === 0 ? 'Free' : `${cost} credit${cost === 1 ? '' : 's'}`}
+          </span>
+        </div>
+        <P>{intro}</P>
 
-      <H3>Parameters</H3>
-      {params.length === 0 ? (
-        <P>None.</P>
-      ) : (
-        <>
-          {/* Phones: one card per parameter; the 5-column table needs width. */}
-          <ul className={styles.paramCards}>
+        <H4>Parameters</H4>
+        {params.length === 0 ? (
+          <p className={styles.none}>This endpoint takes no parameters.</p>
+        ) : (
+          <ul className={styles.paramList}>
             {params.map(([name, type, req, def, rules]) => (
-              <li key={name} className={styles.paramCard}>
+              <li key={name} className={styles.paramItem}>
                 <div className={styles.paramTop}>
-                  <C>{name}</C>
+                  <code className={styles.paramName}>{name}</code>
                   <span className={styles.typeCell}>{type}</span>
                   <span className={`${styles.paramTag} ${req === 'Yes' ? styles.paramTagReq : ''}`}>
                     {req === 'Yes' ? 'Required' : 'Optional'}
@@ -1048,56 +1059,40 @@ function Endpoint({ id, title, path, cost, intro, params, samples, response, lan
               </li>
             ))}
           </ul>
-          <div className={`${styles.tableWrap} ${styles.paramTable}`}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Required</th>
-                  <th>Default</th>
-                  <th>Rules</th>
-                </tr>
-              </thead>
-              <tbody>
-                {params.map(([name, type, req, def, rules]) => (
-                  <tr key={name}>
-                    <td>
-                      <C>{name}</C>
-                    </td>
-                    <td className={styles.typeCell}>{type}</td>
-                    <td>{req}</td>
-                    <td className={styles.num}>{def}</td>
-                    <td>{rules}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+        )}
 
-      <H3>Example request</H3>
-      <CodeTabs samples={samples} lang={lang} onLang={onLang} />
+        {extraFields && (
+          <>
+            <H4>Pagination fields</H4>
+            <FieldTable rows={extraFields} />
+          </>
+        )}
 
-      <H3>Example response</H3>
-      <CodeBlock code={responseCode} label="200 OK" />
-      {extraFields && <FieldTable rows={extraFields} />}
+        <H4>Notes</H4>
+        <ul className={styles.list}>
+          {notes.map((n, i) => (
+            <li key={i}>{n}</li>
+          ))}
+        </ul>
 
-      <H3>Notes</H3>
-      <ul className={styles.list}>
-        {notes.map((n, i) => (
-          <li key={i}>{n}</li>
-        ))}
-      </ul>
-      <p className={styles.errorsLine}>
-        <TriangleAlert size={15} aria-hidden="true" />
-        <span>
-          <b>Errors:</b> {errors} Plus the <a href="#errors">common errors</a>.
-        </span>
-      </p>
+        <H4>Errors</H4>
+        <p className={styles.p}>
+          {errors} Plus the <a href="#errors">common errors</a>.
+        </p>
+      </div>
+
+      <div className={styles.endpointCode}>
+        <p className={styles.codeCaption}>Request</p>
+        <CodeTabs samples={samples} lang={lang} onLang={onLang} />
+        <p className={styles.codeCaption}>Response</p>
+        <CodeBlock code={responseCode} label="200 OK" />
+      </div>
     </section>
   );
+}
+
+function H4({ children }) {
+  return <h3 className={styles.h4}>{children}</h3>;
 }
 
 function Faq({ q, children }) {
