@@ -1,7 +1,7 @@
 # Maps By FUTA
 
 Campus map + walking navigation for FUTA (Akure). Live at mapsbyfuta.xyz (Vercel).
-Product details: `docs/about.md`. Payments: `docs/payments.md`.
+Product details: `docs/about.md`. Payments: `docs/payments.md`. Public API: `docs/public-api.md`.
 
 ## Stack
 React 19 + Vite 8, plain JSX (no TypeScript), React Router 7, raw Leaflet (no react-leaflet),

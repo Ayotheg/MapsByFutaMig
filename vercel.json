@@ -8,6 +8,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "https://vzjlarvtssybglwzfrhi.supabase.co/functions/v1/public-api/v1/:path*"
+    },
     { "source": "/", "destination": "/index.html" },
     { "source": "/((?!assets/).*)", "destination": "/app.html" }
   ],
