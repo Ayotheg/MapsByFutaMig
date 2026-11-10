@@ -119,6 +119,26 @@ export default function NotifyTab() {
     }
   }
 
+  // This Sunday's round-up, now, to every admin's devices (phones included),
+  // exactly as everyone will get it. Save changes first so they're in it.
+  async function sendPreview() {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const { data: admins, error: e } = await supabase.rpc('send_digest_preview');
+      if (e) throw e;
+      track('push_preview_sent', { admins });
+      setNotice(
+        `Preview sent to ${admins} admin${admins === 1 ? '' : 's'}. It arrives within a minute on every device where they turned notifications on.`
+      );
+    } catch (e) {
+      setError(e.message || 'Could not send the preview.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function sendTest() {
     setBusy(true);
     setError(null);
@@ -168,6 +188,13 @@ export default function NotifyTab() {
             <div className={styles.itemMeta}>
               {newPlaces.length} new place{newPlaces.length === 1 ? '' : 's'} · {eventCount} event{eventCount === 1 ? '' : 's'} in the next 7 days
             </div>
+            {preview && (
+              <div className={styles.formActions} style={{ justifyContent: 'flex-start' }}>
+                <button type="button" className={styles.formSave} onClick={sendPreview} disabled={busy}>
+                  Send preview to admins
+                </button>
+              </div>
+            )}
           </div>
 
           <div className={styles.inlineForm} style={{ margin: 0 }}>

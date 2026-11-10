@@ -14,6 +14,7 @@
 --       build_weekly_digest()    — pg_cron, Sundays 18:00 Lagos
 --       queue_admin_summary()    — pg_cron, daily 08:00 Lagos
 --       send_test_push()         — admin, from the Notify tab
+--       send_digest_preview()    — admin: this Sunday's round-up, to admins only
 --   • Every minute pg_cron calls kick_push_sender(), which wakes the
 --     send-push Edge Function only when something is due. That function
 --     applies quiet hours and each person's switches, then sends.
@@ -161,7 +162,7 @@ create trigger waypoints_stamp_approved_at
 create table if not exists public.push_queue (
   id          bigint generated always as identity primary key,
   user_id     uuid not null references auth.users(id) on delete cascade,
-  kind        text not null check (kind in ('review', 'weekly', 'admin', 'test')),
+  kind        text not null check (kind in ('review', 'weekly', 'admin', 'test', 'preview')),
   title       text not null,
   body        text,
   url         text,
@@ -178,6 +179,10 @@ create table if not exists public.push_queue (
   created_at  timestamptz not null default now(),
   dedupe_key  text unique
 );
+-- Tables made before the admin preview existed: allow its kind too.
+alter table public.push_queue drop constraint if exists push_queue_kind_check;
+alter table public.push_queue add constraint push_queue_kind_check
+  check (kind in ('review', 'weekly', 'admin', 'test', 'preview'));
 create index if not exists push_queue_due_idx on public.push_queue(send_after) where status = 'pending';
 create index if not exists push_queue_user_kind_idx on public.push_queue(user_id, kind, sent_at desc);
 alter table public.push_queue enable row level security;
@@ -341,14 +346,18 @@ $$;
 revoke all on function public.weekly_new_places() from public, anon;
 grant execute on function public.weekly_new_places() to authenticated;
 
-create or replace function public.build_weekly_digest()
-returns integer
+-- The round-up's words and picture for the Sunday `p_week`, or null in a
+-- quiet week. Shared by the real send and the admins' preview, so the
+-- preview is exactly what everyone gets. Mirrored for the Notify tab's
+-- on-screen preview in src/features/notifications/weekly.js.
+create or replace function public.compose_weekly_digest(p_week date)
+returns jsonb
 language plpgsql
+stable
 security definer
 set search_path = ''
 as $$
 declare
-  v_today   date := (now() at time zone 'Africa/Lagos')::date;
   v_places  integer;
   v_events  integer;
   v_ann     public.push_announcements%rowtype;
@@ -358,16 +367,15 @@ declare
   v_url     text := '/map?open=explore';
   v_image   text;
   v_parts   text[] := '{}';
-  n         integer;
 begin
   select count(*) into v_places from public.weekly_new_places();
   select count(*) into v_events from public.events
    where status = 'approved' and starts_at >= now() and starts_at < now() + interval '7 days';
   select * into v_ann from public.push_announcements
-   where send_week = v_today and sent_at is null limit 1;
+   where send_week = p_week and sent_at is null limit 1;
 
   if v_places = 0 and v_events = 0 and v_ann.title is null then
-    return 0; -- quiet week: nothing goes out
+    return null; -- quiet week: nothing goes out
   end if;
 
   if v_places > 0 then
@@ -414,11 +422,34 @@ begin
    order by (i.waypoint_id = v_ann.lead_waypoint_id) desc nulls last, p.live_at desc nulls last, i.position
    limit 1;
 
+  return jsonb_build_object(
+    'title', v_title, 'body', v_body, 'url', v_url, 'image_path', v_image,
+    'announcement_id', v_ann.id,
+    'actions', jsonb_build_array(
+      jsonb_build_object('action', 'see', 'title', 'See the week', 'url', v_url),
+      jsonb_build_object('action', 'map', 'title', 'Open map', 'url', '/map')));
+end;
+$$;
+revoke all on function public.compose_weekly_digest(date) from public, anon, authenticated;
+
+create or replace function public.build_weekly_digest()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_today date := (now() at time zone 'Africa/Lagos')::date;
+  d       jsonb;
+  n       integer;
+begin
+  d := public.compose_weekly_digest(v_today);
+  if d is null then
+    return 0;
+  end if;
+
   insert into public.push_queue (user_id, kind, title, body, url, image_path, tag, actions, dedupe_key)
-  select s.user_id, 'weekly', v_title, v_body, v_url, v_image, 'weekly',
-         jsonb_build_array(
-           jsonb_build_object('action', 'see', 'title', 'See the week', 'url', v_url),
-           jsonb_build_object('action', 'map', 'title', 'Open map', 'url', '/map')),
+  select s.user_id, 'weekly', d->>'title', d->>'body', d->>'url', d->>'image_path', 'weekly', d->'actions',
          'weekly:' || s.user_id || ':' || v_today
     from (select distinct user_id from public.push_subscriptions) s
     join public.profiles pr on pr.id = s.user_id
@@ -426,13 +457,56 @@ begin
   on conflict (dedupe_key) do nothing;
   get diagnostics n = row_count;
 
-  if v_ann.id is not null then
-    update public.push_announcements set sent_at = now() where id = v_ann.id;
+  if d->>'announcement_id' is not null then
+    update public.push_announcements set sent_at = now() where id = (d->>'announcement_id')::bigint;
   end if;
   return n;
 end;
 $$;
 revoke all on function public.build_weekly_digest() from public, anon, authenticated;
+
+-- "Send preview to admins" (Notify tab): this Sunday's round-up, now, to
+-- every admin's devices, exactly as everyone will get it. Doesn't mark the
+-- announcement sent and ignores quiet hours. Returns how many admins.
+create or replace function public.send_digest_preview()
+returns integer
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_now  timestamp := now() at time zone 'Africa/Lagos';
+  v_add  integer;
+  d      jsonb;
+  n      integer;
+begin
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_admin) then
+    raise exception 'Admins only';
+  end if;
+  -- The Sunday the next round-up goes out (after 6 pm Sunday: next week's).
+  v_add := (7 - extract(dow from v_now)::integer) % 7;
+  if v_add = 0 and extract(hour from v_now) >= 18 then
+    v_add := 7;
+  end if;
+
+  d := public.compose_weekly_digest(v_now::date + v_add);
+  if d is null then
+    raise exception 'Nothing to send yet: no new places, events or announcement this week';
+  end if;
+
+  insert into public.push_queue (user_id, kind, title, body, url, image_path, tag, actions)
+  select pr.id, 'preview', d->>'title', d->>'body', d->>'url', d->>'image_path', 'weekly-preview', d->'actions'
+    from public.profiles pr
+   where pr.is_admin and public.has_push_device(pr.id);
+  get diagnostics n = row_count;
+  if n = 0 then
+    raise exception 'No admin has notifications turned on yet. Turn them on in your profile first';
+  end if;
+  return n;
+end;
+$$;
+revoke all on function public.send_digest_preview() from public, anon;
+grant execute on function public.send_digest_preview() to authenticated;
 
 
 -- ── 7. Admin morning summary ────────────────────────────────────────────

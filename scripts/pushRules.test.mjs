@@ -1,6 +1,6 @@
 // Run: node scripts/pushRules.test.mjs
 import assert from 'node:assert/strict';
-import { buildPayload, decide, inQuietHours, isApplePush, lagosHour } from '../supabase/functions/_shared/pushRules.js';
+import { buildPayload, decide, inQuietHours, isApplePush, lagosHour, urgencyFor } from '../supabase/functions/_shared/pushRules.js';
 
 const HOUR = 3600 * 1000;
 // 10 Nov 2026, 12:00 Lagos (11:00 UTC).
@@ -50,5 +50,17 @@ assert.equal(chrome.title, 'How was Campus Cuts?');
 assert.equal(chrome.icon, '/push/review.png');
 assert.equal(chrome.actions.length, 2);
 assert.equal(JSON.parse(buildPayload({ kind: 'weekly', title: 't' }, 'https://x.y/z')).url, '/map');
+
+// Admin preview: looks like the round-up, sent now, never switched off.
+const preview = { kind: 'preview', title: 'Your week on campus', created_at: iso(midnight) };
+assert.equal(decide(preview, { now: midnight, prefs: { weekly: false } }), 'send');
+assert.equal(JSON.parse(buildPayload(preview, 'https://fcm.googleapis.com/x')).icon, '/push/weekly.png');
+assert.equal(JSON.parse(buildPayload(preview, 'https://web.push.apple.com/x')).title, '📍 Your week on campus');
+
+// Never "low" urgency (phones may hold those until charging).
+assert.equal(urgencyFor('weekly'), 'normal');
+assert.equal(urgencyFor('admin'), 'normal');
+assert.equal(urgencyFor('preview'), 'high');
+assert.equal(urgencyFor('test'), 'high');
 
 console.log('pushRules tests passed');

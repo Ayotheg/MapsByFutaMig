@@ -10,6 +10,7 @@ import { track } from '../../lib/analytics';
 
 const LOOK = {
   weekly: { Icon: MapPinPlus, tone: 'violet' },
+  preview: { Icon: MapPinPlus, tone: 'violet' },
   review: { Icon: Star, tone: 'ink' },
   admin: { Icon: ClipboardCheck, tone: 'teal' },
   test: { Icon: Bell, tone: 'violet' },

@@ -17,7 +17,7 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { sendWebPush } from '../_shared/webpush.js';
-import { buildPayload, decide } from '../_shared/pushRules.js';
+import { buildPayload, decide, urgencyFor } from '../_shared/pushRules.js';
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
       try {
         const res = await sendWebPush(sub, buildPayload(withImage, sub.endpoint), vapid, {
           topic: row.tag || undefined,
-          urgency: row.kind === 'review' ? 'normal' : 'low',
+          urgency: urgencyFor(row.kind),
         });
         lastStatus = res.status;
         if (res.ok) delivered++;

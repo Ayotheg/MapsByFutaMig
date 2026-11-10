@@ -16,7 +16,16 @@ export const KINDS = {
   weekly: { pref: 'weekly', maxAgeMs: 2 * DAY, quiet: true, emoji: '📍' },
   admin: { pref: null, maxAgeMs: DAY, quiet: true, emoji: '📋' },
   test: { pref: null, maxAgeMs: HOUR, quiet: false, emoji: '🔔' },
+  // An admin's "Send preview to admins": the weekly round-up, looking
+  // exactly like it, sent now to admins only.
+  preview: { pref: null, maxAgeMs: HOUR, quiet: false, emoji: '📍', icon: 'weekly' },
 };
+
+// Test pings and previews go out at once; everything else is "normal" —
+// never "low", which lets phones hold a push until they're charging.
+export function urgencyFor(kind) {
+  return kind === 'test' || kind === 'preview' ? 'high' : 'normal';
+}
 
 // FUTA is in Lagos time: UTC+1, no daylight saving.
 export function lagosHour(ms) {
@@ -63,7 +72,7 @@ export function buildPayload(row, endpoint) {
     title: apple && kind.emoji ? `${kind.emoji} ${row.title}` : row.title,
     body: row.body || '',
     url: row.url || '/map',
-    icon: `/push/${row.kind}.png`,
+    icon: `/push/${kind.icon || row.kind}.png`,
     badge: '/push/badge.png',
     image: row.image || undefined,
     tag: row.tag || undefined,
