@@ -8,12 +8,11 @@
 // (the cron call has no user JWT; it uses the x-webhook-secret header,
 // same pattern as send-welcome-email).
 //
-// Secrets (supabase secrets set ...):
-//   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY — the app's push key pair (base64url);
-//                                         the public one is also VITE_VAPID_PUBLIC_KEY
-//   VAPID_SUBJECT        — optional, defaults to mailto:hello@mapsbyfuta.xyz
-//   PUSH_WEBHOOK_SECRET  — must equal the vault secret `push_webhook_secret`
-//   IMAGE_PROXY_URL      — optional, same ImageKit endpoint the app uses
+// Keys come from the Supabase vault (push_sender_config() in
+// push_notifications.sql), so setup is all SQL: push_webhook_secret,
+// vapid_public_key, vapid_private_key, image_proxy_url (optional).
+// An Edge Function secret with the upper-case name (e.g. VAPID_PRIVATE_KEY)
+// overrides the vault value. VAPID_SUBJECT defaults to mailto:hello@mapsbyfuta.xyz.
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are auto-provided.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -37,10 +36,10 @@ type Row = {
 };
 type Sub = { id: number; user_id: string; endpoint: string; p256dh: string; auth: string };
 
-function imageUrl(path: string | null): string | undefined {
+function imageUrl(path: string | null, proxyUrl: string): string | undefined {
   if (!path) return undefined;
   const clean = encodeURI(path.replace(/^\/+/, ''));
-  const proxy = (Deno.env.get('IMAGE_PROXY_URL') || '').trim().replace(/\/+$/, '');
+  const proxy = proxyUrl.trim().replace(/\/+$/, '');
   // 2:1 picture, small enough for a notification.
   if (proxy) return `${proxy}/${clean}?tr=w-720,h-360,c-maintain_ratio,fo-auto,q-70`;
   return `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/place-images/${clean}`;
@@ -49,26 +48,32 @@ function imageUrl(path: string | null): string | undefined {
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
-  const secret = Deno.env.get('PUSH_WEBHOOK_SECRET');
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
+    auth: { persistSession: false },
+  });
+
+  const { data: vault, error: configError } = await admin.rpc('push_sender_config');
+  if (configError) console.error('[send-push] could not read vault config', configError);
+  const cfg = (vault || {}) as Record<string, string>;
+  const pick = (envName: string, vaultName: string) => Deno.env.get(envName) || cfg[vaultName] || '';
+
+  const secret = pick('PUSH_WEBHOOK_SECRET', 'push_webhook_secret');
   if (!secret) {
-    console.error('[send-push] PUSH_WEBHOOK_SECRET not set — rejecting.');
+    console.error('[send-push] push_webhook_secret not set — rejecting.');
     return json(500, { error: 'Not configured' });
   }
   if (req.headers.get('x-webhook-secret') !== secret) return json(401, { error: 'Unauthorized' });
 
   const vapid = {
-    publicKey: Deno.env.get('VAPID_PUBLIC_KEY') || '',
-    privateKey: Deno.env.get('VAPID_PRIVATE_KEY') || '',
+    publicKey: pick('VAPID_PUBLIC_KEY', 'vapid_public_key'),
+    privateKey: pick('VAPID_PRIVATE_KEY', 'vapid_private_key'),
     subject: Deno.env.get('VAPID_SUBJECT') || 'mailto:hello@mapsbyfuta.xyz',
   };
   if (!vapid.publicKey || !vapid.privateKey) {
-    console.error('[send-push] VAPID keys missing.');
+    console.error('[send-push] VAPID keys missing (vault vapid_public_key / vapid_private_key).');
     return json(500, { error: 'Not configured' });
   }
-
-  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
-    auth: { persistSession: false },
-  });
+  const proxyUrl = pick('IMAGE_PROXY_URL', 'image_proxy_url');
 
   const { data: batch, error: claimError } = await admin.rpc('claim_push_batch', { p_limit: 200 });
   if (claimError) {
@@ -122,7 +127,7 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    const withImage = { ...row, image: imageUrl(row.image_path) };
+    const withImage = { ...row, image: imageUrl(row.image_path, proxyUrl) };
     let delivered = 0;
     let lastStatus = 0;
     for (const sub of devices) {

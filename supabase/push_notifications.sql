@@ -21,12 +21,16 @@
 -- The rule behind it: don't bug people. General news only goes out in the
 -- weekly round-up; everything else is about something the person did.
 --
--- ── ONE-TIME VAULT SETUP (run yourself, do NOT commit the real secret) ───
+-- ── ONE-TIME VAULT SETUP (run yourself, do NOT commit the real values) ───
+-- send-push reads all of these from the vault (push_sender_config below),
+-- so it needs no Edge Function secrets.
 --   select vault.create_secret(
 --     'https://vzjlarvtssybglwzfrhi.supabase.co/functions/v1/send-push',
 --     'push_fn_url');
---   select vault.create_secret('<same value as PUSH_WEBHOOK_SECRET>',
---     'push_webhook_secret');
+--   select vault.create_secret('<long random string>', 'push_webhook_secret');
+--   select vault.create_secret('<VAPID public key>',  'vapid_public_key');
+--   select vault.create_secret('<VAPID private key>', 'vapid_private_key');
+--   select vault.create_secret('https://ik.imagekit.io/<id>', 'image_proxy_url'); -- optional
 --
 -- Pause sending:  select cron.unschedule('push-sender');
 -- Resume:         re-run this file.
@@ -498,6 +502,21 @@ grant execute on function public.send_test_push() to authenticated;
 
 
 -- ── 9. Waking the sender ────────────────────────────────────────────────
+-- send-push's keys, from the vault. Service role only.
+create or replace function public.push_sender_config()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_object_agg(name, decrypted_secret)
+    from vault.decrypted_secrets
+   where name in ('push_webhook_secret', 'vapid_public_key', 'vapid_private_key', 'image_proxy_url');
+$$;
+revoke all on function public.push_sender_config() from public, anon, authenticated;
+grant execute on function public.push_sender_config() to service_role;
+
 create or replace function public.kick_push_sender()
 returns void
 language plpgsql
