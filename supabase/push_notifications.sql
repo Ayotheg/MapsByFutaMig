@@ -486,7 +486,9 @@ security definer
 set search_path = ''
 as $$
 begin
-  if not public.is_admin(auth.uid()) then
+  -- Not public.is_admin(): it reads an unqualified `profiles`, which fails
+  -- under this function's empty search_path.
+  if not exists (select 1 from public.profiles where id = auth.uid() and is_admin) then
     raise exception 'Admins only';
   end if;
   if not public.has_push_device(auth.uid()) then
