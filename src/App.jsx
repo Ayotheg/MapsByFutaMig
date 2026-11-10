@@ -15,6 +15,7 @@ import CookiePolicy from './pages/legal/CookiePolicy'
 import { useTawkOnRoutes } from './lib/tawk'
 
 const EventListingPage = lazy(() => import('./features/events/EventListingPage'))
+const DevelopersPage = lazy(() => import('./features/developers/DevelopersPage'))
 
 // React Router doesn't reset scroll position on navigation by default —
 // without this, clicking e.g. the footer's "Privacy Policy" link (or any
@@ -105,6 +106,15 @@ function App() {
         />
         {/* create-event-checkout's success_url; free events land here too. */}
         <Route path="/event/callback" element={<PromoteCallbackPage kind="event" />} />
+        {/* Public API home: pricing, reference and the developer's own keys. */}
+        <Route
+          path="/developers"
+          element={
+            <Suspense fallback={null}>
+              <DevelopersPage />
+            </Suspense>
+          }
+        />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookiePolicy />} />

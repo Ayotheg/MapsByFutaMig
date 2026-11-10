@@ -78,6 +78,7 @@ function Footer() {
                 <MapLink style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Open the map</MapLink>
                 <a href="#features" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Features</a>
                 <a href="#faq" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>FAQ</a>
+                <Link to="/developers" style={{ fontFamily: 'Poppins, sans-serif', fontSize: 13, color: 'var(--land-text-secondary)', textDecoration: 'none' }}>Developers API</Link>
               </div>
             </div>
             <div>

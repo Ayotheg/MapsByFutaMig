@@ -67,10 +67,13 @@ export function useAuth() {
   // popup (no `auth/popup-closed-by-user` case here — closing/cancelling
   // just leaves the user on Google's page or bounces back with no
   // session, `onAuthStateChange` simply never fires a signed-in event).
-  const signInWithGoogle = useCallback(async () => {
+  // `returnTo` lets a page other than the map (e.g. /developers) bring the
+  // person back to itself. Only same-site paths are accepted.
+  const signInWithGoogle = useCallback(async (returnTo) => {
+    const path = typeof returnTo === 'string' && /^\/(?!\/)/.test(returnTo) ? returnTo : '/map';
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/map` },
+      options: { redirectTo: `${window.location.origin}${path}` },
     });
     if (error) throw error;
   }, []);

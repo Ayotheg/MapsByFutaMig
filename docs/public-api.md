@@ -238,9 +238,29 @@ add it to the view **and** to `PLACE_COLUMNS` / `toPlace()` in
 - `supabase/functions/_shared/publicApi.ts`: pure rules. Tests: `scripts/publicApi.test.mjs`.
 - `vercel.json`: `/api/v1/*` is forwarded to the function, so developers never see the Supabase address.
 
+## Developer dashboard and admin tab
+
+- **`/developers`** (`src/features/developers/`): pricing, quick start and
+  reference for everyone; once signed in, the developer's own keys. They can
+  make a key (shown once), see credits and the last 14 days of calls, roll a
+  leaked key (same plan and credits, old one stops at once), revoke a key, and
+  ask for an upgrade or one-off credits.
+- **Admin panel → API tab** (`src/features/admin/ApiTab.jsx`): open requests
+  ("Upgrade + close" / "Grant + close" once payment has arrived), and every
+  key with grant, change plan and revoke.
+- Database: `supabase/public_api_dashboard.sql`. The browser never touches the
+  `api_*` tables; it calls `api_dev_*` functions (own keys only, by
+  `auth.uid()`), `api_admin_*` functions (`is_admin()` only) and `api_pricing()`.
+- Limits: one active Free key per account, five active keys in all. New keys
+  start on Free.
+- Google sign-in returns to `/developers` only if that URL is in Supabase →
+  Authentication → URL Configuration → Redirect URLs (e.g.
+  `https://mapsbyfuta.xyz/**`); otherwise it lands on the Site URL.
+
 ## Admin tasks (Supabase SQL Editor)
 
-Payments are not wired up yet; credits are granted by hand.
+The admin API tab covers these day to day. Payments are not wired up yet;
+credits are granted by hand.
 
 ```sql
 -- Create a key. The api_key column is shown ONCE; only its hash is stored.
@@ -274,7 +294,7 @@ A lost key cannot be recovered: revoke it and create a new one.
 
 ## Deploy
 
-1. Run `supabase/public_api.sql` in the SQL Editor (safe to re-run).
+1. Run `supabase/public_api.sql`, then `supabase/public_api_dashboard.sql`, in the SQL Editor (both safe to re-run).
 2. `supabase secrets set IMAGE_PROXY_URL=https://ik.imagekit.io/<id>` (the same
    value the app uses). Without it, photo URLs point at Supabase Storage.
 3. `supabase functions deploy public-api --no-verify-jwt` (callers have an API
