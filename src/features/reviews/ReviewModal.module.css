@@ -40,7 +40,7 @@
 }
 
 .sheet {
-  background: #ffffff;
+  background: var(--v2-card, #fff);
   border-top: 1px solid rgba(204, 195, 216, 0.3);
   border-radius: var(--r-2xl) var(--r-2xl) 0 0;
   width: 100%;
@@ -327,7 +327,7 @@
 }
 
 .btnSkip {
-  background: #ffffff;
+  background: var(--v2-card, #fff);
   border: 1px solid var(--v2-border);
   color: var(--v2-neutral);
 }

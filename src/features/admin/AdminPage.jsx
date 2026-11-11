@@ -3,6 +3,7 @@ import { useSeo } from '../../lib/useSeo';
 import { useAdminAccess } from './useAdminAccess';
 import AdminLogin from './AdminLogin';
 import styles from './AdminLogin.module.css';
+import { useAdminTheme } from './useAdminTheme';
 
 const AdminDashboard = lazy(() => import('./AdminDashboard'));
 
@@ -10,9 +11,11 @@ const AdminDashboard = lazy(() => import('./AdminDashboard'));
 export default function AdminPage() {
   useSeo({ title: 'Admin · Maps By FUTA', robots: 'noindex, nofollow' });
   const access = useAdminAccess();
+  const { dark, toggle } = useAdminTheme();
+  const wrap = (node) => node;
 
   if (access.status === 'loading' || access.status === 'checking') {
-    return (
+    return wrap(
       <main className={styles.page} aria-busy="true">
         <p className={styles.status}>Loading…</p>
       </main>
@@ -20,11 +23,11 @@ export default function AdminPage() {
   }
 
   if (access.status === 'signed-out') {
-    return <AdminLogin onSignIn={access.signIn} />;
+    return wrap(<AdminLogin onSignIn={access.signIn} />);
   }
 
   if (access.status === 'denied') {
-    return (
+    return wrap(
       <main className={styles.page}>
         <div className={styles.card}>
           <h1 className={styles.title}>No admin access</h1>
@@ -39,7 +42,7 @@ export default function AdminPage() {
     );
   }
 
-  return (
+  return wrap(
     <Suspense
       fallback={
         <main className={styles.page} aria-busy="true">
@@ -47,7 +50,7 @@ export default function AdminPage() {
         </main>
       }
     >
-      <AdminDashboard user={access.user} onSignOut={() => access.signOut().catch(() => {})} />
+      <AdminDashboard user={access.user} onSignOut={() => access.signOut().catch(() => {})} dark={dark} onToggleTheme={toggle} />
     </Suspense>
   );
 }

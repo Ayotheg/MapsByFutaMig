@@ -77,7 +77,7 @@
   padding: 16px;
   border: 1px solid var(--v2-divider);
   border-radius: 20px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.22), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
   font-family: var(--font-ui);
   animation: popIn var(--v2-duration-quick) var(--v2-ease-standard);
@@ -114,7 +114,7 @@
   min-height: 36px;
   border: 1px solid var(--v2-divider);
   border-radius: var(--r-full);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
@@ -216,7 +216,7 @@
   cursor: pointer;
 }
 .periodActive {
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-primary);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
@@ -240,7 +240,7 @@
   min-height: 38px;
   border: 1px solid var(--v2-divider);
   border-radius: 10px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--v2-font-manrope);
   font-variant-numeric: tabular-nums;
   font-size: 14px;

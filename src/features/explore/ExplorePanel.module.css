@@ -5,7 +5,7 @@
 
 .panel {
   --explore-gutter: 20px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   padding: 4px var(--explore-gutter) 4px;
   font-family: var(--font-ui);
   display: flex;

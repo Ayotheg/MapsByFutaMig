@@ -11,7 +11,7 @@
   --dev-bar-h: 56px;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 15px;
   line-height: 1.6;
@@ -54,7 +54,7 @@
   z-index: 20;
   padding-top: var(--mob-safe-top, 0px);
   border-bottom: 1px solid var(--v2-divider);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .topBarInner {
   display: flex;
@@ -357,7 +357,7 @@
 }
 .inkBtn {
   flex-shrink: 0;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-neutral);
 }
 .inkBtn:hover {
@@ -367,7 +367,7 @@
 .ghostBtn,
 .smallBtn {
   border-color: var(--v2-divider);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-neutral);
 }
 .outlineBtn:hover,
@@ -475,7 +475,7 @@
   padding: 20px;
   border: 1px solid var(--v2-divider);
   border-radius: 14px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .keyCardRevoked {
   gap: 10px;
@@ -669,7 +669,7 @@
   padding: 0 12px;
   border: 1px solid var(--v2-divider);
   border-radius: 9px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
@@ -798,7 +798,7 @@
   padding: 0 12px;
   border: 1px solid var(--v2-divider);
   border-radius: 10px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   list-style: none;
 }
 .callRow {
@@ -885,7 +885,7 @@
   padding: 0 12px;
   border: 1px solid var(--v2-divider);
   border-radius: 10px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 16px;
   color: var(--v2-neutral);
@@ -935,7 +935,7 @@
   padding: 3px;
   border: 1px solid var(--v2-divider);
   border-radius: 10px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .segment {
   min-height: 32px;
@@ -974,7 +974,7 @@
   padding: 12px 14px;
   border: 1px solid var(--v2-divider);
   border-radius: 10px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   text-align: left;
   cursor: pointer;
@@ -1013,7 +1013,7 @@
   padding: 0 14px;
   border: 1px solid var(--v2-divider);
   border-radius: 9px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--v2-font-manrope);
   font-size: 14px;
   font-weight: 700;
@@ -1109,7 +1109,7 @@
   padding: 0 14px;
   border: 1px solid var(--v2-divider);
   border-radius: 10px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;

@@ -12,7 +12,7 @@
   --docs-sticky: calc(var(--dev-bar-h) + var(--mob-safe-top, 0px));
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 15px;
   line-height: 1.65;
@@ -36,7 +36,7 @@
   top: var(--docs-sticky);
   z-index: 10;
   border-bottom: 1px solid var(--v2-divider);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .mobileTocBtn {
   display: flex;

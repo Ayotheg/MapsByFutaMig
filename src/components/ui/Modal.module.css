@@ -167,7 +167,7 @@
 }
 
 .btnOutlined {
-  background: #ffffff;
+  background: var(--v2-card, #fff);
   border: 1px solid var(--v2-track);
   color: var(--v2-neutral);
 }

@@ -47,7 +47,7 @@
     height: 40px;
     padding-left: 40px;
     font-size: 14px;
-    background: var(--v2-on-primary);
+    background: var(--v2-card, var(--v2-on-primary));
     border-color: var(--v2-border);
   }
   .panel .body {
@@ -200,7 +200,7 @@
     right: 0;
     bottom: 0;
     z-index: 1210;
-    background: var(--v2-on-primary);
+    background: var(--v2-card, var(--v2-on-primary));
     border-radius: 24px 24px 0 0;
     /* Half-strength scrim colour. */
     box-shadow: 0 -8px 30px -12px color-mix(in srgb, var(--v2-scrim) 50%, transparent);
@@ -332,7 +332,7 @@
 .pill {
   height: 37px;
   padding: 0 15px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   border: 1px solid var(--v2-divider);
   border-radius: var(--r-full);
   font-family: var(--font-ui);

@@ -15,7 +15,7 @@
   padding: 12px;
   border: 1px solid var(--v2-divider);
   border-radius: 18px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
   font-family: var(--font-ui);
   animation: bannerIn var(--v2-duration-standard) var(--v2-ease-standard);

@@ -11,7 +11,7 @@
 
 .card {
   width: min(440px, 100%);
-  background: #fff;
+  background: var(--admin-card, #fff);
   border: 1px solid var(--v2-divider);
   border-radius: 28px;
   padding: 36px 32px 32px;
@@ -71,7 +71,7 @@
   transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 .field input:focus-visible {
-  background: #fff;
+  background: var(--admin-card, #fff);
   border-color: var(--v2-primary);
   box-shadow: 0 0 0 3px var(--v2-primary-glow);
 }

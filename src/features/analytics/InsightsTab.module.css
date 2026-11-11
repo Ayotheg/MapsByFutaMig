@@ -65,7 +65,7 @@
   color: var(--v2-neutral);
 }
 .segmentBtnActive {
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-primary);
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
@@ -99,7 +99,7 @@
   cursor: pointer;
 }
 .pillActive {
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-primary);
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
@@ -107,7 +107,7 @@
 
 /* ── Cards ─────────────────────────────────────────────────────────── */
 .card {
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   border: 1px solid var(--v2-divider);
   border-radius: 16px;
   padding: 16px;
@@ -367,7 +367,7 @@
   min-height: 36px;
   border: 1px solid var(--v2-divider);
   border-radius: 10px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font: inherit;
   font-size: 12.5px;
   font-weight: 600;

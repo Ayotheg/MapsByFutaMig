@@ -32,7 +32,7 @@
   flex-direction: column;
   align-items: center;
   padding: 16px 0 12px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   border-right: 1px solid var(--v2-divider);
   font-family: var(--font-ui);
   overflow-x: hidden;
@@ -50,7 +50,7 @@
   width: 46px;
   height: 46px;
   border-radius: 14px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 6px 16px -4px var(--v2-primary-glow-strong), 0 0 0 1px var(--v2-primary-tint);
 }
 .logoIcon img {
@@ -225,7 +225,7 @@
   height: 100%;
   overflow: hidden;
   border-radius: var(--r-full);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-primary);
   font-size: 17px;
   font-weight: 700;
@@ -335,7 +335,7 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
   border-radius: var(--r-2xl);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.22), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
   animation: panelIn 0.18s ease;
 }

@@ -195,7 +195,7 @@
 /* Explore and Signal are plain white sheets edge to edge — on the lavender
    --v2-surface their white content left a purple rim around the cards. */
 .panelWhite {
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .panelClosed {
   height: 0;

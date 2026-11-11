@@ -156,7 +156,7 @@
   padding: 11px 22px;
   border: 1px solid var(--v2-divider);
   border-radius: var(--r-full);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-primary);
   font-family: var(--font-ui);
   font-size: 15px;

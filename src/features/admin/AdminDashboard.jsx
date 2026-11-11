@@ -12,7 +12,9 @@ import {
   Map as MapIcon,
   Megaphone,
   MapPin,
+  Moon,
   RefreshCw,
+  Sun,
   Route,
   Tags,
 } from 'lucide-react';
@@ -79,7 +81,11 @@ const VIEW_KEYS = new Set(ITEMS.map((i) => i.key));
 const FILL_VIEWS = new Set(['places', 'routes', 'kml', 'chips', 'pending', 'promotions', 'events', 'api', 'notify']);
 const EMPTY = [];
 
-export default function AdminDashboard({ user, onSignOut }) {
+// Tailwind utilities; `dark:` applies under the .dark wrapper set in AdminPage.
+const iconBtn =
+  'grid size-[46px] place-items-center rounded-full border border-slate-200 bg-white text-slate-900 cursor-pointer hover:bg-slate-100 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800';
+
+export default function AdminDashboard({ user, onSignOut, dark, onToggleTheme }) {
   const [params, setParams] = useSearchParams();
   const requested = params.get('view');
   const view = VIEW_KEYS.has(requested) ? requested : 'overview';
@@ -157,6 +163,7 @@ export default function AdminDashboard({ user, onSignOut }) {
     case 'overview':
       body = (
         <AdminOverview
+          dark={dark}
           counts={counts}
           waypoints={waypoints}
           segments={segments}
@@ -330,9 +337,14 @@ export default function AdminDashboard({ user, onSignOut }) {
             <h1 className={styles.pageTitle}>{item.title}</h1>
             <p className={styles.pageSub}>{item.sub}</p>
           </div>
-          <button type="button" className={styles.refresh} onClick={refreshAll} aria-label="Refresh data" title="Refresh data">
-            <RefreshCw size={18} />
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button type="button" className={iconBtn} onClick={onToggleTheme} aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} title={dark ? 'Light mode' : 'Dark mode'}>
+              {dark ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+            <button type="button" className={iconBtn} onClick={refreshAll} aria-label="Refresh data" title="Refresh data">
+              <RefreshCw size={18} />
+            </button>
+          </div>
         </header>
 
         <main className={styles.content} data-fill={FILL_VIEWS.has(view)} key={`${view}-${refreshKey}`}>

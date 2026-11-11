@@ -50,7 +50,7 @@
   padding: 0 16px;
   border: 1px solid var(--v2-divider);
   border-radius: var(--r-full);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 14px;
   font-weight: 500;
@@ -103,7 +103,7 @@
   border: 1px solid var(--v2-divider);
   border-radius: 20px;
   overflow: hidden;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   text-align: left;
   font-family: var(--font-ui);
   cursor: pointer;
@@ -222,7 +222,7 @@
   width: 48px;
   height: 52px;
   border-radius: 12px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
 }
 .priceTag {
@@ -231,7 +231,7 @@
   right: 10px;
   padding: 4px 10px;
   border-radius: var(--r-full);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-size: 12px;
   font-weight: 600;
   color: var(--v2-neutral);

@@ -124,7 +124,7 @@
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: #fff;
+  background: var(--v2-card, #fff);
   border: 1px solid var(--v2-border);
   border-radius: 12px;
   z-index: 9999;
@@ -186,7 +186,7 @@
   gap: 12px;
   padding: 17px;
   background: var(--v2-hud-upnext-bg);
-  border: 1px solid #dae2fd;
+  border: 1px solid var(--v2-line, #dae2fd);
   border-radius: 8px;
   flex-shrink: 0;
 }
@@ -235,7 +235,7 @@
   align-items: flex-start;
   gap: 8px;
   padding: 13px;
-  background: #fff;
+  background: var(--v2-card, #fff);
   border: 1px solid var(--v2-border);
   border-radius: 12px;
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);

@@ -1,0 +1,80 @@
+/* Dark theme (class on <html>, set by lib/theme.js on the map, promote,
+   events and admin pages). Flips the --v2 brand tokens; components built
+   on tokens follow automatically. Slate ramp; brand violet kept for fills
+   and lightened where it's used as text. The extra --v2-card/-field/-line/
+   -hover tokens stand in for the few fixed light literals (#fff, #f8f9ff,
+   #e2e8f0…) that older component styles used. */
+
+:root {
+  --v2-card: #ffffff;
+  --v2-field: #f8f9ff;
+  --v2-line: #e2e8f0;
+  --v2-hover: #f1f5f9;
+  --admin-card: #ffffff;
+}
+
+html.dark {
+  color-scheme: dark;
+
+  --v2-surface: #0f172a;
+  --v2-card: #0f172a;
+  --v2-field: #1e293b;
+  --v2-line: #273449;
+  --v2-hover: #1e293b;
+  --admin-surface: #020617;
+  --admin-card: #0f172a;
+
+  --v2-text: #cbd5e1;
+  --v2-text-variant: #94a3b8;
+  --v2-text-muted: #94a3b8;
+  --v2-muted: rgba(148, 163, 184, 0.5);
+
+  --v2-primary-outline: rgba(167, 139, 250, 0.3);
+  --v2-primary-glow: rgba(167, 139, 250, 0.18);
+  --v2-primary-glow-strong: rgba(167, 139, 250, 0.7);
+  --v2-primary-hover: #c4b5fd;
+  --v2-primary-tint: rgba(124, 58, 237, 0.26);
+  --v2-primary-tag-fill: rgba(124, 58, 237, 0.4);
+  --v2-primary-badge-fill: rgba(124, 58, 237, 0.25);
+  --v2-primary-border-soft: rgba(167, 139, 250, 0.3);
+
+  --v2-neutral: #f1f5f9;
+  --v2-on-neutral: #0f172a;
+
+  --v2-track: #1e293b;
+  --v2-border: #334155;
+  --v2-divider: #273449;
+  --v2-input-surface: #1e293b;
+  --v2-thumb-bg: #1e293b;
+  --v2-icon-btn-bg: #1e293b;
+  --v2-hud-upnext-bg: #1e293b;
+  --v2-scrim: rgba(2, 6, 23, 0.72);
+
+  --v2-chip-active-bg: rgba(45, 212, 191, 0.18);
+  --v2-chip-active-border: #2dd4bf;
+  --v2-chip-active-text: #5eead4;
+
+  --v2-error-container: rgba(248, 113, 113, 0.18);
+  --v2-error-text: #fca5a5;
+  --v2-error-tint: rgba(186, 26, 26, 0.18);
+  --v2-secondary-tint: rgba(13, 148, 136, 0.2);
+  --v2-tertiary-container: rgba(251, 146, 60, 0.16);
+  --v2-on-tertiary-container: #fed7aa;
+}
+
+/* Map controls only (zoom buttons, popups, attribution). The base map
+   tiles are never touched. */
+html.dark .leaflet-container .leaflet-control-attribution {
+  background: rgba(15, 23, 42, 0.8);
+  color: #94a3b8;
+}
+html.dark .leaflet-container .leaflet-control-attribution a {
+  color: #c4b5fd;
+}
+html.dark .leaflet-container .leaflet-bar a,
+html.dark .leaflet-container .leaflet-popup-content-wrapper,
+html.dark .leaflet-container .leaflet-popup-tip {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: #273449;
+}

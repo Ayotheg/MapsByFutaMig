@@ -18,6 +18,22 @@
  * PromotePage.jsx `typing`) so it can't cover the focused field.
  */
 
+:global(html.dark) .page {
+  --pr-bg: #0b1220;
+  --pr-card: #0f172a;
+  --pr-ink: #f1f5f9;
+  --pr-text: #cbd5e1;
+  --pr-muted: #94a3b8;
+  --pr-faint: #64748b;
+  --pr-line: #273449;
+  --pr-fill: #1e293b;
+  --pr-tint: #172036;
+  --pr-accent: #a78bfa;
+  --pr-accent-soft: rgba(167, 139, 250, 0.14);
+  --pr-accent-line: rgba(167, 139, 250, 0.35);
+  --pr-green: #4ade80;
+}
+
 .page {
   --pr-bg: #fbfaf8;
   --pr-card: #ffffff;

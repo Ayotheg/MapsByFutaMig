@@ -99,7 +99,7 @@
 
 .withdrawBtn {
   align-self: flex-start;
-  background: #ffffff;
+  background: var(--v2-card, #fff);
   border: 1px solid var(--v2-track);
   border-radius: var(--r-md);
   color: var(--v2-text);

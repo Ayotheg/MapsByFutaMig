@@ -1,6 +1,10 @@
 @import "tailwindcss";
+
+/* Class-based dark mode: `dark:` utilities apply inside any element with .dark (the admin dashboard toggles it). */
+@custom-variant dark (&:where(.dark, .dark *));
 @import "./styles/tokens.css";
 @import "./styles/tokens-v2.css";
+@import "./styles/theme-dark.css";
 
 /* ── Self-hosted fonts (@fontsource). To add one, see DESIGN_SYSTEM.md
    › Adding a font. ──────────────────────────────────────────────── */

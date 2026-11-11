@@ -7,7 +7,7 @@
 .page {
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   color: var(--v2-text);
 }
@@ -126,7 +126,7 @@ a.toggleBtn:hover {
   background: rgba(255, 255, 255, 0.12);
 }
 .toggleBtnActive {
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-primary);
 }
 
@@ -205,7 +205,7 @@ a.toggleBtn:hover {
   padding: 20px;
   border: 1px solid var(--v2-divider);
   border-radius: 24px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .stepHead {
   display: flex;
@@ -255,7 +255,7 @@ a.toggleBtn:hover {
   padding: 14px;
   border: 1.5px solid var(--v2-divider);
   border-radius: 18px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   text-align: left;
   font-family: var(--font-ui);
   cursor: pointer;
@@ -296,7 +296,7 @@ a.toggleBtn:hover {
   color: var(--v2-primary);
 }
 .optionViolet .iconViolet {
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .optionCheck {
   position: absolute;
@@ -421,7 +421,7 @@ a.toggleBtn:hover {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .posterPreview {
   position: relative;
@@ -446,7 +446,7 @@ a.toggleBtn:hover {
   height: 28px;
   border: none;
   border-radius: 50%;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-neutral);
   cursor: pointer;
 }
@@ -485,7 +485,7 @@ a.toggleBtn:hover {
   padding: 0 12px;
   border: 1px solid var(--v2-divider);
   border-radius: 12px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 14px;
   font-weight: 600;
@@ -553,7 +553,7 @@ a.toggleBtn:hover {
   padding: 0 13px;
   border: 1.5px solid var(--v2-divider);
   border-radius: var(--r-full);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
@@ -623,7 +623,7 @@ a.toggleBtn:hover {
   overflow: hidden;
   border: 1px solid var(--v2-divider);
   border-radius: 24px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 20px 40px -20px rgba(15, 23, 42, 0.18);
 }
 .payBand {
@@ -792,7 +792,7 @@ a.toggleBtn:hover {
   overflow: hidden;
   border: 1px solid var(--v2-divider);
   border-radius: 20px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 20px 40px -20px rgba(15, 23, 42, 0.18);
 }
 .previewPoster {
@@ -821,7 +821,7 @@ a.toggleBtn:hover {
   width: 48px;
   height: 52px;
   border-radius: 12px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
 }
 .previewPrice {
@@ -836,7 +836,7 @@ a.toggleBtn:hover {
   color: var(--v2-neutral);
 }
 .previewPricePaid {
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .previewBody {
   display: flex;

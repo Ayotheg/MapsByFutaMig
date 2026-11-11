@@ -150,7 +150,7 @@
 .input {
   flex: 1;
   min-width: 0;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   border: 1px solid var(--v2-divider);
   border-radius: 8px;
   color: var(--v2-neutral);
@@ -212,7 +212,7 @@
   padding: 4px;
   border: 1px solid var(--v2-divider);
   border-radius: 10px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   scrollbar-width: thin;
 }
 
@@ -286,7 +286,7 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--v2-error-text);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   border: 1px solid var(--v2-divider);
   border-radius: 8px;
   padding: 7px 14px;

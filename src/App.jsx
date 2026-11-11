@@ -13,6 +13,7 @@ import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import TermsOfService from './pages/legal/TermsOfService'
 import CookiePolicy from './pages/legal/CookiePolicy'
 import { useTawkOnRoutes } from './lib/tawk'
+import { useApplyTheme } from './lib/theme'
 
 const EventListingPage = lazy(() => import('./features/events/EventListingPage'))
 const DevelopersPage = lazy(() => import('./features/developers/DevelopersPage'))
@@ -31,6 +32,12 @@ function ScrollToTop() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
+  return null;
+}
+
+// Dark mode class on <html> for the map, promote, events and admin pages only.
+function ThemeSync() {
+  useApplyTheme(useLocation().pathname);
   return null;
 }
 
@@ -75,6 +82,7 @@ function App() {
     <BrowserRouter>
       <ScrollToTop />
       <TawkChat />
+      <ThemeSync />
       <Routes>
         <Route path="/" element={IS_APP_BUILD ? <Navigate to="/map" replace /> : <LandingPage />} />
         {/* Rendered by <PersistentMap /> below; this entry just keeps

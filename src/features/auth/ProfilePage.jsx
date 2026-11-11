@@ -10,6 +10,7 @@ import {
   LogOut,
   Mail,
   Megaphone,
+  Moon,
   Play,
   Smartphone,
   Star,
@@ -27,6 +28,7 @@ import { shortDate } from '../explore/eventsData';
 import { fetchMarketingConsent, saveMarketingConsent } from './marketingConsent';
 import { SIGN_OUT_FAILED_MESSAGE } from './signOut';
 import WhatsAppIcon from '../../lib/WhatsAppIcon';
+import { useTheme } from '../../lib/theme';
 import { CONTACT_EMAIL, WHATSAPP_CHAT_URL } from '../../lib/contactInfo';
 import { track } from '../../lib/analytics';
 import { isInstalled, openInstallVideo } from '../install/installVideo';
@@ -53,6 +55,7 @@ import {
  * only — a Google account's email belongs to Google).
  */
 export default function ProfilePage({ user, onClose, signOut, requestEmailChange, confirmEmailChange, friendlyError }) {
+  const { dark, setTheme } = useTheme();
   const userId = user.id;
 
   // Stats — four explicit states (profileStats.js): only `ready` shows
@@ -538,6 +541,24 @@ export default function ProfilePage({ user, onClose, signOut, requestEmailChange
     </section>
   );
 
+  const appearance = (
+    <section className={styles.section} style={{ order: 3 }} aria-labelledby="profile-appearance">
+      <div className={styles.sectionHead}>
+        <h3 id="profile-appearance" className={styles.overline}>Appearance</h3>
+      </div>
+      <div className={styles.group}>
+        <label className={`${styles.row} ${styles.switchRow}`}>
+          <span className={styles.rowIcon}><Moon size={17} /></span>
+          <span className={styles.rowText}>
+            <span className={styles.rowTitle}>Dark mode</span>
+            <span className={styles.rowSub}>Applies to the map, promotions, events and admin</span>
+          </span>
+          <Switch checked={dark} onChange={(on) => setTheme(on ? 'dark' : 'light')} />
+        </label>
+      </div>
+    </section>
+  );
+
   const app = showInstall && (
     <section className={styles.section} style={{ order: 4 }} aria-labelledby="profile-app">
       <div className={styles.sectionHead}>
@@ -668,6 +689,7 @@ export default function ProfilePage({ user, onClose, signOut, requestEmailChange
               <div className={styles.col}>
                 {identity}
                 {listings}
+                {appearance}
                 {app}
                 {help}
               </div>

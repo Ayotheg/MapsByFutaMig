@@ -22,7 +22,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.22), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
   font-family: var(--font-ui);
   pointer-events: none;
@@ -106,7 +106,7 @@
   width: 48px;
   height: 52px;
   border-radius: 12px;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
 }
 
@@ -228,7 +228,7 @@
   gap: 10px;
   padding: 12px 16px 14px;
   border-top: 1px solid var(--v2-divider);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
 }
 .card.mobile .footer {
   padding: 12px 16px calc(14px + var(--mob-safe-bottom));
@@ -268,7 +268,7 @@
   height: 50px;
   border: 1px solid var(--v2-divider);
   border-radius: var(--r-full);
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-neutral);
   cursor: pointer;
   transition: background var(--v2-duration-quick) var(--v2-ease-standard);

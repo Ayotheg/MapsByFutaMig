@@ -24,7 +24,7 @@
   gap: 12px;
   padding: 16px 18px;
   border-radius: 20px;
-  background: #fff;
+  background: var(--admin-card, #fff);
   border: 1px solid var(--v2-divider);
   box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.28);
   font-family: var(--font-ui);
@@ -79,7 +79,7 @@
 }
 .field input:focus-visible,
 .field select:focus-visible {
-  background: #fff;
+  background: var(--admin-card, #fff);
   border-color: var(--v2-primary);
   box-shadow: 0 0 0 3px var(--v2-primary-glow);
 }
@@ -105,7 +105,7 @@
   cursor: pointer;
 }
 .btnGhost {
-  background: #fff;
+  background: var(--admin-card, #fff);
   border: 1px solid var(--v2-divider);
   color: var(--v2-neutral);
 }
@@ -141,7 +141,7 @@
   padding: 0 18px;
   border-radius: 999px;
   border: 1px solid var(--v2-divider);
-  background: #fff;
+  background: var(--admin-card, #fff);
   color: var(--v2-neutral);
   font: inherit;
   font-size: 14px;
@@ -163,7 +163,7 @@
 }
 .drawVertex {
   border-radius: 50%;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   border: 3px solid var(--v2-secondary);
   cursor: grab;
 }

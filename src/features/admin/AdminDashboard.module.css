@@ -8,14 +8,14 @@
 
 .shell {
   /* Brand "surface" (#f8f9ff) — the page behind the white cards. */
-  --admin-surface: #f8f9ff;
+  --admin-surface-default: #f8f9ff;
   --rail-w: 248px;
 
   position: fixed;
   inset: 0;
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
-  background: var(--admin-surface);
+  background: var(--admin-surface, var(--admin-surface-default));
   color: var(--v2-text);
   font-family: var(--font-ui);
   padding-left: env(safe-area-inset-left);
@@ -27,7 +27,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #fff;
+  background: var(--admin-card, #fff);
   border-right: 1px solid var(--v2-divider);
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
@@ -115,7 +115,6 @@
 }
 .navItem:focus-visible,
 .signOut:focus-visible,
-.refresh:focus-visible,
 .barBtn:focus-visible {
   outline: 3px solid var(--v2-primary-glow-strong);
   outline-offset: 2px;
@@ -223,21 +222,6 @@
   font-size: 14px;
   color: var(--v2-text-muted);
 }
-.refresh {
-  width: 46px;
-  height: 46px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  border: 1px solid var(--v2-divider);
-  background: #fff;
-  color: var(--v2-neutral);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-.refresh:hover {
-  background: var(--v2-hud-upnext-bg);
-}
 
 .content {
   flex: 1;
@@ -262,7 +246,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #fff;
+  background: var(--admin-card, #fff);
   border: 1px solid var(--v2-divider);
   border-radius: 20px;
   overflow: hidden;
@@ -277,7 +261,7 @@
   padding: 0 18px;
   border-radius: 999px;
   border: 1px solid var(--v2-divider);
-  background: #fff;
+  background: var(--admin-card, #fff);
   color: var(--v2-neutral);
   font: inherit;
   font-size: 14px;
@@ -375,4 +359,21 @@
   .navItem {
     transition: none;
   }
+}
+
+/* Dark mode: the older review tabs are built from fixed light colours, so
+   they're inverted as a block (images flipped back). Their own redesign
+   can replace this. */
+:global(.dark) .workspace,
+:global(.dark) .reading {
+  filter: invert(0.92) hue-rotate(180deg);
+}
+:global(.dark) .workspace img,
+:global(.dark) .reading img,
+:global(.dark) .workspace video {
+  filter: invert(1) hue-rotate(180deg);
+}
+/* The inverted block needs a light base so it lands dark. */
+:global(.dark) .workspace {
+  background: #fff;
 }

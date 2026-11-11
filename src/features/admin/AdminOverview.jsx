@@ -15,7 +15,7 @@ const QUEUES = [
 ];
 
 /** The landing screen: what needs doing, how big the data is, how it's used. */
-export default function AdminOverview({ counts, waypoints, segments, onGo, onAddPlace, onDrawPath }) {
+export default function AdminOverview({ dark, counts, waypoints, segments, onGo, onAddPlace, onDrawPath }) {
   const [totals, setTotals] = useState(null);
   const [totalsError, setTotalsError] = useState(null);
   const [signups, setSignups] = useState(null);
@@ -128,7 +128,7 @@ export default function AdminOverview({ counts, waypoints, segments, onGo, onAdd
           {rollup && (
             <div className={styles.chartBox}>
               <Suspense fallback={null}>
-                <AdminVisitorsChart rows={rollup} />
+                <AdminVisitorsChart rows={rollup} dark={dark} />
               </Suspense>
             </div>
           )}

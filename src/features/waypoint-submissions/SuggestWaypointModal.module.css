@@ -28,7 +28,7 @@
   max-height: calc(100vh - 32px);
   max-height: calc(100dvh - 32px);
   box-sizing: border-box;
-  background: #ffffff;
+  background: var(--v2-card, #fff);
   border-radius: 24px;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
   display: flex;
@@ -133,7 +133,7 @@
   height: 48px;
   box-sizing: border-box;
   border: 1px solid var(--v2-divider);
-  background: #f8f9ff;
+  background: var(--v2-field, #f8f9ff);
   border-radius: 14px;
   display: flex;
   align-items: center;
@@ -202,7 +202,7 @@
   min-height: 48px;
   padding: 0 12px;
   border: 1px solid var(--v2-divider);
-  background: #ffffff;
+  background: var(--v2-card, #fff);
   border-radius: 14px;
   display: flex;
   align-items: center;
@@ -219,8 +219,8 @@
   color: var(--v2-primary);
 }
 .ghost:hover:not(:disabled) {
-  background: #f8f9ff;
-  border-color: #d9d4f5;
+  background: var(--v2-field, #f8f9ff);
+  border-color: var(--v2-line, #d9d4f5);
 }
 .ghost:disabled {
   opacity: 0.7;
@@ -240,7 +240,7 @@
   height: 48px;
   flex: none;
   border-radius: 10px;
-  background: #eef1f8;
+  background: var(--v2-line, #eef1f8);
   overflow: hidden;
 }
 .locText {
@@ -321,8 +321,8 @@
   width: 72px;
   height: 72px;
   box-sizing: border-box;
-  border: 1px dashed #c9c2e8;
-  background: #f8f9ff;
+  border: 1px dashed var(--v2-line, #c9c2e8);
+  background: var(--v2-field, #f8f9ff);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -387,7 +387,7 @@
 .footer {
   flex: none;
   padding: 16px 32px 24px;
-  border-top: 1px solid #eef0f5;
+  border-top: 1px solid var(--v2-line, #eef0f5);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -446,7 +446,7 @@
   width: 56px;
   height: 56px;
   border-radius: var(--r-full);
-  background: #e6f6f4;
+  background: var(--v2-secondary-tint, #e6f6f4);
   color: var(--v2-secondary);
   display: flex;
   align-items: center;
@@ -567,7 +567,7 @@
   }
   .footer {
     padding: 14px 24px calc(24px + env(safe-area-inset-bottom));
-    border-top-color: #eef0f5;
+    border-top-color: var(--v2-line, #eef0f5);
   }
   .submit {
     flex: 1;

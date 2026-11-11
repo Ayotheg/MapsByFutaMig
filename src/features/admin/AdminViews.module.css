@@ -39,7 +39,7 @@
   height: 46px;
   border-radius: 14px;
   border: 1px solid var(--v2-divider);
-  background: #fff;
+  background: var(--admin-card, #fff);
   padding: 0 14px 0 42px;
   font: inherit;
   font-size: 16px;
@@ -58,7 +58,7 @@
   height: 46px;
   border-radius: 14px;
   border: 1px solid var(--v2-divider);
-  background: #fff;
+  background: var(--admin-card, #fff);
   padding: 0 34px 0 14px;
   font: inherit;
   font-size: 14px;
@@ -93,7 +93,7 @@
   background: var(--v2-primary-hover);
 }
 .ghostBtn {
-  background: #fff;
+  background: var(--admin-card, #fff);
   border: 1px solid var(--v2-divider);
   color: var(--v2-neutral);
 }
@@ -139,7 +139,7 @@
   white-space: nowrap;
 }
 .segBtn[aria-pressed='true'] {
-  background: #fff;
+  background: var(--admin-card, #fff);
   color: var(--v2-primary-hover);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
 }
@@ -165,7 +165,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--admin-card, #fff);
   border: 1px solid var(--v2-divider);
   border-radius: 20px;
   overflow: hidden;
@@ -373,7 +373,7 @@
   padding: 16px 18px;
   border-radius: 20px;
   border: 1px solid var(--v2-divider);
-  background: #fff;
+  background: var(--admin-card, #fff);
   font: inherit;
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -405,7 +405,7 @@
   color: var(--v2-primary);
 }
 .queueCard[data-waiting='true'] .queueIcon {
-  background: #fff;
+  background: var(--admin-card, #fff);
 }
 .bigNum {
   font-family: var(--v2-font-manrope);
@@ -432,7 +432,7 @@
   padding: 16px 18px;
   border-radius: 20px;
   border: 1px solid var(--v2-divider);
-  background: #fff;
+  background: var(--admin-card, #fff);
 }
 .kpiLabel {
   font-size: 13px;
@@ -450,7 +450,7 @@
   gap: 12px;
 }
 .panel {
-  background: #fff;
+  background: var(--admin-card, #fff);
   border: 1px solid var(--v2-divider);
   border-radius: 20px;
   padding: 18px;
@@ -599,4 +599,10 @@
   .ghostBtn {
     transition: none;
   }
+}
+
+/* Soften the pastel type badges and icon tiles on dark. */
+:global(.dark) .badge,
+:global(.dark) .rowIcon {
+  filter: brightness(0.82) saturate(0.9);
 }

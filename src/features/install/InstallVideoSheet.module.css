@@ -42,7 +42,7 @@
   place-items: center;
   border: 1px solid var(--v2-divider);
   border-radius: 50%;
-  background: var(--v2-on-primary);
+  background: var(--v2-card, var(--v2-on-primary));
   color: var(--v2-neutral);
   cursor: pointer;
 }
