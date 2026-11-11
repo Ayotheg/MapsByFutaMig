@@ -1,0 +1,169 @@
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: var(--v2-hud-upnext-bg);
+}
+.stage[hidden] {
+  display: none;
+}
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+.bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 1000;
+  width: min(620px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: #fff;
+  border: 1px solid var(--v2-divider);
+  box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.28);
+  font-family: var(--font-ui);
+}
+.barText {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--v2-neutral);
+}
+.barIcon {
+  flex-shrink: 0;
+  color: var(--v2-primary);
+  display: inline-flex;
+  margin-top: 1px;
+}
+.barActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.barForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.field {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.field input,
+.field select {
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid var(--v2-divider);
+  background: var(--v2-hud-upnext-bg);
+  padding: 0 12px;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--v2-neutral);
+  outline: none;
+}
+.field input:focus-visible,
+.field select:focus-visible {
+  background: #fff;
+  border-color: var(--v2-primary);
+  box-shadow: 0 0 0 3px var(--v2-primary-glow);
+}
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--v2-error-text);
+}
+
+.btnGhost,
+.btnPrimary {
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.btnGhost {
+  background: #fff;
+  border: 1px solid var(--v2-divider);
+  color: var(--v2-neutral);
+}
+.btnGhost:hover:not(:disabled) {
+  background: var(--v2-hud-upnext-bg);
+}
+.btnPrimary {
+  background: var(--v2-primary);
+  border: 1px solid var(--v2-primary);
+  color: var(--v2-on-primary);
+}
+.btnPrimary:hover:not(:disabled) {
+  background: var(--v2-primary-hover);
+}
+.btnGhost:disabled,
+.btnPrimary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btnGhost:focus-visible,
+.btnPrimary:focus-visible,
+.closeView:focus-visible {
+  outline: 3px solid var(--v2-primary-glow-strong);
+  outline-offset: 2px;
+}
+
+.closeView {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: 16px;
+  z-index: 1000;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--v2-divider);
+  background: #fff;
+  color: var(--v2-neutral);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -6px rgba(15, 23, 42, 0.25);
+}
+
+/* Leaflet markers for the map modes (L.divIcon className). */
+.movePin {
+  border-radius: 50%;
+  background: var(--v2-primary);
+  border: 3px solid var(--v2-on-primary);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.35);
+  cursor: grab;
+}
+.drawVertex {
+  border-radius: 50%;
+  background: var(--v2-on-primary);
+  border: 3px solid var(--v2-secondary);
+  cursor: grab;
+}

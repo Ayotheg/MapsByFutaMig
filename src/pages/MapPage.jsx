@@ -7,7 +7,7 @@ import MarketingOptInPrompt from '../features/auth/MarketingOptInPrompt';
 import InstallVideoHost from '../features/install/InstallVideoHost';
 import { useInstallVideoOpen } from '../features/install/installVideo';
 import { setTawkHidden, useTawkChatOpen } from '../lib/tawk';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import WaypointLayer from '../features/waypoints/WaypointLayer';
 import PlaceCard from '../features/waypoints/PlaceCard';
 import { useWaypoints } from '../features/waypoints/useWaypoints';
@@ -30,7 +30,6 @@ import { useGpsTracking } from '../features/navigation/useGpsTracking';
 import { useAuth, friendlyError } from '../features/auth/useAuth';
 import { useGuestUsage } from '../features/auth/useGuestUsage';
 import { flushPendingNavCompletions, reportNavigationCompletion } from '../features/navigation/navCompletionClient';
-import { useAdminPin } from '../features/auth/useAdminPin';
 import { useSeo } from '../lib/useSeo';
 import { useOnlineStatus } from '../lib/useOnlineStatus';
 import SubmissionToast from '../features/waypoint-submissions/SubmissionToast';
@@ -43,8 +42,6 @@ import DetailModal from '../features/segments/DetailModal';
 import NavigationController from '../features/navigation/NavigationController';
 import ReviewModal from '../features/reviews/ReviewModal';
 import AuthModal from '../features/auth/AuthModal';
-import AdminPinGate from '../features/auth/AdminPinGate';
-import AdminPanel from '../features/admin/AdminPanel';
 import SuggestWaypointModal from '../features/waypoint-submissions/SuggestWaypointModal';
 import MyWaypointSubmissionsPanel from '../features/waypoint-submissions/MyWaypointSubmissionsPanel';
 import MapPickBanner from '../features/map/MapPickBanner';
@@ -511,7 +508,7 @@ export default function MapPage({ onReadinessChange }) {
   // an open route-segment `DetailModal`, an expanded `ChipResultsPanel`
   // (`activeChip`), and the full-screen `MobileSearchOverlay`. All four
   // get cleared here, once, the moment `navActive` flips true.
-  // Deliberately NOT touched: `authModalOpen`/`adminPanelOpen`/
+  // Deliberately NOT touched: `authModalOpen`/
   // `suggestModalOpen`/`mySubmissionsOpen`/`reviewTarget`. Those are
   // blocking modals for a deliberate task the person is mid-way through,
   // not ambient cards left open around the map — and in the auth case,
@@ -544,32 +541,11 @@ export default function MapPage({ onReadinessChange }) {
       document.body.classList.remove('nav-active');
     };
   }, [navActive, map]);
-  // ── Admin panel (Slice 11) ────────────────────────────────────────────
-  // Sidebar's Admin button previously had no onClick handler; a prior
-  // stopgap (superseded here) pointed it at `ImportTrigger`'s KML/GPX
-  // import panel since that was "the only real admin capability currently
-  // built." That stopgap's own premise doesn't hold up against legacy's
-  // actual `index.html`: `#adminImportBtn`/`#adminImportInput` — the
-  // trigger `ImportTrigger.jsx` was built to eventually "relocate inside
-  // the admin overlay" — don't exist anywhere in legacy's real markup.
-  // That whole import flow is dead/unreachable in the live legacy app, not
-  // "reserved for Slice 11." Clicking Admin now opens the real, ported
-  // `#adminOverlay` (`AdminPanel.jsx`) instead. `ImportTrigger` itself has
-  // since been unmounted from this page entirely (its fixed bottom-left
-  // position overlapped the sidebar rail once collapsed) — its lazy-loaded
-  // `KmlImportPanel.jsx` pipeline is unreached until a real entry point is
-  // decided on, likely inside `AdminPanel.jsx`.
-  const [adminPanelOpen, setAdminPanelOpen] = useState(false);
-  const adminPin = useAdminPin(auth.user, openAuthModal);
-
+  // Admin is its own full-page dashboard at /admin (own email sign-in).
+  const navigate = useNavigate();
   function handleAdminClick() {
-    // The PIN prompt is a surface too.
-    closeOtherOverlays('admin');
-    adminPin.requestAdminAccess(() => {
-      closeOtherOverlays('admin');
-      setAdminPanelOpen(true);
-      presence.updatePresence('in admin panel');
-    });
+    presence.updatePresence('in admin panel');
+    navigate('/admin');
   }
 
   // ── Slice 13: student waypoint submissions ────────────────────────────
@@ -644,7 +620,6 @@ export default function MapPage({ onReadinessChange }) {
     if (keep !== 'suggest') setSuggestModalOpen(false);
     if (keep !== 'submissions') setMySubmissionsOpen(false);
     if (keep !== 'review') setReviewTarget(null);
-    if (keep !== 'admin') setAdminPanelOpen(false);
     if (keep !== 'auth') setAuthModalOpen(false);
     if (keep !== 'profile') setProfileOpen(false);
     if (keep !== 'gps') setGpsCardOpen(false);
@@ -736,7 +711,6 @@ export default function MapPage({ onReadinessChange }) {
     },
     [closeOtherOverlays]
   );
-  const handleSelectPlace = useCallback((wp) => openPlace(wp, null), [openPlace]);
   const selectFromSearch = useCallback(
     (wp, opts) => openPlace(wp, opts?.fromMarker ? 'map' : 'search'),
     [openPlace]
@@ -780,8 +754,7 @@ export default function MapPage({ onReadinessChange }) {
     } else if (target.kind === 'profile') {
       openAuthModal('login');
     } else if (target.kind === 'admin') {
-      if (auth.user) handleAdminClick();
-      else openAuthModal('login');
+      handleAdminClick();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest, map, waypointsLoading, auth.loading]);
@@ -989,8 +962,6 @@ export default function MapPage({ onReadinessChange }) {
     !!reviewTarget ||
     authModalOpen ||
     profileOpen ||
-    adminPin.pinOpen ||
-    adminPanelOpen ||
     suggestModalOpen ||
     mySubmissionsOpen ||
     !!submissionToast ||
@@ -1359,30 +1330,6 @@ export default function MapPage({ onReadinessChange }) {
         </Suspense>
       )}
       <PushBanner onOpen={handleOpenUrl} />
-      {adminPin.pinOpen && (
-        <AdminPinGate
-          open={adminPin.pinOpen}
-          onSuccess={adminPin.handleSuccess}
-          onClose={adminPin.closePinGate}
-        />
-      )}
-      {map && adminPanelOpen && (
-        <AdminPanel
-          map={map}
-          user={auth.user}
-          waypoints={waypoints}
-          segments={segments}
-          kmlAnnotations={kmlAnnotations}
-          chips={quickChips.chips}
-          onChipsChanged={quickChips.refetch}
-          onClose={() => setAdminPanelOpen(false)}
-          onWaypointsChanged={refetchWaypoints}
-          onSegmentsChanged={refetchSegments}
-          onSelect={handleSelectPlace}
-          searchRegister={searchIndex.register}
-        />
-      )}
-
       {/* ── Slice 13: student waypoint submissions ─────────────────── */}
       {suggestModalOpen && (
         <SuggestWaypointModal

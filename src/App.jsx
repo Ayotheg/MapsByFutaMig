@@ -18,6 +18,7 @@ const EventListingPage = lazy(() => import('./features/events/EventListingPage')
 const DevelopersPage = lazy(() => import('./features/developers/DevelopersPage'))
 const DocsPage = lazy(() => import('./features/developers/DocsPage'))
 const SwaggerPage = lazy(() => import('./features/developers/SwaggerPage'))
+const AdminPage = lazy(() => import('./features/admin/AdminPage'))
 
 // React Router doesn't reset scroll position on navigation by default —
 // without this, clicking e.g. the footer's "Privacy Policy" link (or any
@@ -132,6 +133,15 @@ function App() {
           element={
             <Suspense fallback={null}>
               <SwaggerPage />
+            </Suspense>
+          }
+        />
+        {/* Full-page admin dashboard: email sign-in, then the data views. */}
+        <Route
+          path="/admin"
+          element={
+            <Suspense fallback={null}>
+              <AdminPage />
             </Suspense>
           }
         />

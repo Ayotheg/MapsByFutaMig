@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Maps By FUTA</string>
+    <string name="title_activity_main">Maps By FUTA</string>
+    <string name="package_name">xyz.mapsbyfuta.app</string>
+    <string name="custom_url_scheme">xyz.mapsbyfuta.app</string>
+</resources>

@@ -853,3 +853,79 @@
   border: 3px solid var(--v2-secondary);
   cursor: grab;
 }
+
+/* ── Wide (full-page dashboard) ──────────────────────────────
+   AdminDashboard.jsx mounts these tabs inside a tablet-sized page, so
+   lists become a two-up grid and text steps up from the narrow panel's
+   sizes. Everything here is scoped under .wide; the tabs themselves are
+   unchanged. */
+.wide .toolbar {
+  padding: 18px 20px 12px;
+  gap: 10px;
+}
+.wide .list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+  align-content: start;
+  align-items: start;
+  gap: 12px;
+  padding: 6px 20px 28px;
+}
+.wide .list > .empty,
+.wide .list > .loading {
+  grid-column: 1 / -1;
+}
+.wide .countBadge {
+  font-size: 13px;
+}
+.wide .searchInput {
+  font-size: 16px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+.wide .addBtn,
+.wide .formSave,
+.wide .formCancel {
+  min-height: 42px;
+  font-size: 13px;
+  padding: 0 18px;
+  border-radius: 999px;
+}
+.wide .categoryPill {
+  min-height: 38px;
+  font-size: 13px;
+  padding: 0 16px;
+}
+.wide .itemName {
+  font-size: 15px;
+}
+.wide .itemDesc {
+  font-size: 13px;
+}
+.wide .itemMeta {
+  font-size: 12px;
+}
+.wide .itemBadge {
+  font-size: 11px;
+}
+.wide .itemPhotoBadge {
+  font-size: 11px;
+}
+.wide .fieldGroup label {
+  font-size: 11px;
+}
+.wide .fieldGroup input,
+.wide .fieldGroup select {
+  font-size: 16px;
+  padding: 10px 12px;
+}
+.wide .saveStatus {
+  font-size: 12px;
+}
+.wide .sectionLabel {
+  font-size: 11px;
+}
+.wide .empty,
+.wide .loading {
+  font-size: 13px;
+}

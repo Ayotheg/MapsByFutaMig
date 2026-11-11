@@ -1,0 +1,633 @@
+import { supabase } from '../../lib/supabase';
+import { track } from '../../lib/analytics';
+import { normalizeWaypointType } from '../waypoints/wpTypeMeta';
+import { compressImageFile } from '../../lib/imageCompression';
+
+// ── Admin panel — Supabase mutation helpers ─────────────────────────────
+//
+// Re-targets legacy's `window.db.collection(...).update/delete/add(...)`
+// calls (app.js ~3418–4320, the `adminSaveBtn`/`adminDeleteBtn`/
+// `adminAddPointSave` handlers + the KML edit-modal's "IMPORT TO FIREBASE"
+// button) onto Supabase, matching CLAUDE.md's "Supabase only" rule and
+// segmentSave.js's (Slice 5) established insert/upload pattern.
+//
+// ── Deliberate deviation from legacy: images ────────────────────────────
+// Legacy keeps a single `imageUrls: string[]` field per waypoint/segment
+// doc (base64 data URIs, resaved wholesale on every edit — app.js
+// ~4109/4162). This schema normalizes images into their own
+// `waypoint_images`/`segment_images` tables (Slice 2/4/5's precedent), so
+// there's no single array to overwrite — this file exposes row-level
+// upload/insert/delete instead. `AdminEditModal.jsx` fetches a waypoint's/
+// segment's existing image rows itself (own concern, not threaded through
+// useWaypoints.js/useSegments.js, which only expose resolved display URLs)
+// and reconciles added/removed images against these functions on save.
+//
+// ── Unverified — flag before relying on this live ───────────────────────
+// Same exposure segmentSave.js already flagged: this client uses the anon
+// key. Legacy's PIN gate is (by its own comment, adminPin.js) a UI
+// convenience only — these UPDATE/DELETE/INSERT calls need real RLS
+// policies (ideally scoped to `auth.uid()`, now that Slice 10 exists) on
+// `waypoints`/`segments`/`waypoint_images`/`segment_images`/
+// `segment_points` before they'll actually succeed for anyone. Not
+// confirmed live.
+
+const PLACE_IMAGES_BUCKET = 'place-images';
+
+
+// ── Silent-failure guard ─────────────────────────────────────────────────
+// Postgres Row-Level Security does NOT raise an error when an UPDATE or
+// DELETE is filtered out by policy — PostgREST answers "204 OK, 0 rows
+// changed". supabase-js therefore reports `error: null` and the old code
+// happily showed "Waypoint updated!" / "Approved" while nothing had been
+// written (and, since nothing changed, the map never refreshed). Every
+// admin write below now asks for the affected rows back (`.select('id')`)
+// and calls this when none came back, so a blocked write is a loud,
+// explained failure instead of a silent no-op.
+async function blockedWriteError(action) {
+  let reason =
+    'The database accepted the request but changed nothing — a Row-Level Security policy blocked it.';
+  try {
+    const { data: userRes } = await supabase.auth.getUser();
+    const user = userRes?.user;
+    if (!user) {
+      reason = 'You are not signed in to Maps By FUTA. Sign in first, then open the admin panel again.';
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (!profile?.is_admin) {
+        reason =
+          `Your account (${user.email || user.id}) is not marked as an admin in the database, ` +
+          'so it is not allowed to change waypoints. The PIN only unlocks the panel — the database checks ' +
+          "profiles.is_admin. Run: update profiles set is_admin = true where id = '" + user.id + "';";
+      } else {
+        reason =
+          'Your account is an admin, but the waypoints table has no policy allowing this action. ' +
+          'Run supabase/admin_waypoint_policies.sql in the Supabase SQL editor.';
+      }
+    }
+  } catch {
+    // Diagnosis is best-effort; fall through with the generic message.
+  }
+  return new Error(`Could not ${action}. ${reason}`);
+}
+
+// PostgREST's missing-column message is "Could not find the 'x' column of
+// 'waypoints' in the schema cache" (PGRST204); Postgres' own is "column ...
+// does not exist" (42703).
+export function isMissingColumn(error) {
+  return (
+    !!error &&
+    (error.code === 'PGRST204' ||
+      error.code === '42703' ||
+      /column .* does not exist|could not find the .* column/i.test(error.message || ''))
+  );
+}
+
+// ── Images ───────────────────────────────────────────────────────────────
+
+/** Raw image rows (with row id + storage_path, not just a resolved URL) —
+ * needed so the edit modal can delete/reorder individual images, which
+ * useWaypoints.js/useSegments.js's shaped output doesn't expose. */
+export async function fetchImageRows(table, idColumn, entityId) {
+  const { data, error } = await supabase
+    .from(table)
+    .select('id, storage_path, position')
+    .eq(idColumn, entityId)
+    .order('position', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function uploadImage(kind, entityId, file, position) {
+  // Every photo upload path in the app (admin edit, KML photo attach,
+  // student "suggest a place" submissions, business promotion photos)
+  // calls this one function — so compressing here covers all of them.
+  // See lib/imageCompression.js for why this also fixes the EXIF-orientation
+  // "flipped photo" bug rather than just shrinking file size.
+  const compressed = await compressImageFile(file);
+  const ext = (compressed.name.split('.').pop() || 'jpg').toLowerCase();
+  const path = `${kind}/${entityId}/${position}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from(PLACE_IMAGES_BUCKET)
+    .upload(path, compressed, { contentType: compressed.type, upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+export async function removeStorageFiles(paths) {
+  if (!paths.length) return;
+  const { error } = await supabase.storage.from(PLACE_IMAGES_BUCKET).remove(paths);
+  if (error) throw error;
+}
+
+export async function insertImageRows(table, idColumn, entityId, paths, startPosition = 0) {
+  if (!paths.length) return;
+  const rows = paths.map((p, i) => ({ [idColumn]: entityId, storage_path: p, position: startPosition + i }));
+  const { error } = await supabase.from(table).insert(rows);
+  if (error) throw error;
+}
+
+export async function deleteImageRows(table, ids) {
+  if (!ids.length) return;
+  const { error } = await supabase.from(table).delete().in('id', ids);
+  if (error) throw error;
+}
+
+// ── Waypoints ────────────────────────────────────────────────────────────
+// Legacy: `adminSaveBtn`'s waypoint branch (app.js ~4103–4154). This port
+// skips all the imperative marker/popup/search-entry patching legacy does
+// after the write (`marker.setIcon`, `_placeCardOpts` rebuild, `FUTA_
+// SEARCH.index.find(...)` mutation) — WaypointLayer/PlaceCard/useSearchIndex
+// all re-render declaratively from the `waypoints` prop once the caller
+// calls `refetch()`, same "refetch instead of hand-patch" deviation
+// segmentSave.js already established for the save flow.
+//
+// Explore fields (isExplore/exploreTags/explorePriority/isPromoted/
+// sponsorName/promoLabel — supabase/explore_fields.sql) are optional
+// patch fields, not required ones: AdminEditModal.jsx always passes them
+// now, but this stays backward-compatible with any other caller passing
+// only name/description/type.
+export async function updateWaypoint(id, { name, description, type, area, lat, lng, isExplore, exploreTags, explorePriority, isPromoted, sponsorName, promoLabel, channelLink, channelPlatform, businessLink, businessPlatform }) {
+  // Never write a type the map/legend can't render (see wpTypeMeta.js).
+  const patch = { name, description };
+  if (type !== undefined) patch.type = normalizeWaypointType(type);
+  // Moved by the admin: a new position, locked so OSM never overrides it
+  // (supabase/waypoint_pin_locked.sql).
+  if (lat !== undefined && lng !== undefined) {
+    patch.lat = lat;
+    patch.lng = lng;
+  }
+  const explorePatch = {};
+  if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
+  if (exploreTags !== undefined) explorePatch.explore_tags = exploreTags;
+  if (explorePriority !== undefined) explorePatch.explore_priority = explorePriority;
+  if (isPromoted !== undefined) explorePatch.is_promoted = !!isPromoted;
+  if (sponsorName !== undefined) explorePatch.sponsor_name = sponsorName || null;
+  if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
+  // Channel entries (supabase/channel_entries.sql) — same "optional patch
+  // fields" shape as the Explore fields above.
+  if (channelLink !== undefined) explorePatch.channel_link = channelLink || null;
+  if (channelPlatform !== undefined) explorePatch.channel_platform = channelPlatform || null;
+  // Business entries (supabase/business_entries.sql) — same shape again.
+  if (businessLink !== undefined) explorePatch.business_link = businessLink || null;
+  if (businessPlatform !== undefined) explorePatch.business_platform = businessPlatform || null;
+  // Place area (supabase/waypoint_area.sql) — optional for the same reason.
+  if (area !== undefined) explorePatch.area = area.trim() || null;
+  if ('lat' in patch) explorePatch.pin_locked = true;
+
+  const hasExploreFields = Object.keys(explorePatch).length > 0;
+  let { data, error } = await supabase
+    .from('waypoints')
+    .update(hasExploreFields ? { ...patch, ...explorePatch } : patch)
+    .eq('id', id)
+    .select('id');
+
+  // pin_locked is newer than area: if it's the missing one, save the rest.
+  let pinSkipped = false;
+  if (error && 'pin_locked' in explorePatch && isMissingColumn(error) && /pin_locked/.test(error.message || '')) {
+    delete explorePatch.pin_locked;
+    ({ data, error } = await supabase
+      .from('waypoints')
+      .update({ ...patch, ...explorePatch })
+      .eq('id', id)
+      .select('id'));
+    pinSkipped = !error;
+  }
+
+  // The area column is the newest; if it's the missing one, keep every other
+  // field rather than falling back to name/description/type only.
+  let areaSkipped = false;
+  if (error && 'area' in explorePatch && isMissingColumn(error)) {
+    const withoutArea = { ...explorePatch };
+    delete withoutArea.area;
+    ({ data, error } = await supabase
+      .from('waypoints')
+      .update({ ...patch, ...withoutArea })
+      .eq('id', id)
+      .select('id'));
+    areaSkipped = !error;
+  }
+
+  const missingColumn = isMissingColumn(error);
+
+  if (missingColumn && hasExploreFields) {
+    // supabase/explore_fields.sql hasn't been run yet — don't let that
+    // block saving the ordinary name/description/type edit too.
+    const { data: baseData, error: baseError } = await supabase
+      .from('waypoints')
+      .update(patch)
+      .eq('id', id)
+      .select('id');
+    if (baseError) throw baseError;
+    if (!baseData?.length) throw await blockedWriteError('save this waypoint');
+    throw new Error(
+      'Saved name/description/type, but some fields need a migration run first — supabase/explore_fields.sql for the Explore toggle/tags/priority, supabase/channel_entries.sql for the channel link, supabase/business_entries.sql for the business link, and/or supabase/waypoint_area.sql for the area — those were not saved.'
+    );
+  }
+  if (error) throw error;
+  if (!data?.length) throw await blockedWriteError('save this waypoint');
+  // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+  track('admin_action', { action: 'update', entity: 'waypoint' });
+  // A warning, not an error: the save succeeded, so the caller must still
+  // run its photo upload and map refresh.
+  if (areaSkipped) return { warning: AREA_NOT_SAVED };
+  return pinSkipped ? { warning: PIN_NOT_LOCKED } : {};
+}
+
+const AREA_NOT_SAVED = 'Saved, except the area — run supabase/waypoint_area.sql in the Supabase SQL editor first.';
+const PIN_NOT_LOCKED =
+  'Saved. The map may still show it at the OpenStreetMap spot until supabase/waypoint_pin_locked.sql is run in the Supabase SQL editor.';
+
+// Legacy: `adminDeleteBtn`'s waypoint branch (app.js ~4283–4300). Only
+// deletes the waypoints row — `waypoint_images` cascade-deletes per the DB
+// FK, but the Storage *files*
+// themselves don't (a DB cascade can't reach Storage) — callers should
+// pass the waypoint's image storage_paths so this can also call
+// removeStorageFiles, or they'll be orphaned. Flagged, not silently
+// skipped: legacy never had this problem (base64-in-doc, nothing external
+// to orphan).
+export async function deleteWaypoint(id) {
+  const { data, error } = await supabase.from('waypoints').delete().eq('id', id).select('id');
+  if (error) throw error;
+  if (!data?.length) throw await blockedWriteError('delete this waypoint');
+  track('admin_action', { action: 'delete', entity: 'waypoint' });
+}
+
+// Legacy: `adminAddPointSave` (app.js ~3418–3459). `source_type:
+// 'gps_annotation'` matches legacy's literal value exactly (the type this
+// port's `useWaypoints.js` already filters `osm_import` rows out by).
+//
+// `isPerson` (supabase/people_entries.sql): a Person entry is the same
+// insert, minus a location — `lat`/`lng` are left null rather than
+// required, since a person has nowhere on the map to pin. Everything
+// else (status/source_type/admin write path) is identical to a Place.
+//
+// `isChannel` (supabase/channel_entries.sql): same "no location" shape
+// as a Person, plus `channelLink`/`channelPlatform` instead of a `type`.
+//
+// `isBusiness` (supabase/business_entries.sql): same "no location" shape
+// again, plus `businessLink`/`businessPlatform` instead of a `type` — an
+// admin-added Online Store, deliberately its own boolean/columns rather
+// than reusing `isChannel`'s (see business_entries.sql's header comment
+// for why).
+export async function insertWaypoint({
+  name,
+  description,
+  type,
+  lat,
+  lng,
+  area,
+  isPerson,
+  isChannel,
+  channelLink,
+  channelPlatform,
+  isBusiness,
+  businessLink,
+  businessPlatform,
+  isExplore,
+  exploreTags,
+  explorePriority,
+  isPromoted,
+  sponsorName,
+  promoLabel,
+}, { onWarning } = {}) {
+  const noLocation = isPerson || isChannel || isBusiness;
+  const row = {
+    id: crypto.randomUUID(),
+    name,
+    description,
+    lat: noLocation ? null : lat,
+    lng: noLocation ? null : lng,
+    source_type: 'gps_annotation',
+    // Explicit, not left to the column default: the map only ever loads
+    // `status = 'approved'` rows (useWaypoints.js), so an admin-added
+    // point must be approved on insert or it never shows up.
+    status: 'approved',
+    saved_at: new Date().toISOString(),
+  };
+  if (!noLocation) row.type = normalizeWaypointType(type);
+  if (isPerson) row.is_person = true;
+  if (isChannel) {
+    row.is_channel = true;
+    row.channel_link = channelLink || null;
+    row.channel_platform = channelPlatform || null;
+  }
+  if (isBusiness) {
+    row.is_business = true;
+    row.business_link = businessLink || null;
+    row.business_platform = businessPlatform || null;
+  }
+  const explorePatch = {};
+  if (isExplore !== undefined) explorePatch.is_explore = !!isExplore;
+  if (exploreTags !== undefined) explorePatch.explore_tags = exploreTags;
+  if (explorePriority !== undefined) explorePatch.explore_priority = explorePriority;
+  if (isPromoted !== undefined) explorePatch.is_promoted = !!isPromoted;
+  if (sponsorName !== undefined) explorePatch.sponsor_name = sponsorName || null;
+  if (promoLabel !== undefined) explorePatch.promo_label = promoLabel || 'Promoted';
+  // In explorePatch so it's also dropped by the full retry further down.
+  // A Person has no location, but reuses this column for their title
+  // ("300L · Electrical & Electronics") — see AdminEditModal.jsx.
+  if (area !== undefined && !isChannel && !isBusiness) explorePatch.area = area.trim() || null;
+  Object.assign(row, explorePatch);
+
+  let { data, error } = await supabase.from('waypoints').insert(row).select('id').single();
+
+  // Area is the newest column: if waypoint_area.sql hasn't run, insert
+  // everything else rather than losing the Explore/link fields too.
+  if (isMissingColumn(error) && 'area' in row) {
+    const withoutArea = { ...row };
+    delete withoutArea.area;
+    delete explorePatch.area;
+    ({ data, error } = await supabase.from('waypoints').insert(withoutArea).select('id').single());
+    if (!error) {
+      track('admin_action', { action: 'insert', entity: 'waypoint' });
+      if (row.area) onWarning?.(AREA_NOT_SAVED);
+      return data.id;
+    }
+  }
+
+  // supabase/people_entries.sql / channel_entries.sql haven't been run
+  // yet — `is_person`/`is_channel`/`channel_*` don't exist as columns.
+  // Don't let that block adding a Person or Channel entirely; retry
+  // without them (behaves like an ordinary waypoint with no coordinates
+  // until the relevant migration runs).
+  const missingColumn = isMissingColumn(error);
+  if (missingColumn && (isPerson || isChannel || isBusiness || Object.keys(explorePatch).length > 0)) {
+    const withoutNewCols = { ...row };
+    delete withoutNewCols.is_person;
+    delete withoutNewCols.is_channel;
+    delete withoutNewCols.channel_link;
+    delete withoutNewCols.channel_platform;
+    delete withoutNewCols.is_business;
+    delete withoutNewCols.business_link;
+    delete withoutNewCols.business_platform;
+    for (const field of Object.keys(explorePatch)) delete withoutNewCols[field];
+    delete withoutNewCols.area;
+    const { data: retryData, error: retryError } = await supabase
+      .from('waypoints')
+      .insert(withoutNewCols)
+      .select('id')
+      .single();
+    if (retryError) throw retryError;
+    track('admin_action', { action: 'insert', entity: 'waypoint' });
+    if (row.area) onWarning?.(AREA_NOT_SAVED);
+    return retryData.id;
+  }
+
+  if (error) throw error;
+  track('admin_action', { action: 'insert', entity: 'waypoint' });
+  return data.id;
+}
+
+// ── Pending submissions (Slice 13) ──────────────────────────────────────
+// No legacy equivalent — a genuinely new admin action, not a port. Lives
+// here (not `submitWaypoint.js`) for the same reason every other function
+// in this file does: it's an admin write. RLS's `admin_update` policy
+// (`supabase/waypoint_submissions.sql`) is what actually enforces only
+// admins can call these successfully — this client uses the anon key,
+// same as every other call in this file.
+export async function approveWaypoint(id) {
+  const { data, error } = await supabase
+    .from('waypoints')
+    .update({ status: 'approved', rejection_reason: null })
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw await blockedWriteError('approve this submission');
+  track('admin_action', { action: 'approve', entity: 'waypoint_submission' });
+}
+
+export async function rejectWaypoint(id, reason) {
+  const { data, error } = await supabase
+    .from('waypoints')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw await blockedWriteError('reject this submission');
+  track('admin_action', { action: 'reject', entity: 'waypoint_submission' });
+}
+
+// ── Promotions (paid business listings) ──────────────────────────────────
+// Go through SECURITY DEFINER functions (supabase/promotions_admin.sql), not
+// a table UPDATE — promotions has no client UPDATE policy on purpose, since
+// payment columns share the row. The functions check is_admin() themselves
+// and only allow a paid, 'pending_review' row to change.
+export async function approvePromotion(id) {
+  // Publishes the listing in one database transaction: creates the approved
+  // waypoint (map pin for a Physical Shop, link-out business card for an
+  // Online Store), features it in Explore as Promoted, copies the photos,
+  // and starts the paid duration. Returns the new waypoint id.
+  const { data, error } = await supabase.rpc('admin_approve_promotion', { p_id: id });
+  if (error) throw promotionRpcError(error, 'approve');
+  track('admin_action', { action: 'approve', entity: 'promotion' });
+  return data;
+}
+
+/**
+ * Takes a live promotion down before its expiry date. `erase: false` removes
+ * the listing from the map/Explore but keeps the promotion record (status
+ * "removed"); `erase: true` also deletes the record. Both delete the
+ * published waypoint (what the app actually reads) AND the business's photo
+ * files from the `place-images` bucket — a DB cascade can't reach Storage,
+ * so the files are removed here, after the database step has succeeded.
+ *
+ * Order matters: paths are read first (they're gone from the DB afterwards),
+ * the database is cleaned next (the source of truth — if that fails nothing
+ * has been destroyed), and the files go last. A failure at that last step
+ * doesn't undo the removal; it's reported via `photoError` so the caller can
+ * tell the admin which files to clear by hand.
+ *
+ * @returns {Promise<{ photoCount: number, photoError: string|null }>}
+ */
+export async function removePromotion(id, { erase = false } = {}) {
+  // Every photo this business has: its promotion_images rows, plus any
+  // waypoint_images rows on the published listing (Approve copies the same
+  // paths across, but an admin may have added more via the edit form).
+  const paths = new Set();
+  const { data: promo } = await supabase.from('promotions').select('waypoint_id').eq('id', id).maybeSingle();
+  const { data: promoImgs } = await supabase.from('promotion_images').select('storage_path').eq('promotion_id', id);
+  for (const r of promoImgs || []) if (r.storage_path) paths.add(r.storage_path);
+  if (promo?.waypoint_id) {
+    const { data: wpImgs } = await supabase
+      .from('waypoint_images')
+      .select('storage_path')
+      .eq('waypoint_id', promo.waypoint_id);
+    for (const r of wpImgs || []) if (r.storage_path) paths.add(r.storage_path);
+  }
+
+  const { error } = await supabase.rpc('admin_remove_promotion', { p_id: id, p_erase: erase });
+  if (error) throw promotionRpcError(error, erase ? 'delete' : 'remove');
+  track('admin_action', { action: erase ? 'delete' : 'remove', entity: 'promotion' });
+
+  // If the listing's waypoint is still there, the ad was on an existing
+  // place (or one another live ad still uses) and only its badge came off
+  // (supabase/promotions_dedupe_ranking.sql). Its other photos belong to
+  // that place — only delete the files this promotion uploaded.
+  if (promo?.waypoint_id) {
+    const { data: still, error: stillErr } = await supabase
+      .from('waypoints')
+      .select('id')
+      .eq('id', promo.waypoint_id)
+      .maybeSingle();
+    if (still || stillErr) {
+      const own = `promotion/${id}/`;
+      for (const p of [...paths]) if (!p.startsWith(own)) paths.delete(p);
+    }
+  }
+
+  let photoError = null;
+  if (paths.size) {
+    try {
+      await removeStorageFiles([...paths]);
+    } catch (e) {
+      photoError = e?.message || 'unknown error';
+    }
+  }
+  return { photoCount: paths.size, photoError };
+}
+
+/** Un-features promotions whose paid days have run out. Best-effort — a
+ * failure here must never block the review screen. */
+export async function expireEndedPromotions() {
+  try {
+    const { data } = await supabase.rpc('expire_promotions');
+    return typeof data === 'number' ? data : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function rejectPromotion(id, reason) {
+  const { error } = await supabase.rpc('admin_reject_promotion', { p_id: id, p_reason: reason || null });
+  if (error) throw promotionRpcError(error, 'reject');
+  track('admin_action', { action: 'reject', entity: 'promotion' });
+}
+
+// ── Events (supabase/events.sql) ──────────────────────────────────────────
+// Same SECURITY DEFINER RPC pattern as promotions: the events table has no
+// client UPDATE policy because payment columns share the row.
+export async function approveEvent(id, { featured = false } = {}) {
+  const { error } = await supabase.rpc('admin_approve_event', { p_id: id, p_featured: featured });
+  if (error) throw eventRpcError(error, 'approve');
+  track('admin_action', { action: 'approve', entity: 'event' });
+}
+
+export async function rejectEvent(id, reason) {
+  const { error } = await supabase.rpc('admin_reject_event', { p_id: id, p_reason: reason || null });
+  if (error) throw eventRpcError(error, 'reject');
+  track('admin_action', { action: 'reject', entity: 'event' });
+}
+
+export async function setEventFeatured(id, featured) {
+  const { error } = await supabase.rpc('admin_set_event_featured', { p_id: id, p_featured: featured });
+  if (error) throw eventRpcError(error, 'update');
+  track('admin_action', { action: featured ? 'feature' : 'unfeature', entity: 'event' });
+}
+
+/**
+ * Takes an event down (`erase: false`, kept under Removed) or deletes the
+ * record (`erase: true`). The poster file is deleted from Storage after the
+ * database step succeeds; a failure there is returned as `photoError`.
+ */
+export async function removeEvent(id, { erase = false } = {}) {
+  const { data: row } = await supabase.from('events').select('poster_path').eq('id', id).maybeSingle();
+  const { error } = await supabase.rpc('admin_remove_event', { p_id: id, p_erase: erase });
+  if (error) throw eventRpcError(error, erase ? 'delete' : 'remove');
+  track('admin_action', { action: erase ? 'delete' : 'remove', entity: 'event' });
+
+  // Only ever delete a file in this event's own folder. The database now
+  // refuses any other poster_path (events_hardening.sql); this guards rows
+  // and paths it hasn't seen.
+  const path = row?.poster_path;
+  if (!path || !path.startsWith(`event/${id}/`) || path.includes('..')) return { photoError: null };
+  try {
+    await removeStorageFiles([path]);
+    return { photoError: null };
+  } catch (e) {
+    return { photoError: e?.message || String(e) };
+  }
+}
+
+function eventRpcError(error, verb) {
+  const missing = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
+  if (missing) {
+    return new Error(
+      `Could not ${verb} this event — the database function is missing. Run supabase/events.sql in the Supabase SQL editor.`
+    );
+  }
+  return new Error(error.message || `Could not ${verb} this event.`);
+}
+
+function promotionRpcError(error, verb) {
+  const missing = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
+  if (missing) {
+    return new Error(
+      `Could not ${verb} this promotion — the database function is missing. ` +
+        'Run supabase/promotions_admin.sql in the Supabase SQL editor.'
+    );
+  }
+  return new Error(error.message || `Could not ${verb} this promotion.`);
+}
+
+// ── Segments ─────────────────────────────────────────────────────────────
+// Legacy: `adminSaveBtn`'s segment branch (app.js ~4156–4197) also
+// batch-writes a denormalized `segmentName` onto every child waypoint doc.
+// Not ported — waypoints join to `segments.name` live via `segment_id`
+// so there's no copy to keep in sync.
+export async function updateSegment(id, { name, description, category }) {
+  const { error } = await supabase.from('segments').update({ name, description, category }).eq('id', id);
+  if (error) throw error;
+  track('admin_action', { action: 'update', entity: 'segment' });
+}
+
+// Legacy: `adminDeleteBtn`'s segment branch (app.js ~4302–4318). In the
+// schema, `segment_points`/
+// `segment_images` cascade-delete with the segment; `waypoints.segment_id`
+// is `on delete set null` (children are orphaned from the route, not
+// deleted) — matches legacy's own behavior of only ever deleting the
+// segment doc itself, never its recorded waypoints.
+export async function deleteSegment(id) {
+  const { error } = await supabase.from('segments').delete().eq('id', id);
+  if (error) throw error;
+  track('admin_action', { action: 'delete', entity: 'segment' });
+}
+
+// ── KML tab → "Import to Supabase" ──────────────────────────────────────
+// Legacy: the KML edit-modal's `aeKmlImportBtn` handler (app.js
+// ~4017–4096) — turns a session-only admin-loaded KML feature into a real
+// row. Point features become a waypoint; line features become a segment
+// (+ its recorded `segment_points`, one per vertex, distance computed via
+// `haversine` — same as legacy's own inline distance loop there).
+export async function insertKmlPointAsWaypoint({ name, description, type = 'landmark', lat, lng }) {
+  return insertWaypoint({ name, description, type, lat, lng });
+}
+
+// Also saves paths drawn in the admin panel (`category` footpath/shortcut).
+export async function insertKmlLineAsSegment({ name, description, points, distanceM, category = 'other' }) {
+  const { data, error } = await supabase
+    .from('segments')
+    .insert({
+      name,
+      description,
+      category,
+      distance_m: distanceM,
+      duration_ms: 0,
+      recorded_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+  if (error) throw error;
+  const segmentId = data.id;
+  track('admin_action', { action: 'insert', entity: 'segment' });
+
+  if (points.length > 0) {
+    const rows = points.map((p, seq) => ({ segment_id: segmentId, seq, lat: p.lat, lng: p.lng }));
+    const { error: ptErr } = await supabase.from('segment_points').insert(rows);
+    if (ptErr) throw ptErr;
+  }
+  return segmentId;
+}

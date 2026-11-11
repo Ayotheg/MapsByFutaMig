@@ -1,0 +1,345 @@
+/* Day / time pickers (see DateTimeFields.jsx). A popover under the field
+   on wider screens; a bottom sheet with a dimmed backdrop on phones. */
+
+.field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+
+/* Looks like the page's other inputs. */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--v2-divider);
+  border-radius: 14px;
+  background: var(--v2-hud-upnext-bg);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.trigger > svg {
+  flex-shrink: 0;
+  color: var(--v2-primary);
+}
+.trigger:hover,
+.triggerOpen {
+  border-color: var(--v2-primary);
+}
+.trigger:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+.value,
+.placeholder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.value {
+  color: var(--v2-neutral);
+  font-weight: 500;
+}
+.placeholder {
+  color: var(--v2-text-muted);
+}
+
+/* ── Popover / sheet ──────────────────────────────────────────────── */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: transparent;
+}
+.popover {
+  position: absolute;
+  z-index: 41;
+  top: calc(100% + 8px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 300px;
+  padding: 16px;
+  border: 1px solid var(--v2-divider);
+  border-radius: 20px;
+  background: var(--v2-on-primary);
+  box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.22), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
+  font-family: var(--font-ui);
+  animation: popIn var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.popoverEnd {
+  left: auto;
+  right: 0;
+}
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.sheetHandle,
+.sheetTitle {
+  display: none;
+}
+.doneBtn {
+  display: none;
+}
+
+/* Calendar */
+.quick {
+  display: flex;
+  gap: 8px;
+}
+.quickChip {
+  flex: 1;
+  min-height: 36px;
+  border: 1px solid var(--v2-divider);
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  cursor: pointer;
+}
+.quickChip:hover {
+  background: var(--v2-hud-upnext-bg);
+}
+.monthHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.monthName {
+  font-family: var(--v2-font-satoshi);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+.monthNav {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--v2-hud-upnext-bg);
+  color: var(--v2-neutral);
+  cursor: pointer;
+}
+.monthNav:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.weekday {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--v2-text-muted);
+}
+.day {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid transparent;
+  border-radius: 50%;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--v2-neutral);
+  cursor: pointer;
+}
+.day:hover:not(:disabled) {
+  background: var(--v2-primary-tint);
+}
+.day:disabled {
+  color: var(--v2-text-muted);
+  opacity: 0.45;
+  cursor: default;
+}
+.dayToday {
+  border-color: var(--v2-primary-outline);
+  color: var(--v2-primary);
+  font-weight: 700;
+}
+.daySelected,
+.daySelected:hover:not(:disabled) {
+  border-color: var(--v2-primary);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+}
+
+/* Time */
+.periods {
+  display: flex;
+  padding: 4px;
+  border-radius: var(--r-full);
+  background: var(--v2-hud-upnext-bg);
+}
+.period {
+  flex: 1;
+  min-height: 34px;
+  border: none;
+  border-radius: var(--r-full);
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v2-text);
+  cursor: pointer;
+}
+.periodActive {
+  background: var(--v2-on-primary);
+  color: var(--v2-primary);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+.subLabel {
+  margin-bottom: -4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2-text-muted);
+}
+.hours {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.minutes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.timeChip {
+  min-height: 38px;
+  border: 1px solid var(--v2-divider);
+  border-radius: 10px;
+  background: var(--v2-on-primary);
+  font-family: var(--v2-font-manrope);
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  color: var(--v2-neutral);
+  cursor: pointer;
+}
+.timeChip:hover:not(:disabled) {
+  background: var(--v2-primary-tint);
+}
+.timeChip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.timeChipActive,
+.timeChipActive:hover:not(:disabled) {
+  border-color: var(--v2-primary);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+}
+
+.quickChip:focus-visible,
+.monthNav:focus-visible,
+.day:focus-visible,
+.period:focus-visible,
+.timeChip:focus-visible,
+.doneBtn:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+
+/* ── Phones: bottom sheet ─────────────────────────────────────────── */
+@media (max-width: 599px) {
+  .scrim {
+    z-index: 1400;
+    background: var(--v2-scrim);
+  }
+  .popover,
+  .popoverEnd {
+    position: fixed;
+    z-index: 1401;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    padding: 8px 20px calc(20px + var(--mob-safe-bottom, 0px));
+    border: none;
+    border-radius: 24px 24px 0 0;
+    animation: sheetUp 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  @keyframes sheetUp {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  .sheetHandle {
+    display: block;
+    align-self: center;
+    width: 36px;
+    height: 5px;
+    border-radius: var(--r-full);
+    background: var(--v2-divider);
+  }
+  .sheetTitle {
+    display: block;
+    font-family: var(--v2-font-satoshi);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--v2-neutral);
+  }
+  .day {
+    font-size: 15px;
+  }
+  .timeChip {
+    min-height: 44px;
+    font-size: 15px;
+  }
+  .doneBtn {
+    display: block;
+    min-height: 50px;
+    margin-top: 4px;
+    border: none;
+    border-radius: var(--r-full);
+    background: var(--v2-primary);
+    font-family: var(--font-ui);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--v2-on-primary);
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popover {
+    animation: none;
+  }
+}

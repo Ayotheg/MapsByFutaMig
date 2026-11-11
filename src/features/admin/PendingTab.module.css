@@ -127,3 +127,27 @@
   background: #f1f5f9;
   color: #94a3b8;
 }
+
+/* Full-page dashboard: same cards, tablet-sized text (see
+   AdminPanel.module.css's .wide). */
+.wide .card {
+  padding: 18px;
+  gap: 8px;
+}
+.wide .submitter,
+.wide .errorNote,
+.wide .noPhoto {
+  font-size: 12px;
+}
+.wide .photoThumb,
+.wide .photoThumbFallback {
+  width: 72px;
+  height: 72px;
+}
+.wide .rejectTextarea {
+  font-size: 16px;
+}
+.wide .rejectBtn {
+  min-height: 42px;
+  font-size: 13px;
+}

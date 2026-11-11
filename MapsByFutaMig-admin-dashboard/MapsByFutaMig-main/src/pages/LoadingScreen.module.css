@@ -1,0 +1,434 @@
+/*
+ * Loading screen. The original light design (v2 violet, uppercase spaced
+ * title, single breathing ring, hairline progress bar), with a few
+ * additions kept from the Oct 2026 redesign:
+ *   - wide background rings + ripples behind the icon, masked to fade out
+ *     below it so they never reach the title or progress text
+ *   - the thicker, wider progress bar
+ *   - a small dot orbiting the ring
+ *   - a soft shimmer on the bar and a fade-in on each new status label
+ *   - roomier slow-connection state, with "Continue with saved data" as a
+ *     quiet grey option at the bottom (the tagline steps aside for it)
+ * All motion is gated on prefers-reduced-motion: no-preference.
+ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--v2-surface);
+  overflow: hidden;
+  z-index: 9999;
+}
+
+/* Ambient violet glow behind the icon, faded out before it reaches
+   the top/bottom edges so it reads as a soft wash, not a hard blob. */
+.screen::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 500px;
+  height: 500px;
+  max-width: 130vw;
+  max-height: 130vw;
+  transform: translate(-50%, -50%);
+  border-radius: var(--r-full);
+  background: var(--v2-primary-glow);
+  filter: blur(40px);
+  pointer-events: none;
+}
+.screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, var(--v2-surface) 0%, transparent 18%, transparent 82%, var(--v2-surface) 100%);
+  pointer-events: none;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 var(--pad-lg);
+  transform: translateY(-6%);
+}
+
+/* ── Icon ─────────────────────────────────────────────────────────── */
+.iconWrap {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 36px;
+}
+
+/* ── Background rings ─────────────────────────────────────────────── */
+/* Sized to the widest ring. Full strength above the icon's centre, faded
+   out ~100px below it — the title starts ~116px below the centre. */
+.halo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 600px;
+  height: 600px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 48%, transparent 66%);
+  mask-image: linear-gradient(to bottom, #000 48%, transparent 66%);
+}
+.ring,
+.ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: var(--r-full);
+  transform: translate(-50%, -50%);
+}
+.ring {
+  border: 1px solid var(--v2-primary-outline);
+}
+.ringMd {
+  width: 260px;
+  height: 260px;
+  opacity: 0.8;
+}
+.ringLg {
+  width: 400px;
+  height: 400px;
+  opacity: 0.6;
+}
+.ringXl {
+  width: 580px;
+  height: 580px;
+  opacity: 0.45;
+}
+.ripple {
+  width: 80px;
+  height: 80px;
+  border: 1px solid var(--v2-primary-outline);
+  opacity: 0;
+}
+
+.ringOuter {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  border: 1px solid var(--v2-primary-outline);
+}
+
+/* Small dot riding the ring. The wrapper spins; the dot sits on its edge. */
+.orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-full);
+  transform: rotate(-40deg);
+}
+.orbitDot {
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  box-shadow: 0 0 0 4px var(--v2-primary-glow);
+}
+
+.iconCircle {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+}
+.pinIcon {
+  width: 25px;
+  height: 25px;
+  color: #ffffff;
+}
+
+/* ── Text ─────────────────────────────────────────────────────────── */
+.title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 35px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--v2-primary);
+  text-align: center;
+  margin: 0 0 8px;
+}
+.subtitle {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--v2-text-variant);
+  opacity: 0.85;
+  text-align: center;
+  max-width: 320px;
+  margin: 0 0 40px;
+}
+
+/* ── Progress ─────────────────────────────────────────────────────── */
+.barTrack {
+  position: relative;
+  width: min(78vw, 300px);
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--v2-track);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.barFill {
+  position: relative;
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  box-shadow: 0 0 8px var(--v2-primary-glow-strong);
+  overflow: hidden;
+  transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.barFill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.6) 50%, transparent 100%);
+  transform: translateX(-100%);
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(78vw, 300px);
+}
+.statusLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--v2-text-variant);
+  white-space: nowrap;
+}
+.statusPercent {
+  flex-shrink: 0;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-primary);
+}
+
+.footerMeta {
+  position: absolute;
+  z-index: 1; /* above .screen::after's edge fade */
+  bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  left: 24px;
+  right: 24px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--v2-text-variant);
+  opacity: 0.7;
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Boot-timeout failsafe (HomeRoute.jsx's BOOT_TIMEOUT_MS) ───────── */
+.stuckPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 36px;
+  max-width: min(80vw, 300px);
+}
+.stuckMessage {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--v2-text-variant);
+  text-align: center;
+  margin: 0;
+}
+.stuckButtonPrimary {
+  min-height: 40px;
+  min-width: 120px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  color: #ffffff;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.stuckButtonPrimary:hover {
+  opacity: 0.85;
+}
+
+/* "Continue with saved data": plain grey text near the bottom, an option
+   rather than a second button. */
+.continueOption {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--v2-text-variant);
+  opacity: 0.8;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.continueOption:hover {
+  color: var(--v2-text-variant);
+  text-decoration: underline;
+}
+.screenStuck .footerMeta {
+  display: none;
+}
+
+/* Sound toggle: "Mute" while the anthem plays, "Tap for sound" while it
+   doesn't (browser blocked it, or muted). Small and quiet, top centre;
+   44px tall to meet iOS touch-target size. */
+.soundPrompt {
+  position: absolute;
+  z-index: 2;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1px solid var(--v2-primary-outline);
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--v2-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.soundPrompt:hover {
+  background: #ffffff;
+}
+.soundPrompt:focus-visible {
+  outline: 2px solid var(--v2-primary-outline);
+  outline-offset: 2px;
+}
+
+/* ── Motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .ringOuter {
+    animation: breathe var(--v2-duration-breathe) var(--v2-ease-standard) infinite;
+  }
+  .orbit {
+    animation: orbit 7s linear infinite;
+  }
+  .ripple {
+    animation: ripple 3.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  }
+  .rippleDelayed {
+    animation-delay: 1.7s;
+  }
+  .barFill::after {
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+  .statusLabel {
+    animation: labelIn 0.3s ease-out;
+  }
+  .soundPrompt {
+    animation: promptIn 0.35s ease-out;
+  }
+}
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+@keyframes ripple {
+  0% {
+    width: 80px;
+    height: 80px;
+    opacity: 0.8;
+  }
+  100% {
+    width: 440px;
+    height: 440px;
+    opacity: 0;
+  }
+}
+@keyframes orbit {
+  from { transform: rotate(-40deg); }
+  to { transform: rotate(320deg); }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes promptIn {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes labelIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Desktop: a little more room and a wider bar. */
+@media (min-width: 900px) and (min-height: 640px) {
+  .halo {
+    width: 760px;
+    height: 760px;
+    /* same ~100px fade below the icon centre, at this larger box size */
+    -webkit-mask-image: linear-gradient(to bottom, #000 48%, transparent 62%);
+    mask-image: linear-gradient(to bottom, #000 48%, transparent 62%);
+  }
+  .ringMd { width: 300px; height: 300px; }
+  .ringLg { width: 480px; height: 480px; }
+  .ringXl { width: 720px; height: 720px; }
+  .barTrack,
+  .status {
+    width: 340px;
+  }
+}
