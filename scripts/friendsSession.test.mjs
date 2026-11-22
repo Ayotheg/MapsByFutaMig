@@ -13,6 +13,12 @@ import {
   distanceM,
   nextHost,
   raceDone,
+  CHAT_MAX_LENGTH,
+  CHAT_MAX_MESSAGES,
+  CHAT_QUICK_REPLIES,
+  sanitizeChatText,
+  appendChatMessage,
+  formatMessageTime,
 } from '../src/features/friends/friendsSession.js';
 
 for (let i = 0; i < 200; i++) {
@@ -67,3 +73,23 @@ assert.equal(raceDone(['a', 'b'], [{ id: 'a', ms: 1 }], ['b']), true, 'the rest 
 assert.equal(raceDone(['a', 'b'], [], ['a', 'b']), true, 'everyone left');
 assert.equal(raceDone(null, [], []), false, 'no roster yet');
 console.log('ok: raceDone');
+
+assert.equal(sanitizeChatText('   '), null, 'blank message ignored');
+assert.equal(sanitizeChatText('  On   my\nway  '), 'On my way', 'whitespace normalized');
+assert.equal(sanitizeChatText('a'.repeat(CHAT_MAX_LENGTH + 20)).length, CHAT_MAX_LENGTH, 'length capped');
+assert.ok(CHAT_QUICK_REPLIES.meet.length >= 4 && CHAT_QUICK_REPLIES.race.length >= 4, 'quick replies defined for meet and race');
+
+let thread = [];
+thread = appendChatMessage(thread, { id: 'm1', text: 'Here' });
+thread = appendChatMessage(thread, { id: 'm1', text: 'Here' });
+assert.equal(thread.length, 1, 'deduplicates by id');
+assert.equal(appendChatMessage(thread, { id: '', text: 'bad' }), thread, 'ignores missing id');
+let capped = [];
+for (let i = 0; i < CHAT_MAX_MESSAGES + 10; i++) {
+  capped = appendChatMessage(capped, { id: `id-${i}`, text: `msg ${i}` });
+}
+assert.equal(capped.length, CHAT_MAX_MESSAGES, 'caps retained messages');
+assert.equal(capped[0].id, 'id-10', 'drops oldest messages');
+assert.match(formatMessageTime(Date.UTC(2026, 0, 1, 9, 5)), /^\d{2}:\d{2}$/, 'formats HH:MM');
+assert.equal(formatMessageTime(NaN), '', 'invalid timestamp returns empty string');
+console.log('ok: chat helpers');

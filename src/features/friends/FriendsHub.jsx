@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import { useFriendsSession } from './useFriendsSession';
 import { Countdown, Ended, Finished, Invite, JoinCode, Lobby, MeetBoard, RaceBoard, RaceSetup, Results } from './FriendsScreens';
+import FriendsChat from './FriendsChat';
 import { PAUSED_AFTER_MS, distanceM, firstName } from './friendsSession';
 import { getLastFix } from '../navigation/gpsWatch';
 
@@ -159,6 +160,68 @@ export default function FriendsHub({
   // hidden (place card, sheet), reset for a new race or meetup.
   const [boardMin, setBoardMin] = useState(true);
   useEffect(() => setBoardMin(true), [session?.code]);
+
+  // ── Ephemeral in-session chat (Meet & Race) ────────────────────────
+  const { messages, typingUsers } = f;
+  const [chatOpen, setChatOpen] = useState(false);
+  const [lastReadId, setLastReadId] = useState(null);
+  const [toastMsg, setToastMsg] = useState(null);
+  const lastSeenIdRef = useRef(null);
+  const toastTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!session?.code || !joined || phase === 'ended') {
+      setChatOpen(false);
+      setLastReadId(null);
+      setToastMsg(null);
+      lastSeenIdRef.current = null;
+      clearTimeout(toastTimerRef.current);
+    } else if (phase === 'countdown') {
+      setChatOpen(false);
+    }
+  }, [session?.code, joined, phase]);
+
+  // Mark messages read while chat is open, or pop a brief toast on new incoming ones.
+  useEffect(() => {
+    const latest = messages.length ? messages[messages.length - 1] : null;
+    if (!latest) {
+      lastSeenIdRef.current = null;
+      setToastMsg(null);
+      return;
+    }
+    if (chatOpen) {
+      setLastReadId(latest.id);
+      lastSeenIdRef.current = latest.id;
+      setToastMsg(null);
+      clearTimeout(toastTimerRef.current);
+      return;
+    }
+    if (latest.id !== lastSeenIdRef.current) {
+      lastSeenIdRef.current = latest.id;
+      if (latest.senderId !== myId) {
+        setToastMsg(latest);
+        clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => setToastMsg(null), 8000);
+      }
+    }
+  }, [messages, chatOpen, myId]);
+
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+
+  const unreadCount = useMemo(() => {
+    if (chatOpen || !messages.length) return 0;
+    const idx = lastReadId ? messages.findIndex((m) => m.id === lastReadId) : -1;
+    const unseen = idx >= 0 ? messages.slice(idx + 1) : messages;
+    return unseen.filter((m) => m.senderId !== myId).length;
+  }, [chatOpen, messages, lastReadId, myId]);
+
+  const lastMessage = messages.length ? messages[messages.length - 1] : null;
+  function openChat() {
+    setChatOpen(true);
+    setToastMsg(null);
+    clearTimeout(toastTimerRef.current);
+    if (messages.length) setLastReadId(messages[messages.length - 1].id);
+  }
 
   // ── Trip: the racer heads to the finish once the countdown ends ────
   const launchedRef = useRef(null);
@@ -352,28 +415,56 @@ export default function FriendsHub({
     );
   }
 
+  const resolvedOtherName = otherName || (isHost ? 'Your friend' : session.hostName);
+  const placeDistance = session.place ? distanceM(f.myFix, session.place) : null;
+  const chatDrawer = chatOpen && (
+    <FriendsChat
+      isMobile={isMobile}
+      mode={session.mode}
+      myId={myId}
+      otherName={resolvedOtherName}
+      distance={f.meetDistance}
+      place={session.place}
+      placeDistance={placeDistance}
+      arrived={f.meetArrived}
+      paused={phase === 'live' && !f.meetArrived && otherPaused}
+      playerCount={session.roster?.length || members.length || 2}
+      connected={f.connected}
+      messages={messages}
+      typingUsers={typingUsers}
+      onSend={f.sendMessage}
+      onTyping={f.notifyTyping}
+      onClose={() => setChatOpen(false)}
+    />
+  );
+
   if (phase === 'lobby') {
     return (
-      <Lobby
-        isMobile={isMobile}
-        session={session}
-        members={members}
-        progress={progress}
-        myId={myId}
-        isHost={isHost}
-        now={now}
-        searchIndex={searchIndex}
-        notice={notice}
-        connected={f.connected}
-        everConnected={f.everConnected}
-        onMeetPlaceChange={f.setMeetPlace}
-        onHaveCode={() => {
-          f.leave();
-          onStartModeChange('code');
-        }}
-        onStart={f.start}
-        onLeave={f.leave}
-      />
+      <>
+        <Lobby
+          isMobile={isMobile}
+          session={session}
+          members={members}
+          progress={progress}
+          myId={myId}
+          isHost={isHost}
+          now={now}
+          searchIndex={searchIndex}
+          notice={notice}
+          connected={f.connected}
+          everConnected={f.everConnected}
+          unreadCount={unreadCount}
+          onOpenChat={openChat}
+          onMeetPlaceChange={f.setMeetPlace}
+          onHaveCode={() => {
+            f.leave();
+            onStartModeChange('code');
+          }}
+          onStart={f.start}
+          onLeave={f.leave}
+        />
+        {chatDrawer}
+      </>
     );
   }
 
@@ -405,15 +496,21 @@ export default function FriendsHub({
   if (race) {
     if (meFinished && watchingCode !== session.code) {
       return (
-        <Finished
-          isMobile={isMobile}
-          session={session}
-          rows={rows}
-          onWatch={() => setWatchingCode(session.code)}
-          onLeave={f.leave}
-        />
+        <>
+          <Finished
+            isMobile={isMobile}
+            session={session}
+            rows={rows}
+            unreadCount={unreadCount}
+            onOpenChat={openChat}
+            onWatch={() => setWatchingCode(session.code)}
+            onLeave={f.leave}
+          />
+          {chatDrawer}
+        </>
       );
     }
+    if (chatOpen) return chatDrawer;
     if (!boardVisible) return null;
     return (
       <RaceBoard
@@ -424,6 +521,10 @@ export default function FriendsHub({
         isHost={isHost}
         notice={notice}
         minimized={boardMin}
+        unreadCount={unreadCount}
+        lastMessage={lastMessage}
+        toastMessage={toastMsg}
+        onOpenChat={openChat}
         onMinimizedChange={setBoardMin}
         onDirections={() => onNavigateTo(session.place)}
         onLeave={() => {
@@ -434,18 +535,23 @@ export default function FriendsHub({
     );
   }
 
+  if (chatOpen) return chatDrawer;
   if (!boardVisible) return null;
   return (
     <MeetBoard
-      otherName={otherName || (isHost ? 'Your friend' : session.hostName)}
+      otherName={resolvedOtherName}
       distance={f.meetDistance}
       updatedAt={other?.at || null}
       now={now}
       arrived={f.meetArrived}
       navOpen={navOpen}
       place={session.place}
-      placeDistance={session.place ? distanceM(f.myFix, session.place) : null}
+      placeDistance={placeDistance}
       minimized={boardMin}
+      unreadCount={unreadCount}
+      lastMessage={lastMessage}
+      toastMessage={toastMsg}
+      onOpenChat={openChat}
       onMinimizedChange={setBoardMin}
       onShowBoth={showBoth}
       onDirections={meetDirections}

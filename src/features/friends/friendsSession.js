@@ -119,3 +119,34 @@ export function ago(ms) {
 export function firstName(name) {
   return (name || 'Friend').trim().split(/\s+/)[0];
 }
+
+// Ephemeral in-session chat (Meet and Race). Nothing is persisted to the DB.
+export const CHAT_MAX_LENGTH = 240;
+export const CHAT_MAX_MESSAGES = 100;
+export const TYPING_TTL_MS = 3500;
+export const TYPING_THROTTLE_MS = 2000;
+
+export const CHAT_QUICK_REPLIES = {
+  meet: ['On my way', 'I’m here', 'Wait 2 mins', 'Where are you?', 'I see you!'],
+  race: ['On my way', 'Almost there!', 'Wait up!', 'Where are you?', 'Let’s go!'],
+};
+
+export function sanitizeChatText(input) {
+  const text = String(input || '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  return text.slice(0, CHAT_MAX_LENGTH);
+}
+
+export function appendChatMessage(list, message) {
+  if (!message?.id || !message.text) return list;
+  if (list.some((m) => m.id === message.id)) return list;
+  const next = [...list, message];
+  return next.length > CHAT_MAX_MESSAGES ? next.slice(next.length - CHAT_MAX_MESSAGES) : next;
+}
+
+export function formatMessageTime(ts) {
+  if (!Number.isFinite(ts)) return '';
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+

@@ -16,10 +16,14 @@ import {
   RACE_FINISH_M,
   RACE_LIMIT_MS,
   SEND_EVERY_MS,
+  TYPING_THROTTLE_MS,
+  TYPING_TTL_MS,
+  appendChatMessage,
   createCode,
   distanceM,
   nextHost,
   raceDone,
+  sanitizeChatText,
 } from './friendsSession';
 
 const STORE_KEY = 'friends-session';
@@ -100,6 +104,9 @@ export function useFriendsSession(user) {
   const membersRef = useRef(members);
   membersRef.current = members;
   const [progress, setProgress] = useState({});
+  const [messages, setMessages] = useState([]);
+  const [typingBy, setTypingBy] = useState({});
+  const lastTypingSentRef = useRef({ active: false, at: 0 });
   const [peek, setPeek] = useState('loading');
   const [connected, setConnected] = useState(false);
   // Has this session's channel ever been up ("Connecting…" vs "Reconnecting…").
@@ -351,6 +358,44 @@ export function useFriendsSession(user) {
         channel.on('broadcast', { event: 'pos' }, ({ payload }) => {
           if (!payload?.id) return;
           setProgress((p) => ({ ...p, [payload.id]: { ...payload, at: Date.now() } }));
+        });
+
+        channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
+          const s = sessionRef.current;
+          if (!s?.joined || s.phase === 'ended' || !payload?.id || !payload?.senderId) return;
+          const text = sanitizeChatText(payload.text);
+          if (!text) return;
+          const msg = {
+            id: String(payload.id),
+            senderId: String(payload.senderId),
+            senderName: String(payload.senderName || s.names?.[payload.senderId] || 'Friend'),
+            text,
+            at: Number.isFinite(payload.at) ? payload.at : Date.now(),
+          };
+          setMessages((prev) => appendChatMessage(prev, msg));
+          setTypingBy((prev) => {
+            if (!prev[msg.senderId]) return prev;
+            const next = { ...prev };
+            delete next[msg.senderId];
+            return next;
+          });
+        });
+
+        channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+          const s = sessionRef.current;
+          if (!s?.joined || s.phase === 'ended' || !payload?.id || payload.id === myIdRef.current) return;
+          const id = String(payload.id);
+          if (payload.active) {
+            const name = String(payload.name || s.names?.[id] || 'Friend');
+            setTypingBy((prev) => ({ ...prev, [id]: { id, name, at: Date.now() } }));
+          } else {
+            setTypingBy((prev) => {
+              if (!prev[id]) return prev;
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
+          }
         });
 
         channel.on('broadcast', { event: 'arrived' }, ({ payload }) => {
@@ -706,12 +751,87 @@ export function useFriendsSession(user) {
     return () => clearTimeout(t);
   }, [isHost, meetArrived, endSession]);
 
+  // ── Ephemeral chat: clears automatically once a meetup or race ends ─
+  useEffect(() => {
+    if (!code || !joined || phase === 'ended') {
+      setMessages([]);
+      setTypingBy({});
+      lastTypingSentRef.current = { active: false, at: 0 };
+    }
+  }, [code, joined, phase]);
+
+  // Prune typing indicators if someone locks their phone mid-sentence.
+  const hasTypers = Object.keys(typingBy).length > 0;
+  useEffect(() => {
+    if (!hasTypers) return undefined;
+    const t = setInterval(() => {
+      const cutoff = Date.now() - TYPING_TTL_MS;
+      setTypingBy((prev) => {
+        let changed = false;
+        const next = {};
+        Object.entries(prev).forEach(([id, entry]) => {
+          if (entry.at >= cutoff) next[id] = entry;
+          else changed = true;
+        });
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [hasTypers]);
+
+  const typingUsers = useMemo(() => Object.values(typingBy), [typingBy]);
+
   // ── Actions ─────────────────────────────────────────────────────────
+  const notifyTyping = useCallback(
+    (active) => {
+      const s = sessionRef.current;
+      const me = myIdRef.current;
+      if (!s?.joined || s.phase === 'ended' || !me || !connectedRef.current) return;
+      const now = Date.now();
+      const prev = lastTypingSentRef.current;
+      if (active) {
+        if (prev.active && now - prev.at < TYPING_THROTTLE_MS) return;
+        lastTypingSentRef.current = { active: true, at: now };
+        send('typing', { id: me, name: myNameRef.current || 'Friend', active: true });
+      } else if (prev.active) {
+        lastTypingSentRef.current = { active: false, at: now };
+        send('typing', { id: me, name: myNameRef.current || 'Friend', active: false });
+      }
+    },
+    [send]
+  );
+
+  const sendMessage = useCallback(
+    (rawText, { quick = false } = {}) => {
+      const s = sessionRef.current;
+      const me = myIdRef.current;
+      if (!s?.joined || s.phase === 'ended' || !me || !connectedRef.current) return false;
+      const text = sanitizeChatText(rawText);
+      if (!text) return false;
+      const now = Date.now();
+      const msg = {
+        id: `${me}-${now}-${Math.random().toString(36).slice(2, 6)}`,
+        senderId: me,
+        senderName: myNameRef.current || 'You',
+        text,
+        at: now,
+      };
+      setMessages((prev) => appendChatMessage(prev, msg));
+      send('chat', msg);
+      notifyTyping(false);
+      track('friends_chat_sent', { mode: s.mode, quick });
+      return true;
+    },
+    [send, notifyTyping]
+  );
+
   const create = useCallback(
     async (newMode, place) => {
       if (!myId) return;
       const now = Date.now();
       setProgress({});
+      setMessages([]);
+      setTypingBy({});
       setSession({
         mode: newMode,
         code: createCode(),
@@ -743,6 +863,8 @@ export function useFriendsSession(user) {
       if (s?.code === invite.code) return;
       setPeek('loading');
       setProgress({});
+      setMessages([]);
+      setTypingBy({});
       setSession({ mode: invite.mode, code: invite.code, joined: false, phase: 'invite', names: {}, fromCode });
     },
     [setSession]
@@ -820,6 +942,8 @@ export function useFriendsSession(user) {
     }
     setSession(null);
     setProgress({});
+    setMessages([]);
+    setTypingBy({});
     setMyFix(null);
   }, [amHost, endSession, setSession, send, presentIds]);
 
@@ -827,6 +951,8 @@ export function useFriendsSession(user) {
     session,
     members,
     progress,
+    messages,
+    typingUsers,
     peek,
     connected,
     everConnected,
@@ -843,5 +969,7 @@ export function useFriendsSession(user) {
     leave,
     setMeetPlace,
     setFollow,
+    sendMessage,
+    notifyTyping,
   };
 }
