@@ -9,8 +9,6 @@ import {
   KeyRound,
   Link2,
   LocateFixed,
-  Lock,
-  LogIn,
   MapPin,
   MessageCircle,
   Navigation,
@@ -28,8 +26,11 @@ import { ChatStrip, ChatToast, UnreadBadge } from './FriendsChat';
 import {
   CAPACITY,
   LOBBY_TTL_MS,
+  MEET_MAX_DISTANCE_M,
   PAUSED_AFTER_MS,
   RACE_LIMIT_MS,
+  SUGGESTED_USERNAMES,
+  USERNAME_MAX_LENGTH,
   ago,
   firstName,
   formatClock,
@@ -39,6 +40,7 @@ import {
   inviteUrl,
   normalizeCode,
   ordinal,
+  sanitizeUsername,
   walkMinutes,
 } from './friendsSession';
 
@@ -136,6 +138,40 @@ function PlacePicker({ id, label, searchIndex, onPick }) {
   );
 }
 
+// Lightweight username picker (no sign-in required).
+function UsernameField({ id, value, onChange, autoFocus = false }) {
+  const inputRef = useRef(null);
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
+  return (
+    <div className={styles.col} style={{ gap: 8 }}>
+      <label className={styles.overline} htmlFor={id}>
+        Your username
+      </label>
+      <input
+        id={id}
+        ref={inputRef}
+        className={styles.search}
+        placeholder="e.g. Tolu, Ayo, Chidi"
+        value={value}
+        maxLength={USERNAME_MAX_LENGTH}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete="nickname"
+      />
+      {!value.trim() && (
+        <div className={styles.nameChips} aria-label="Suggested usernames">
+          {SUGGESTED_USERNAMES.map((preset) => (
+            <button key={preset} type="button" className={styles.nameChip} onClick={() => onChange(preset)}>
+              {preset}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Join with a code (instead of tapping the link) ──────────────────
 export function JoinCode({ isMobile, onJoin, onClose }) {
   const [value, setValue] = useState('');
@@ -181,17 +217,52 @@ export function JoinCode({ isMobile, onJoin, onClose }) {
           Join
         </button>
       </form>
-      <span className={styles.note}>
-        <Lock size={14} />
-        Everyone needs to be signed in to join.
-      </span>
     </Panel>
   );
 }
 
-// ── 1 · Race to a place: pick the finish line ────────────────────────
-export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreate, onHaveCode, onClose }) {
+// ── 0 · Meet a friend: pick a username first (only when none saved) ──
+export function MeetSetup({ isMobile, initialName = '', onCreate, onHaveCode, onClose }) {
+  const [name, setName] = useState(initialName);
+  const cleanName = sanitizeUsername(name);
+  const maxKm = Math.round(MEET_MAX_DISTANCE_M / 1000);
+
+  return (
+    <Panel isMobile={isMobile} label="Meet a friend" onScrim={onClose}>
+      <div className={styles.headRow}>
+        <div className={styles.headText}>
+          <span className={cx(styles.overline, styles.overlineViolet)}>Short distance · Within {maxKm} km</span>
+          <h2 className={styles.title}>Meet a friend</h2>
+          <p className={styles.sub}>Choose a username so your friend knows who’s on the map.</p>
+        </div>
+        <CloseBtn onClick={onClose} />
+      </div>
+      <form
+        className={styles.col}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (cleanName) onCreate(cleanName);
+        }}
+      >
+        <UsernameField id="friends-meet-name" value={name} onChange={setName} autoFocus />
+        <button type="submit" className={cx(styles.btn, styles.btnPrimary)} disabled={!cleanName}>
+          <Link2 size={18} />
+          Create meetup
+        </button>
+      </form>
+      <button type="button" className={cx(styles.btn, styles.btnGhost)} onClick={onHaveCode}>
+        <KeyRound size={16} />
+        <span className={styles.btnLabel}>Have a code? Join a friend</span>
+      </button>
+    </Panel>
+  );
+}
+
+// ── 1 · Race to a place: pick the finish line + username ─────────────
+export function RaceSetup({ isMobile, place, initialName = '', onPlaceChange, searchIndex, onCreate, onHaveCode, onClose }) {
   const [editing, setEditing] = useState(!place);
+  const [name, setName] = useState(initialName);
+  const cleanName = sanitizeUsername(name);
 
   return (
     <Panel isMobile={isMobile} label="Race to a place" onScrim={onClose}>
@@ -199,7 +270,7 @@ export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreat
         <div className={styles.headText}>
           <span className={cx(styles.overline, styles.overlineViolet)}>2–4 people</span>
           <h2 className={styles.title}>Race to a place</h2>
-          <p className={styles.sub}>Pick a place. Everyone heads there, and the first to arrive wins.</p>
+          <p className={styles.sub}>Pick a finish line and a username. First to arrive wins.</p>
         </div>
         <CloseBtn onClick={onClose} />
       </div>
@@ -226,8 +297,9 @@ export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreat
           }}
         />
       )}
+      <UsernameField id="friends-race-name" value={name} onChange={setName} />
       <div className={styles.col}>
-        <button type="button" className={cx(styles.btn, styles.btnPrimary)} disabled={!place} onClick={onCreate}>
+        <button type="button" className={cx(styles.btn, styles.btnPrimary)} disabled={!place || !cleanName} onClick={() => onCreate(cleanName)}>
           <Link2 size={18} />
           Create invite link
         </button>
@@ -235,10 +307,6 @@ export function RaceSetup({ isMobile, place, onPlaceChange, searchIndex, onCreat
           <KeyRound size={16} />
           <span className={styles.btnLabel}>Have a code? Join a friend’s race</span>
         </button>
-        <span className={styles.note}>
-          <Lock size={14} />
-          Everyone needs to be signed in to join.
-        </span>
       </div>
     </Panel>
   );
@@ -251,7 +319,26 @@ function shareText(session) {
   return `${intro}: ${url}\nOr open Nav › Join with a code: ${session.code}`;
 }
 
-export function Lobby({ isMobile, session, members, progress, myId, isHost, now, notice, connected, everConnected, searchIndex, unreadCount = 0, hasMessages = false, onOpenChat, onMeetPlaceChange, onHaveCode, onStart, onLeave }) {
+export function Lobby({
+  isMobile,
+  session,
+  members,
+  progress,
+  myId,
+  isHost,
+  now,
+  notice,
+  connected,
+  everConnected,
+  searchIndex,
+  unreadCount = 0,
+  hasMessages = false,
+  onOpenChat,
+  onMeetPlaceChange,
+  onHaveCode,
+  onStart,
+  onLeave,
+}) {
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [pickingPlace, setPickingPlace] = useState(false);
@@ -262,19 +349,21 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
   const list = members.slice(0, cap);
   const canStart = list.length >= 2;
   const minsLeft = Math.max(1, Math.ceil((session.createdAt + LOBBY_TTL_MS - now) / 60000));
+  const maxKm = Math.round(MEET_MAX_DISTANCE_M / 1000);
+  const showShareCard = isHost && list.length < cap;
 
-  async function copy() {
+  async function copyLink() {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Clipboard blocked: the link stays on screen to copy by hand.
+      // Clipboard blocked: the code stays on screen to read out.
     }
   }
   function share() {
     if (navigator.share) navigator.share({ title: 'Maps By FUTA', text: shareText(session) }).catch(() => {});
-    else copy();
+    else copyLink();
   }
   async function copyCode() {
     try {
@@ -286,42 +375,49 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
     }
   }
 
-  const linkBlock = isHost && (
-    <div className={styles.col}>
-      <span className={styles.overline}>Invite link</span>
-      <div className={styles.linkBox}>
-        <span className={styles.linkText}>{url.replace(/^https?:\/\//, '')}</span>
-        <button type="button" className={cx(styles.btn, styles.btnOutline, styles.btnSmall)} onClick={copy}>
-          {copied ? <Check size={16} /> : <Copy size={16} />}
-          {copied ? 'Copied' : 'Copy'}
+  // Single unified share card — hides automatically once a Meet is full (2/2).
+  const shareCard = showShareCard && (
+    <div className={styles.shareCard}>
+      <div className={styles.shareCodeRow}>
+        <div className={styles.headText} style={{ gap: 2 }}>
+          <span className={styles.overline}>Invite code</span>
+          <span className={styles.shareCode}>{session.code}</span>
+        </div>
+        <button type="button" className={cx(styles.btn, styles.btnOutline, styles.btnSmall)} onClick={copyCode}>
+          {codeCopied ? <Check size={15} /> : <Copy size={15} />}
+          {codeCopied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <div className={styles.row}>
+      <div className={styles.row} style={{ gap: 8 }}>
+        <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, styles.grow2)} onClick={share}>
+          <Share2 size={16} />
+          Share invite
+        </button>
         <a
-          className={cx(styles.btn, styles.btnSecondary, styles.grow)}
-          style={{ height: 46, fontSize: 14, textDecoration: 'none' }}
+          className={cx(styles.btn, styles.btnSecondary, styles.btnSmall, styles.grow)}
+          style={{ textDecoration: 'none' }}
           href={`https://wa.me/?text=${encodeURIComponent(shareText(session))}`}
           target="_blank"
           rel="noreferrer"
         >
-          <MessageCircle size={18} />
-          Share on WhatsApp
+          <MessageCircle size={16} />
+          WhatsApp
         </a>
-        <button type="button" className={cx(styles.iconBtn, styles.btnOutline)} style={{ width: 46, height: 46 }} aria-label="More ways to share" onClick={share}>
-          <Share2 size={18} />
+        <button
+          type="button"
+          className={cx(styles.iconBtn, styles.btnOutline)}
+          style={{ width: 40, height: 40 }}
+          aria-label={copied ? 'Link copied' : 'Copy invite link'}
+          title={copied ? 'Link copied' : 'Copy invite link'}
+          onClick={copyLink}
+        >
+          {copied ? <Check size={16} /> : <Link2 size={16} />}
         </button>
       </div>
-      <button type="button" className={styles.codeBox} onClick={copyCode} aria-label={`Copy code ${session.code}`}>
-        <span className={styles.overline}>{codeCopied ? 'Code copied' : 'Or share the code'}</span>
-        <span className={styles.codeText}>{session.code}</span>
-      </button>
-      <span className={styles.sub}>The link and code stop working in {minsLeft} min, or once you start.</span>
-      {list.length < cap && (
-        <div className={styles.notice}>
-          <Smartphone size={18} />
-          Keep this screen open until your friends join. After sharing, come back here: they can only join while it’s open.
-        </div>
-      )}
+      <span className={styles.shareHint}>
+        <Smartphone size={13} />
+        Keep this open until {race ? 'everyone joins' : 'your friend joins'}.
+      </span>
     </div>
   );
 
@@ -334,115 +430,127 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
     </div>
   );
 
-  const players = (
-    <div className={styles.col}>
-      <div className={styles.listHead}>
-        <span className={styles.overline}>{race ? 'Players' : 'People'}</span>
-        <span className={styles.num} style={{ fontSize: 13 }}>
-          {list.length} / {cap}
-        </span>
+  const detailsCard = (
+    <div className={styles.lobbyCard}>
+      {race && session.place && (
+        <>
+          <div className={styles.lobbyRow}>
+            <span className={cx(styles.dotIcon, styles.dotIconTeal)} style={{ width: 32, height: 32 }}>
+              <Flag size={15} />
+            </span>
+            <span className={styles.stripText}>
+              <span className={styles.overline}>Finish line</span>
+              <span className={styles.personName}>{session.place.name}</span>
+            </span>
+          </div>
+          <div className={styles.divider} />
+        </>
+      )}
+
+      <div className={styles.col} style={{ gap: 10 }}>
+        <div className={styles.listHead}>
+          <span className={styles.overline}>{race ? 'Players' : 'People'}</span>
+          <span className={styles.num} style={{ fontSize: 12 }}>
+            {list.length} / {cap}
+          </span>
+        </div>
+        {list.map((m, i) => (
+          <div key={m.id} className={styles.person}>
+            <Avatar name={m.name} index={i} size="avatarSm" />
+            <span className={styles.personText}>
+              <span className={styles.personName}>
+                {firstName(m.name)}
+                {m.id === myId ? ' (you)' : ''}
+              </span>
+              <span className={styles.personMeta}>
+                {m.id === session.hostId ? (
+                  'Host'
+                ) : (
+                  <>
+                    <Check size={12} strokeWidth={2.5} /> Joined
+                  </>
+                )}
+              </span>
+            </span>
+            {race && <span className={styles.rankVal}>{formatDistance(progress[m.id]?.dist)}</span>}
+          </div>
+        ))}
+        {list.length < cap && (
+          <div className={styles.person}>
+            <span className={styles.emptySlot} style={{ width: 34, height: 34 }}>
+              <UserPlus size={15} />
+            </span>
+            <span className={styles.waiting}>
+              {race
+                ? `Waiting for up to ${cap - list.length} more${list.length >= 2 ? ' (optional)' : ''}`
+                : 'Waiting for your friend to join…'}
+            </span>
+          </div>
+        )}
       </div>
-      {list.map((m, i) => (
-        <div key={m.id} className={styles.person}>
-          <Avatar name={m.name} index={i} />
-          <span className={styles.personText}>
-            <span className={styles.personName}>
-              {firstName(m.name)}
-              {m.id === myId ? ' (you)' : ''}
-            </span>
-            <span className={styles.personMeta}>
-              {m.id === session.hostId ? (
-                'Host'
-              ) : (
-                <>
-                  <Check size={12} strokeWidth={2.5} /> Joined
-                </>
-              )}
-            </span>
-          </span>
-          {race && <span className={styles.rankVal}>{formatDistance(progress[m.id]?.dist)}</span>}
-        </div>
-      ))}
-      {list.length < cap && (
-        <div className={styles.person}>
-          <span className={styles.emptySlot}>
-            <UserPlus size={18} />
-          </span>
-          <span className={styles.waiting}>
-            {race
-              ? `Waiting for up to ${cap - list.length} more${list.length >= 2 ? ' (optional)' : ''}`
-              : 'Waiting for your friend to open the link'}
-          </span>
-        </div>
+
+      {!race && (
+        <>
+          <div className={styles.divider} />
+          {pickingPlace ? (
+            <PlacePicker
+              id="friends-meet-place"
+              label="Meeting point (optional)"
+              searchIndex={searchIndex}
+              onPick={(p) => {
+                onMeetPlaceChange(p);
+                setPickingPlace(false);
+              }}
+            />
+          ) : (
+            <div className={styles.lobbyRow}>
+              <MapPin size={16} className={styles.lobbyRowIcon} />
+              <span className={styles.stripText}>
+                <span className={styles.overline}>Meeting point</span>
+                <span className={styles.personName}>{session.place?.name || 'Anywhere · find each other'}</span>
+              </span>
+              {isHost &&
+                (session.place ? (
+                  <button type="button" className={styles.linkBtn} onClick={() => onMeetPlaceChange(null)}>
+                    Clear
+                  </button>
+                ) : (
+                  <button type="button" className={styles.linkBtn} onClick={() => setPickingPlace(true)}>
+                    Set place
+                  </button>
+                ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
 
-  // A meetup is "find each other" until the host picks a place.
-  const meetAction =
-    isHost &&
-    !race &&
-    (session.place ? (
-      <button type="button" className={styles.linkBtn} onClick={() => onMeetPlaceChange(null)}>
-        Remove
-      </button>
-    ) : (
-      <button type="button" className={styles.linkBtn} onClick={() => setPickingPlace(true)}>
-        Pick a place
-      </button>
-    ));
-  const placeStrip =
-    !race && pickingPlace ? (
-      <PlacePicker
-        id="friends-meet-place"
-        label="Meet at"
-        searchIndex={searchIndex}
-        onPick={(p) => {
-          onMeetPlaceChange(p);
-          setPickingPlace(false);
-        }}
-      />
-    ) : (
-      <PlaceStrip
-        mode={session.mode}
-        name={session.place?.name || 'Find each other, live'}
-        action={meetAction}
-      />
-    );
-
   const footer = isHost ? (
-    <div className={styles.col}>
-      <div className={styles.row}>
-        <button type="button" className={cx(styles.btn, styles.btnDanger, styles.grow)} onClick={onLeave}>
-          Cancel
-        </button>
-        <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.grow2)} disabled={!canStart} onClick={onStart}>
+    canStart ? (
+      <div className={styles.col} style={{ gap: 8 }}>
+        <button type="button" className={cx(styles.btn, styles.btnPrimary)} onClick={onStart}>
           {race ? 'Start race' : 'Start sharing'}
         </button>
-      </div>
-      <span className={styles.note}>
-        {!canStart
-          ? 'You can start once someone joins.'
-          : race
+        <span className={styles.note}>
+          {race
             ? 'Everyone gets a 3-second countdown.'
             : `You and ${firstName(list[1]?.name)} will see each other live until one of you ends it.`}
-      </span>
-      {/* "Meet a friend" opens this lobby straight away, so someone who
-          was sent a code needs a way to the code box from here. */}
-      {!race && list.length < 2 && (
-        <button type="button" className={cx(styles.btn, styles.btnGhost)} onClick={onHaveCode}>
-          <KeyRound size={16} />
-          <span className={styles.btnLabel}>Have a friend’s code? Join theirs</span>
-        </button>
-      )}
-    </div>
+        </span>
+      </div>
+    ) : !race ? (
+      <button type="button" className={cx(styles.btn, styles.btnGhost)} onClick={onHaveCode}>
+        <KeyRound size={16} />
+        <span className={styles.btnLabel}>Have a friend’s code? Join theirs</span>
+      </button>
+    ) : null
   ) : (
-    <div className={styles.col}>
+    <div className={styles.col} style={{ gap: 8 }}>
       <span className={styles.note}>
         <Clock size={14} />
         Waiting for {hostFirst} to start.
       </span>
-      <button type="button" className={cx(styles.btn, styles.btnOutline)} onClick={onLeave}>
+      <button type="button" className={cx(styles.btn, styles.btnOutline, styles.btnSmall)} onClick={onLeave}>
         Leave
       </button>
     </div>
@@ -451,55 +559,62 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
   const title = race ? 'Race lobby' : 'Meet me';
   const head = (
     <div className={styles.headRow}>
-      <div className={styles.headText}>
-        <span className={cx(styles.overline, styles.overlineViolet)}>{race ? 'Race to a place' : 'Meet a friend'}</span>
+      <div className={styles.headText} style={{ gap: 3 }}>
         <h2 className={styles.title}>{title}</h2>
+        <span className={styles.sub}>
+          {race ? `2–4 players · ${minsLeft} min left` : `Short distance (within ${maxKm} km) · ${minsLeft} min left`}
+        </span>
       </div>
-      {(canStart || hasMessages || unreadCount > 0) && onOpenChat && (
-        <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall)} onClick={onOpenChat}>
-          <MessageCircle size={16} />
-          Chat
-          <UnreadBadge count={unreadCount} />
-        </button>
-      )}
+      <div className={styles.row} style={{ gap: 8, alignItems: 'center' }}>
+        {(canStart || hasMessages || unreadCount > 0) && onOpenChat && (
+          <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall)} onClick={onOpenChat}>
+            <MessageCircle size={16} />
+            Chat
+            <UnreadBadge count={unreadCount} />
+          </button>
+        )}
+        <CloseBtn onClick={onLeave} label={isHost ? 'Cancel' : 'Leave'} />
+      </div>
     </div>
   );
 
-  if (!isMobile) {
+  if (!isMobile && showShareCard) {
     return (
       <Panel isMobile={false} wide label={title}>
         {head}
         {notice && <div className={styles.notice} role="status"><Users size={18} />{notice}</div>}
         {offline}
         <div className={styles.split}>
-          <div className={styles.splitMain}>
-            {placeStrip}
-            {linkBlock}
-          </div>
-          <div className={styles.splitSide}>{players}</div>
+          <div className={styles.splitMain}>{shareCard}</div>
+          <div className={styles.splitMain}>{detailsCard}</div>
         </div>
         {footer}
       </Panel>
     );
   }
   return (
-    <Panel isMobile label={title}>
+    <Panel isMobile={isMobile} label={title}>
       {head}
       {notice && <div className={styles.notice} role="status"><Users size={18} />{notice}</div>}
       {offline}
-      {placeStrip}
-      {linkBlock}
-      {isHost && <div className={styles.divider} />}
-      {players}
+      {shareCard}
+      {detailsCard}
       {footer}
     </Panel>
   );
 }
 
-// ── 3/4 · Friend opens the link ──────────────────────────────────────
-export function Invite({ isMobile, session, peek, user, members, myDistance, onSignIn, onCreateAccount, onJoin, onDecline }) {
+// ── 3/4 · Friend opens the link (no sign-in required) ────────────────
+export function Invite({ isMobile, session, peek, initialName = '', members, myDistance, onJoin, onDecline }) {
+  const [name, setName] = useState(initialName);
+  const cleanName = sanitizeUsername(name);
   const race = session.mode === 'race';
   const hostFirst = firstName(session.hostName);
+  const maxKm = Math.round(MEET_MAX_DISTANCE_M / 1000);
+
+  useEffect(() => {
+    if (!name && initialName) setName(initialName);
+  }, [initialName, name]);
 
   if (peek !== 'ready') {
     // `mode` is unknown until the host answers (a typed code).
@@ -527,66 +642,18 @@ export function Invite({ isMobile, session, peek, user, members, myDistance, onS
     );
   }
 
-  const placeName = session.place?.name || `Find ${hostFirst}, live`;
-  const count = session.playerCount ?? members.length;
-
-  if (!user) {
-    const stats = session.hostStats;
-    return (
-      <Panel isMobile={isMobile} centered label={`${hostFirst}'s invite`}>
-        <div className={cx(styles.headText, styles.center)} style={{ gap: 10 }}>
-          <Avatar name={session.hostName} size="avatarLg" />
-          <div className={cx(styles.headText, styles.center)} style={{ gap: 2 }}>
-            <h2 className={styles.title}>{session.hostName}</h2>
-            {stats && (
-              <span className={styles.modeCount}>
-                {stats.navs} navigation{stats.navs === 1 ? '' : 's'} · {stats.reviews} review{stats.reviews === 1 ? '' : 's'}
-              </span>
-            )}
-          </div>
-          <p className={styles.body}>
-            {race ? 'invited you to a race. First to arrive wins.' : 'wants to meet up. You’ll see each other live on the map.'}
-          </p>
-        </div>
-        <PlaceStrip
-          mode={session.mode}
-          name={placeName}
-          action={race && <span className={styles.rankVal}>{count}/{CAPACITY.race}</span>}
-        />
-        <div className={styles.notice}>
-          <Lock size={18} />
-          Sign in to join. Races and meetups are only for people with a Maps By FUTA account.
-        </div>
-        <div className={styles.col}>
-          <button type="button" className={cx(styles.btn, styles.btnPrimary)} onClick={onSignIn}>
-            <LogIn size={18} />
-            Sign in to join
-          </button>
-          <button type="button" className={cx(styles.btn, styles.btnOutline)} onClick={onCreateAccount}>
-            Create an account
-          </button>
-          <button type="button" className={cx(styles.btn, styles.btnGhost)} onClick={onDecline}>
-            Not now
-          </button>
-        </div>
-      </Panel>
-    );
-  }
-
   const players = members.map((m) => firstName(m.name)).join(', ');
   return (
     <Panel isMobile={isMobile} centered label={race ? `Join ${hostFirst}'s race` : `Meet ${hostFirst}`}>
-      <span className={cx(styles.pill)} style={{ alignSelf: 'center' }}>
-        <Check size={14} />
-        Signed in as {firstName(user.user_metadata?.display_name || user.email)}
-      </span>
       <div className={styles.person} style={{ gap: 14 }}>
         <Avatar name={session.hostName} />
         <div className={styles.headText}>
           <h2 className={styles.title} style={{ fontSize: 20 }}>
             {race ? `Join ${hostFirst}’s race` : `Meet ${hostFirst}`}
           </h2>
-          <p className={styles.sub}>{race ? `Starts when ${hostFirst} taps Start` : `${hostFirst} is waiting for you`}</p>
+          <p className={styles.sub}>
+            {race ? `Starts when ${hostFirst} taps Start` : `Short distance (within ${maxKm} km) · ${hostFirst} is waiting`}
+          </p>
         </div>
       </div>
       <div className={styles.table}>
@@ -605,17 +672,18 @@ export function Invite({ isMobile, session, peek, user, members, myDistance, onS
           <span className={styles.personName}>{race ? `${players || hostFirst} + you` : 'Both of you, live'}</span>
         </div>
       </div>
+      <UsernameField id="friends-invite-name" value={name} onChange={setName} autoFocus={!initialName} />
       <div className={styles.notice}>
         <MapPin size={18} />
         {race
           ? 'The group sees how far you are from the finish, not where you are. We will ask for your location next.'
-          : `You and ${hostFirst} see each other’s live location until the meetup ends. We will ask for your location next.`}
+          : `You and ${hostFirst} see each other’s live location until the meetup ends. Works best within ${maxKm} km.`}
       </div>
       <div className={styles.row}>
         <button type="button" className={cx(styles.btn, styles.btnOutline, styles.grow)} onClick={onDecline}>
           Decline
         </button>
-        <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.grow2)} onClick={onJoin}>
+        <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.grow2)} disabled={!cleanName} onClick={() => onJoin(cleanName)}>
           {race ? 'Join race' : 'Share my location'}
         </button>
       </div>
@@ -961,6 +1029,8 @@ export function MeetBoard({
 }) {
   const name = firstName(otherName);
   const paused = !arrived && (!updatedAt || now - updatedAt > PAUSED_AFTER_MS);
+  const tooFar = !arrived && distance != null && distance > MEET_MAX_DISTANCE_M;
+  const maxKm = Math.round(MEET_MAX_DISTANCE_M / 1000);
   const headline = arrived
     ? `You’ve met ${name}`
     : !updatedAt
@@ -970,11 +1040,13 @@ export function MeetBoard({
         : `${name} is ${formatDistance(distance)} away`;
   const subline = arrived
     ? 'You’re within 30 m of each other. The meetup ends in a minute.'
-    : place
-      ? `Meeting at ${place.name}${placeDistance != null ? ` · you’re ${formatDistance(placeDistance)} from it` : ''}`
-      : paused && updatedAt
-        ? `Last seen ${ago(now - updatedAt)} ago`
-        : 'Walk towards each other, or wait where you are.';
+    : tooFar
+      ? `Meet me works best for short distances (within ${maxKm} km).`
+      : place
+        ? `Meeting at ${place.name}${placeDistance != null ? ` · you’re ${formatDistance(placeDistance)} from it` : ''}`
+        : paused && updatedAt
+          ? `Last seen ${ago(now - updatedAt)} ago`
+          : 'Walk towards each other, or wait where you are.';
   const canDirect = !navOpen && !arrived;
   const pill = (
     <span className={cx(styles.pill, paused && styles.pillMuted)}>
@@ -1011,6 +1083,7 @@ export function MeetBoard({
             <Avatar name={otherName} index={1} size="avatarSm" />
             <div className={styles.headText} style={{ gap: 2, flex: 1, minWidth: 0 }}>
               <span className={styles.boardTitle}>{headline}</span>
+              {tooFar && <span className={styles.sub}>Best within {maxKm} km</span>}
             </div>
             {pill}
             <DetailsBtn onClick={() => onMinimizedChange(false)} />
@@ -1050,6 +1123,12 @@ export function MeetBoard({
             <span className={styles.statVal}>{updatedAt ? ago(now - updatedAt) : '—'}</span>
           </div>
         </div>
+        {tooFar && (
+          <div className={styles.notice} role="status">
+            <MapPin size={18} />
+            You’re {formatDistance(distance)} apart. Meet me is designed for short distances (within {maxKm} km around campus).
+          </div>
+        )}
         {onOpenChat && <ChatStrip title={`Message ${name}`} lastMessage={lastMessage} unread={unreadCount} onOpen={onOpenChat} />}
         {paused && updatedAt && (
           <div className={styles.notice}>

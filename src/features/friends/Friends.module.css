@@ -1330,3 +1330,88 @@
   .chatScrim, .chatSheet, .chatPanel, .chatToast, .chatTypingDot { animation: none; }
 }
 
+/* ── Redesigned Lobby & Username picker ─────────────────────────────── */
+.shareCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--r-xl);
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-divider);
+}
+.shareCodeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.shareCode {
+  font-family: var(--v2-font-manrope);
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1.15;
+  color: var(--v2-neutral);
+  font-variant-numeric: tabular-nums;
+}
+.shareHint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--v2-text-muted);
+}
+.shareHint svg {
+  flex-shrink: 0;
+  color: var(--v2-primary);
+}
+
+.lobbyCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--r-xl);
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
+}
+.lobbyRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lobbyRowIcon {
+  color: var(--v2-primary);
+  flex-shrink: 0;
+}
+
+.nameChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.nameChip {
+  padding: 6px 12px;
+  border: 1px solid var(--v2-divider);
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  color: var(--v2-text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard), background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.nameChip:hover {
+  border-color: var(--v2-primary-outline);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+}
+.nameChip:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+
+

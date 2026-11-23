@@ -17,7 +17,11 @@ import {
   CHAT_MAX_MESSAGES,
   CHAT_NAME_MAX_LENGTH,
   CHAT_QUICK_REPLIES,
+  MEET_MAX_DISTANCE_M,
+  USERNAME_MAX_LENGTH,
+  createGuestId,
   sanitizeChatText,
+  sanitizeUsername,
   appendChatMessage,
   normalizeIncomingChat,
   normalizeIncomingTyping,
@@ -155,3 +159,11 @@ assert.equal(countUnreadMessages(sample, 'evicted-id', 'u1'), 3, 'falls back to 
 assert.match(formatMessageTime(Date.UTC(2026, 0, 1, 9, 5)), /^\d{2}:\d{2}$/, 'formats HH:MM');
 assert.equal(formatMessageTime(NaN), '', 'invalid timestamp returns empty string');
 console.log('ok: chat helpers');
+
+assert.equal(MEET_MAX_DISTANCE_M, 5000, 'Meet short-distance threshold is 5 km');
+assert.equal(sanitizeUsername('   '), null, 'blank username rejected');
+assert.equal(sanitizeUsername('  Tolu   A. '), 'Tolu A.', 'username whitespace normalized');
+assert.equal(Array.from(sanitizeUsername('a'.repeat(USERNAME_MAX_LENGTH + 10))).length, USERNAME_MAX_LENGTH, 'username length capped');
+assert.match(createGuestId(), /^guest-[0-9a-f]{16}$/, 'guest id format');
+assert.notEqual(createGuestId(), createGuestId(), 'guest ids are unique');
+console.log('ok: guest username');

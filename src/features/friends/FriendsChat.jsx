@@ -14,6 +14,7 @@ import styles from './Friends.module.css';
 import {
   CHAT_MAX_LENGTH,
   CHAT_QUICK_REPLIES,
+  MEET_MAX_DISTANCE_M,
   firstName,
   formatDistance,
   formatMessageTime,
@@ -320,12 +321,21 @@ export default function FriendsChat({
           <WifiOff size={15} />
           <span>Reconnecting… you can send messages once you’re back online.</span>
         </div>
+      ) : !race && paused ? (
+        <div className={styles.chatBanner} role="status">
+          <Clock size={15} />
+          <span>{friendFirst}’s app is paused — they may miss messages sent until they return.</span>
+        </div>
       ) : (
         !race &&
-        paused && (
+        !arrived &&
+        distance != null &&
+        distance > MEET_MAX_DISTANCE_M && (
           <div className={styles.chatBanner} role="status">
-            <Clock size={15} />
-            <span>{friendFirst}’s app is paused — they may miss messages sent until they return.</span>
+            <MapPin size={15} />
+            <span>
+              You’re {formatDistance(distance)} apart — Meet me works best within {Math.round(MEET_MAX_DISTANCE_M / 1000)} km.
+            </span>
           </div>
         )
       )}

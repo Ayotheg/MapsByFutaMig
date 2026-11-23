@@ -6,6 +6,8 @@ export const CAPACITY = { meet: 2, race: 4 };
 export const RACE_FINISH_M = 25;
 // Inside this distance of each other, a meetup is done.
 export const MEET_ARRIVED_M = 30;
+// Meet me is designed for short-distance campus meetups (~5 km).
+export const MEET_MAX_DISTANCE_M = 5000;
 // The invite stops working this long after it's made, if nobody started.
 export const LOBBY_TTL_MS = 30 * 60 * 1000;
 // A race nobody finishes ends after an hour.
@@ -191,5 +193,21 @@ export function formatMessageTime(ts) {
   if (!Number.isFinite(ts)) return '';
   const d = new Date(ts);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+export const USERNAME_MAX_LENGTH = 24;
+export const SUGGESTED_USERNAMES = ['Campus Walker', 'FUTArian', 'Speedster', 'Obanla Guide'];
+
+export function sanitizeUsername(input) {
+  const text = String(input ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  const chars = Array.from(text);
+  return chars.length > USERNAME_MAX_LENGTH ? chars.slice(0, USERNAME_MAX_LENGTH).join('') : text;
+}
+
+export function createGuestId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `guest-${hex}`;
 }
 

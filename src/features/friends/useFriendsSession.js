@@ -20,21 +20,19 @@ import {
   TYPING_TTL_MS,
   appendChatMessage,
   createCode,
+  createGuestId,
   distanceM,
   nextHost,
   normalizeIncomingChat,
   normalizeIncomingTyping,
   raceDone,
   sanitizeChatText,
+  sanitizeUsername,
 } from './friendsSession';
 
 const STORE_KEY = 'friends-session';
-// Turn on only once supabase/friends_realtime.sql is applied: `friends:*`
-// channels then need a signed-in user, checked by the database rather than
-// just this app's screens. A signed-out visitor reads the invite (who,
-// where) from a separate public `friends-invite:*` channel that never
-// carries positions.
-const PRIVATE = import.meta.env.VITE_FRIENDS_PRIVATE_CHANNELS === 'true';
+const GUEST_ID_KEY = 'friends-guest-id';
+const GUEST_NAME_KEY = 'friends-guest-name';
 // Codes aren't stored anywhere: an invite is only answered by the host's
 // phone, which pauses while they're in another app (sharing the code, say).
 // So keep asking, and only after this long say we can't reach them. A late
@@ -91,6 +89,15 @@ const union = (list, ids) => Array.from(new Set([...(list || []), ...ids]));
  * ('loading' | 'ready' | 'closed' | 'unreachable' | 'full' | 'started').
  */
 export function useFriendsSession(user) {
+  const [guestId] = useState(() => {
+    const saved = readPersistentState(GUEST_ID_KEY, null);
+    if (saved) return saved;
+    const fresh = createGuestId();
+    writePersistentState(GUEST_ID_KEY, fresh);
+    return fresh;
+  });
+  const [guestName, setGuestNameState] = useState(() => sanitizeUsername(readPersistentState(GUEST_NAME_KEY, '')) || '');
+
   const [session, setSessionState] = useState(() => readPersistentState(STORE_KEY, null));
   const sessionRef = useRef(session);
   const setSession = useCallback((next) => {
@@ -121,12 +128,21 @@ export function useFriendsSession(user) {
   const askHostRef = useRef(null);
   // My latest position, sent as soon as a connection is (back) up.
   const lastPosRef = useRef(null);
-  const myId = user?.id || null;
-  const myName = user ? displayName(user) : null;
+  const myId = user?.id || guestId;
+  const myName = guestName || (user ? displayName(user) : '');
   const myIdRef = useRef(myId);
   myIdRef.current = myId;
   const myNameRef = useRef(myName);
   myNameRef.current = myName;
+
+  const setUsername = useCallback((raw) => {
+    const clean = sanitizeUsername(raw) || '';
+    setGuestNameState(clean);
+    myNameRef.current = clean || (user ? displayName(user) : '');
+    if (clean) writePersistentState(GUEST_NAME_KEY, clean);
+    else removePersistentState(GUEST_NAME_KEY);
+    return myNameRef.current;
+  }, [user]);
 
   const code = session?.code || null;
   const joined = !!session?.joined;
@@ -295,20 +311,15 @@ export function useFriendsSession(user) {
   );
 
   // ── The channel ─────────────────────────────────────────────────────
-  // One per code (and per signed-in user, the presence key). Joining or
+  // One per code (and per participant, the presence key). Joining or
   // leaving the lobby only tracks/untracks presence on it — see below.
   useEffect(() => {
     if (!code) return undefined;
-    // Private channels turn away signed-out visitors; they read the invite
-    // from the public one below instead.
-    if (PRIVATE && !myId) return undefined;
-    // Without private channels a signed-out visitor reads the invite here,
-    // but isn't in presence and can't join.
     const key = myId || `peek-${Math.random().toString(36).slice(2)}`;
     let retry = null;
     const close = openChannel(
       `friends:${code}`,
-      { private: PRIVATE, broadcast: { self: false }, presence: { key } },
+      { broadcast: { self: false }, presence: { key } },
       (channel) => {
         channelRef.current = channel;
 
@@ -524,62 +535,9 @@ export function useFriendsSession(user) {
     const channel = channelRef.current;
     if (!connected || !channel || !myId) return;
     if (joined) {
-      channel.track({ id: myId, name: myNameRef.current, joinedAt: sessionRef.current?.joinedAt || Date.now() });
+      channel.track({ id: myId, name: myNameRef.current || 'Friend', joinedAt: sessionRef.current?.joinedAt || Date.now() });
     } else channel.untrack();
-  }, [connected, joined, myId]);
-
-  // Private channels only: the invite card a signed-out visitor sees, from
-  // a public channel that carries nothing but who's inviting and where.
-  const peeking = !!session && !joined && !myId;
-  const inviteReplyRef = useRef(null);
-  useEffect(() => {
-    if (!PRIVATE || !code || (!isHost && !peeking)) return undefined;
-    const close = openChannel(`friends-invite:${code}`, { broadcast: { self: false } }, (channel) => {
-      const reply = () => {
-        const st = stateFor();
-        channel.send({
-          type: 'broadcast',
-          event: 'state',
-          payload: {
-            mode: st.mode,
-            phase: st.phase,
-            place: st.place,
-            hostId: st.hostId,
-            hostName: st.hostName,
-            hostStats: st.hostStats,
-            hostTerm: st.hostTerm,
-            createdAt: st.createdAt,
-            count: st.count,
-            // Past the lobby the invite is closed to newcomers.
-            roster: st.phase === 'lobby' ? null : [],
-          },
-        });
-      };
-      if (isHost) inviteReplyRef.current = reply;
-      channel.on('broadcast', { event: 'hello' }, () => isHost && reply());
-      channel.on('broadcast', { event: 'state' }, ({ payload }) => peeking && applyState(payload));
-      channel.subscribe((status) => {
-        if (status !== 'SUBSCRIBED') {
-          if (peeking) askHostRef.current = null;
-          return;
-        }
-        if (isHost) reply();
-        else {
-          askHostRef.current = () => channel.send({ type: 'broadcast', event: 'hello', payload: {} });
-          askHostRef.current();
-        }
-      });
-    });
-    return () => {
-      close();
-      inviteReplyRef.current = null;
-      if (peeking) askHostRef.current = null;
-    };
-  }, [code, isHost, peeking, stateFor, applyState]);
-  // Signed-out viewers learn when the lobby starts, ends or fills.
-  useEffect(() => {
-    inviteReplyRef.current?.();
-  }, [phase, members.length]);
+  }, [connected, joined, myId, myName]);
 
   // Waiting on an invite: keep asking, since the host may be back any moment.
   const waitingForHost = !!code && !joined && !isHost && (peek === 'loading' || peek === 'unreachable');
@@ -823,8 +781,9 @@ export function useFriendsSession(user) {
   );
 
   const create = useCallback(
-    async (newMode, place) => {
+    async (newMode, place, chosenName) => {
       if (!myId) return;
+      const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
       const now = Date.now();
       setProgress({});
       setMessages([]);
@@ -838,20 +797,22 @@ export function useFriendsSession(user) {
         phase: 'lobby',
         place: place || null,
         hostId: myId,
-        hostName: myName,
+        hostName: resolvedName,
         hostTerm: 0,
         createdAt: now,
-        names: { [myId]: myName },
+        names: { [myId]: resolvedName },
         finishers: [],
         dropped: [],
       });
       track('friends_created', { mode: newMode, place: place?.name || null });
-      const stats = await fetchProfileStats(supabase, myId).catch(() => null);
-      if (stats?.status === 'ready' && sessionRef.current?.hostId === myId) {
-        patch({ hostStats: { navs: stats.navs, reviews: stats.reviews } });
+      if (user?.id) {
+        const stats = await fetchProfileStats(supabase, user.id).catch(() => null);
+        if (stats?.status === 'ready' && sessionRef.current?.hostId === myId) {
+          patch({ hostStats: { navs: stats.navs, reviews: stats.reviews } });
+        }
       }
     },
-    [myId, myName, setSession, patch]
+    [myId, user?.id, setUsername, setSession, patch]
   );
 
   // `fromCode`: typed into the code box, so "can't reach" also says to check it.
@@ -869,12 +830,21 @@ export function useFriendsSession(user) {
     [setSession]
   );
 
-  const join = useCallback(() => {
-    if (!myId) return;
-    const s = sessionRef.current;
-    const phaseNow = s.roster?.includes(myId) ? 'live' : 'lobby';
-    patch({ joined: true, joinedAt: Date.now(), phase: phaseNow });
-  }, [myId, patch]);
+  const join = useCallback(
+    (chosenName) => {
+      if (!myId) return;
+      const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
+      const s = sessionRef.current;
+      const phaseNow = s.roster?.includes(myId) ? 'live' : 'lobby';
+      patch({
+        joined: true,
+        joinedAt: Date.now(),
+        phase: phaseNow,
+        names: { ...(s.names || {}), [myId]: resolvedName },
+      });
+    },
+    [myId, setUsername, patch]
+  );
 
   const start = useCallback(() => {
     const s = sessionRef.current;
@@ -957,11 +927,13 @@ export function useFriendsSession(user) {
     connected,
     everConnected,
     myId,
+    myName,
     myFix,
     isHost,
     otherId,
     meetDistance,
     meetArrived,
+    setUsername,
     create,
     openInvite,
     join,

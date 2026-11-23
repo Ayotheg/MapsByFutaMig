@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import { useFriendsSession } from './useFriendsSession';
-import { Countdown, Ended, Finished, Invite, JoinCode, Lobby, MeetBoard, RaceBoard, RaceSetup, Results } from './FriendsScreens';
+import { Countdown, Ended, Finished, Invite, JoinCode, Lobby, MeetBoard, MeetSetup, RaceBoard, RaceSetup, Results } from './FriendsScreens';
 import FriendsChat from './FriendsChat';
 import { PAUSED_AFTER_MS, countUnreadMessages, distanceM, firstName } from './friendsSession';
 import { getLastFix } from '../navigation/gpsWatch';
@@ -63,7 +63,6 @@ export default function FriendsHub({
   navOpen,
   navActive,
   covered,
-  onSignIn,
   onNavigateTo,
   onRetarget,
   onLayout,
@@ -350,14 +349,14 @@ export default function FriendsHub({
   }, [boardVisible, quietArrival, onLayout]);
   useEffect(() => () => onLayout({ board: false, quietArrival: false }), [onLayout]);
 
-  // "Meet a friend" needs nothing picked: straight to its lobby and link.
+  // "Meet a friend": if we already have a username, open the lobby straight away;
+  // otherwise MeetSetup below lets the user enter or pick one first.
   useEffect(() => {
-    if (session || startMode !== 'meet') return;
-    if (user) f.create('meet', null);
-    else onSignIn('login', 'Sign in to meet a friend.');
+    if (session || startMode !== 'meet' || !f.myName) return;
+    f.create('meet', null);
     onStartModeChange(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, startMode, user]);
+  }, [session, startMode, f.myName]);
 
   // The trip ends with the race or meetup (finished, ended by someone, or
   // left). Starts set from a reload that lands on an already-ended session.
@@ -388,21 +387,32 @@ export default function FriendsHub({
         />
       );
     }
+    if (startMode === 'meet') {
+      return (
+        <MeetSetup
+          isMobile={isMobile}
+          initialName={f.myName}
+          onHaveCode={() => onStartModeChange('code')}
+          onClose={() => onStartModeChange(null)}
+          onCreate={(chosenName) => {
+            f.create('meet', null, chosenName);
+            onStartModeChange(null);
+          }}
+        />
+      );
+    }
     if (startMode !== 'race') return null;
     return (
       <RaceSetup
         isMobile={isMobile}
         place={place}
+        initialName={f.myName}
         onPlaceChange={setPlace}
         searchIndex={searchIndex}
         onHaveCode={() => onStartModeChange('code')}
         onClose={() => onStartModeChange(null)}
-        onCreate={() => {
-          if (!user) {
-            onSignIn('login', 'Sign in to start a race.');
-            return;
-          }
-          f.create('race', place);
+        onCreate={(chosenName) => {
+          f.create('race', place, chosenName);
           onStartModeChange(null);
         }}
       />
@@ -420,12 +430,10 @@ export default function FriendsHub({
         isMobile={isMobile}
         session={session}
         peek={peek}
-        user={user}
+        initialName={f.myName}
         members={members}
         myDistance={myDistance}
-        onSignIn={() => onSignIn('login', race ? `Sign in to join ${hostFirst}’s race.` : `Sign in to meet ${hostFirst}.`)}
-        onCreateAccount={() => onSignIn('signup', race ? `Create an account to join ${hostFirst}’s race.` : `Create an account to meet ${hostFirst}.`)}
-        onJoin={f.join}
+        onJoin={(chosenName) => f.join(chosenName)}
         onDecline={f.leave}
       />
     );
