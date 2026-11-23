@@ -632,7 +632,20 @@ export function Lobby({
 }
 
 // ── 3/4 · Friend opens the link (no sign-in required) ────────────────
-export function Invite({ isMobile, session, peek, joining = false, initialName = '', members, myDistance, onJoin, onDecline }) {
+export function Invite({
+  isMobile,
+  session,
+  peek,
+  joining = false,
+  joinError = null,
+  connected = true,
+  myId = null,
+  initialName = '',
+  members,
+  myDistance,
+  onJoin,
+  onDecline,
+}) {
   const [name, setName] = useState(initialName);
   const editedRef = useRef(false);
   const cleanName = sanitizeUsername(name);
@@ -679,11 +692,14 @@ export function Invite({ isMobile, session, peek, joining = false, initialName =
         ? session.roster
         : session.roster.filter((id) => !dropped.has(id))
       : null;
-  const activeNames = activeIds
-    ? activeIds.map((id) => firstName(session.names?.[id] || members.find((m) => m.id === id)?.name || 'Friend'))
-    : members.map((m) => firstName(m.name));
-  const activeCount = activeNames.length || session.playerCount || 1;
-  const players = activeNames.join(', ');
+  const alreadyInRoom = Boolean(myId && (activeIds ? activeIds.includes(myId) : members.some((m) => m.id === myId)));
+  const peerNames = activeIds
+    ? activeIds
+        .filter((id) => id !== myId)
+        .map((id) => firstName(session.names?.[id] || members.find((m) => m.id === id)?.name || 'Friend'))
+    : members.filter((m) => m.id !== myId).map((m) => firstName(m.name));
+  const activeCount = (activeIds ? activeIds.length : members.length) || session.playerCount || 1;
+  const players = peerNames.join(', ');
 
   return (
     <Panel isMobile={isMobile} centered label={race ? `Join ${hostFirst}'s race` : `Meet ${hostFirst}`}>
@@ -720,7 +736,11 @@ export function Invite({ isMobile, session, peek, joining = false, initialName =
             {race ? 'Players' : 'People'}
             {cap ? ` (${activeCount}/${cap})` : ''}
           </span>
-          <span className={styles.personName}>{`${players || hostFirst} + you`}</span>
+          <span className={styles.personName}>
+            {alreadyInRoom
+              ? `${players || hostFirst}${players ? ' + you' : ''}`
+              : `${players || hostFirst} + you`}
+          </span>
         </div>
       </div>
       <form
@@ -747,12 +767,32 @@ export function Invite({ isMobile, session, peek, joining = false, initialName =
               ? `Everyone in this meetup sees each other’s live location until it ends. Works best within ${maxKm} km.`
               : `You and ${hostFirst} see each other’s live location until the meetup ends. Works best within ${maxKm} km.`}
         </div>
+        {!connected && (
+          <div className={styles.notice} role="status">
+            <WifiOff size={18} />
+            Reconnecting… you can join as soon as you’re back online.
+          </div>
+        )}
+        {joinError && (
+          <div className={styles.notice} role="status">
+            <WifiOff size={18} />
+            {joinError}
+          </div>
+        )}
         <div className={styles.row}>
           <button type="button" className={cx(styles.btn, styles.btnOutline, styles.grow)} onClick={onDecline}>
             Decline
           </button>
           <button type="submit" className={cx(styles.btn, styles.btnPrimary, styles.grow2)} disabled={!cleanName || joining}>
-            {joining ? 'Joining…' : race ? 'Join race' : 'Share my location'}
+            {joining
+              ? 'Joining…'
+              : alreadyInRoom
+                ? race
+                  ? 'Rejoin race'
+                  : 'Rejoin meetup'
+                : race
+                  ? 'Join race'
+                  : 'Share my location'}
           </button>
         </div>
       </form>
@@ -831,7 +871,7 @@ function DetailsBtn({ onClick }) {
 }
 
 function LiveInviteStrip({ session, count }) {
-  const [copied, setCopied] = useState(false);
+  const [copiedKind, setCopiedKind] = useState(null);
   const timerRef = useRef(null);
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
@@ -839,12 +879,16 @@ function LiveInviteStrip({ session, count }) {
   if (!session?.code || !cap || count >= cap) return null;
   const spotsLeft = cap - count;
 
+  function markCopied(kind) {
+    setCopiedKind(kind);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setCopiedKind(null), 2000);
+  }
+
   async function copyCode() {
     try {
       await navigator.clipboard.writeText(session.code);
-      setCopied(true);
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
+      markCopied('code');
     } catch {
       // Clipboard blocked; the code stays visible in the strip.
     }
@@ -858,9 +902,7 @@ function LiveInviteStrip({ session, count }) {
     }
     try {
       await navigator.clipboard.writeText(url);
-      setCopied(true);
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
+      markCopied('link');
     } catch {
       // Clipboard blocked; the code stays visible in the strip.
     }
@@ -873,19 +915,22 @@ function LiveInviteStrip({ session, count }) {
       </span>
       <span className={styles.liveInviteText}>
         <span className={styles.liveInviteLabel}>
-          Invite · {count}/{cap} ({spotsLeft} {spotsLeft === 1 ? 'spot' : 'spots'} left)
+          Invite · <span className={styles.liveInviteCount}>{count}/{cap}</span> · {spotsLeft} left
         </span>
         <span className={styles.liveInviteCode}>{session.code}</span>
       </span>
       <span className={styles.liveInviteActions}>
         <button type="button" className={styles.liveInviteBtn} onClick={copyCode} aria-label="Copy invite code">
-          {copied ? <Check size={13} /> : <Copy size={13} />}
-          {copied ? 'Copied' : 'Copy'}
+          {copiedKind === 'code' ? <Check size={13} /> : <Copy size={13} />}
+          {copiedKind === 'code' ? 'Copied' : 'Copy'}
         </button>
         <button type="button" className={styles.liveInviteBtn} onClick={share} aria-label="Share invite">
-          <Share2 size={13} />
-          Share
+          {copiedKind === 'link' ? <Check size={13} /> : <Share2 size={13} />}
+          {copiedKind === 'link' ? 'Link copied' : 'Share'}
         </button>
+      </span>
+      <span className="sr-only" aria-live="polite">
+        {copiedKind === 'code' ? 'Invite code copied' : copiedKind === 'link' ? 'Invite link copied' : ''}
       </span>
     </div>
   );

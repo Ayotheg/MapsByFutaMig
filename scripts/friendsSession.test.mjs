@@ -300,4 +300,50 @@ assert.deepEqual(
   normalizeIncomingTyping({ id: 'u3', active: true }, updatedRaceSession, 'u1', new Set(['u1', 'u2', 'u3']), 9200),
   { id: 'u3', name: 'Chidi', active: true, at: 9200 }
 );
+
+// Dropped Meet peer cannot reclaim a spot taken by an 8th newcomer
+const meet8Full = {
+  mode: 'meet',
+  phase: 'live',
+  roster: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9'],
+  names: { m1: 'A', m2: 'B', m3: 'C', m4: 'D', m5: 'E', m6: 'F', m7: 'G', m8: 'H', m9: 'I' },
+  dropped: ['m8'],
+};
+assert.equal(roomOccupancy(meet8Full), 8, '8 active peers after m9 replaced dropped m8');
+assert.equal(canLateJoin(meet8Full, 'm8'), false, 'dropped meet peer cannot rejoin once 8th slot was filled');
+assert.deepEqual(admitLateJoiner(meet8Full, 'm8', 'H'), { accepted: false, reason: 'full' });
+
+// Dropped racer CAN rejoin a full 4/4 race without duplicating roster entry
+const fullRaceWithDrop = {
+  mode: 'race',
+  phase: 'live',
+  roster: ['u1', 'u2', 'u3', 'u4'],
+  names: { u1: 'Ayo', u2: 'Tolu', u3: 'Chidi', u4: 'Dami' },
+  dropped: ['u4'],
+};
+const rejoinedRace = admitLateJoiner(fullRaceWithDrop, 'u4', 'Dami');
+assert.equal(rejoinedRace.accepted, true);
+assert.deepEqual(rejoinedRace.roster, ['u1', 'u2', 'u3', 'u4']);
+assert.deepEqual(rejoinedRace.dropped, []);
+
+// Invalid / prototype-polluting IDs & active name-spoof protection
+for (const badId of [null, undefined, 123, '', '   ', 'a'.repeat(100), '__proto__', 'constructor', 'prototype']) {
+  assert.equal(canLateJoin(liveRace2, badId), false, `canLateJoin rejects bad id: ${String(badId)}`);
+  assert.deepEqual(admitLateJoiner(liveRace2, badId, 'Evil'), { accepted: false, reason: 'invalid' }, `admitLateJoiner rejects bad id: ${String(badId)}`);
+}
+assert.equal(canLateJoin({ mode: 'unknown', phase: 'live', roster: ['u1'] }, 'u2'), false, 'unknown mode rejected');
+assert.equal(admitLateJoiner(liveRace2, 'u3', '   ').name, 'Friend', 'blank name falls back to Friend');
+assert.equal(
+  admitLateJoiner(liveRace2, 'u1', 'Spoofed Host').names.u1,
+  'Ayo',
+  'active participant name cannot be overwritten via join-live'
+);
+
+// Interaction checks: raceDone, meetArrivedCheck, and 2-person Meet occupancy recovery
+assert.equal(raceDone(['u1', 'u2'], [{ id: 'u1', ms: 1000 }], []), false, 'race not done yet');
+assert.equal(raceDone(admittedRace.roster, [{ id: 'u1', ms: 1000 }, { id: 'u2', ms: 1200 }], []), false, 'late joiner keeps race open until they finish or drop');
+assert.equal(meetArrivedCheck(spot, [near1], null), true, '2-person meet arrived when within 30 m');
+assert.equal(meetArrivedCheck(spot, [near1, null], null), false, 'adding a late joiner without fix un-marks meet arrived');
+assert.equal(meetArrivedCheck(spot, [near1, far], null), false, 'adding a far late joiner un-marks meet arrived');
+assert.equal(roomOccupancy({ mode: 'meet', phase: 'live', roster: ['m1', 'm2', 'm3'], dropped: ['m3'] }), 2, 'meet drops back to 2-person occupancy when 3rd leaves');
 console.log('ok: late join');

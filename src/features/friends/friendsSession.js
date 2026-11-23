@@ -38,6 +38,15 @@ export function raceDone(roster, finishers, dropped) {
   return roster.every((id) => done.has(id));
 }
 
+const FORBIDDEN_IDS = new Set(['__proto__', 'constructor', 'prototype', 'toString', 'valueOf', 'hasOwnProperty']);
+
+function sanitizeParticipantId(input) {
+  if (typeof input !== 'string') return null;
+  const id = input.trim();
+  if (!id || id.length > CHAT_ID_MAX_LENGTH || FORBIDDEN_IDS.has(id)) return null;
+  return id;
+}
+
 // How many spots are currently taken in a lobby or active session.
 // Dropped meet peers free their spot; dropped racers stay on the roster so they can still finish.
 export function roomOccupancy(session, presentCount = 0) {
@@ -54,26 +63,32 @@ export function roomOccupancy(session, presentCount = 0) {
 
 // Whether `userId` can join (or rejoin) a race or meetup that is already live/counting down.
 export function canLateJoin(session, userId) {
-  if (!session || !userId) return false;
+  const id = sanitizeParticipantId(userId);
+  if (!session || !id) return false;
   if (session.phase !== 'live' && session.phase !== 'countdown') return false;
   const cap = CAPACITY[session.mode];
   if (!cap) return false;
   const roster = session.roster || [];
   const dropped = session.dropped || [];
-  if (roster.includes(userId) && !(session.mode === 'meet' && dropped.includes(userId))) return true;
+  if (roster.includes(id) && !(session.mode === 'meet' && dropped.includes(id))) return true;
   return roomOccupancy(session) < cap;
 }
 
 // Host-side admission for a late joiner (or returning participant).
 export function admitLateJoiner(session, joinerId, joinerName) {
-  if (!session || !joinerId || session.phase === 'ended') return { accepted: false, reason: 'closed' };
+  const id = sanitizeParticipantId(joinerId);
+  if (!id) return { accepted: false, reason: 'invalid' };
+  if (!session || session.phase === 'ended') return { accepted: false, reason: 'closed' };
   if (session.phase !== 'live' && session.phase !== 'countdown') return { accepted: false, reason: 'not-live' };
-  if (!canLateJoin(session, joinerId)) return { accepted: false, reason: 'full' };
-  const cleanName = sanitizeUsername(joinerName) || sanitizeUsername(session.names?.[joinerId]) || 'Friend';
+  if (!canLateJoin(session, id)) return { accepted: false, reason: 'full' };
   const existing = session.roster || [];
-  const roster = existing.includes(joinerId) ? [...existing] : [...existing, joinerId];
-  const names = { ...(session.names || {}), [joinerId]: cleanName };
-  const dropped = (session.dropped || []).filter((id) => id !== joinerId);
+  const alreadyActive = existing.includes(id) && !(session.dropped || []).includes(id);
+  const cleanName = alreadyActive
+    ? sanitizeUsername(session.names?.[id]) || sanitizeUsername(joinerName) || 'Friend'
+    : sanitizeUsername(joinerName) || sanitizeUsername(session.names?.[id]) || 'Friend';
+  const roster = existing.includes(id) ? [...existing] : [...existing, id];
+  const names = { ...(session.names || {}), [id]: cleanName };
+  const dropped = (session.dropped || []).filter((x) => x !== id);
   return { accepted: true, roster, names, dropped, name: cleanName };
 }
 

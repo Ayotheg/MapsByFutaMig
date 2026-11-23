@@ -238,6 +238,9 @@ export default function FriendsHub({
   // ── Trip: the racer heads to the finish once the countdown ends ────
   const launchedRef = useRef(null);
   useEffect(() => {
+    if (!session?.code) launchedRef.current = null;
+  }, [session?.code]);
+  useEffect(() => {
     if (!race || phase !== 'live' || !joined || meFinished || !session?.place) return;
     if (launchedRef.current === session.code) return;
     launchedRef.current = session.code;
@@ -509,6 +512,9 @@ export default function FriendsHub({
         session={session}
         peek={peek}
         joining={f.joining}
+        joinError={f.joinError}
+        connected={f.connected}
+        myId={myId}
         initialName={f.myName}
         members={members}
         myDistance={myDistance}

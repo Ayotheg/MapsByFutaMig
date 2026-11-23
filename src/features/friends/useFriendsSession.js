@@ -43,6 +43,7 @@ const GUEST_NAME_KEY = 'friends-guest-name';
 const PEEK_TIMEOUT_MS = 60 * 1000;
 const PEEK_ASK_EVERY_MS = 3000;
 const JOIN_ASK_EVERY_MS = 2000;
+const JOIN_TIMEOUT_MS = 20 * 1000;
 // A channel the server closed is reopened after this.
 const RECONNECT_AFTER_MS = 3000;
 // A finished meetup closes on its own after this.
@@ -132,7 +133,9 @@ export function useFriendsSession(user) {
   const lastTypingSentRef = useRef({ active: false, at: 0 });
   const [peek, setPeek] = useState('loading');
   const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState(null);
   const pendingJoinRef = useRef(null);
+  const absentSinceRef = useRef({});
   const [connected, setConnected] = useState(false);
   // Has this session's channel ever been up ("Connecting…" vs "Reconnecting…").
   const [everConnected, setEverConnected] = useState(false);
@@ -193,6 +196,7 @@ export function useFriendsSession(user) {
   const requestLiveJoin = useCallback(
     (id, name) => {
       if (!id) return;
+      setJoinError(null);
       pendingJoinRef.current = { id, name };
       setJoining(true);
       if (connectedRef.current) send('join-live', { id, name });
@@ -307,6 +311,7 @@ export function useFriendsSession(user) {
         if (amHost()) send('state', stateFor());
         return;
       }
+      if (s.phase === 'ended' && term <= mine) return;
       const fields = {
         mode: payload.mode,
         hostPhase: payload.phase,
@@ -323,7 +328,7 @@ export function useFriendsSession(user) {
         endReason: payload.endReason,
         playerCount: payload.count ?? null,
       };
-      if (payload.elapsedMs != null) fields.goAt = Date.now() - payload.elapsedMs;
+      if (Number.isFinite(payload.elapsedMs)) fields.goAt = Date.now() - payload.elapsedMs;
       if (payload.lastJoined?.id && (payload.lastJoined.agoMs ?? 0) < 10000) {
         const sameLast = s.lastJoined?.seq === payload.lastJoined.seq && s.lastJoined?.id === payload.lastJoined.id;
         fields.lastJoined = sameLast
@@ -337,30 +342,34 @@ export function useFriendsSession(user) {
       }
       const isLive = payload.phase === 'live' || payload.phase === 'countdown';
       const activeInRoster = Boolean(
-        !payload.roster || (payload.roster.includes(me) && !(payload.mode === 'meet' && (payload.dropped || []).includes(me)))
+        Array.isArray(payload.roster) && payload.roster.includes(me) && !(payload.dropped || []).includes(me)
       );
       let shouldRequestLiveJoin = null;
       if (s.joined || pendingJoinRef.current) {
         if (payload.phase === 'ended') {
           clearPendingJoin();
+          setJoinError(null);
           if (s.joined) fields.phase = 'ended';
           else setPeek('closed');
         } else if (isLive) {
           if (activeInRoster) {
             clearPendingJoin();
+            setJoinError(null);
             fields.joined = true;
             fields.joinedAt = s.joinedAt || Date.now();
-            fields.phase = payload.elapsedMs != null && payload.elapsedMs < 0 ? 'countdown' : 'live';
+            fields.phase = Number.isFinite(payload.elapsedMs) && payload.elapsedMs < 0 ? 'countdown' : 'live';
           } else if (canLateJoin(payload, me)) {
+            if (s.joined) {
+              // Keep navigation/chat/pins intact while requesting admission in the background.
+              fields.joined = true;
+              fields.phase = s.phase;
+            }
             if (!pendingJoinRef.current) {
-              // Joined a moment too late or re-entering a meet with room: auto-request live admission.
-              fields.joined = false;
-              fields.phase = 'invite';
-              setPeek('ready');
               shouldRequestLiveJoin = myNameRef.current || s.names?.[me] || 'Friend';
             }
           } else {
             clearPendingJoin();
+            setJoinError(null);
             fields.joined = false;
             fields.phase = 'invite';
             setPeek('full');
@@ -369,6 +378,7 @@ export function useFriendsSession(user) {
           fields.phase = payload.phase;
         } else if (pendingJoinRef.current) {
           clearPendingJoin();
+          setJoinError(null);
           fields.joined = true;
           fields.phase = payload.phase;
         }
@@ -456,7 +466,7 @@ export function useFriendsSession(user) {
         channel.on('broadcast', { event: 'state' }, ({ payload }) => applyState(payload));
 
         channel.on('broadcast', { event: 'join-live' }, ({ payload }) => {
-          if (!amHost() || !payload?.id) return;
+          if (!amHost() || !payload?.id || payload.id === myIdRef.current) return;
           const res = admitLateJoiner(sessionRef.current, payload.id, payload.name);
           if (res.accepted) {
             delete absentSinceRef.current[payload.id];
@@ -473,6 +483,7 @@ export function useFriendsSession(user) {
             send('state', stateFor());
             if (lastPosRef.current) send('pos', lastPosRef.current);
           } else {
+            if (res.reason === 'invalid') return;
             if (res.reason === 'full' || res.reason === 'closed') {
               send('join-denied', { id: payload.id, reason: res.reason, hostTerm: sessionRef.current?.hostTerm || 0 });
             }
@@ -482,8 +493,11 @@ export function useFriendsSession(user) {
 
         channel.on('broadcast', { event: 'join-denied' }, ({ payload }) => {
           if (!payload || payload.id !== myIdRef.current) return;
-          if ((payload.hostTerm || 0) < (sessionRef.current?.hostTerm || 0)) return;
+          const s = sessionRef.current;
+          if (!s || s.phase === 'ended' || amHost() || !pendingJoinRef.current) return;
+          if ((payload.hostTerm || 0) < (s.hostTerm || 0)) return;
           clearPendingJoin();
+          setJoinError(null);
           patch({ joined: false, phase: 'invite' });
           setPeek(payload.reason === 'closed' ? 'closed' : 'full');
         });
@@ -507,17 +521,19 @@ export function useFriendsSession(user) {
           if (!s.joined || (payload.roster && !payload.roster.includes(me))) {
             const roomOpen = canLateJoin({ mode: payload.mode, phase: nextPhase, roster: payload.roster, dropped: [] }, me);
             if (s.joined) {
-              patch({ ...nextMeta, joined: false, phase: 'invite' });
               if (roomOpen) {
-                setPeek('ready');
+                patch(nextMeta);
                 requestLiveJoin(me, myNameRef.current || s.names?.[me] || 'Friend');
               } else {
                 clearPendingJoin();
+                setJoinError(null);
+                patch({ ...nextMeta, joined: false, phase: 'invite' });
                 setPeek('full');
               }
             } else {
               patch(nextMeta);
-              setPeek(roomOpen ? 'ready' : 'full');
+              if (!s.hostId) send('hello', {});
+              else setPeek(roomOpen ? 'ready' : 'full');
             }
             return;
           }
@@ -618,6 +634,8 @@ export function useFriendsSession(user) {
             const active = (s.roster || []).filter((id) => !(s.dropped || []).includes(id));
             if (active.length > 2) return;
           }
+          clearPendingJoin();
+          setJoinError(null);
           if (!s.joined) {
             setPeek('closed');
             return;
@@ -679,6 +697,7 @@ export function useFriendsSession(user) {
     lastPosRef.current = null;
     setEverConnected(false);
     clearPendingJoin();
+    setJoinError(null);
   }, [code, myId, clearPendingJoin]);
 
   // Back in the app (or back online): get the connection up now rather than
@@ -735,12 +754,21 @@ export function useFriendsSession(user) {
 
   // Joining an already-started session: retry until the host admits or turns us away.
   useEffect(() => {
-    if (!joining || !connected || !pendingJoinRef.current) return undefined;
+    if (!joining || !connected || !pendingJoinRef.current || peek === 'closed' || peek === 'full') return undefined;
     const t = setInterval(() => {
       if (pendingJoinRef.current) send('join-live', pendingJoinRef.current);
     }, JOIN_ASK_EVERY_MS);
     return () => clearInterval(t);
-  }, [joining, connected, send]);
+  }, [joining, connected, peek, send]);
+
+  useEffect(() => {
+    if (!joining || joined) return undefined;
+    const t = setTimeout(() => {
+      clearPendingJoin();
+      setJoinError('Couldn’t reach the host. Check your connection and try again.');
+    }, JOIN_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [joining, joined, clearPendingJoin]);
 
   // Over capacity: the last to join is turned away.
   useEffect(() => {
@@ -773,7 +801,7 @@ export function useFriendsSession(user) {
     }
     patch({ joinCounted: true });
     track('friends_joined', { mode: s.mode, via: s.fromCode ? 'code' : 'link' });
-  }, [members, myId, phase, rosterLength, droppedLength, patch]);
+  }, [members, myId, joined, phase, rosterLength, droppedLength, patch]);
 
   // Host timers: the invite expires, a race has a time limit. A new host
   // picks these up from the same createdAt / goAt.
@@ -805,7 +833,7 @@ export function useFriendsSession(user) {
   // ── Host vanished (network drop / phone died): next person takes over ─
   const hostPresent = members.some((m) => m.id === session?.hostId);
   const meInPresence = members.some((m) => m.id === myId);
-  const groupMeet = mode === 'meet' && (session?.roster?.length || members.length) >= 3;
+  const groupMeet = mode === 'meet' && roomOccupancy(session, members.length) >= 3;
   const takeoverOpen = (mode === 'race' || groupMeet) && joined && (phase === 'lobby' || phase === 'countdown' || phase === 'live');
   useEffect(() => {
     // Our own presence entry means the list is in sync, so a missing host
@@ -822,8 +850,7 @@ export function useFriendsSession(user) {
   }, [takeoverOpen, phase, isHost, connected, meInPresence, hostPresent, becomeHost, presentIds]);
 
   // ── Drop participants who have been offline a while (races & 3+ meetups) ─
-  const absentSinceRef = useRef({});
-  const dropAbsentEnabled = isHost && phase === 'live' && (mode === 'race' || (mode === 'meet' && (session?.roster?.length || 0) >= 3));
+  const dropAbsentEnabled = isHost && phase === 'live' && (mode === 'race' || groupMeet);
   useEffect(() => {
     if (!dropAbsentEnabled) return undefined;
     const t = setInterval(() => {
@@ -1017,6 +1044,7 @@ export function useFriendsSession(user) {
       const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
       const now = Date.now();
       clearPendingJoin();
+      setJoinError(null);
       setProgress({});
       setMessages([]);
       setTypingBy({});
@@ -1048,6 +1076,7 @@ export function useFriendsSession(user) {
       const s = sessionRef.current;
       if (s?.code === invite.code) return;
       clearPendingJoin();
+      setJoinError(null);
       setPeek('loading');
       setProgress({});
       setMessages([]);
@@ -1062,10 +1091,11 @@ export function useFriendsSession(user) {
     (chosenName) => {
       const s = sessionRef.current;
       if (!s || !myId) return;
+      setJoinError(null);
       const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
       const hostLive = s.hostPhase === 'live' || s.hostPhase === 'countdown';
       if (hostLive) {
-        const alreadyActive = Boolean(s.roster?.includes(myId) && !(s.mode === 'meet' && (s.dropped || []).includes(myId)));
+        const alreadyActive = Boolean(s.roster?.includes(myId) && !(s.dropped || []).includes(myId));
         if (alreadyActive) {
           patch({
             participantId: s.participantId || myId,
@@ -1165,6 +1195,7 @@ export function useFriendsSession(user) {
       } else if (active) send('left', { id: me });
     }
     clearPendingJoin();
+    setJoinError(null);
     setSession(null);
     setProgress({});
     setMessages([]);
@@ -1181,6 +1212,7 @@ export function useFriendsSession(user) {
     typingUsers,
     peek,
     joining,
+    joinError,
     connected,
     everConnected,
     myId,
