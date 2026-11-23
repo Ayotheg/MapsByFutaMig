@@ -388,6 +388,7 @@ export default function FriendsHub({
       );
     }
     if (startMode === 'meet') {
+      if (f.myName) return null;
       return (
         <MeetSetup
           isMobile={isMobile}
@@ -486,7 +487,13 @@ export default function FriendsHub({
           onStartModeChange('code');
         }}
         onStart={f.start}
-        onLeave={f.leave}
+        onLeave={() => {
+          if (isHost) {
+            // eslint-disable-next-line no-alert
+            if (!confirm(race ? 'Cancel this race and invalidate the invite code?' : 'Cancel this meetup and invalidate the invite code?')) return;
+          }
+          f.leave();
+        }}
       />
     );
   }

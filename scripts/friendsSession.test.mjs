@@ -18,12 +18,14 @@ import {
   CHAT_NAME_MAX_LENGTH,
   CHAT_QUICK_REPLIES,
   MEET_MAX_DISTANCE_M,
+  SUGGESTED_USERNAMES,
   USERNAME_MAX_LENGTH,
   createGuestId,
   sanitizeChatText,
   sanitizeUsername,
   appendChatMessage,
   normalizeIncomingChat,
+  normalizeIncomingPos,
   normalizeIncomingTyping,
   countUnreadMessages,
   formatMessageTime,
@@ -161,9 +163,54 @@ assert.equal(formatMessageTime(NaN), '', 'invalid timestamp returns empty string
 console.log('ok: chat helpers');
 
 assert.equal(MEET_MAX_DISTANCE_M, 5000, 'Meet short-distance threshold is 5 km');
+assert.equal(walkMinutes(null), '—');
+assert.equal(walkMinutes(0), 'Now');
+assert.equal(walkMinutes(4800), '~1h', 'exact hour formatting');
+assert.equal(walkMinutes(6000), '~1h 15m', 'hour + minute formatting');
 assert.equal(sanitizeUsername('   '), null, 'blank username rejected');
+assert.equal(sanitizeUsername(null), null, 'null username rejected');
+assert.equal(sanitizeUsername(undefined), null, 'undefined username rejected');
+assert.equal(sanitizeUsername('\r\n\t '), null, 'control whitespace rejected');
 assert.equal(sanitizeUsername('  Tolu   A. '), 'Tolu A.', 'username whitespace normalized');
 assert.equal(Array.from(sanitizeUsername('a'.repeat(USERNAME_MAX_LENGTH + 10))).length, USERNAME_MAX_LENGTH, 'username length capped');
+const emojiName = sanitizeUsername(`${'a'.repeat(USERNAME_MAX_LENGTH - 1)}👋extra`);
+assert.ok(emojiName.endsWith('👋'), 'username does not split surrogate-pair emoji');
+for (const preset of SUGGESTED_USERNAMES) {
+  assert.equal(sanitizeUsername(preset), preset, `preset valid: ${preset}`);
+}
 assert.match(createGuestId(), /^guest-[0-9a-f]{16}$/, 'guest id format');
 assert.notEqual(createGuestId(), createGuestId(), 'guest ids are unique');
-console.log('ok: guest username');
+
+const guestSession = { joined: true, phase: 'live', mode: 'meet', roster: ['guest-1', 'guest-2'], names: { 'guest-1': 'Ayo', 'guest-2': 'Tolu' } };
+assert.deepEqual(
+  normalizeIncomingChat({ id: 'g1', senderId: 'guest-2', text: 'Here' }, guestSession, 'guest-1', new Set(['guest-1', 'guest-2']), 1000),
+  { id: 'g1', senderId: 'guest-2', senderName: 'Tolu', text: 'Here', at: 1000 },
+  'guest chat accepted'
+);
+assert.equal(
+  normalizeIncomingChat({ id: 'g2', senderId: 'guest-2', text: 'Late' }, { ...guestSession, phase: 'ended' }, 'guest-1', new Set(['guest-1', 'guest-2']), 1000),
+  null,
+  'rejects chat after session ended'
+);
+assert.equal(
+  normalizeIncomingChat({ id: 'g3', senderId: 'guest-2', text: 'Unjoined' }, { ...guestSession, joined: false }, 'guest-1', new Set(['guest-1', 'guest-2']), 1000),
+  null,
+  'rejects chat when not joined'
+);
+
+assert.deepEqual(
+  normalizeIncomingPos({ id: 'guest-2', lat: 7.3, lng: 5.13, extra: 'ignored' }, guestSession, new Set(['guest-1', 'guest-2']), 2000),
+  { id: 'guest-2', lat: 7.3, lng: 5.13, at: 2000 },
+  'valid meet position accepted and stripped of extra fields'
+);
+assert.equal(normalizeIncomingPos({ id: 'guest-2', lat: NaN, lng: 5.13 }, guestSession, new Set(['guest-1', 'guest-2']), 2000), null, 'rejects NaN lat');
+assert.equal(normalizeIncomingPos({ id: 'guest-2', lat: 95, lng: 5.13 }, guestSession, new Set(['guest-1', 'guest-2']), 2000), null, 'rejects out-of-range lat');
+assert.equal(normalizeIncomingPos({ id: 'intruder', lat: 7.3, lng: 5.13 }, guestSession, new Set(['guest-1', 'guest-2']), 2000), null, 'rejects non-roster pos');
+const raceSession = { joined: true, phase: 'live', mode: 'race', roster: ['u1', 'u2'], names: { u1: 'Ayo', u2: 'Tolu' } };
+assert.deepEqual(
+  normalizeIncomingPos({ id: 'u2', dist: 140 }, raceSession, new Set(['u1', 'u2']), 3000),
+  { id: 'u2', dist: 140, at: 3000 },
+  'valid race distance accepted'
+);
+assert.equal(normalizeIncomingPos({ id: 'u2', dist: -5 }, raceSession, new Set(['u1', 'u2']), 3000), null, 'rejects negative race distance');
+console.log('ok: guest username & pos validation');

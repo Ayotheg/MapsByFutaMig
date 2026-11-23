@@ -905,9 +905,6 @@ export default function MapPage({ onReadinessChange }) {
   const handleFriendsLayout = useCallback((next) => {
     setFriendsLayout((prev) => (prev.board === next.board && prev.quietArrival === next.quietArrival ? prev : next));
   }, []);
-  const openAuthModalRef = useRef(openAuthModal);
-  openAuthModalRef.current = openAuthModal;
-  const handleFriendsSignIn = useCallback((tab, message) => openAuthModalRef.current(tab, message), []);
 
   // An invite link is read once; drop it from the address bar so a reload
   // or a shared screenshot doesn't carry it on.
@@ -1277,7 +1274,6 @@ export default function MapPage({ onReadinessChange }) {
             navOpen={navOpen}
             navActive={navActive}
             covered={!!selected || (isMobile && (sheetState !== 'peek' || mobileSearchOpen))}
-            onSignIn={handleFriendsSignIn}
             onNavigateTo={navigateForFriends}
             onRetarget={retargetForFriends}
             onEndTrip={endTripForFriends}

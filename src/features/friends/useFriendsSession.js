@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabase';
 import { subscribeGps, getLastFix } from '../navigation/gpsWatch';
 import { readPersistentState, writePersistentState, removePersistentState } from '../../lib/persistentState';
 import { displayName } from '../auth/useAuth';
-import { fetchProfileStats } from '../auth/profileStats';
 import { track } from '../../lib/analytics';
 import {
   CAPACITY,
@@ -24,6 +23,7 @@ import {
   distanceM,
   nextHost,
   normalizeIncomingChat,
+  normalizeIncomingPos,
   normalizeIncomingTyping,
   raceDone,
   sanitizeChatText,
@@ -69,6 +69,16 @@ function openChannel(topic, config, setup) {
 }
 
 const union = (list, ids) => Array.from(new Set([...(list || []), ...ids]));
+function sanitizeNames(map) {
+  if (!map || typeof map !== 'object') return {};
+  const out = {};
+  Object.entries(map).forEach(([k, v]) => {
+    if (!k) return;
+    const clean = sanitizeUsername(v);
+    if (clean) out[String(k)] = clean;
+  });
+  return out;
+}
 
 /**
  * One "Meet me" or "Race to a place" session over a Supabase Realtime
@@ -128,21 +138,33 @@ export function useFriendsSession(user) {
   const askHostRef = useRef(null);
   // My latest position, sent as soon as a connection is (back) up.
   const lastPosRef = useRef(null);
-  const myId = user?.id || guestId;
-  const myName = guestName || (user ? displayName(user) : '');
+  // Pin participantId once joined so auth.loading on reload or signing in mid-session
+  // never changes identity and kicks the user out of an active meetup/race.
+  const myId = session?.participantId || user?.id || guestId;
+  const accountName = user ? displayName(user) : '';
+  const myName = guestName || accountName;
   const myIdRef = useRef(myId);
   myIdRef.current = myId;
   const myNameRef = useRef(myName);
   myNameRef.current = myName;
 
-  const setUsername = useCallback((raw) => {
-    const clean = sanitizeUsername(raw) || '';
-    setGuestNameState(clean);
-    myNameRef.current = clean || (user ? displayName(user) : '');
-    if (clean) writePersistentState(GUEST_NAME_KEY, clean);
-    else removePersistentState(GUEST_NAME_KEY);
-    return myNameRef.current;
-  }, [user]);
+  const setUsername = useCallback(
+    (raw) => {
+      const clean = sanitizeUsername(raw) || '';
+      if (accountName && clean === accountName) {
+        setGuestNameState('');
+        myNameRef.current = accountName;
+        removePersistentState(GUEST_NAME_KEY);
+        return accountName;
+      }
+      setGuestNameState(clean);
+      myNameRef.current = clean || accountName;
+      if (clean) writePersistentState(GUEST_NAME_KEY, clean);
+      else removePersistentState(GUEST_NAME_KEY);
+      return myNameRef.current;
+    },
+    [accountName]
+  );
 
   const code = session?.code || null;
   const joined = !!session?.joined;
@@ -168,7 +190,6 @@ export function useFriendsSession(user) {
       place: s.place || null,
       hostId: s.hostId,
       hostName: s.hostName,
-      hostStats: s.hostStats || null,
       hostTerm: s.hostTerm || 0,
       createdAt: s.createdAt,
       roster: s.roster || null,
@@ -255,12 +276,11 @@ export function useFriendsSession(user) {
         mode: payload.mode,
         place: payload.place,
         hostId: payload.hostId,
-        hostName: payload.hostName,
-        hostStats: payload.hostStats,
+        hostName: sanitizeUsername(payload.hostName) || 'Friend',
         hostTerm: term,
         createdAt: payload.createdAt,
         roster: payload.roster,
-        names: { ...(s.names || {}), ...(payload.names || {}) },
+        names: { ...(s.names || {}), ...sanitizeNames(payload.names) },
         finishers: payload.finishers,
         dropped: payload.dropped || [],
         handover: payload.handover || s.handover || null,
@@ -327,6 +347,7 @@ export function useFriendsSession(user) {
           const list = Object.values(channel.presenceState())
             .map((entries) => entries[0])
             .filter((m) => m?.id)
+            .map((m) => ({ ...m, name: sanitizeUsername(m.name) || 'Friend' }))
             .sort((a, b) => a.joinedAt - b.joinedAt);
           setMembers(list);
           const s = sessionRef.current;
@@ -363,14 +384,22 @@ export function useFriendsSession(user) {
             return;
           }
           const now = Date.now();
-          const common = { mode: payload.mode, roster: payload.roster, names: payload.names, finishers: [], dropped: [], handover: null };
+          const common = {
+            mode: payload.mode,
+            roster: payload.roster,
+            names: sanitizeNames(payload.names),
+            finishers: [],
+            dropped: [],
+            handover: null,
+          };
           if (payload.mode === 'race') patch({ ...common, phase: 'countdown', goAt: now + payload.countdownMs });
           else patch({ ...common, phase: 'live', goAt: now });
         });
 
         channel.on('broadcast', { event: 'pos' }, ({ payload }) => {
-          if (!payload?.id) return;
-          setProgress((p) => ({ ...p, [payload.id]: { ...payload, at: Date.now() } }));
+          const pos = normalizeIncomingPos(payload, sessionRef.current, presentIds());
+          if (!pos) return;
+          setProgress((p) => ({ ...p, [pos.id]: pos }));
         });
 
         channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
@@ -419,12 +448,14 @@ export function useFriendsSession(user) {
         channel.on('broadcast', { event: 'handover' }, ({ payload }) => {
           const s = sessionRef.current;
           if (!s || (payload.hostTerm || 0) <= (s.hostTerm || 0)) return;
+          const nextHostName = sanitizeUsername(payload.hostName) || 'Player';
+          const fromName = sanitizeUsername(payload.from) || 'Player';
           patch({
             hostId: payload.hostId,
-            hostName: payload.hostName,
+            hostName: nextHostName,
             hostTerm: payload.hostTerm,
             dropped: payload.dropped ?? s.dropped ?? [],
-            handover: { from: payload.from, to: payload.hostName, at: Date.now() },
+            handover: { from: fromName, to: nextHostName, at: Date.now() },
           });
           if (!amHost()) {
             resendArrival();
@@ -449,10 +480,10 @@ export function useFriendsSession(user) {
           patch({
             phase: 'ended',
             endReason: payload.reason,
-            endedBy: payload.by || null,
+            endedBy: sanitizeUsername(payload.by) || null,
             finishers: payload.finishers || s.finishers,
             dropped: payload.dropped || s.dropped,
-            names: { ...(s.names || {}), ...(payload.names || {}) },
+            names: { ...(s.names || {}), ...sanitizeNames(payload.names) },
             endedAt: Date.now(),
           });
         });
@@ -469,7 +500,8 @@ export function useFriendsSession(user) {
             askHostRef.current();
             const s = sessionRef.current;
             if (s?.joined && myIdRef.current) {
-              channel.track({ id: myIdRef.current, name: myNameRef.current, joinedAt: s.joinedAt || Date.now() });
+              const name = myNameRef.current || s.names?.[myIdRef.current] || 'Friend';
+              channel.track({ id: myIdRef.current, name, joinedAt: s.joinedAt || Date.now() });
             }
             if (amHost()) send('state', stateFor());
             if (lastPosRef.current) send('pos', lastPosRef.current);
@@ -535,7 +567,8 @@ export function useFriendsSession(user) {
     const channel = channelRef.current;
     if (!connected || !channel || !myId) return;
     if (joined) {
-      channel.track({ id: myId, name: myNameRef.current || 'Friend', joinedAt: sessionRef.current?.joinedAt || Date.now() });
+      const name = myNameRef.current || sessionRef.current?.names?.[myId] || 'Friend';
+      channel.track({ id: myId, name, joinedAt: sessionRef.current?.joinedAt || Date.now() });
     } else channel.untrack();
   }, [connected, joined, myId, myName]);
 
@@ -650,7 +683,8 @@ export function useFriendsSession(user) {
   // ── My own position ─────────────────────────────────────────────────
   const [myFix, setMyFix] = useState(null);
   const lastSentRef = useRef(0);
-  const sharing = joined && (phase === 'lobby' || phase === 'countdown' || phase === 'live');
+  // Meet coordinates are never broadcast in lobby — only once live sharing starts.
+  const sharing = joined && (phase === 'live' || phase === 'countdown' || (phase === 'lobby' && mode === 'race'));
   useEffect(() => {
     if (!sharing || !myId) return undefined;
     const onFix = (pos) => {
@@ -781,8 +815,9 @@ export function useFriendsSession(user) {
   );
 
   const create = useCallback(
-    async (newMode, place, chosenName) => {
-      if (!myId) return;
+    (newMode, place, chosenName) => {
+      const id = user?.id || guestId;
+      if (!id) return;
       const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
       const now = Date.now();
       setProgress({});
@@ -792,27 +827,22 @@ export function useFriendsSession(user) {
       setSession({
         mode: newMode,
         code: createCode(),
+        participantId: id,
         joined: true,
         joinedAt: now,
         phase: 'lobby',
         place: place || null,
-        hostId: myId,
+        hostId: id,
         hostName: resolvedName,
         hostTerm: 0,
         createdAt: now,
-        names: { [myId]: resolvedName },
+        names: { [id]: resolvedName },
         finishers: [],
         dropped: [],
       });
       track('friends_created', { mode: newMode, place: place?.name || null });
-      if (user?.id) {
-        const stats = await fetchProfileStats(supabase, user.id).catch(() => null);
-        if (stats?.status === 'ready' && sessionRef.current?.hostId === myId) {
-          patch({ hostStats: { navs: stats.navs, reviews: stats.reviews } });
-        }
-      }
     },
-    [myId, user?.id, setUsername, setSession, patch]
+    [user?.id, guestId, setUsername, setSession]
   );
 
   // `fromCode`: typed into the code box, so "can't reach" also says to check it.
@@ -832,11 +862,12 @@ export function useFriendsSession(user) {
 
   const join = useCallback(
     (chosenName) => {
-      if (!myId) return;
-      const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
       const s = sessionRef.current;
+      if (!s || !myId) return;
+      const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
       const phaseNow = s.roster?.includes(myId) ? 'live' : 'lobby';
       patch({
+        participantId: s.participantId || myId,
         joined: true,
         joinedAt: Date.now(),
         phase: phaseNow,

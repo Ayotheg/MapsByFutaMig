@@ -103,7 +103,12 @@ export function formatDuration(ms) {
 // ~80 m a minute walking.
 export function walkMinutes(m) {
   if (m == null) return '—';
-  return m < 40 ? 'Now' : `~${Math.max(1, Math.round(m / 80))} min`;
+  if (m < 40) return 'Now';
+  const mins = Math.max(1, Math.round(m / 80));
+  if (mins < 60) return `~${mins} min`;
+  const h = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem ? `~${h}h ${rem}m` : `~${h}h`;
 }
 
 export function ordinal(n) {
@@ -180,6 +185,27 @@ export function normalizeIncomingTyping(payload, session, myId, presentIds, now 
     sanitizeChatText(payload.name, CHAT_NAME_MAX_LENGTH) ||
     'Friend';
   return { id, name, active: Boolean(payload.active), at: now };
+}
+
+export function normalizeIncomingPos(payload, session, presentIds, now = Date.now()) {
+  if (!session?.joined || session.phase === 'ended' || !payload?.id) return null;
+  const id = String(payload.id).slice(0, CHAT_ID_MAX_LENGTH);
+  if (!id || !isAllowedChatSender(id, session, presentIds)) return null;
+  if (session.mode === 'race') {
+    if (!Number.isFinite(payload.dist) || payload.dist < 0) return null;
+    return { id, dist: payload.dist, at: now };
+  }
+  if (
+    !Number.isFinite(payload.lat) ||
+    !Number.isFinite(payload.lng) ||
+    payload.lat < -90 ||
+    payload.lat > 90 ||
+    payload.lng < -180 ||
+    payload.lng > 180
+  ) {
+    return null;
+  }
+  return { id, lat: payload.lat, lng: payload.lng, at: now };
 }
 
 export function countUnreadMessages(messages, lastReadId, myId) {
