@@ -13,6 +13,8 @@ import {
   distanceM,
   nextHost,
   raceDone,
+  CAPACITY,
+  meetArrivedCheck,
   CHAT_MAX_LENGTH,
   CHAT_MAX_MESSAGES,
   CHAT_NAME_MAX_LENGTH,
@@ -214,3 +216,15 @@ assert.deepEqual(
 );
 assert.equal(normalizeIncomingPos({ id: 'u2', dist: -5 }, raceSession, new Set(['u1', 'u2']), 3000), null, 'rejects negative race distance');
 console.log('ok: guest username & pos validation');
+
+assert.ok(CAPACITY.meet >= 3, 'Meet supports 2 or more people');
+const spot = { lat: 7.3000, lng: 5.1300 };
+const near1 = { lat: 7.3001, lng: 5.1300 }; // ~11 m
+const near2 = { lat: 7.3000, lng: 5.1301 }; // ~11 m
+const far = { lat: 7.3050, lng: 5.1300 };   // ~555 m
+assert.equal(meetArrivedCheck(spot, [near1, near2], null), true, 'group arrived when all peers within 30 m');
+assert.equal(meetArrivedCheck(spot, [near1, far], null), false, 'group not arrived if one peer is still far');
+assert.equal(meetArrivedCheck(spot, [near1, null], null), false, 'group not arrived if a peer has no fix');
+assert.equal(meetArrivedCheck(spot, [near1, near2], spot), true, 'group arrived at meeting point');
+assert.equal(meetArrivedCheck(spot, [], null), false, 'empty peers is not arrived');
+console.log('ok: group meetup');

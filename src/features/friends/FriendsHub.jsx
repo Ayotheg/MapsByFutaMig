@@ -244,34 +244,73 @@ export default function FriendsHub({
     if (!navOpen) onNavigateTo(session.place);
   }, [race, phase, joined, meFinished, session?.place, session?.code, navOpen, onNavigateTo]);
 
-  // ── Meetup pins ────────────────────────────────────────────────────
+  // ── Meetup pins (2+ people) ────────────────────────────────────────
   const meetLive = mode === 'meet' && phase === 'live' && joined;
-  const other = f.otherId ? progress[f.otherId] : null;
-  const otherName = f.otherId ? session?.names?.[f.otherId] : null;
-  const otherPaused = !other?.at || now - other.at > PAUSED_AFTER_MS;
-  const pinsRef = useRef({ other: null, me: null });
+  const meetPeers = useMemo(() => {
+    if (mode !== 'meet' || !session) return [];
+    return f.meetPeerIds.map((id, i) => {
+      const p = progress[id] || null;
+      const name = session.names?.[id] || members.find((m) => m.id === id)?.name || 'Friend';
+      const at = p?.at || null;
+      const paused = !at || now - at > PAUSED_AFTER_MS;
+      return {
+        id,
+        color: i + 1,
+        name,
+        lat: p?.lat ?? null,
+        lng: p?.lng ?? null,
+        at,
+        paused,
+        distance: f.myFix && p?.lat != null ? distanceM(f.myFix, p) : null,
+      };
+    });
+  }, [mode, session, f.meetPeerIds, f.myFix, progress, members, now]);
+  const primaryPeer = meetPeers[0] || null;
+  const other = primaryPeer ? progress[primaryPeer.id] : null;
+  const otherName = primaryPeer?.name || null;
+  const otherPaused = primaryPeer ? primaryPeer.paused : true;
+
+  const pinsRef = useRef({ peers: new Map(), me: null });
   useEffect(() => {
     if (!map || !meetLive) return undefined;
     const pins = pinsRef.current;
     return () => {
-      if (pins.other) map.removeLayer(pins.other);
+      pins.peers.forEach((marker) => map.removeLayer(marker));
+      pins.peers.clear();
       if (pins.me) map.removeLayer(pins.me);
-      pins.other = null;
       pins.me = null;
     };
   }, [map, meetLive]);
   useEffect(() => {
     if (!map || !meetLive) return;
     const pins = pinsRef.current;
-    if (other?.lat != null) {
-      const html = `<div class="friends-pin-avatar">${initialOf(otherName)}</div>`;
-      const icon = L.divIcon({ className: `friends-pin${otherPaused ? ' friends-pin-paused' : ''}`, html, iconSize: [44, 44], iconAnchor: [22, 22] });
-      if (!pins.other) pins.other = L.marker([other.lat, other.lng], { icon, interactive: false, zIndexOffset: 900 }).addTo(map);
-      else {
-        pins.other.setLatLng([other.lat, other.lng]);
-        pins.other.setIcon(icon);
+    const activeIds = new Set();
+    meetPeers.forEach((peer) => {
+      if (peer.lat == null) return;
+      activeIds.add(peer.id);
+      const colorCls = meetPeers.length > 1 ? ` friends-pin-c${peer.color % 4}` : '';
+      const html = `<div class="friends-pin-avatar${colorCls}">${initialOf(peer.name)}</div>`;
+      const icon = L.divIcon({
+        className: `friends-pin${peer.paused ? ' friends-pin-paused' : ''}`,
+        html,
+        iconSize: [44, 44],
+        iconAnchor: [22, 22],
+      });
+      const existing = pins.peers.get(peer.id);
+      if (!existing) {
+        const marker = L.marker([peer.lat, peer.lng], { icon, interactive: false, zIndexOffset: 900 }).addTo(map);
+        pins.peers.set(peer.id, marker);
+      } else {
+        existing.setLatLng([peer.lat, peer.lng]);
+        existing.setIcon(icon);
       }
-    }
+    });
+    pins.peers.forEach((marker, id) => {
+      if (!activeIds.has(id)) {
+        map.removeLayer(marker);
+        pins.peers.delete(id);
+      }
+    });
     // During a trip the nav dot already shows where you are.
     if (f.myFix && !navActive) {
       if (!pins.me) {
@@ -282,39 +321,49 @@ export default function FriendsHub({
       map.removeLayer(pins.me);
       pins.me = null;
     }
-  }, [map, meetLive, other?.lat, other?.lng, otherName, otherPaused, f.myFix, navActive]);
+  }, [map, meetLive, meetPeers, f.myFix, navActive]);
 
   // ── Meetup trip: the route follows the friend ──────────────────────
   // Walking to a person (not a place): when they've moved 30 m from where
   // the route ends, move the destination to them and plan again — at most
   // every 15 s so the route doesn't jump while they shuffle about.
-  // `session.follow` ({ lat, lng, at }) is where the route ends; it's saved
-  // with the session so a reload keeps following.
+  // `session.follow` ({ id, lat, lng, at }) is where the route ends; it's
+  // saved with the session so a reload keeps following.
   const follow = session?.follow || null;
   const { setFollow } = f;
   useEffect(() => {
     if (!navOpen && follow) setFollow(null);
   }, [navOpen, follow, setFollow]);
-  const otherLat = other?.lat;
-  const otherLng = other?.lng;
+  const followTarget = follow?.id ? meetPeers.find((p) => p.id === follow.id) || primaryPeer : primaryPeer;
+  const targetLat = followTarget?.lat ?? null;
+  const targetLng = followTarget?.lng ?? null;
+  const targetName = followTarget?.name || null;
+  const targetId = followTarget?.id || null;
   useEffect(() => {
-    if (!meetLive || !navActive || !follow || session?.place || otherLat == null) return;
-    const here = { lat: otherLat, lng: otherLng };
+    if (!meetLive || !navActive || !follow || session?.place || targetLat == null) return;
+    const here = { lat: targetLat, lng: targetLng };
     if (distanceM(follow, here) < FOLLOW_MOVE_M || now - follow.at < FOLLOW_EVERY_MS) return;
-    const name = firstName(otherName);
+    const name = firstName(targetName);
     // False when the trip now goes somewhere they chose themselves.
     const moved = onRetarget({ ...here, name: `${name}’s location`, type: 'friend' }, `${name} moved. Route updated.`);
-    setFollow(moved ? { ...here, at: now } : null);
-  }, [meetLive, navActive, follow, session?.place, otherLat, otherLng, otherName, onRetarget, setFollow, now]);
+    setFollow(moved ? { id: targetId, ...here, at: now } : null);
+  }, [meetLive, navActive, follow, session?.place, targetLat, targetLng, targetName, targetId, onRetarget, setFollow, now]);
+
+  function meetDirectionsTo(peer) {
+    if (!peer || peer.lat == null) return;
+    setFollow({ id: peer.id, lat: peer.lat, lng: peer.lng, at: Date.now() });
+    onNavigateTo({ lat: peer.lat, lng: peer.lng, name: `${firstName(peer.name)}’s location`, type: 'friend' });
+  }
 
   function meetDirections() {
     if (session.place) {
       onNavigateTo(session.place);
       return;
     }
-    if (other?.lat == null) return;
-    setFollow({ lat: other.lat, lng: other.lng, at: Date.now() });
-    onNavigateTo({ lat: other.lat, lng: other.lng, name: `${firstName(otherName)}’s location`, type: 'friend' });
+    const located = meetPeers.filter((p) => p.lat != null);
+    if (!located.length) return;
+    const nearest = located.reduce((best, p) => ((p.distance ?? Infinity) < (best.distance ?? Infinity) ? p : best), located[0]);
+    meetDirectionsTo(nearest);
   }
 
   // "Tolu left. Dami is now the host." for a few seconds after a handover.
@@ -326,10 +375,15 @@ export default function FriendsHub({
         : `${firstName(handover.from)} left. ${firstName(handover.to)} is now the host.`
       : null;
 
-  function showBoth() {
-    if (!map || other?.lat == null) return;
-    const pts = [[other.lat, other.lng]];
+  function showAll() {
+    if (!map) return;
+    const pts = [];
+    meetPeers.forEach((p) => {
+      if (p.lat != null) pts.push([p.lat, p.lng]);
+    });
     if (f.myFix) pts.push([f.myFix.lat, f.myFix.lng]);
+    if (session?.place) pts.push([session.place.lat, session.place.lng]);
+    if (!pts.length) return;
     if (pts.length === 1) map.setView(pts[0], 18);
     else map.fitBounds(pts, { padding: [90, 90], maxZoom: 18 });
   }
@@ -442,6 +496,7 @@ export default function FriendsHub({
 
   const resolvedOtherName = otherName || (isHost ? 'Your friend' : session.hostName);
   const placeDistance = session.place ? distanceM(f.myFix, session.place) : null;
+  const activeMeetCount = mode === 'meet' ? Math.max(meetPeers.length + 1, members.length, 2) : session.roster?.length || members.length || 2;
   const chatDrawer = chatOpen && (
     <FriendsChat
       isMobile={isMobile}
@@ -449,11 +504,12 @@ export default function FriendsHub({
       myId={myId}
       otherName={resolvedOtherName}
       distance={f.meetDistance}
+      maxDistance={f.meetMaxDistance}
       place={session.place}
       placeDistance={placeDistance}
       arrived={f.meetArrived}
-      paused={phase === 'live' && !f.meetArrived && Boolean(other?.at) && otherPaused}
-      playerCount={session.roster?.length || members.length || 2}
+      paused={phase === 'live' && meetPeers.length <= 1 && !f.meetArrived && Boolean(other?.at) && otherPaused}
+      playerCount={activeMeetCount}
       connected={f.connected}
       messages={messages}
       typingUsers={typingUsers}
@@ -565,14 +621,18 @@ export default function FriendsHub({
 
   if (!boardVisible) return null;
   if (chatOpen) return chatDrawer;
+  const isGroupMeet = meetPeers.length > 1;
   return (
     <MeetBoard
       otherName={resolvedOtherName}
+      peers={meetPeers}
       distance={f.meetDistance}
+      maxDistance={f.meetMaxDistance}
       updatedAt={other?.at || null}
       now={now}
       arrived={f.meetArrived}
       navOpen={navOpen}
+      notice={notice}
       place={session.place}
       placeDistance={placeDistance}
       minimized={boardMin}
@@ -581,11 +641,17 @@ export default function FriendsHub({
       toastMessage={toastMsg}
       onOpenChat={openChat}
       onMinimizedChange={setBoardMin}
-      onShowBoth={showBoth}
+      onShowBoth={showAll}
       onDirections={meetDirections}
+      onDirectionsToPeer={meetDirectionsTo}
       onEnd={() => {
         // eslint-disable-next-line no-alert
-        if (confirm('End the meetup for both of you?')) f.leave();
+        const msg = isGroupMeet
+          ? isHost
+            ? 'Leave the meetup? The next person takes over as host.'
+            : 'Leave the meetup? The others stay connected.'
+          : 'End the meetup for both of you?';
+        if (confirm(msg)) f.leave();
       }}
     />
   );

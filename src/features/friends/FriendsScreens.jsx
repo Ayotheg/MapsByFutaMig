@@ -506,9 +506,9 @@ export function Lobby({
               <UserPlus size={15} />
             </span>
             <span className={styles.waiting}>
-              {race
-                ? `Waiting for up to ${cap - list.length} more${list.length >= 2 ? ' (optional)' : ''}`
-                : 'Waiting for your friend to join…'}
+              {list.length >= 2
+                ? `Waiting for up to ${cap - list.length} more (optional)`
+                : `Waiting for friends to join (2–${cap} people)…`}
             </span>
           </div>
         )}
@@ -560,7 +560,9 @@ export function Lobby({
         <span className={styles.note}>
           {race
             ? 'Everyone gets a 3-second countdown.'
-            : `You and ${firstName(list[1]?.name)} will see each other live until one of you ends it.`}
+            : list.length === 2
+              ? `You and ${firstName(list[1]?.name)} will see each other live.`
+              : `All ${list.length} of you will see each other live on the map.`}
         </span>
       </div>
     ) : !race ? (
@@ -587,7 +589,7 @@ export function Lobby({
       <div className={styles.headText} style={{ gap: 3 }}>
         <h2 className={styles.title}>{title}</h2>
         <span className={styles.sub}>
-          {race ? `2–4 players · ${minsLeft} min left` : `Short distance (within ${maxKm} km) · ${minsLeft} min left`}
+          {race ? `2–${cap} players · ${minsLeft} min left` : `2–${cap} people · Within ${maxKm} km · ${minsLeft} min left`}
         </span>
       </div>
       <div className={styles.row} style={{ gap: 8, alignItems: 'center' }}>
@@ -653,7 +655,7 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
         'Couldn’t reach the host',
         `${session.fromCode ? 'Check the code, and ask' : 'Ask'} your friend to open Maps By FUTA. We’ll keep trying while this screen is open.`,
       ],
-      full: [what ? `This ${what} is full` : 'This is full', race ? 'A race takes up to 4 people.' : 'Meet me is for 2 people.'],
+      full: [what ? `This ${what} is full` : 'This is full', race ? `A race takes up to ${CAPACITY.race} people.` : `Meet me takes up to ${CAPACITY.meet} people.`],
       started: [what ? `This ${what} already started` : 'This already started', 'Ask your friend to send a new link or code next time.'],
     }[peek] || ['Opening invite…', ''];
     return (
@@ -695,8 +697,8 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
           </div>
         )}
         <div className={styles.tableRow}>
-          <span className={styles.tableMeta} style={{ flex: 1 }}>{race ? 'Players' : 'Sharing'}</span>
-          <span className={styles.personName}>{race ? `${players || hostFirst} + you` : 'Both of you, live'}</span>
+          <span className={styles.tableMeta} style={{ flex: 1 }}>{race ? 'Players' : 'People'}</span>
+          <span className={styles.personName}>{`${players || hostFirst} + you`}</span>
         </div>
       </div>
       <form
@@ -1053,11 +1055,14 @@ export function Results({ isMobile, session, rows, isHost, onDone, onRaceAgain }
 // ── 9/10 · Meet me, live (the same card on both phones) ──────────────
 export function MeetBoard({
   otherName,
+  peers = [],
   distance,
+  maxDistance = null,
   updatedAt,
   now,
   arrived,
   navOpen,
+  notice,
   place,
   placeDistance,
   minimized,
@@ -1069,25 +1074,44 @@ export function MeetBoard({
   onEnd,
   onShowBoth,
   onDirections,
+  onDirectionsToPeer,
 }) {
+  const isGroup = peers.length > 1;
   const name = firstName(otherName);
-  const paused = !arrived && (!updatedAt || now - updatedAt > PAUSED_AFTER_MS);
-  const tooFar = !arrived && distance != null && distance > MEET_MAX_DISTANCE_M;
+  const locatedPeers = peers.filter((p) => p.at != null);
+  const hasAnyFix = isGroup ? locatedPeers.length > 0 : Boolean(updatedAt);
+  const paused = !arrived && (isGroup ? peers.every((p) => p.paused) : !updatedAt || now - updatedAt > PAUSED_AFTER_MS);
+  const farDistance = maxDistance ?? distance;
+  const tooFar = !arrived && farDistance != null && farDistance > MEET_MAX_DISTANCE_M;
   const maxKm = Math.round(MEET_MAX_DISTANCE_M / 1000);
-  const headline = arrived
-    ? `You’ve met ${name}`
-    : !updatedAt
-      ? `Waiting for ${name}’s location`
-      : paused
-        ? `${name}’s location paused`
-        : `${name} is ${formatDistance(distance)} away`;
+  const totalPeople = peers.length + 1;
+
+  const headline = isGroup
+    ? arrived
+      ? 'You’ve all met'
+      : !hasAnyFix
+        ? 'Waiting for locations'
+        : distance != null
+          ? `${totalPeople} people · ${formatDistance(distance)} nearest`
+          : `${totalPeople} people meeting`
+    : arrived
+      ? `You’ve met ${name}`
+      : !updatedAt
+        ? `Waiting for ${name}’s location`
+        : paused
+          ? `${name}’s location paused`
+          : `${name} is ${formatDistance(distance)} away`;
+
   const subline = arrived
-    ? 'You’re within 30 m of each other. The meetup ends in a minute.'
+    ? 'Everyone is within 30 m. The meetup ends in a minute.'
     : place
       ? `Meeting at ${place.name}${placeDistance != null ? ` · you’re ${formatDistance(placeDistance)} from it` : ''}`
-      : paused && updatedAt
+      : !isGroup && paused && updatedAt
         ? `Last seen ${ago(now - updatedAt)} ago`
-        : 'Walk towards each other, or wait where you are.';
+        : isGroup
+          ? 'Tap any friend below for walking directions.'
+          : 'Walk towards each other, or wait where you are.';
+
   const canDirect = !navOpen && !arrived;
   const pill = (
     <span className={cx(styles.pill, paused && styles.pillMuted)}>
@@ -1096,15 +1120,22 @@ export function MeetBoard({
     </span>
   );
   const directionsBtn = (grow) => (
-    <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, grow && styles.grow)} disabled={!place && !updatedAt} onClick={onDirections}>
+    <button
+      type="button"
+      className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, grow && styles.grow)}
+      disabled={!place && !hasAnyFix}
+      onClick={onDirections}
+    >
       <Navigation size={16} />
-      <span className={styles.btnLabel}>{place ? `Directions to ${place.name}` : `Directions to ${name}`}</span>
+      <span className={styles.btnLabel}>
+        {place ? `Directions to ${place.name}` : isGroup ? 'Directions to nearest' : `Directions to ${name}`}
+      </span>
     </button>
   );
-  const showBothBtn = (grow) => (
-    <button type="button" className={cx(styles.btn, styles.btnOutline, styles.btnSmall, grow && styles.grow)} disabled={!updatedAt} onClick={onShowBoth}>
+  const showAllBtn = (grow) => (
+    <button type="button" className={cx(styles.btn, styles.btnOutline, styles.btnSmall, grow && styles.grow)} disabled={!hasAnyFix} onClick={onShowBoth}>
       <LocateFixed size={16} />
-      Show both
+      {isGroup ? 'Show all' : 'Show both'}
     </button>
   );
   const chatBtn = onOpenChat && (
@@ -1114,6 +1145,12 @@ export function MeetBoard({
       <UnreadBadge count={unreadCount} />
     </button>
   );
+  const noticeEl = notice && (
+    <div className={styles.notice} role="status">
+      <Users size={18} />
+      {notice}
+    </div>
+  );
 
   if (minimized) {
     return (
@@ -1121,7 +1158,13 @@ export function MeetBoard({
         {onOpenChat && <ChatToast message={toastMessage} onOpen={onOpenChat} />}
         <section className={cx(styles.board, styles.boardMin)} aria-label="Meetup">
           <div className={styles.person}>
-            <Avatar name={otherName} index={1} size="avatarSm" />
+            {isGroup ? (
+              <span className={styles.dotIcon} style={{ width: 34, height: 34 }}>
+                <Users size={16} />
+              </span>
+            ) : (
+              <Avatar name={otherName} index={1} size="avatarSm" />
+            )}
             <div className={styles.headText} style={{ gap: 2, flex: 1, minWidth: 0 }}>
               <span className={styles.boardTitle}>{headline}</span>
               {tooFar && <span className={styles.sub}>Best within {maxKm} km</span>}
@@ -1129,8 +1172,9 @@ export function MeetBoard({
             {pill}
             <DetailsBtn onClick={() => onMinimizedChange(false)} />
           </div>
+          {noticeEl}
           <div className={styles.row}>
-            {canDirect ? directionsBtn(true) : showBothBtn(true)}
+            {canDirect ? directionsBtn(true) : showAllBtn(true)}
             {chatBtn}
           </div>
         </section>
@@ -1142,7 +1186,13 @@ export function MeetBoard({
     <div className={styles.boardStack}>
       <section className={styles.board} aria-label="Meetup">
         <div className={styles.person}>
-          <Avatar name={otherName} index={1} />
+          {isGroup ? (
+            <span className={styles.dotIcon}>
+              <Users size={18} />
+            </span>
+          ) : (
+            <Avatar name={otherName} index={1} />
+          )}
           <div className={styles.headText} style={{ gap: 2, flex: 1 }}>
             <span className={styles.boardTitle}>{headline}</span>
             <span className={styles.sub}>{subline}</span>
@@ -1150,28 +1200,63 @@ export function MeetBoard({
           {pill}
           <MinimiseBtn onClick={() => onMinimizedChange(true)} />
         </div>
-        <div className={styles.boardStats}>
-          <div className={styles.stat}>
-            <span className={styles.overline}>Apart</span>
-            <span className={styles.statVal}>{formatDistance(distance)}</span>
+        {noticeEl}
+        {isGroup ? (
+          <div className={styles.col} style={{ gap: 6 }}>
+            {peers.map((peer) => (
+              <div key={peer.id} className={styles.meetPeerRow}>
+                <Avatar name={peer.name} index={peer.color} size="avatarSm" />
+                <span className={styles.personText}>
+                  <span className={styles.personName}>{firstName(peer.name)}</span>
+                  <span className={styles.personMeta}>
+                    {peer.at == null
+                      ? 'Waiting for location'
+                      : peer.paused
+                        ? `Paused · ${ago(now - peer.at)} ago`
+                        : `${formatDistance(peer.distance)} away · ${walkMinutes(peer.distance)}`}
+                  </span>
+                </span>
+                {!place && !arrived && peer.lat != null && onDirectionsToPeer && (
+                  <button
+                    type="button"
+                    className={styles.meetPeerBtn}
+                    aria-label={`Directions to ${firstName(peer.name)}`}
+                    onClick={() => onDirectionsToPeer(peer)}
+                  >
+                    <Navigation size={15} />
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
-          <div className={styles.stat}>
-            <span className={styles.overline}>Walk</span>
-            <span className={styles.statVal}>{arrived ? 'Now' : walkMinutes(place ? placeDistance : distance)}</span>
+        ) : (
+          <div className={styles.boardStats}>
+            <div className={styles.stat}>
+              <span className={styles.overline}>Apart</span>
+              <span className={styles.statVal}>{formatDistance(distance)}</span>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.overline}>Walk</span>
+              <span className={styles.statVal}>{arrived ? 'Now' : walkMinutes(place ? placeDistance : distance)}</span>
+            </div>
+            <div className={styles.stat}>
+              <span className={styles.overline}>Updated</span>
+              <span className={styles.statVal}>{updatedAt ? ago(now - updatedAt) : '—'}</span>
+            </div>
           </div>
-          <div className={styles.stat}>
-            <span className={styles.overline}>Updated</span>
-            <span className={styles.statVal}>{updatedAt ? ago(now - updatedAt) : '—'}</span>
-          </div>
-        </div>
+        )}
         {tooFar && (
           <div className={styles.notice} role="status">
             <MapPin size={18} />
-            You’re {formatDistance(distance)} apart. Meet me is designed for short distances (within {maxKm} km around campus).
+            {isGroup
+              ? `Someone is ${formatDistance(farDistance)} away. Meet me is designed for short distances (within ${maxKm} km around campus).`
+              : `You’re ${formatDistance(farDistance)} apart. Meet me is designed for short distances (within ${maxKm} km around campus).`}
           </div>
         )}
-        {onOpenChat && <ChatStrip title={`Message ${name}`} lastMessage={lastMessage} unread={unreadCount} onOpen={onOpenChat} />}
-        {paused && updatedAt && (
+        {onOpenChat && (
+          <ChatStrip title={isGroup ? 'Group chat' : `Message ${name}`} lastMessage={lastMessage} unread={unreadCount} onOpen={onOpenChat} />
+        )}
+        {!isGroup && paused && updatedAt && (
           <div className={styles.notice}>
             <Clock size={18} />
             {name}’s app may be closed or their screen locked. Their pin updates again when they open Maps By FUTA.
@@ -1179,14 +1264,14 @@ export function MeetBoard({
         )}
         <div className={styles.row}>
           <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onEnd}>
-            End meetup
+            {isGroup ? 'Leave meetup' : 'End meetup'}
           </button>
-          {showBothBtn(true)}
+          {showAllBtn(true)}
         </div>
         {canDirect && directionsBtn(false)}
         <span className={styles.note} style={{ justifyContent: 'flex-start', textAlign: 'left' }}>
           <Smartphone size={14} />
-          Keep this screen open so {name} can see you.
+          Keep this screen open so {isGroup ? 'everyone' : name} can see you.
         </span>
       </section>
     </div>

@@ -8,6 +8,7 @@ import {
   MapPin,
   MessageCircle,
   Send,
+  Users,
   WifiOff,
 } from 'lucide-react';
 import styles from './Friends.module.css';
@@ -91,6 +92,7 @@ export default function FriendsChat({
   myId,
   otherName,
   distance,
+  maxDistance = null,
   place,
   placeDistance,
   arrived,
@@ -112,6 +114,8 @@ export default function FriendsChat({
   const typingTimerRef = useRef(null);
 
   const race = mode === 'race';
+  const isGroup = race || playerCount > 2;
+  const farDistance = maxDistance ?? distance;
   const friendFirst = firstName(otherName);
   const quickReplies = CHAT_QUICK_REPLIES[race ? 'race' : 'meet'];
   const canSend = connected && draft.trim().length > 0;
@@ -216,14 +220,14 @@ export default function FriendsChat({
   }
 
   // Header status pill & subtitle
-  const statusPill = race ? (
+  const statusPill = isGroup ? (
     <span className={styles.pill}>
       <span className={styles.liveDot} />
       <span>
         <span className={styles.num} style={{ fontSize: 12 }}>
           {playerCount}
         </span>{' '}
-        players
+        {race ? 'players' : 'people'}
       </span>
     </span>
   ) : (
@@ -253,7 +257,9 @@ export default function FriendsChat({
     : place?.name
       ? `${place.name} · ${walkMinutes(placeDistance ?? distance)} walk`
       : distance != null
-        ? `${walkMinutes(distance)} walk apart`
+        ? isGroup
+          ? `Nearest ${formatDistance(distance)} away`
+          : `${walkMinutes(distance)} walk apart`
         : 'Find each other, live';
 
   const typingText =
@@ -276,13 +282,15 @@ export default function FriendsChat({
         }
       : undefined;
 
+  const dialogTitle = race ? 'Race chat' : isGroup ? 'Group meetup' : friendFirst;
+
   const content = (
     <section
       ref={dialogRef}
       tabIndex={-1}
       role="dialog"
       aria-modal={isMobile ? 'true' : undefined}
-      aria-label={race ? 'Race chat' : `Chat with ${friendFirst}`}
+      aria-label={isGroup ? dialogTitle : `Chat with ${friendFirst}`}
       className={isMobile ? styles.chatSheet : styles.chatPanel}
       style={mobileSheetStyle}
     >
@@ -297,12 +305,16 @@ export default function FriendsChat({
           <span className={cx(styles.dotIcon, styles.dotIconTeal)} aria-hidden="true">
             <Flag size={18} />
           </span>
+        ) : isGroup ? (
+          <span className={styles.dotIcon} aria-hidden="true">
+            <Users size={18} />
+          </span>
         ) : (
           <ChatAvatar name={otherName} />
         )}
         <div className={styles.chatHeadMain}>
           <div className={styles.chatHeadTop}>
-            <span className={styles.chatHeadTitle}>{race ? 'Race chat' : friendFirst}</span>
+            <span className={styles.chatHeadTitle}>{dialogTitle}</span>
             {statusPill}
           </div>
           <span className={styles.chatHeadSub}>
@@ -321,7 +333,7 @@ export default function FriendsChat({
           <WifiOff size={15} />
           <span>Reconnecting… you can send messages once you’re back online.</span>
         </div>
-      ) : !race && paused ? (
+      ) : !isGroup && paused ? (
         <div className={styles.chatBanner} role="status">
           <Clock size={15} />
           <span>{friendFirst}’s app is paused — they may miss messages sent until they return.</span>
@@ -329,12 +341,14 @@ export default function FriendsChat({
       ) : (
         !race &&
         !arrived &&
-        distance != null &&
-        distance > MEET_MAX_DISTANCE_M && (
+        farDistance != null &&
+        farDistance > MEET_MAX_DISTANCE_M && (
           <div className={styles.chatBanner} role="status">
             <MapPin size={15} />
             <span>
-              You’re {formatDistance(distance)} apart — Meet me works best within {Math.round(MEET_MAX_DISTANCE_M / 1000)} km.
+              {isGroup
+                ? `Someone is ${formatDistance(farDistance)} away — Meet me works best within ${Math.round(MEET_MAX_DISTANCE_M / 1000)} km.`
+                : `You’re ${formatDistance(farDistance)} apart — Meet me works best within ${Math.round(MEET_MAX_DISTANCE_M / 1000)} km.`}
             </span>
           </div>
         )
@@ -346,7 +360,9 @@ export default function FriendsChat({
             <span className={styles.chatEmptyIcon} aria-hidden="true">
               <MessageCircle size={22} />
             </span>
-            <h3 className={styles.chatEmptyTitle}>{race ? 'Race group chat' : `Chat with ${friendFirst}`}</h3>
+            <h3 className={styles.chatEmptyTitle}>
+              {race ? 'Race group chat' : isGroup ? 'Group meetup chat' : `Chat with ${friendFirst}`}
+            </h3>
             <p className={styles.chatEmptySub}>{emptySub}</p>
           </div>
         ) : (
@@ -360,7 +376,7 @@ export default function FriendsChat({
               {messages.map((m, i) => {
                 const isMe = m.senderId === myId;
                 const prev = i > 0 ? messages[i - 1] : null;
-                const showSender = race && !isMe && prev?.senderId !== m.senderId;
+                const showSender = isGroup && !isMe && prev?.senderId !== m.senderId;
                 return (
                   <div key={m.id} className={cx(styles.chatMsg, isMe && styles.chatMsgMe)}>
                     {showSender && <span className={styles.chatSender}>{firstName(m.senderName)}</span>}
@@ -405,8 +421,8 @@ export default function FriendsChat({
           className={styles.chatInput}
           value={draft}
           maxLength={CHAT_MAX_LENGTH}
-          placeholder={race ? 'Message group…' : `Message ${friendFirst}…`}
-          aria-label={race ? 'Message group' : `Message ${friendFirst}`}
+          placeholder={isGroup ? 'Message group…' : `Message ${friendFirst}…`}
+          aria-label={isGroup ? 'Message group' : `Message ${friendFirst}`}
           autoComplete="off"
           onChange={(e) => handleInputChange(e.target.value)}
           onBlur={handleInputBlur}

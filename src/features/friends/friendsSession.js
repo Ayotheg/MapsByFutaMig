@@ -1,7 +1,7 @@
 import { haversine } from '../../lib/geoUtils.js';
 
-// Meet me is two people (host + one friend); a race is 2–4.
-export const CAPACITY = { meet: 2, race: 4 };
+// Meet me supports 2–8 people; a race supports 2–4.
+export const CAPACITY = { meet: 8, race: 4 };
 // Inside this distance of the finish counts as arrived.
 export const RACE_FINISH_M = 25;
 // Inside this distance of each other, a meetup is done.
@@ -36,6 +36,16 @@ export function raceDone(roster, finishers, dropped) {
   if (!roster?.length) return false;
   const done = new Set([...(finishers || []).map((f) => f.id), ...(dropped || [])]);
   return roster.every((id) => done.has(id));
+}
+
+// Meetup arrived: you and every active peer have a fix and are within
+// MEET_ARRIVED_M of you (or of the chosen meeting point).
+export function meetArrivedCheck(myFix, peerPositions, place) {
+  if (!myFix || !peerPositions?.length) return false;
+  if (place && distanceM(myFix, place) <= MEET_ARRIVED_M) {
+    if (peerPositions.every((p) => p && distanceM(p, place) <= MEET_ARRIVED_M)) return true;
+  }
+  return peerPositions.every((p) => p && distanceM(myFix, p) <= MEET_ARRIVED_M);
 }
 
 // No 0/O/1/I so a code read aloud can't be misheard.
