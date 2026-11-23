@@ -219,12 +219,21 @@ console.log('ok: guest username & pos validation');
 
 assert.ok(CAPACITY.meet >= 3, 'Meet supports 2 or more people');
 const spot = { lat: 7.3000, lng: 5.1300 };
-const near1 = { lat: 7.3001, lng: 5.1300 }; // ~11 m
-const near2 = { lat: 7.3000, lng: 5.1301 }; // ~11 m
-const far = { lat: 7.3050, lng: 5.1300 };   // ~555 m
-assert.equal(meetArrivedCheck(spot, [near1, near2], null), true, 'group arrived when all peers within 30 m');
+const north22 = { lat: 7.3002, lng: 5.1300 }; // ~22 m north of spot
+const south22 = { lat: 7.2998, lng: 5.1300 }; // ~22 m south of spot (~44 m from north22)
+const near1 = { lat: 7.3001, lng: 5.1300 };   // ~11 m
+const near2 = { lat: 7.3000, lng: 5.1301 };   // ~11 m
+const far = { lat: 7.3050, lng: 5.1300 };     // ~555 m
+assert.equal(meetArrivedCheck(null, [near1, near2], null), false, 'null myFix is not arrived');
+assert.equal(meetArrivedCheck(spot, [near1, near2], null), true, 'group arrived when all pairs within 30 m');
+assert.equal(meetArrivedCheck(spot, [north22, south22], null), false, 'pairwise check rejects peers >30 m apart from each other');
+assert.equal(meetArrivedCheck(spot, [north22, south22], spot), true, 'meeting-point branch passes when all are within 30 m of place');
 assert.equal(meetArrivedCheck(spot, [near1, far], null), false, 'group not arrived if one peer is still far');
 assert.equal(meetArrivedCheck(spot, [near1, null], null), false, 'group not arrived if a peer has no fix');
-assert.equal(meetArrivedCheck(spot, [near1, near2], spot), true, 'group arrived at meeting point');
 assert.equal(meetArrivedCheck(spot, [], null), false, 'empty peers is not arrived');
+
+const droppedMeetSession = { ...guestSession, dropped: ['guest-2'] };
+assert.equal(normalizeIncomingChat({ id: 'd1', senderId: 'guest-2', text: 'Hi' }, droppedMeetSession, 'guest-1', new Set(['guest-1']), 1000), null, 'rejects chat from dropped meet peer');
+assert.equal(normalizeIncomingPos({ id: 'guest-2', lat: 7.3, lng: 5.13 }, droppedMeetSession, new Set(['guest-1']), 1000), null, 'rejects pos from dropped meet peer');
+assert.equal(normalizeIncomingTyping({ id: 'guest-2', active: true }, droppedMeetSession, 'guest-1', new Set(['guest-1']), 1000), null, 'rejects typing from dropped meet peer');
 console.log('ok: group meetup');

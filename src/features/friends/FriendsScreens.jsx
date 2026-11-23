@@ -400,7 +400,7 @@ export function Lobby({
     }
   }
 
-  // Single unified share card — hides automatically once a Meet is full (2/2).
+  // Single unified share card — hides automatically once the room is full.
   const shareCard = showShareCard && (
     <div className={styles.shareCard}>
       <div className={styles.shareCodeRow}>
@@ -441,7 +441,7 @@ export function Lobby({
       </div>
       <span className={styles.shareHint}>
         <Smartphone size={13} />
-        Keep this open until {race ? 'everyone joins' : 'your friend joins'}.
+        Keep this open until everyone joins.
       </span>
     </div>
   );
@@ -561,7 +561,7 @@ export function Lobby({
           {race
             ? 'Everyone gets a 3-second countdown.'
             : list.length === 2
-              ? `You and ${firstName(list[1]?.name)} will see each other live.`
+              ? `You and ${firstName(list.find((m) => m.id !== myId)?.name)} will see each other live.`
               : `All ${list.length} of you will see each other live on the map.`}
         </span>
       </div>
@@ -721,7 +721,9 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
           <MapPin size={18} />
           {race
             ? 'The group sees how far you are from the finish, not where you are. We will ask for your location next.'
-            : `You and ${hostFirst} see each other’s live location until the meetup ends. Works best within ${maxKm} km.`}
+            : members.length > 1
+              ? `Everyone in this meetup sees each other’s live location until it ends. Works best within ${maxKm} km.`
+              : `You and ${hostFirst} see each other’s live location until the meetup ends. Works best within ${maxKm} km.`}
         </div>
         <div className={styles.row}>
           <button type="button" className={cx(styles.btn, styles.btnOutline, styles.grow)} onClick={onDecline}>
@@ -1202,18 +1204,27 @@ export function MeetBoard({
         </div>
         {noticeEl}
         {isGroup ? (
-          <div className={styles.col} style={{ gap: 6 }}>
+          <div className={styles.meetPeerList}>
             {peers.map((peer) => (
               <div key={peer.id} className={styles.meetPeerRow}>
                 <Avatar name={peer.name} index={peer.color} size="avatarSm" />
                 <span className={styles.personText}>
                   <span className={styles.personName}>{firstName(peer.name)}</span>
                   <span className={styles.personMeta}>
-                    {peer.at == null
-                      ? 'Waiting for location'
-                      : peer.paused
-                        ? `Paused · ${ago(now - peer.at)} ago`
-                        : `${formatDistance(peer.distance)} away · ${walkMinutes(peer.distance)}`}
+                    {peer.at == null ? (
+                      'Waiting for location'
+                    ) : peer.paused ? (
+                      <>
+                        Paused · <span className={styles.meetPeerDist}>{ago(now - peer.at)}</span> ago
+                      </>
+                    ) : peer.distance == null ? (
+                      'Live · waiting for your GPS'
+                    ) : (
+                      <>
+                        <span className={styles.meetPeerDist}>{formatDistance(peer.distance)}</span> away ·{' '}
+                        <span className={styles.meetPeerDist}>{walkMinutes(peer.distance)}</span>
+                      </>
+                    )}
                   </span>
                 </span>
                 {!place && !arrived && peer.lat != null && onDirectionsToPeer && (

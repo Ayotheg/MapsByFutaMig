@@ -3,7 +3,7 @@ import L from 'leaflet';
 import { useFriendsSession } from './useFriendsSession';
 import { Countdown, Ended, Finished, Invite, JoinCode, Lobby, MeetBoard, MeetSetup, RaceBoard, RaceSetup, Results } from './FriendsScreens';
 import FriendsChat from './FriendsChat';
-import { PAUSED_AFTER_MS, countUnreadMessages, distanceM, firstName } from './friendsSession';
+import { CAPACITY, PAUSED_AFTER_MS, countUnreadMessages, distanceM, firstName } from './friendsSession';
 import { getLastFix } from '../navigation/gpsWatch';
 
 function useNow(active, everyMs = 1000) {
@@ -28,7 +28,7 @@ const ENDED_COPY = {
   expired: (_host, race) => ['This invite expired', `${race ? 'The race' : 'The meetup'} didn’t start within 30 minutes.`],
   'host-left': (host, race) => [race ? 'Race ended' : 'Meetup ended', `${host} ended it.`],
   met: () => ['You found each other', 'The meetup has ended.'],
-  left: (_host, _race, by) => ['Meetup ended', `${firstName(by)} ended the meetup.`],
+  left: (_host, _race, by) => ['Meetup ended', by ? `${firstName(by)} ended the meetup.` : 'Everyone else left the meetup.'],
 };
 
 const FOLLOW_MOVE_M = 30;
@@ -275,7 +275,7 @@ export default function FriendsHub({
     if (!map || !meetLive) return undefined;
     const pins = pinsRef.current;
     return () => {
-      pins.peers.forEach((marker) => map.removeLayer(marker));
+      pins.peers.forEach((entry) => map.removeLayer(entry.marker));
       pins.peers.clear();
       if (pins.me) map.removeLayer(pins.me);
       pins.me = null;
@@ -288,26 +288,42 @@ export default function FriendsHub({
     meetPeers.forEach((peer) => {
       if (peer.lat == null) return;
       activeIds.add(peer.id);
+      const initial = initialOf(peer.name);
       const colorCls = meetPeers.length > 1 ? ` friends-pin-c${peer.color % 4}` : '';
-      const html = `<div class="friends-pin-avatar${colorCls}">${initialOf(peer.name)}</div>`;
-      const icon = L.divIcon({
-        className: `friends-pin${peer.paused ? ' friends-pin-paused' : ''}`,
-        html,
-        iconSize: [44, 44],
-        iconAnchor: [22, 22],
-      });
+      const sig = `${initial}|${colorCls}|${peer.paused ? 1 : 0}`;
       const existing = pins.peers.get(peer.id);
       if (!existing) {
+        const html = `<div class="friends-pin-avatar${colorCls}">${initial}</div>`;
+        const icon = L.divIcon({
+          className: `friends-pin${peer.paused ? ' friends-pin-paused' : ''}`,
+          html,
+          iconSize: [44, 44],
+          iconAnchor: [22, 22],
+        });
         const marker = L.marker([peer.lat, peer.lng], { icon, interactive: false, zIndexOffset: 900 }).addTo(map);
-        pins.peers.set(peer.id, marker);
+        pins.peers.set(peer.id, { marker, lat: peer.lat, lng: peer.lng, sig });
       } else {
-        existing.setLatLng([peer.lat, peer.lng]);
-        existing.setIcon(icon);
+        if (existing.lat !== peer.lat || existing.lng !== peer.lng) {
+          existing.marker.setLatLng([peer.lat, peer.lng]);
+          existing.lat = peer.lat;
+          existing.lng = peer.lng;
+        }
+        if (existing.sig !== sig) {
+          const html = `<div class="friends-pin-avatar${colorCls}">${initial}</div>`;
+          const icon = L.divIcon({
+            className: `friends-pin${peer.paused ? ' friends-pin-paused' : ''}`,
+            html,
+            iconSize: [44, 44],
+            iconAnchor: [22, 22],
+          });
+          existing.marker.setIcon(icon);
+          existing.sig = sig;
+        }
       }
     });
-    pins.peers.forEach((marker, id) => {
+    pins.peers.forEach((entry, id) => {
       if (!activeIds.has(id)) {
-        map.removeLayer(marker);
+        map.removeLayer(entry.marker);
         pins.peers.delete(id);
       }
     });
@@ -334,7 +350,10 @@ export default function FriendsHub({
   useEffect(() => {
     if (!navOpen && follow) setFollow(null);
   }, [navOpen, follow, setFollow]);
-  const followTarget = follow?.id ? meetPeers.find((p) => p.id === follow.id) || primaryPeer : primaryPeer;
+  const followTarget = follow?.id ? meetPeers.find((p) => p.id === follow.id) || null : primaryPeer;
+  useEffect(() => {
+    if (meetLive && follow?.id && !followTarget) setFollow(null);
+  }, [meetLive, follow?.id, followTarget, setFollow]);
   const targetLat = followTarget?.lat ?? null;
   const targetLng = followTarget?.lng ?? null;
   const targetName = followTarget?.name || null;
@@ -496,7 +515,12 @@ export default function FriendsHub({
 
   const resolvedOtherName = otherName || (isHost ? 'Your friend' : session.hostName);
   const placeDistance = session.place ? distanceM(f.myFix, session.place) : null;
-  const activeMeetCount = mode === 'meet' ? Math.max(meetPeers.length + 1, members.length, 2) : session.roster?.length || members.length || 2;
+  const activeMeetCount =
+    mode === 'meet'
+      ? phase === 'live'
+        ? Math.max(meetPeers.length + 1, 2)
+        : Math.min(Math.max(members.length, 2), CAPACITY.meet)
+      : session.roster?.length || members.length || 2;
   const chatDrawer = chatOpen && (
     <FriendsChat
       isMobile={isMobile}

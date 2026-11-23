@@ -1415,6 +1415,13 @@
 }
 
 /* Group meetup peer rows in MeetBoard */
+.meetPeerList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
 .meetPeerRow {
   display: flex;
   align-items: center;
@@ -1423,9 +1430,15 @@
   border-radius: var(--r-xl);
   background: var(--v2-hud-upnext-bg);
 }
+.meetPeerDist {
+  font-family: var(--v2-font-manrope);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-text);
+}
 .meetPeerBtn {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
   border: none;
   border-radius: var(--r-full);
@@ -1446,9 +1459,9 @@
   outline-offset: 2px;
 }
 
-/* Multi-peer map pin accents */
-:global(.friends-pin-c0) { background: var(--v2-neutral); color: var(--v2-on-primary); }
-:global(.friends-pin-c1) { background: var(--v2-secondary); color: var(--v2-on-primary); }
+/* Multi-peer map pin accents (high-contrast pairings from DESIGN_SYSTEM.md) */
+:global(.friends-pin-c0) { background: var(--v2-primary); color: var(--v2-on-primary); }
+:global(.friends-pin-c1) { background: var(--v2-secondary-tint); color: var(--v2-neutral); }
 :global(.friends-pin-c2) { background: var(--v2-primary-hover); color: var(--v2-on-primary); }
 :global(.friends-pin-c3) { background: var(--v2-neutral); color: var(--v2-on-primary); }
 

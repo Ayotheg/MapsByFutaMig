@@ -204,11 +204,11 @@ export function useFriendsSession(user) {
   }, []);
 
   const endSession = useCallback(
-    (reason) => {
+    (reason, by = null) => {
       const s = sessionRef.current;
       if (!s || s.phase === 'ended') return;
-      patch({ phase: 'ended', endReason: reason, endedAt: Date.now() });
-      send('end', { reason, finishers: s.finishers || [], dropped: s.dropped || [], names: s.names || {}, hostTerm: s.hostTerm || 0 });
+      patch({ phase: 'ended', endReason: reason, endedBy: by, endedAt: Date.now() });
+      send('end', { reason, by, finishers: s.finishers || [], dropped: s.dropped || [], names: s.names || {}, hostTerm: s.hostTerm || 0 });
       track('friends_ended', { mode: s.mode, reason, finishers: (s.finishers || []).length });
     },
     [patch, send]
@@ -217,7 +217,7 @@ export function useFriendsSession(user) {
   // Host: publish the standings/dropped list, ending a race when everyone is
   // done or a group meetup when fewer than two people remain.
   const publishStandings = useCallback(
-    (finishers, dropped) => {
+    (finishers, dropped, lastDroppedId = null) => {
       const s = sessionRef.current;
       patch({ finishers, dropped });
       send('standings', { finishers, dropped, hostTerm: s.hostTerm || 0 });
@@ -225,7 +225,7 @@ export function useFriendsSession(user) {
         if (s.mode === 'race' && raceDone(s.roster, finishers, dropped)) endSession('done');
         else if (s.mode === 'meet') {
           const active = (s.roster || []).filter((id) => !dropped.includes(id));
-          if (active.length < 2) endSession('left');
+          if (active.length < 2) endSession('left', lastDroppedId ? s.names?.[lastDroppedId] || null : null);
         }
       }
     },
@@ -250,9 +250,14 @@ export function useFriendsSession(user) {
       const s = sessionRef.current;
       if (!s || (s.phase !== 'live' && s.phase !== 'countdown')) return;
       if (s.mode !== 'race' && s.mode !== 'meet') return;
-      const fresh = ids.filter((id) => !(s.finishers || []).some((f) => f.id === id));
+      const fresh = ids.filter(
+        (id) =>
+          (!s.roster || s.roster.includes(id)) &&
+          !(s.finishers || []).some((f) => f.id === id) &&
+          !(s.dropped || []).includes(id)
+      );
       if (!fresh.length) return;
-      publishStandings(s.finishers || [], union(s.dropped, fresh));
+      publishStandings(s.finishers || [], union(s.dropped, fresh), fresh[fresh.length - 1]);
     },
     [publishStandings]
   );
@@ -333,7 +338,13 @@ export function useFriendsSession(user) {
       send('handover', { hostId: me, hostName: myNameRef.current, hostTerm: term, from: handover.from, dropped });
       send('state', stateFor());
       track('friends_handover', { reason: 'host_gone' });
-      if (s.phase === 'live' && raceDone(s.roster, s.finishers, dropped)) endSession('done');
+      if (s.phase === 'live') {
+        if (s.mode === 'race' && raceDone(s.roster, s.finishers, dropped)) endSession('done');
+        else if (s.mode === 'meet') {
+          const active = (s.roster || []).filter((id) => !dropped.includes(id));
+          if (active.length < 2) endSession('host-left');
+        }
+      }
     },
     [patch, send, stateFor, endSession]
   );
@@ -441,9 +452,9 @@ export function useFriendsSession(user) {
           if (amHost() && payload?.id) recordFinish(payload.id);
         });
 
-        // A racer tapped Leave.
+        // A participant tapped Leave.
         channel.on('broadcast', { event: 'left' }, ({ payload }) => {
-          if (amHost() && payload?.id) dropPlayers([payload.id]);
+          if (amHost() && payload?.id && payload.id !== myIdRef.current) dropPlayers([payload.id]);
         });
 
         channel.on('broadcast', { event: 'standings' }, ({ payload }) => {
@@ -472,15 +483,26 @@ export function useFriendsSession(user) {
           // It's us now: bring everyone up to date and pick up the timers.
           send('state', stateFor());
           const now = sessionRef.current;
-          if (now.phase === 'live' && raceDone(now.roster, now.finishers, now.dropped)) endSession('done');
+          if (now.phase === 'live') {
+            if (now.mode === 'race' && raceDone(now.roster, now.finishers, now.dropped)) endSession('done');
+            else if (now.mode === 'meet') {
+              const active = (now.roster || []).filter((id) => !(now.dropped || []).includes(id));
+              if (active.length < 2) endSession('host-left');
+            }
+          }
         });
 
         channel.on('broadcast', { event: 'end' }, ({ payload }) => {
           const s = sessionRef.current;
           if (!s || s.phase === 'ended') return;
           if ((payload.hostTerm || 0) < (s.hostTerm || 0)) return;
-          // The host ends everything else itself; a meetup either side can end.
-          if (amHost() && payload.reason !== 'left') return;
+          // The host ends everything else itself; a non-host 'left' broadcast
+          // can only end a 2-person meetup (3+ person meetups drop individually).
+          if (amHost()) {
+            if (payload.reason !== 'left' || s.mode !== 'meet') return;
+            const active = (s.roster || []).filter((id) => !(s.dropped || []).includes(id));
+            if (active.length > 2) return;
+          }
           if (!s.joined) {
             setPeek('closed');
             return;
@@ -642,14 +664,15 @@ export function useFriendsSession(user) {
     return () => clearTimeout(t);
   }, [phase, patch]);
 
-  // ── Race: a host who vanished is replaced ───────────────────────────
+  // ── Host vanished (network drop / phone died): next person takes over ─
   const hostPresent = members.some((m) => m.id === session?.hostId);
   const meInPresence = members.some((m) => m.id === myId);
-  const raceOpen = mode === 'race' && joined && (phase === 'lobby' || phase === 'countdown' || phase === 'live');
+  const groupMeet = mode === 'meet' && (session?.roster?.length || members.length) >= 3;
+  const takeoverOpen = (mode === 'race' || groupMeet) && joined && (phase === 'lobby' || phase === 'countdown' || phase === 'live');
   useEffect(() => {
     // Our own presence entry means the list is in sync, so a missing host
     // really is missing (not just "not loaded yet").
-    if (!raceOpen || isHost || !connected || !meInPresence || hostPresent) return undefined;
+    if (!takeoverOpen || isHost || !connected || !meInPresence || hostPresent) return undefined;
     const t = setTimeout(() => {
       const s = sessionRef.current;
       const present = presentIds();
@@ -658,12 +681,13 @@ export function useFriendsSession(user) {
       if (nextHost(order, present, s.hostId) === myIdRef.current) becomeHost(s.hostId);
     }, phase === 'lobby' ? HOST_GONE_LOBBY_MS : HOST_GONE_MS);
     return () => clearTimeout(t);
-  }, [raceOpen, phase, isHost, connected, meInPresence, hostPresent, becomeHost, presentIds]);
+  }, [takeoverOpen, phase, isHost, connected, meInPresence, hostPresent, becomeHost, presentIds]);
 
-  // ── Race: the host drops racers who have been gone a while ──────────
+  // ── Drop participants who have been offline a while (races & 3+ meetups) ─
   const absentSinceRef = useRef({});
+  const dropAbsentEnabled = isHost && phase === 'live' && (mode === 'race' || (mode === 'meet' && (session?.roster?.length || 0) >= 3));
   useEffect(() => {
-    if (!isHost || mode !== 'race' || phase !== 'live') return undefined;
+    if (!dropAbsentEnabled) return undefined;
     const t = setInterval(() => {
       // Our own connection is down, so the list says nothing about them.
       if (!connectedRef.current) {
@@ -686,7 +710,7 @@ export function useFriendsSession(user) {
       if (gone.length) dropPlayers(gone);
     }, 10 * 1000);
     return () => clearInterval(t);
-  }, [isHost, mode, phase, dropPlayers, presentIds]);
+  }, [dropAbsentEnabled, dropPlayers, presentIds]);
 
   // ── My own position ─────────────────────────────────────────────────
   const [myFix, setMyFix] = useState(null);
@@ -956,11 +980,13 @@ export function useFriendsSession(user) {
         (id) => id !== me && !(s.dropped || []).includes(id)
       );
       const twoPersonMeet = s.mode === 'meet' && activePeers.length <= 1;
-      if (twoPersonMeet) {
+      if (s.phase === 'lobby' && amHost()) {
+        endSession('cancelled');
+      } else if (twoPersonMeet) {
         if (s.phase === 'live') {
           send('end', { reason: 'left', by: myNameRef.current, hostTerm: s.hostTerm || 0 });
           track('friends_ended', { mode: 'meet', reason: 'left', finishers: 0 });
-        } else if (amHost()) endSession('cancelled');
+        }
       } else if (amHost()) {
         const next = nextHost(activePeers, presentIds(), me);
         if (next) {

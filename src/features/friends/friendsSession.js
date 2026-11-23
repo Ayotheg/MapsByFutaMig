@@ -38,14 +38,20 @@ export function raceDone(roster, finishers, dropped) {
   return roster.every((id) => done.has(id));
 }
 
-// Meetup arrived: you and every active peer have a fix and are within
-// MEET_ARRIVED_M of you (or of the chosen meeting point).
+// Meetup arrived: you and every active peer have a fix and either everyone
+// is within MEET_ARRIVED_M of the chosen meeting point, or every pair in
+// the group is within MEET_ARRIVED_M of each other (so all phones agree).
 export function meetArrivedCheck(myFix, peerPositions, place) {
   if (!myFix || !peerPositions?.length) return false;
-  if (place && distanceM(myFix, place) <= MEET_ARRIVED_M) {
-    if (peerPositions.every((p) => p && distanceM(p, place) <= MEET_ARRIVED_M)) return true;
+  if (peerPositions.some((p) => !p)) return false;
+  const all = [myFix, ...peerPositions];
+  if (place && all.every((p) => distanceM(p, place) <= MEET_ARRIVED_M)) return true;
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      if (distanceM(all[i], all[j]) > MEET_ARRIVED_M) return false;
+    }
   }
-  return peerPositions.every((p) => p && distanceM(myFix, p) <= MEET_ARRIVED_M);
+  return true;
 }
 
 // No 0/O/1/I so a code read aloud can't be misheard.
@@ -165,6 +171,7 @@ export function appendChatMessage(list, message) {
 }
 
 function isAllowedChatSender(senderId, session, presentIds) {
+  if (session.mode === 'meet' && session.dropped?.includes(senderId)) return false;
   if (session.roster?.length) return session.roster.includes(senderId);
   return Boolean(presentIds?.has(senderId) || session.names?.[senderId]);
 }

@@ -223,12 +223,16 @@ export default function FriendsChat({
   const statusPill = isGroup ? (
     <span className={styles.pill}>
       <span className={styles.liveDot} />
-      <span>
-        <span className={styles.num} style={{ fontSize: 12 }}>
-          {playerCount}
-        </span>{' '}
-        {race ? 'players' : 'people'}
-      </span>
+      {!race && arrived ? (
+        'Met'
+      ) : (
+        <span>
+          <span className={styles.num} style={{ fontSize: 12 }}>
+            {playerCount}
+          </span>{' '}
+          {race ? 'players' : 'people'}
+        </span>
+      )}
     </span>
   ) : (
     <span className={cx(styles.pill, paused && styles.pillMuted)}>
@@ -254,13 +258,17 @@ export default function FriendsChat({
     ? place?.name
       ? `Race to ${place.name}`
       : 'Group race chat'
-    : place?.name
-      ? `${place.name} · ${walkMinutes(placeDistance ?? distance)} walk`
-      : distance != null
-        ? isGroup
-          ? `Nearest ${formatDistance(distance)} away`
-          : `${walkMinutes(distance)} walk apart`
-        : 'Find each other, live';
+    : arrived
+      ? isGroup
+        ? 'You’ve all met'
+        : `You’ve met ${friendFirst}`
+      : place?.name
+        ? `${place.name} · ${walkMinutes(placeDistance ?? distance)} walk`
+        : distance != null
+          ? isGroup
+            ? `Nearest ${formatDistance(distance)} away`
+            : `${walkMinutes(distance)} walk apart`
+          : 'Find each other, live';
 
   const typingText =
     typingUsers.length === 1
