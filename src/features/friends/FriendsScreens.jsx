@@ -24,6 +24,7 @@ import {
   X,
 } from 'lucide-react';
 import styles from './Friends.module.css';
+import { ChatStrip, ChatToast, UnreadBadge } from './FriendsChat';
 import {
   CAPACITY,
   LOBBY_TTL_MS,
@@ -250,7 +251,7 @@ function shareText(session) {
   return `${intro}: ${url}\nOr open Nav › Join with a code: ${session.code}`;
 }
 
-export function Lobby({ isMobile, session, members, progress, myId, isHost, now, notice, connected, everConnected, searchIndex, onMeetPlaceChange, onHaveCode, onStart, onLeave }) {
+export function Lobby({ isMobile, session, members, progress, myId, isHost, now, notice, connected, everConnected, searchIndex, unreadCount = 0, hasMessages = false, onOpenChat, onMeetPlaceChange, onHaveCode, onStart, onLeave }) {
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [pickingPlace, setPickingPlace] = useState(false);
@@ -454,6 +455,13 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
         <span className={cx(styles.overline, styles.overlineViolet)}>{race ? 'Race to a place' : 'Meet a friend'}</span>
         <h2 className={styles.title}>{title}</h2>
       </div>
+      {(canStart || hasMessages || unreadCount > 0) && onOpenChat && (
+        <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall)} onClick={onOpenChat}>
+          <MessageCircle size={16} />
+          Chat
+          <UnreadBadge count={unreadCount} />
+        </button>
+      )}
     </div>
   );
 
@@ -685,13 +693,39 @@ function DetailsBtn({ onClick }) {
   );
 }
 
-export function RaceBoard({ session, rows, now, navOpen, notice, minimized, onMinimizedChange, onDirections, onLeave }) {
+export function RaceBoard({
+  session,
+  rows,
+  now,
+  navOpen,
+  notice,
+  minimized,
+  unreadCount = 0,
+  lastMessage = null,
+  toastMessage = null,
+  onOpenChat,
+  onMinimizedChange,
+  onDirections,
+  onLeave,
+}) {
   const me = rows.find((r) => r.me);
   const elapsed = session.goAt ? now - session.goAt : 0;
   const directions = !navOpen && !me?.finish && (
-    <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, minimized ? null : styles.grow2)} onClick={onDirections}>
+    <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, minimized ? styles.grow : styles.grow2)} onClick={onDirections}>
       <Navigation size={16} />
       Directions
+    </button>
+  );
+  const chatBtn = onOpenChat && (
+    <button
+      type="button"
+      className={cx(styles.btn, styles.btnSecondary, styles.btnSmall, !directions && styles.grow)}
+      style={{ flexShrink: 0 }}
+      onClick={onOpenChat}
+    >
+      <MessageCircle size={16} />
+      Chat
+      <UnreadBadge count={unreadCount} />
     </button>
   );
   const noticeEl = notice && (
@@ -706,65 +740,76 @@ export function RaceBoard({ session, rows, now, navOpen, notice, minimized, onMi
       ? `You finished ${ordinal(me.rank)} · ${formatClock(elapsed)}`
       : `You’re ${me ? ordinal(me.rank) : '—'} · ${formatDistance(me?.dist)} left · ${formatClock(elapsed)}`;
     return (
-      <section className={cx(styles.board, styles.boardMin)} aria-label="Live ranking">
-        <div className={styles.boardHead}>
-          <div className={styles.headText} style={{ gap: 2, minWidth: 0 }}>
-            <span className={styles.boardTitle}>Race to {session.place?.name}</span>
-            <span className={styles.rankVal} style={{ color: 'var(--v2-text)' }}>{summary}</span>
+      <div className={styles.boardStack}>
+        {onOpenChat && <ChatToast message={toastMessage} onOpen={onOpenChat} />}
+        <section className={cx(styles.board, styles.boardMin)} aria-label="Live ranking">
+          <div className={styles.boardHead}>
+            <div className={styles.headText} style={{ gap: 2, minWidth: 0 }}>
+              <span className={styles.boardTitle}>Race to {session.place?.name}</span>
+              <span className={styles.rankVal} style={{ color: 'var(--v2-text)' }}>{summary}</span>
+            </div>
+            <DetailsBtn onClick={() => onMinimizedChange(false)} />
           </div>
-          <DetailsBtn onClick={() => onMinimizedChange(false)} />
-        </div>
-        {noticeEl}
-        {directions}
-      </section>
+          {noticeEl}
+          {(directions || chatBtn) && (
+            <div className={styles.row}>
+              {directions}
+              {chatBtn}
+            </div>
+          )}
+        </section>
+      </div>
     );
   }
 
   return (
-    <section className={styles.board} aria-label="Live ranking">
-      <div className={styles.boardHead}>
-        <div className={styles.headText} style={{ gap: 2 }}>
-          <span className={styles.overline}>Live ranking</span>
-          <span className={styles.boardTitle}>Race to {session.place?.name}</span>
+    <div className={styles.boardStack}>
+      <section className={styles.board} aria-label="Live ranking">
+        <div className={styles.boardHead}>
+          <div className={styles.headText} style={{ gap: 2 }}>
+            <span className={styles.overline}>Live ranking</span>
+            <span className={styles.boardTitle}>Race to {session.place?.name}</span>
+          </div>
+          <MinimiseBtn onClick={() => onMinimizedChange(true)} />
         </div>
-        <MinimiseBtn onClick={() => onMinimizedChange(true)} />
-      </div>
-      {noticeEl}
-      <div className={styles.boardStats}>
-        <div className={styles.stat}>
-          <span className={styles.overline}>Time</span>
-          <span className={styles.statVal}>{formatClock(elapsed)}</span>
+        {noticeEl}
+        <div className={styles.boardStats}>
+          <div className={styles.stat}>
+            <span className={styles.overline}>Time</span>
+            <span className={styles.statVal}>{formatClock(elapsed)}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.overline}>You</span>
+            <span className={styles.statVal}>{me ? ordinal(me.rank) : '—'}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.overline}>Left</span>
+            <span className={styles.statVal}>{me?.finish ? 'Done' : formatDistance(me?.dist)}</span>
+          </div>
         </div>
-        <div className={styles.stat}>
-          <span className={styles.overline}>You</span>
-          <span className={styles.statVal}>{me ? ordinal(me.rank) : '—'}</span>
+        <div className={styles.col} style={{ gap: 4 }}>
+          {rows.map((row) => (
+            <RankRow key={row.id} row={row} now={now} />
+          ))}
         </div>
-        <div className={styles.stat}>
-          <span className={styles.overline}>Left</span>
-          <span className={styles.statVal}>{me?.finish ? 'Done' : formatDistance(me?.dist)}</span>
+        {onOpenChat && <ChatStrip title="Race chat" lastMessage={lastMessage} unread={unreadCount} onOpen={onOpenChat} />}
+        <div className={styles.row}>
+          <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onLeave}>
+            Leave
+          </button>
+          {directions}
         </div>
-      </div>
-      <div className={styles.col} style={{ gap: 4 }}>
-        {rows.map((row) => (
-          <RankRow key={row.id} row={row} now={now} />
-        ))}
-      </div>
-      <div className={styles.row}>
-        <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onLeave}>
-          Leave
-        </button>
-        {directions}
-      </div>
-      <span className={styles.note} style={{ justifyContent: 'flex-start', textAlign: 'left' }}>
-        <Smartphone size={14} />
-        Keep the app open so the others see you moving.
-      </span>
-    </section>
+        <span className={styles.note} style={{ justifyContent: 'flex-start', textAlign: 'left' }}>
+          <Smartphone size={14} />
+          Keep the app open so the others see you moving.
+        </span>
+      </section>
+    </div>
   );
 }
 
 // ── 7 · You arrived, others still racing ─────────────────────────────
-export function Finished({ isMobile, session, rows, onWatch, onLeave }) {
+export function Finished({ isMobile, session, rows, unreadCount = 0, onOpenChat, onWatch, onLeave }) {
   const me = rows.find((r) => r.me);
   return (
     <Panel isMobile={isMobile} centered label="You finished" onScrim={onWatch}>
@@ -798,13 +843,22 @@ export function Finished({ isMobile, session, rows, onWatch, onLeave }) {
       <p className={cx(styles.sub)} style={{ textAlign: 'center' }}>
         Final results show when everyone arrives, or after {Math.round(RACE_LIMIT_MS / 60000)} minutes.
       </p>
-      <div className={styles.row}>
-        <button type="button" className={cx(styles.btn, styles.btnOutline, styles.grow)} onClick={onLeave}>
-          Leave
-        </button>
-        <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.grow2)} onClick={onWatch}>
-          Watch the rest
-        </button>
+      <div className={styles.col}>
+        {onOpenChat && (
+          <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall)} onClick={onOpenChat}>
+            <MessageCircle size={16} />
+            Race chat
+            <UnreadBadge count={unreadCount} />
+          </button>
+        )}
+        <div className={styles.row}>
+          <button type="button" className={cx(styles.btn, styles.btnOutline, styles.grow)} onClick={onLeave}>
+            Leave
+          </button>
+          <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.grow2)} onClick={onWatch}>
+            Watch the rest
+          </button>
+        </div>
       </div>
     </Panel>
   );
@@ -886,7 +940,25 @@ export function Results({ isMobile, session, rows, isHost, onDone, onRaceAgain }
 }
 
 // ── 9/10 · Meet me, live (the same card on both phones) ──────────────
-export function MeetBoard({ otherName, distance, updatedAt, now, arrived, navOpen, place, placeDistance, minimized, onMinimizedChange, onEnd, onShowBoth, onDirections }) {
+export function MeetBoard({
+  otherName,
+  distance,
+  updatedAt,
+  now,
+  arrived,
+  navOpen,
+  place,
+  placeDistance,
+  minimized,
+  unreadCount = 0,
+  lastMessage = null,
+  toastMessage = null,
+  onOpenChat,
+  onMinimizedChange,
+  onEnd,
+  onShowBoth,
+  onDirections,
+}) {
   const name = firstName(otherName);
   const paused = !arrived && (!updatedAt || now - updatedAt > PAUSED_AFTER_MS);
   const headline = arrived
@@ -910,78 +982,94 @@ export function MeetBoard({ otherName, distance, updatedAt, now, arrived, navOpe
       {arrived ? 'Met' : paused ? 'Paused' : 'Live'}
     </span>
   );
-  const directionsBtn = (
-    <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall)} disabled={!place && !updatedAt} onClick={onDirections}>
+  const directionsBtn = (grow) => (
+    <button type="button" className={cx(styles.btn, styles.btnPrimary, styles.btnSmall, grow && styles.grow)} disabled={!place && !updatedAt} onClick={onDirections}>
       <Navigation size={16} />
       <span className={styles.btnLabel}>{place ? `Directions to ${place.name}` : `Directions to ${name}`}</span>
     </button>
   );
   const showBothBtn = (grow) => (
-    <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall, grow && styles.grow)} disabled={!updatedAt} onClick={onShowBoth}>
+    <button type="button" className={cx(styles.btn, styles.btnOutline, styles.btnSmall, grow && styles.grow)} disabled={!updatedAt} onClick={onShowBoth}>
       <LocateFixed size={16} />
       Show both
+    </button>
+  );
+  const chatBtn = onOpenChat && (
+    <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall)} style={{ flexShrink: 0 }} onClick={onOpenChat}>
+      <MessageCircle size={16} />
+      Chat
+      <UnreadBadge count={unreadCount} />
     </button>
   );
 
   if (minimized) {
     return (
-      <section className={cx(styles.board, styles.boardMin)} aria-label="Meetup">
-        <div className={styles.person}>
-          <Avatar name={otherName} index={1} size="avatarSm" />
-          <div className={styles.headText} style={{ gap: 2, flex: 1, minWidth: 0 }}>
-            <span className={styles.boardTitle}>{headline}</span>
+      <div className={styles.boardStack}>
+        {onOpenChat && <ChatToast message={toastMessage} onOpen={onOpenChat} />}
+        <section className={cx(styles.board, styles.boardMin)} aria-label="Meetup">
+          <div className={styles.person}>
+            <Avatar name={otherName} index={1} size="avatarSm" />
+            <div className={styles.headText} style={{ gap: 2, flex: 1, minWidth: 0 }}>
+              <span className={styles.boardTitle}>{headline}</span>
+            </div>
+            {pill}
+            <DetailsBtn onClick={() => onMinimizedChange(false)} />
           </div>
-          {pill}
-          <DetailsBtn onClick={() => onMinimizedChange(false)} />
-        </div>
-        {canDirect ? directionsBtn : showBothBtn(false)}
-      </section>
+          <div className={styles.row}>
+            {canDirect ? directionsBtn(true) : showBothBtn(true)}
+            {chatBtn}
+          </div>
+        </section>
+      </div>
     );
   }
 
   return (
-    <section className={styles.board} aria-label="Meetup">
-      <div className={styles.person}>
-        <Avatar name={otherName} index={1} />
-        <div className={styles.headText} style={{ gap: 2, flex: 1 }}>
-          <span className={styles.boardTitle}>{headline}</span>
-          <span className={styles.sub}>{subline}</span>
+    <div className={styles.boardStack}>
+      <section className={styles.board} aria-label="Meetup">
+        <div className={styles.person}>
+          <Avatar name={otherName} index={1} />
+          <div className={styles.headText} style={{ gap: 2, flex: 1 }}>
+            <span className={styles.boardTitle}>{headline}</span>
+            <span className={styles.sub}>{subline}</span>
+          </div>
+          {pill}
+          <MinimiseBtn onClick={() => onMinimizedChange(true)} />
         </div>
-        {pill}
-        <MinimiseBtn onClick={() => onMinimizedChange(true)} />
-      </div>
-      <div className={styles.boardStats}>
-        <div className={styles.stat}>
-          <span className={styles.overline}>Apart</span>
-          <span className={styles.statVal}>{formatDistance(distance)}</span>
+        <div className={styles.boardStats}>
+          <div className={styles.stat}>
+            <span className={styles.overline}>Apart</span>
+            <span className={styles.statVal}>{formatDistance(distance)}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.overline}>Walk</span>
+            <span className={styles.statVal}>{arrived ? 'Now' : walkMinutes(place ? placeDistance : distance)}</span>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.overline}>Updated</span>
+            <span className={styles.statVal}>{updatedAt ? ago(now - updatedAt) : '—'}</span>
+          </div>
         </div>
-        <div className={styles.stat}>
-          <span className={styles.overline}>Walk</span>
-          <span className={styles.statVal}>{arrived ? 'Now' : walkMinutes(place ? placeDistance : distance)}</span>
+        {onOpenChat && <ChatStrip title={`Message ${name}`} lastMessage={lastMessage} unread={unreadCount} onOpen={onOpenChat} />}
+        {paused && updatedAt && (
+          <div className={styles.notice}>
+            <Clock size={18} />
+            {name}’s app may be closed or their screen locked. Their pin updates again when they open Maps By FUTA.
+          </div>
+        )}
+        <div className={styles.row}>
+          <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onEnd}>
+            End meetup
+          </button>
+          {showBothBtn(true)}
         </div>
-        <div className={styles.stat}>
-          <span className={styles.overline}>Updated</span>
-          <span className={styles.statVal}>{updatedAt ? ago(now - updatedAt) : '—'}</span>
-        </div>
-      </div>
-      {paused && updatedAt && (
-        <div className={styles.notice}>
-          <Clock size={18} />
-          {name}’s app may be closed or their screen locked. Their pin updates again when they open Maps By FUTA.
-        </div>
-      )}
-      <div className={styles.row}>
-        <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onEnd}>
-          End meetup
-        </button>
-        {showBothBtn(true)}
-      </div>
-      {canDirect && directionsBtn}
-      <span className={styles.note} style={{ justifyContent: 'flex-start', textAlign: 'left' }}>
-        <Smartphone size={14} />
-        Keep this screen open so {name} can see you.
-      </span>
-    </section>
+        {canDirect && directionsBtn(false)}
+        <span className={styles.note} style={{ justifyContent: 'flex-start', textAlign: 'left' }}>
+          <Smartphone size={14} />
+          Keep this screen open so {name} can see you.
+        </span>
+      </section>
+    </div>
   );
 }
 
