@@ -6,6 +6,8 @@ export const CAPACITY = { meet: 2, race: 4 };
 export const RACE_FINISH_M = 25;
 // Inside this distance of each other, a meetup is done.
 export const MEET_ARRIVED_M = 30;
+// Meet me is designed for short-distance campus meetups (~5 km).
+export const MEET_MAX_DISTANCE_M = 5000;
 // The invite stops working this long after it's made, if nobody started.
 export const LOBBY_TTL_MS = 30 * 60 * 1000;
 // A race nobody finishes ends after an hour.
@@ -101,7 +103,12 @@ export function formatDuration(ms) {
 // ~80 m a minute walking.
 export function walkMinutes(m) {
   if (m == null) return '—';
-  return m < 40 ? 'Now' : `~${Math.max(1, Math.round(m / 80))} min`;
+  if (m < 40) return 'Now';
+  const mins = Math.max(1, Math.round(m / 80));
+  if (mins < 60) return `~${mins} min`;
+  const h = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem ? `~${h}h ${rem}m` : `~${h}h`;
 }
 
 export function ordinal(n) {
@@ -180,6 +187,27 @@ export function normalizeIncomingTyping(payload, session, myId, presentIds, now 
   return { id, name, active: Boolean(payload.active), at: now };
 }
 
+export function normalizeIncomingPos(payload, session, presentIds, now = Date.now()) {
+  if (!session?.joined || session.phase === 'ended' || !payload?.id) return null;
+  const id = String(payload.id).slice(0, CHAT_ID_MAX_LENGTH);
+  if (!id || !isAllowedChatSender(id, session, presentIds)) return null;
+  if (session.mode === 'race') {
+    if (!Number.isFinite(payload.dist) || payload.dist < 0) return null;
+    return { id, dist: payload.dist, at: now };
+  }
+  if (
+    !Number.isFinite(payload.lat) ||
+    !Number.isFinite(payload.lng) ||
+    payload.lat < -90 ||
+    payload.lat > 90 ||
+    payload.lng < -180 ||
+    payload.lng > 180
+  ) {
+    return null;
+  }
+  return { id, lat: payload.lat, lng: payload.lng, at: now };
+}
+
 export function countUnreadMessages(messages, lastReadId, myId) {
   if (!messages?.length) return 0;
   const idx = lastReadId ? messages.findIndex((m) => m.id === lastReadId) : -1;
@@ -191,5 +219,21 @@ export function formatMessageTime(ts) {
   if (!Number.isFinite(ts)) return '';
   const d = new Date(ts);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+export const USERNAME_MAX_LENGTH = 24;
+export const SUGGESTED_USERNAMES = ['Campus Walker', 'FUTArian', 'Speedster', 'Obanla Guide'];
+
+export function sanitizeUsername(input) {
+  const text = String(input ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  const chars = Array.from(text);
+  return chars.length > USERNAME_MAX_LENGTH ? chars.slice(0, USERNAME_MAX_LENGTH).join('') : text;
+}
+
+export function createGuestId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `guest-${hex}`;
 }
 
