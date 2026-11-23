@@ -1,0 +1,2146 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 5726025..9213400 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -1,7 +1,7 @@
+ # Maps By FUTA
+ 
+ Campus map + walking navigation for FUTA (Akure). Live at mapsbyfuta.xyz (Vercel).
+-Product details: `docs/about.md`. Payments: `docs/payments.md`.
++Product details: `docs/about.md`. Payments: `docs/payments.md`. Public API: `docs/public-api.md`.
+ 
+ ## Stack
+ React 19 + Vite 8, plain JSX (no TypeScript), React Router 7, raw Leaflet (no react-leaflet),
+diff --git a/docs/public-api.md b/docs/public-api.md
+new file mode 100644
+index 0000000..cefe0f4
+--- /dev/null
++++ b/docs/public-api.md
+@@ -0,0 +1,311 @@
++# Maps By FUTA Public API (v1)
++
++Read-only access to FUTA campus places, their categories and their photos, for
++other apps (delivery, lodging, campus guides, student tools).
++
++- Base URL: `https://mapsbyfuta.xyz/api/v1`
++- Auth: send your key in the `x-api-key` header on every request.
++- Format: JSON. Read-only: `GET` only.
++- Call it from your server. A key placed in a mobile app or web page can be copied.
++
++```bash
++curl https://mapsbyfuta.xyz/api/v1/places?limit=5 \
++  -H "x-api-key: fk_live_your_key_here"
++```
++
++## Credits
++
++1 credit = 1 standard request. Photo requests cost more.
++
++| Endpoint | Credits |
++|---|---|
++| `GET /v1/places` | 1 |
++| `GET /v1/places/:id` | 1 |
++| `GET /v1/places/nearby` | 1 |
++| `GET /v1/categories` | 1 |
++| `GET /v1/places/:id/images` | 5 |
++| `GET /v1/usage` | 0 |
++
++| Plan | Price | Credits per month | Requests per minute |
++|---|---|---|---|
++| Free | ₦0 | 1,000 | 20 |
++| Starter | ₦3,000 | 5,000 | 60 |
++| Growth | ₦10,000 | 25,000 | 120 |
++
++- **Plan credits** reset every month on your reset date. Unused ones do not carry over.
++- **Top-up credits** never expire. They are used only after the month's plan credits run out.
++
++### What counts as a charged request
++
++You are charged only when a request succeeds and we send you data.
++
++| Outcome | Charged? |
++|---|---|
++| `200` with data | Yes |
++| `200` with an empty list (the search ran, nothing matched) | Yes |
++| `400` bad parameter, `404` not found, `405` | No |
++| `401`, `402`, `403`, `429` | No |
++| `500` (our fault) | No |
++| `GET /v1/usage`, `OPTIONS` | No |
++
++Credits are taken after the data has been fetched. If your last credits are spent
++by another of your requests at the same moment, you get `402` and no data.
++
++## Response format
++
++Success:
++
++```json
++{
++  "data": [],
++  "meta": { "credits_charged": 1, "credits_remaining": 4999, "rate_limit_remaining": 59 }
++}
++```
++
++Error:
++
++```json
++{ "error": { "code": "bad_request", "message": "limit must be between 1 and 50." } }
++```
++
++| HTTP | `code` | Meaning |
++|---|---|---|
++| 400 | `bad_request` | A parameter is missing or wrong. The message says which. |
++| 401 | `missing_api_key`, `invalid_api_key` | No key, or not a real key. |
++| 402 | `out_of_credits` | No credits left for this request. |
++| 403 | `key_revoked` | The key was turned off. |
++| 404 | `not_found` | No such place or endpoint. |
++| 405 | `method_not_allowed` | Only `GET` is supported. |
++| 429 | `rate_limited` | Too many requests this minute. |
++| 500 | `server_error` | Our fault. Not charged. Safe to retry. |
++
++## Rate limits
++
++Each key has a per-minute limit set by its plan. The count restarts at the
++start of every clock minute. Responses carry:
++
++- `X-RateLimit-Limit`: requests allowed per minute
++- `X-RateLimit-Remaining`: requests left in the current minute
++- `Retry-After` (on `429` only): seconds until the next minute starts
++
++Requests with a missing, wrong or revoked key are limited to 10 per minute per
++IP address.
++
++## Endpoints
++
++### `GET /v1/places`
++
++Approved places, sorted by name.
++
++| Param | Notes |
++|---|---|
++| `type` | A category id from `/v1/categories`, e.g. `hostel`. |
++| `q` | Text search over name, area and type. Up to 80 characters. No wildcards. |
++| `limit` | 1 to 50. Default 20. |
++| `offset` | Where to start. Default 0, up to 10000. Use `meta.pagination.next_offset` for the next page. |
++
++```bash
++curl "https://mapsbyfuta.xyz/api/v1/places?type=food&q=cafe&limit=2" -H "x-api-key: $KEY"
++```
++
++```json
++{
++  "data": [
++    {
++      "id": "0AbCdEf123",
++      "name": "SUB Cafeteria",
++      "description": "Main student cafeteria.",
++      "type": "food",
++      "area": "SUB area",
++      "lat": 7.3001,
++      "lng": 5.1352,
++      "rating": 4.5,
++      "review_count": 2,
++      "image_count": 3
++    }
++  ],
++  "meta": {
++    "credits_charged": 1,
++    "credits_remaining": 4999,
++    "rate_limit_remaining": 59,
++    "pagination": { "limit": 2, "offset": 0, "total": 1, "next_offset": null }
++  }
++}
++```
++
++`description`, `type`, `area` and `rating` can be `null`. `image_count` tells you
++whether a photo request is worth its 5 credits.
++
++### `GET /v1/places/:id`
++
++One place, same fields as above.
++
++```bash
++curl https://mapsbyfuta.xyz/api/v1/places/0AbCdEf123 -H "x-api-key: $KEY"
++```
++
++### `GET /v1/places/nearby`
++
++Places around a point, nearest first. Each has a `distance_m` (metres).
++
++| Param | Notes |
++|---|---|
++| `lat`, `lng` | Required. Decimal degrees. |
++| `radius_m` | 1 to 5000. Default 500. |
++| `type` | Optional category id. |
++| `limit` | 1 to 50. Default 20. |
++
++```bash
++curl "https://mapsbyfuta.xyz/api/v1/places/nearby?lat=7.3003&lng=5.1350&radius_m=300" -H "x-api-key: $KEY"
++```
++
++### `GET /v1/categories`
++
++Every place type in use, with how many places have it.
++
++```bash
++curl https://mapsbyfuta.xyz/api/v1/categories -H "x-api-key: $KEY"
++```
++
++```json
++{ "data": [{ "id": "hostel", "label": "Hostel", "place_count": 107 }], "meta": { "credits_charged": 1, "credits_remaining": 4998, "rate_limit_remaining": 58 } }
++```
++
++### `GET /v1/places/:id/images` (5 credits)
++
++Photos of one place, in display order. `url` is sized for cards (900 px wide),
++`full_url` for full-screen viewing (1600 px).
++
++```bash
++curl https://mapsbyfuta.xyz/api/v1/places/0AbCdEf123/images -H "x-api-key: $KEY"
++```
++
++```json
++{
++  "data": [{ "position": 0, "url": "https://ik.imagekit.io/…/a.jpg?tr=w-900,c-at_max,q-75,f-auto", "full_url": "https://ik.imagekit.io/…/a.jpg?tr=w-1600,c-at_max,q-80,f-auto" }],
++  "meta": { "credits_charged": 5, "credits_remaining": 4993, "rate_limit_remaining": 57 }
++}
++```
++
++A place with no photos returns an empty list and is still charged; check
++`image_count` first.
++
++### `GET /v1/usage` (free)
++
++Your plan, credits, reset date and last 20 calls.
++
++```bash
++curl https://mapsbyfuta.xyz/api/v1/usage -H "x-api-key: $KEY"
++```
++
++```json
++{
++  "data": {
++    "key": "fk_live_1a2b",
++    "plan": { "id": "starter", "name": "Starter", "monthly_credits": 5000, "rate_limit_per_minute": 60 },
++    "credits": { "plan": 4993, "topup": 0, "total": 4993 },
++    "resets_at": "2026-12-10T07:30:00+00:00",
++    "recent_calls": [{ "endpoint": "GET /v1/places", "status": 200, "credits_charged": 1, "response_ms": 84, "at": "2026-11-10T07:31:02+00:00" }]
++  },
++  "meta": { "credits_charged": 0, "credits_remaining": 4993, "rate_limit_remaining": 56 }
++}
++```
++
++---
++
++# For the Maps By FUTA team
++
++## What the API can and cannot see
++
++It reads three database views and nothing else (`supabase/public_api.sql`):
++
++| View | Columns | Rows |
++|---|---|---|
++| `api_public_places` | id, name, description, type, area, lat, lng, rating, review_count, image_count | Approved places with a location. No people, channels or online businesses. |
++| `api_public_place_images` | place_id, storage_path, position | Photos of those places only. The path is turned into a URL and never returned. |
++| `api_public_categories` | type, place_count | Built from the places view. |
++
++It never reads users, profiles, reviews, analytics, events, promotions or
++submissions, and never returns who submitted a place. To expose a new field,
++add it to the view **and** to `PLACE_COLUMNS` / `toPlace()` in
++`supabase/functions/_shared/publicApi.ts`. A column missing from either is not served.
++
++## Code
++
++- `supabase/public_api.sql`: tables, views, functions, seeds, permissions.
++- `supabase/functions/public-api/`: `index.ts` (Deno entry), `handler.ts`
++  (auth → rate limit → fetch → charge → log), `store.ts` (every query).
++- `supabase/functions/_shared/publicApi.ts`: pure rules. Tests: `scripts/publicApi.test.mjs`.
++- `vercel.json`: `/api/v1/*` is forwarded to the function, so developers never see the Supabase address.
++
++## Admin tasks (Supabase SQL Editor)
++
++Payments are not wired up yet; credits are granted by hand.
++
++```sql
++-- Create a key. The api_key column is shown ONCE; only its hash is stored.
++select * from api_create_key('Acme Delivery', 'dev@acme.com', 'starter');
++
++-- List keys (the prefix is safe to show; the full key cannot be recovered).
++select id, key_prefix, owner_name, plan_id, plan_credits_remaining,
++       topup_credits_remaining, period_reset_at, status, last_used_at
++  from api_keys order by created_at desc;
++
++-- Grant top-up credits (never expire). The 4th argument is a unique reference:
++-- running the same reference twice grants once.
++select grant_credits('<key id>', 2000, 'topup', 'transfer-2026-11-10-acme', 'paid by bank transfer');
++
++-- Change plan (refills to the new allowance and starts a fresh month).
++select api_set_plan('<key id>', 'growth');
++
++-- Revoke a key (it gets 403 from then on).
++select api_revoke_key('<key id>');
++
++-- Change a price, an allowance or a limit. No redeploy needed.
++update api_credit_costs set credits = 8 where endpoint_pattern = 'GET /v1/places/:id/images';
++update api_plans set monthly_credits = 6000 where id = 'starter';
++
++-- A key's recent calls.
++select endpoint, status_code, credits_charged, response_ms, created_at
++  from api_usage where key_id = '<key id>' order by created_at desc limit 50;
++```
++
++A lost key cannot be recovered: revoke it and create a new one.
++
++## Deploy
++
++1. Run `supabase/public_api.sql` in the SQL Editor (safe to re-run).
++2. `supabase secrets set IMAGE_PROXY_URL=https://ik.imagekit.io/<id>` (the same
++   value the app uses). Without it, photo URLs point at Supabase Storage.
++3. `supabase functions deploy public-api --no-verify-jwt` (callers have an API
++   key, not a Supabase login; the function checks the key itself).
++4. Merge and deploy the site so the `/api/v1/*` rule in `vercel.json` goes live.
++
++## Adding payments later
++
++A paid webhook (BACHS or Paystack) should call
++`grant_credits(key_id, amount, 'topup', '<payment id>')` for a credit pack. The
++payment id as the reference makes a repeated webhook harmless: the same
++reference grants once.
++
++`api_set_plan(key_id, plan)` has no such guard and refills on every call, so a
++subscription webhook must first record the payment id itself (as
++`bachs-webhook` does with `bachs_webhook_events`) and skip repeats.
++
++Same rule as `docs/payments.md`: only the signature-checked webhook may grant
++paid credits.
++
++## Known limits
++
++- `api_usage` grows by one row per request. Clear old rows when needed:
++  `delete from api_usage where created_at < now() - interval '90 days';`
++- Requests with a missing or unknown key are counted per IP but not written to
++  `api_usage` (there is no key to file them under, and strangers must not be
++  able to fill the table). A revoked key's requests are logged up to the
++  per-IP limit.
++- The per-IP limit trusts the `x-forwarded-for` header for the caller's IP, so
++  a determined caller can dodge it. Keys carry about 180 random bits, so
++  guessing one is not practical either way.
++- The per-minute limit is a fixed clock-minute window: a caller can use one
++  minute's allowance at its end and the next one's straight after.
++- A reset day of the 29th to 31st settles on the last day of a shorter month.
+diff --git a/package.json b/package.json
+index e26c1e9..93df6f6 100644
+--- a/package.json
++++ b/package.json
+@@ -5,7 +5,7 @@
+   "type": "module",
+   "scripts": {
+     "dev": "vite",
+-    "test": "node scripts/escape.test.mjs && node scripts/sw.test.mjs && node scripts/tileHealth.test.mjs && node scripts/profileStats.test.mjs && node scripts/navCompletion.test.mjs && node scripts/routeAhead.test.mjs && node scripts/shortcutRoute.test.mjs && node scripts/busStops.test.mjs && node scripts/coordInput.test.mjs && node scripts/routePlans.test.mjs && node scripts/pendingReview.test.mjs && node scripts/mapSession.test.mjs && node scripts/bachsWebhook.test.mjs && node scripts/eventsData.test.mjs && node scripts/friendsSession.test.mjs",
++    "test": "node scripts/escape.test.mjs && node scripts/sw.test.mjs && node scripts/tileHealth.test.mjs && node scripts/profileStats.test.mjs && node scripts/navCompletion.test.mjs && node scripts/routeAhead.test.mjs && node scripts/shortcutRoute.test.mjs && node scripts/busStops.test.mjs && node scripts/coordInput.test.mjs && node scripts/routePlans.test.mjs && node scripts/pendingReview.test.mjs && node scripts/mapSession.test.mjs && node scripts/bachsWebhook.test.mjs && node scripts/eventsData.test.mjs && node scripts/friendsSession.test.mjs && node scripts/publicApi.test.mjs",
+     "build": "npm run test && vite build && node scripts/checkLeafletChunk.mjs && vite build --ssr src/entry-server.jsx --outDir dist-ssr && node scripts/prerender.mjs",
+     "build:client-only": "vite build",
+     "lint": "oxlint",
+diff --git a/scripts/publicApi.test.mjs b/scripts/publicApi.test.mjs
+new file mode 100644
+index 0000000..ec8842f
+--- /dev/null
++++ b/scripts/publicApi.test.mjs
+@@ -0,0 +1,545 @@
++// Tests for the Public API (supabase/functions/public-api): the pure rules in
++// _shared/publicApi.ts, the request handler against an in-memory fake of the
++// database, and store.ts's queries (which tables and columns it may touch).
++// Run: node scripts/publicApi.test.mjs
++//
++// The .ts files have no TypeScript-only syntax, so they're copied to
++// temporary .mjs files and imported as plain JavaScript (no Deno needed).
++import assert from 'node:assert/strict';
++import { createHash } from 'node:crypto';
++import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { pathToFileURL } from 'node:url';
++
++const dir = mkdtempSync(join(tmpdir(), 'public-api-'));
++const sources = {};
++for (const file of ['_shared/publicApi', 'public-api/handler', 'public-api/store']) {
++  const src = readFileSync(new URL(`../supabase/functions/${file}.ts`, import.meta.url), 'utf8');
++  sources[file] = src;
++  mkdirSync(join(dir, file.split('/')[0]), { recursive: true });
++  writeFileSync(join(dir, `${file}.mjs`), src.replace(/(from\s+'[^']+)\.ts'/g, "$1.mjs'"));
++}
++const load = (file) => import(pathToFileURL(join(dir, `${file}.mjs`)).href);
++const api = await load('_shared/publicApi');
++const { createHandler } = await load('public-api/handler');
++const { createStore } = await load('public-api/store');
++rmSync(dir, { recursive: true, force: true });
++
++// ═══ 1. Pure rules ════════════════════════════════════════════════════════
++
++// ── key hashing matches Postgres' encode(sha256(...), 'hex')
++const KEY = `fk_live_${'a1b2c3d4'.repeat(6)}`;
++assert.equal(await api.sha256Hex(KEY), createHash('sha256').update(KEY).digest('hex'));
++assert.equal((await api.sha256Hex(KEY)).length, 64);
++assert.ok(api.isKeyFormat(KEY));
++for (const bad of ['', 'fk_live_short', 'sk_live_' + 'a'.repeat(48), `${KEY}!`, null, 42]) {
++  assert.equal(api.isKeyFormat(bad), false, `not a key: ${bad}`);
++}
++// ── a key is never printable in full
++assert.equal(api.maskKey(KEY), 'fk_live_a1b2…');
++assert.ok(!api.maskKey(KEY).includes(KEY.slice(12)));
++assert.equal(api.maskKey('whatever-they-sent'), '(malformed)');
++
++// ── routing (the function sees its own name before /v1)
++const route = (p) => api.matchRoute(p);
++assert.equal(route('/public-api/v1/places').pattern, 'GET /v1/places');
++assert.equal(route('/v1/places/').pattern, 'GET /v1/places');
++assert.equal(route('/functions/v1/public-api/v1/places/p2').id, 'p2');
++assert.equal(route('/public-api/v1/places/nearby').pattern, 'GET /v1/places/nearby');
++assert.deepEqual(route('/public-api/v1/places/abc123'), { pattern: 'GET /v1/places/:id', name: 'places.detail', id: 'abc123' });
++assert.equal(route('/public-api/v1/places/abc123/images').pattern, 'GET /v1/places/:id/images');
++assert.equal(route('/public-api/v1/categories').pattern, 'GET /v1/categories');
++assert.equal(route('/public-api/v1/usage').pattern, 'GET /v1/usage');
++for (const p of ['/public-api', '/public-api/v1', '/public-api/v2/places', '/public-api/v1/users', '/public-api/v1/places/a/b/c']) {
++  assert.equal(route(p), null, `no route: ${p}`);
++}
++
++// ── cost lookup: database first, defaults if the row is missing or broken
++assert.equal(api.costFor('GET /v1/places', { 'GET /v1/places': 3 }), 3);
++assert.equal(api.costFor('GET /v1/places/:id/images', {}), 5);
++assert.equal(api.costFor('GET /v1/places/:id/images', null), 5);
++assert.equal(api.costFor('GET /v1/usage', { 'GET /v1/usage': 0 }), 0);
++assert.equal(api.costFor('GET /v1/usage', { 'GET /v1/usage': 3 }), 0, 'usage is free whatever the price list says');
++assert.equal(api.costFor('GET /v1/places', { 'GET /v1/places': -2 }), 1);
++assert.equal(api.costFor('GET /v1/places', { 'GET /v1/places': 'abc' }), 1);
++
++// ── charge-or-not: only a 2xx with a price
++assert.equal(api.shouldCharge(200, 1), true);
++assert.equal(api.shouldCharge(200, 0), false);
++for (const status of [400, 401, 402, 403, 404, 405, 429, 500]) assert.equal(api.shouldCharge(status, 5), false);
++
++// ── params
++const qs = (s) => new URLSearchParams(s);
++assert.deepEqual(api.parseListParams(qs('')).value, { limit: 20, offset: 0, type: null, q: null });
++assert.deepEqual(api.parseListParams(qs('limit=50&offset=100&type=Hostel&q= cafe ')).value, {
++  limit: 50, offset: 100, type: 'hostel', q: 'cafe',
++});
++for (const bad of ['limit=51', 'limit=0', 'limit=abc', 'limit=-1', 'offset=-1', 'offset=1.5', 'offset=10001', 'type=food;drop', `q=${'x'.repeat(81)}`, 'q=a%00b']) {
++  assert.ok(api.parseListParams(qs(bad)).error, `rejected: ${bad}`);
++}
++assert.deepEqual(api.parseNearbyParams(qs('lat=7.3&lng=5.135')).value, {
++  lat: 7.3, lng: 5.135, radius_m: 500, limit: 20, type: null,
++});
++assert.equal(api.parseNearbyParams(qs('lat=7.3&lng=5.135&radius_m=5000')).value.radius_m, 5000);
++for (const bad of ['', 'lat=7.3', 'lat=abc&lng=5', 'lat=91&lng=5', 'lat=7&lng=181', 'lat=7&lng=5&radius_m=5001', 'lat=7&lng=5&radius_m=0', 'lat=1e2&lng=5']) {
++  assert.ok(api.parseNearbyParams(qs(bad)).error, `rejected: ${bad}`);
++}
++assert.ok(api.isPlaceId('0Ab_9-xyz'));
++for (const bad of ['', 'a b', "a'--", 'a/b', 'x'.repeat(65)]) assert.equal(api.isPlaceId(bad), false);
++// ── search wildcards are made literal
++assert.equal(api.likePattern('50%_Off*'), '%50\\%\\_off %');
++
++// ── column allow-list: named columns only, nothing private
++const PRIVATE = /submitted_by|user_id|email|phone|status|rejection|source_type|created_by|is_admin|sponsor|promo|is_person|is_channel|is_business|channel_link|business_link|segment_id|pin_locked|explore/;
++for (const cols of [api.PLACE_COLUMNS, api.IMAGE_COLUMNS, api.CATEGORY_COLUMNS]) {
++  assert.ok(!cols.includes('*'), 'never SELECT *');
++  assert.ok(!PRIVATE.test(cols), `no private column in: ${cols}`);
++}
++assert.equal(api.PLACE_COLUMNS, 'id, name, description, type, area, lat, lng, rating, review_count, image_count');
++
++// ── output shaping drops anything not on the list, and fixes numeric strings
++const dirtyRow = {
++  id: 'p1', name: 'SUB Cafeteria', description: null, type: 'food', area: 'SUB area',
++  lat: '7.3000', lng: '5.1350', rating: '4.5', review_count: 2, image_count: 2,
++  submitted_by: 'user-uuid', status: 'approved', sponsor_name: 'Secret', is_promoted: true,
++  email: 'someone@example.com', search_text: 'sub cafeteria',
++};
++assert.deepEqual(api.toPlace(dirtyRow), {
++  id: 'p1', name: 'SUB Cafeteria', description: null, type: 'food', area: 'SUB area',
++  lat: 7.3, lng: 5.135, rating: 4.5, review_count: 2, image_count: 2,
++});
++assert.equal(api.toPlace({ ...dirtyRow, rating: null }).rating, null);
++assert.equal(api.toPlace({ ...dirtyRow, distance_m: 156.62 }).distance_m, 157);
++assert.deepEqual(api.toCategory({ type: 'lecture_hall', place_count: '14' }), { id: 'lecture_hall', label: 'Lecture hall', place_count: 14 });
++
++// ── image URLs: proxy if set, else public storage; never another folder
++const PROXY = { imageProxyUrl: 'https://ik.imagekit.io/demo/', supabaseUrl: 'https://proj.supabase.co' };
++assert.deepEqual(api.imageUrls('waypoints/p1/a b.jpg', PROXY), {
++  url: 'https://ik.imagekit.io/demo/waypoints/p1/a%20b.jpg?tr=w-900,c-at_max,q-75,f-auto',
++  full_url: 'https://ik.imagekit.io/demo/waypoints/p1/a%20b.jpg?tr=w-1600,c-at_max,q-80,f-auto',
++});
++assert.equal(
++  api.imageUrls('waypoint/1/x.jpg', { imageProxyUrl: '', supabaseUrl: 'https://proj.supabase.co/' }).url,
++  'https://proj.supabase.co/storage/v1/object/public/place-images/waypoint/1/x.jpg'
++);
++// a stored "?" or "#" stays part of the file name, not the URL's query
++assert.equal(
++  api.imageUrls('waypoints/p1/a?tr=w-9#x.jpg', PROXY).url,
++  'https://ik.imagekit.io/demo/waypoints/p1/a%3Ftr%3Dw-9%23x.jpg?tr=w-900,c-at_max,q-75,f-auto'
++);
++for (const path of ['promotion/9/secret.jpg', 'event/9/poster.jpg', 'waypoints/../promotion/9/a.jpg', '', null, 'private/x.jpg']) {
++  assert.equal(api.imageUrls(path, PROXY), null, `not served: ${path}`);
++}
++assert.deepEqual(Object.keys(api.toImage({ id: 7, place_id: 'p1', storage_path: 'waypoints/p1/a.jpg', position: 1 }, PROXY)), ['position', 'url', 'full_url']);
++
++// ── envelope and errors
++assert.deepEqual(api.envelope([1], { creditsCharged: 1, creditsRemaining: 9, rateLimitRemaining: 19 }), {
++  data: [1], meta: { credits_charged: 1, credits_remaining: 9, rate_limit_remaining: 19 },
++});
++assert.deepEqual(api.errorBody('out_of_credits').status, 402);
++assert.deepEqual(api.errorBody('bad_request', 'limit must be a whole number.'), {
++  status: 400, body: { error: { code: 'bad_request', message: 'limit must be a whole number.' } },
++});
++const codes = Object.fromEntries(Object.entries(api.ERRORS).map(([code, [status]]) => [code, status]));
++assert.deepEqual(codes, {
++  missing_api_key: 401, invalid_api_key: 401, out_of_credits: 402, key_revoked: 403, not_found: 404,
++  method_not_allowed: 405, rate_limited: 429, bad_request: 400, server_error: 500,
++});
++// ── rate-limit headers
++assert.deepEqual(api.rateHeaders({ limit: 20, remaining: -3, retryAfter: 12.2 }), {
++  'X-RateLimit-Limit': '20', 'X-RateLimit-Remaining': '0', 'Retry-After': '13',
++});
++assert.deepEqual(api.rateHeaders({ limit: 20, remaining: 5 }), { 'X-RateLimit-Limit': '20', 'X-RateLimit-Remaining': '5' });
++assert.equal(api.clientIp(new Headers({ 'x-forwarded-for': '1.2.3.4, 10.0.0.1' })), '1.2.3.4');
++assert.equal(api.clientIp(new Headers()), 'unknown');
++
++console.log('ok: public API rules (keys, routes, costs, params, allow-list, envelope)');
++
++// ═══ 2. The handler against a fake database ═══════════════════════════════
++// Mirrors what supabase/public_api.sql does: per-minute counters, plan
++// credits spent before top-up, and an all-or-nothing consume.
++
++const hash = (s) => createHash('sha256').update(s).digest('hex');
++const KEYS = {
++  good: `fk_live_${'1'.repeat(48)}`,
++  revoked: `fk_live_${'2'.repeat(48)}`,
++  unknown: `fk_live_${'9'.repeat(48)}`,
++};
++const IP_LIMIT = 10;
++
++function makeDb() {
++  return {
++    plan: { id: 'free', name: 'Free', monthly_credits: 1000, rate_limit_per_minute: 20 },
++    keys: [
++      { id: 'key-good', key_hash: hash(KEYS.good), key_prefix: KEYS.good.slice(0, 12), status: 'active', plan: 100, topup: 0, hits: 0 },
++      { id: 'key-revoked', key_hash: hash(KEYS.revoked), key_prefix: KEYS.revoked.slice(0, 12), status: 'revoked', plan: 100, topup: 0, hits: 0 },
++    ],
++    ipHits: {},
++    usage: [],
++    costs: { 'GET /v1/places': 1, 'GET /v1/places/:id': 1, 'GET /v1/places/nearby': 1, 'GET /v1/categories': 1, 'GET /v1/places/:id/images': 5, 'GET /v1/usage': 0 },
++    places: [
++      { ...dirtyRow },
++      { id: 'p2', name: 'Main Library', description: 'Quiet', type: 'library', area: null, lat: '7.3010', lng: '5.1360', rating: null, review_count: 0, image_count: 0, submitted_by: 'user-2' },
++    ],
++    images: [
++      { id: 1, place_id: 'p1', storage_path: 'waypoints/p1/a.jpg', position: 0 },
++      { id: 2, place_id: 'p1', storage_path: 'promotion/zz/leak.jpg', position: 1 },
++    ],
++    failFetch: false,
++    seenHashes: [],
++  };
++}
++
++function makeStore(db) {
++  return {
++    async authorize(keyHash, ipHash) {
++      db.seenHashes.push(keyHash);
++      const k = db.keys.find((r) => r.key_hash === keyHash);
++      if (!k || k.status !== 'active') {
++        const n = (db.ipHits[ipHash] = (db.ipHits[ipHash] || 0) + 1);
++        const status = n > IP_LIMIT ? 'ip_rate_limited' : k ? 'revoked' : 'invalid';
++        return { status, key_id: k ? k.id : null, rate_limit: IP_LIMIT, rate_remaining: Math.max(IP_LIMIT - n, 0), retry_after: 30 };
++      }
++      k.hits += 1;
++      const limit = db.plan.rate_limit_per_minute;
++      return {
++        status: k.hits > limit ? 'rate_limited' : 'ok',
++        key_id: k.id, key_prefix: k.key_prefix, plan_id: db.plan.id, plan_name: db.plan.name,
++        monthly_credits: db.plan.monthly_credits, rate_limit: limit, rate_remaining: Math.max(limit - k.hits, 0),
++        retry_after: 30, plan_credits_remaining: k.plan, topup_credits_remaining: k.topup,
++        credits_remaining: k.plan + k.topup, period_reset_at: '2026-12-10T00:00:00+00:00', costs: db.costs,
++      };
++    },
++    async listPlaces({ type, q, limit, offset }) {
++      if (db.failFetch) throw new Error('database is down');
++      const all = db.places.filter((p) => (!type || p.type === type) && (!q || p.name.toLowerCase().includes(q.toLowerCase())));
++      return { rows: all.slice(offset, offset + limit), total: all.length };
++    },
++    async getPlace(id) { return db.places.find((p) => p.id === id) || null; },
++    async nearbyPlaces() { return db.places.map((p, i) => ({ ...p, distance_m: i * 156.6 })); },
++    async categories() { return [{ type: 'food', place_count: 1 }, { type: 'library', place_count: 1 }]; },
++    async placeImages(id) { return db.images.filter((i) => i.place_id === id); },
++    async consumeCredits(keyId, cost) {
++      // Yield first, like a real round trip: lets parallel requests interleave.
++      await new Promise((r) => setTimeout(r, 1));
++      const k = db.keys.find((r) => r.id === keyId);
++      if (k.status !== 'active') return { revoked: true };
++      if (k.plan + k.topup < cost) return { insufficient: true };
++      const fromPlan = Math.min(k.plan, cost);
++      k.plan -= fromPlan;
++      k.topup -= cost - fromPlan;
++      return { plan_credits_remaining: k.plan, topup_credits_remaining: k.topup, credits_remaining: k.plan + k.topup };
++    },
++    async logUsage(row) { db.usage.push({ ...row, created_at: new Date().toISOString() }); },
++    async recentUsage(keyId) { return db.usage.filter((u) => u.key_id === keyId).slice(-20).reverse(); },
++  };
++}
++
++let db = makeDb();
++const logged = [];
++const quietLog = { error: (...args) => logged.push(args.join(' ')) };
++const newHandler = () => createHandler({ store: makeStore(db), config: PROXY, log: quietLog });
++let handler = newHandler();
++const reset = () => { db = makeDb(); handler = newHandler(); logged.length = 0; };
++
++async function call(path, { key = KEYS.good, method = 'GET', ip = '41.0.0.1' } = {}) {
++  const headers = { 'x-forwarded-for': ip };
++  if (key) headers['x-api-key'] = key;
++  const res = await handler(new Request(`https://x.supabase.co/functions/v1/public-api${path}`, { method, headers }));
++  const text = await res.text();
++  return { status: res.status, headers: res.headers, text, json: text ? JSON.parse(text) : null };
++}
++const credits = () => { const k = db.keys[0]; return k.plan + k.topup; };
++const lastLog = () => db.usage[db.usage.length - 1];
++
++// ── no key → 401
++let r = await call('/v1/places', { key: null });
++assert.equal(r.status, 401);
++assert.equal(r.json.error.code, 'missing_api_key');
++assert.equal(r.json.data, undefined);
++// ── wrong key → 401
++r = await call('/v1/places', { key: KEYS.unknown });
++assert.equal(r.status, 401);
++assert.equal(r.json.error.code, 'invalid_api_key');
++assert.equal(r.headers.get('X-RateLimit-Limit'), String(IP_LIMIT));
++// ── malformed key → 401, and its text never reaches the database
++r = await call('/v1/places', { key: "' or 1=1 --" });
++assert.equal(r.status, 401);
++assert.equal(db.seenHashes.at(-1), '');
++assert.equal(credits(), 100, 'failed auth never charges');
++
++// ── revoked key → 403
++r = await call('/v1/places', { key: KEYS.revoked });
++assert.equal(r.status, 403);
++assert.equal(r.json.error.code, 'key_revoked');
++assert.equal(db.keys[1].plan, 100);
++assert.equal(r.headers.get('X-RateLimit-Limit'), String(IP_LIMIT), 'rate headers on a 403 too');
++assert.ok(r.headers.get('X-RateLimit-Remaining') !== null);
++
++// ── valid key, places list → 200, charges 1
++reset();
++r = await call('/v1/places');
++assert.equal(r.status, 200);
++assert.equal(r.json.data.length, 2);
++assert.deepEqual(r.json.meta, {
++  credits_charged: 1, credits_remaining: 99, rate_limit_remaining: 19,
++  pagination: { limit: 20, offset: 0, total: 2, next_offset: null },
++});
++assert.equal(credits(), 99);
++assert.equal(r.headers.get('X-RateLimit-Limit'), '20');
++assert.equal(r.headers.get('X-RateLimit-Remaining'), '19');
++assert.equal(r.headers.get('Access-Control-Allow-Origin'), '*');
++assert.equal(r.headers.get('Cache-Control'), 'no-store');
++assert.deepEqual(lastLog(), { key_id: 'key-good', endpoint: 'GET /v1/places', status_code: 200, credits_charged: 1, response_ms: lastLog().response_ms, created_at: lastLog().created_at });
++// ── no user data in any response field, even though the rows carry some
++assert.ok(!/submitted_by|user-uuid|user-2|someone@example\.com|sponsor|Secret|status|search_text/.test(r.text), 'no private field leaks');
++assert.deepEqual(Object.keys(r.json.data[0]), ['id', 'name', 'description', 'type', 'area', 'lat', 'lng', 'rating', 'review_count', 'image_count']);
++assert.equal(typeof r.json.data[0].lat, 'number');
++
++// ── paging
++r = await call('/v1/places?limit=1');
++assert.equal(r.json.data.length, 1);
++assert.equal(r.json.meta.pagination.next_offset, 1);
++// ── an empty result from a valid query IS charged
++const before = credits();
++r = await call('/v1/places?q=zzzz-nothing');
++assert.equal(r.status, 200);
++assert.deepEqual(r.json.data, []);
++assert.equal(r.json.meta.credits_charged, 1);
++assert.equal(credits(), before - 1);
++
++// ── one place, nearby, categories → 1 credit each
++reset();
++r = await call('/v1/places/p2');
++assert.equal(r.status, 200);
++assert.equal(r.json.data.name, 'Main Library');
++r = await call('/v1/places/nearby?lat=7.3&lng=5.135&radius_m=500');
++assert.equal(r.status, 200);
++assert.equal(r.json.data[1].distance_m, 157);
++r = await call('/v1/categories');
++assert.deepEqual(r.json.data[0], { id: 'food', label: 'Food', place_count: 1 });
++assert.equal(credits(), 97);
++
++// ── image request → charges 5, and only place photos come back
++reset();
++r = await call('/v1/places/p1/images');
++assert.equal(r.status, 200);
++assert.equal(r.json.meta.credits_charged, 5);
++assert.equal(credits(), 95);
++assert.equal(r.json.data.length, 1, 'the promotion/ upload is not served');
++assert.ok(r.json.data[0].url.startsWith('https://ik.imagekit.io/demo/waypoints/p1/a.jpg'));
++assert.ok(!r.text.includes('storage_path') && !r.text.includes('promotion/'));
++assert.equal(lastLog().credits_charged, 5);
++// ── the price list is read from the database, not the code
++db.costs['GET /v1/places/:id/images'] = 8;
++r = await call('/v1/places/p1/images');
++assert.equal(r.json.meta.credits_charged, 8);
++
++// ── bad param → 400, charges 0
++reset();
++for (const path of ['/v1/places?limit=500', '/v1/places/nearby?lat=abc&lng=5', '/v1/places/nearby', '/v1/places/bad%20id']) {
++  r = await call(path);
++  assert.equal(r.status, 400, path);
++  assert.equal(r.json.error.code, 'bad_request');
++}
++assert.equal(credits(), 100);
++assert.equal(lastLog().status_code, 400);
++assert.equal(lastLog().credits_charged, 0);
++
++// ── unknown place → 404, charges 0 (for the place and for its images)
++for (const path of ['/v1/places/nope', '/v1/places/nope/images', '/v1/nothing-here']) {
++  r = await call(path);
++  assert.equal(r.status, 404, path);
++  assert.equal(r.json.error.code, 'not_found');
++}
++assert.equal(credits(), 100);
++assert.equal(lastLog().credits_charged, 0);
++
++// ── writes are refused, uncharged
++r = await call('/v1/places', { method: 'POST' });
++assert.equal(r.status, 405);
++assert.equal(credits(), 100);
++assert.equal(lastLog().endpoint, 'POST /v1/places');
++
++// ── our own failure → 500, charges 0
++db.failFetch = true;
++r = await call('/v1/places');
++assert.equal(r.status, 500);
++assert.equal(r.json.error.code, 'server_error');
++assert.equal(credits(), 100);
++assert.ok(logged.some((line) => line.includes('database is down')));
++db.failFetch = false;
++
++// ── OPTIONS: CORS only, nothing counted or logged
++const logsBefore = db.usage.length;
++const hitsBefore = db.keys[0].hits;
++r = await call('/v1/places', { method: 'OPTIONS', key: null });
++assert.equal(r.status, 204);
++assert.ok(r.headers.get('Access-Control-Allow-Headers').includes('x-api-key'));
++assert.equal(db.usage.length, logsBefore);
++assert.equal(db.keys[0].hits, hitsBefore);
++
++// ── /v1/usage → 0 credits, shows the caller's own plan and calls
++reset();
++await call('/v1/places');
++r = await call('/v1/usage');
++assert.equal(r.status, 200);
++assert.equal(r.json.meta.credits_charged, 0);
++assert.equal(credits(), 99);
++assert.equal(r.json.data.plan.name, 'Free');
++assert.deepEqual(r.json.data.credits, { plan: 99, topup: 0, total: 99 });
++assert.equal(r.json.data.resets_at, '2026-12-10T00:00:00+00:00');
++assert.equal(r.json.data.recent_calls[0].endpoint, 'GET /v1/places');
++assert.equal(r.json.data.key, 'fk_live_1111');
++assert.ok(!r.text.includes(KEYS.good), 'the full key is never echoed');
++assert.ok(!r.text.includes('key_hash') && !r.text.includes('key-good'));
++
++// ── credits exhausted → 402, no data
++reset();
++db.keys[0].plan = 0;
++r = await call('/v1/places');
++assert.equal(r.status, 402);
++assert.equal(r.json.error.code, 'out_of_credits');
++assert.equal(r.json.data, undefined);
++// 4 credits can't buy a 5-credit image call, and aren't partly taken
++db.keys[0].plan = 4;
++r = await call('/v1/places/p1/images');
++assert.equal(r.status, 402);
++assert.equal(credits(), 4);
++// usage still works with no credits
++r = await call('/v1/usage');
++assert.equal(r.status, 200);
++
++// ── plan credits are spent before top-up credits
++reset();
++db.keys[0].plan = 2;
++db.keys[0].topup = 10;
++r = await call('/v1/places/p1/images');
++assert.equal(r.status, 200);
++assert.deepEqual([db.keys[0].plan, db.keys[0].topup], [0, 7]);
++assert.equal(r.json.meta.credits_remaining, 7);
++
++// ── two parallel requests with 1 credit left → only one succeeds
++reset();
++db.keys[0].plan = 1;
++const pair = await Promise.all([call('/v1/places'), call('/v1/places/p2')]);
++assert.deepEqual(pair.map((x) => x.status).sort(), [200, 402]);
++const loser = pair.find((x) => x.status === 402);
++assert.equal(loser.json.data, undefined, 'the loser gets no data');
++assert.equal(credits(), 0);
++assert.deepEqual(db.usage.map((u) => u.credits_charged).sort(), [0, 1]);
++
++// ── burst over the rate limit → 429 with Retry-After, not charged
++reset();
++const burst = [];
++for (let i = 0; i < 25; i++) burst.push(await call('/v1/usage'));
++assert.equal(burst.filter((x) => x.status === 200).length, 20);
++assert.equal(burst.filter((x) => x.status === 429).length, 5);
++const limited = burst.at(-1);
++assert.equal(limited.json.error.code, 'rate_limited');
++assert.equal(limited.headers.get('Retry-After'), '30');
++assert.equal(limited.headers.get('X-RateLimit-Remaining'), '0');
++assert.equal(credits(), 100);
++assert.equal(lastLog().status_code, 429);
++
++// ── a key revoked between the check and the charge → 403, no data, no charge
++reset();
++const realStore = makeStore(db);
++handler = createHandler({
++  store: { ...realStore, listPlaces: async (p) => { db.keys[0].status = 'revoked'; return realStore.listPlaces(p); } },
++  config: PROXY, log: quietLog,
++});
++r = await call('/v1/places');
++assert.equal(r.status, 403);
++assert.equal(r.json.data, undefined);
++assert.equal(db.keys[0].plan, 100);
++
++// ── a revoked key can't hammer the API or its log: counted per IP
++reset();
++const revokedBurst = [];
++for (let i = 0; i < 14; i++) revokedBurst.push(await call('/v1/places', { key: KEYS.revoked, ip: '55.5.5.5' }));
++assert.deepEqual(revokedBurst.map((x) => x.status), [...Array(10).fill(403), 429, 429, 429, 429]);
++assert.equal(db.usage.length, 10);
++
++// ── key guessing: the 11th wrong key from one IP is blocked; none are logged
++reset();
++const guesses = [];
++for (let i = 0; i < 12; i++) guesses.push(await call('/v1/places', { key: `fk_live_${String(i).padStart(48, '0')}`, ip: '66.6.6.6' }));
++assert.deepEqual(guesses.map((x) => x.status), [...Array(10).fill(401), 429, 429]);
++assert.ok(guesses.at(-1).headers.get('Retry-After'));
++assert.equal(db.usage.length, 0, 'strangers cannot fill the usage log');
++// another IP, and a real key from the blocked IP, are unaffected
++assert.equal((await call('/v1/places', { key: KEYS.unknown, ip: '77.7.7.7' })).status, 401);
++assert.equal((await call('/v1/places', { ip: '66.6.6.6' })).status, 200);
++
++// ── a full key is never logged, even when things break
++reset();
++// (an empty answer from the key check is a clean 500 too)
++handler = createHandler({ store: { ...makeStore(db), authorize: async () => null }, config: PROXY, log: quietLog });
++assert.equal((await call('/v1/places')).status, 500);
++logged.length = 0;
++const brokenStore = { ...makeStore(db), authorize: async () => { throw new Error('boom'); } };
++handler = createHandler({ store: brokenStore, config: PROXY, log: quietLog });
++r = await call('/v1/places');
++assert.equal(r.status, 500);
++assert.ok(logged.length > 0);
++assert.ok(!logged.some((line) => line.includes(KEYS.good)), 'logs carry the masked key only');
++assert.ok(logged.some((line) => line.includes('fk_live_1111…')));
++
++console.log('ok: public API handler (auth, charging, 402 race, rate limits, no leaks)');
++
++// ═══ 3. store.ts: what the API is allowed to touch ════════════════════════
++
++const touched = { tables: new Set(), selects: [], rpcs: new Set(), inserts: [] };
++function fakeClient() {
++  const builder = (table) => {
++    touched.tables.add(table);
++    const q = {
++      select(cols) { touched.selects.push([table, cols]); return q; },
++      insert(row) { touched.inserts.push([table, row]); return Promise.resolve({ error: null }); },
++      eq() { return q; }, ilike() { return q; }, order() { return q; }, limit() { return q; },
++      range() { return q; },
++      maybeSingle() { return Promise.resolve({ data: null, error: null }); },
++      then(ok, bad) { return Promise.resolve({ data: [], error: null, count: 0 }).then(ok, bad); },
++    };
++    return q;
++  };
++  return {
++    from: builder,
++    rpc(name) {
++      touched.rpcs.add(name);
++      return Promise.resolve(name === 'consume_credits' ? { data: null, error: { message: 'insufficient_credits' } } : { data: [], error: null });
++    },
++  };
++}
++const store = createStore(fakeClient());
++await store.authorize('h', 'ip');
++await store.listPlaces({ type: 'food', q: 'x', limit: 5, offset: 0 });
++await store.getPlace('p1');
++await store.nearbyPlaces({ lat: 1, lng: 2, radius_m: 3, type: null, limit: 5 });
++await store.categories();
++await store.placeImages('p1');
++await store.logUsage({ key_id: 'k', endpoint: 'GET /v1/places', status_code: 200, credits_charged: 1, response_ms: 3 });
++await store.recentUsage('k');
++assert.deepEqual(await store.consumeCredits('k', 1), { insufficient: true });
++
++assert.deepEqual([...touched.tables].sort(), ['api_public_categories', 'api_public_place_images', 'api_public_places', 'api_usage']);
++assert.deepEqual([...touched.rpcs].sort(), ['api_authorize', 'api_places_nearby', 'consume_credits']);
++for (const [table, cols] of touched.selects) {
++  assert.ok(typeof cols === 'string' && cols.length > 0 && !cols.includes('*'), `${table}: named columns only`);
++}
++assert.deepEqual(Object.keys(touched.inserts[0][1]).sort(), ['credits_charged', 'endpoint', 'key_id', 'response_ms', 'status_code']);
++
++// ── the API code never names a private table, and never logs a raw key
++const FORBIDDEN = /auth\.users|\bprofiles\b|\breviews\b|analytics_|\bevents\b|\bpromotions?\b|promotion_images|waypoint_submission|submission_log|navigation_completions|friends|marketing|bachs_webhook/i;
++for (const [file, src] of Object.entries(sources)) {
++  const code = src.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n');
++  // "promotion/" appears once, as a folder the image check refuses.
++  assert.ok(!FORBIDDEN.test(code.replace(/Promotion and event uploads/g, '')), `${file} touches no private table`);
++  assert.ok(!/\.from\(\s*['"`](?!api_)/.test(code), `${file} only reads api_* objects`);
++  assert.ok(!/select\(\s*['"`]\*/.test(code), `${file} never selects *`);
++  assert.ok(!/log\.\w+\([^)]*\bapiKey\b(?!\))/.test(code.replace(/maskKey\(apiKey\)/g, '')), `${file} never logs the raw key`);
++}
++
++console.log('ok: public API store (only api_* views, named columns, no private tables)');
+diff --git a/supabase/functions/_shared/publicApi.ts b/supabase/functions/_shared/publicApi.ts
+new file mode 100644
+index 0000000..2fe1b36
+--- /dev/null
++++ b/supabase/functions/_shared/publicApi.ts
+@@ -0,0 +1,290 @@
++// ── supabase/functions/_shared/publicApi.ts ──────────────────────────────
++//
++// Pure rules for the Public API (no Deno, no database), so
++// scripts/publicApi.test.mjs can test them in Node. Plain JavaScript on
++// purpose: the test copies this file to .mjs and imports it.
++
++export const KEY_PREFIX = 'fk_live_';
++
++// The ONLY columns the API may select and return. They are columns of the
++// api_public_* views (supabase/public_api.sql), never of the base tables.
++export const PLACE_COLUMNS = 'id, name, description, type, area, lat, lng, rating, review_count, image_count';
++export const IMAGE_COLUMNS = 'id, place_id, storage_path, position';
++export const CATEGORY_COLUMNS = 'type, place_count';
++export const USAGE_COLUMNS = 'endpoint, status_code, credits_charged, response_ms, created_at';
++
++// Used only if a row is missing from api_credit_costs.
++export const DEFAULT_COSTS = {
++  'GET /v1/places': 1,
++  'GET /v1/places/:id': 1,
++  'GET /v1/places/nearby': 1,
++  'GET /v1/categories': 1,
++  'GET /v1/places/:id/images': 5,
++  'GET /v1/usage': 0,
++};
++
++export const MAX_LIMIT = 50;
++export const DEFAULT_LIMIT = 20;
++export const MAX_OFFSET = 10000;
++export const MAX_RADIUS_M = 5000;
++export const DEFAULT_RADIUS_M = 500;
++
++// Uploads for places live under these folders of the public place-images
++// bucket. Promotion and event uploads share the bucket and must never be
++// handed out.
++const IMAGE_PATH = /^(waypoint|waypoints|waypoint_images)\//;
++const IMAGE_BUCKET = 'place-images';
++// Same sizes the app uses (src/lib/supabase.js).
++const IMAGE_TRANSFORM = 'tr=w-900,c-at_max,q-75,f-auto';
++const IMAGE_FULL_TRANSFORM = 'tr=w-1600,c-at_max,q-80,f-auto';
++
++const PLACE_ID = /^[A-Za-z0-9_-]{1,64}$/;
++const TYPE = /^[a-z0-9_]{1,40}$/;
++
++// ── Keys ─────────────────────────────────────────────────────────────────
++
++export async function sha256Hex(text) {
++  const bytes = new TextEncoder().encode(String(text));
++  const digest = await crypto.subtle.digest('SHA-256', bytes);
++  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
++}
++
++export function isKeyFormat(key) {
++  return typeof key === 'string' && /^fk_live_[A-Za-z0-9]{32,64}$/.test(key);
++}
++
++/** For logs: never the full key. */
++export function maskKey(key) {
++  if (typeof key !== 'string' || !key) return '(none)';
++  return isKeyFormat(key) ? `${key.slice(0, 12)}…` : '(malformed)';
++}
++
++// ── Routing and cost ─────────────────────────────────────────────────────
++
++/** Path as the function sees it (".../public-api/v1/places") → route. */
++export function matchRoute(pathname) {
++  // Everything up to the function's own name is hosting prefix
++  // ("/functions/v1/public-api"), which has a /v1 of its own.
++  const path = String(pathname || '');
++  const own = path.lastIndexOf('/public-api/');
++  const rest = own === -1 ? path : path.slice(own + '/public-api'.length);
++  const parts = rest.split('/').filter(Boolean); // ['v1', ...]
++  if (parts[0] !== 'v1') return null;
++  const [, a, b, c] = parts;
++  if (parts.length === 2 && a === 'places') return { pattern: 'GET /v1/places', name: 'places.list' };
++  if (parts.length === 2 && a === 'categories') return { pattern: 'GET /v1/categories', name: 'categories' };
++  if (parts.length === 2 && a === 'usage') return { pattern: 'GET /v1/usage', name: 'usage' };
++  if (parts.length === 3 && a === 'places' && b === 'nearby') {
++    return { pattern: 'GET /v1/places/nearby', name: 'places.nearby' };
++  }
++  if (parts.length === 3 && a === 'places') {
++    return { pattern: 'GET /v1/places/:id', name: 'places.detail', id: safeDecode(b) };
++  }
++  if (parts.length === 4 && a === 'places' && c === 'images') {
++    return { pattern: 'GET /v1/places/:id/images', name: 'places.images', id: safeDecode(b) };
++  }
++  return null;
++}
++
++function safeDecode(part) {
++  try {
++    return decodeURIComponent(part);
++  } catch {
++    return part;
++  }
++}
++
++/** Credits for a route: the database's price list first, then the defaults. */
++export function costFor(pattern, costs) {
++  // Checking your own balance is always free, whatever the price list says.
++  if (pattern === 'GET /v1/usage') return 0;
++  const fromDb = costs ? Number(costs[pattern]) : NaN;
++  if (Number.isInteger(fromDb) && fromDb >= 0) return fromDb;
++  return DEFAULT_COSTS[pattern] ?? 1;
++}
++
++/** Only a 2xx that returned data is charged. */
++export function shouldCharge(status, cost) {
++  return status >= 200 && status < 300 && cost > 0;
++}
++
++// ── Query params ─────────────────────────────────────────────────────────
++// Each parser returns { value } or { error: 'message' }.
++
++function parseIntParam(raw, name, { min, max, fallback }) {
++  if (raw === null || raw === undefined || raw === '') return { value: fallback };
++  if (!/^\d+$/.test(raw)) return { error: `${name} must be a whole number.` };
++  const n = Number(raw);
++  if (n < min || n > max) return { error: `${name} must be between ${min} and ${max}.` };
++  return { value: n };
++}
++
++function parseType(raw) {
++  if (raw === null || raw === undefined || raw === '') return { value: null };
++  const type = String(raw).trim().toLowerCase();
++  if (!TYPE.test(type)) return { error: 'type must be a category id such as "hostel" (see /v1/categories).' };
++  return { value: type };
++}
++
++export function isPlaceId(id) {
++  return typeof id === 'string' && PLACE_ID.test(id);
++}
++
++export function parseListParams(params) {
++  const limit = parseIntParam(params.get('limit'), 'limit', { min: 1, max: MAX_LIMIT, fallback: DEFAULT_LIMIT });
++  if (limit.error) return limit;
++  const offset = parseIntParam(params.get('offset'), 'offset', { min: 0, max: MAX_OFFSET, fallback: 0 });
++  if (offset.error) return offset;
++  const type = parseType(params.get('type'));
++  if (type.error) return type;
++  const q = (params.get('q') || '').trim();
++  if (q.length > 80) return { error: 'q must be 80 characters or fewer.' };
++  // Postgres rejects NUL and friends; that is the caller's mistake, not ours.
++  // eslint-disable-next-line no-control-regex
++  if (/[\u0000-\u001f\u007f]/.test(q)) return { error: 'q contains characters that are not allowed.' };
++  return { value: { limit: limit.value, offset: offset.value, type: type.value, q: q || null } };
++}
++
++export function parseNearbyParams(params) {
++  const lat = parseCoord(params.get('lat'), 'lat', 90);
++  if (lat.error) return lat;
++  const lng = parseCoord(params.get('lng'), 'lng', 180);
++  if (lng.error) return lng;
++  const radius = parseIntParam(params.get('radius_m'), 'radius_m', {
++    min: 1,
++    max: MAX_RADIUS_M,
++    fallback: DEFAULT_RADIUS_M,
++  });
++  if (radius.error) return radius;
++  const limit = parseIntParam(params.get('limit'), 'limit', { min: 1, max: MAX_LIMIT, fallback: DEFAULT_LIMIT });
++  if (limit.error) return limit;
++  const type = parseType(params.get('type'));
++  if (type.error) return type;
++  return { value: { lat: lat.value, lng: lng.value, radius_m: radius.value, limit: limit.value, type: type.value } };
++}
++
++function parseCoord(raw, name, max) {
++  if (raw === null || raw === undefined || raw === '') return { error: `${name} is required.` };
++  if (!/^-?\d+(\.\d+)?$/.test(raw)) return { error: `${name} must be a number.` };
++  const n = Number(raw);
++  if (Math.abs(n) > max) return { error: `${name} must be between -${max} and ${max}.` };
++  return { value: n };
++}
++
++/** A search term as an ILIKE pattern, with its wildcards made literal. */
++export function likePattern(q) {
++  // PostgREST also reads * as a wildcard and has no escape for it.
++  const clean = String(q).toLowerCase().replace(/\*/g, ' ').replace(/[\\%_]/g, (ch) => `\\${ch}`);
++  return `%${clean}%`;
++}
++
++// ── Output shaping (the allow-list on the way out) ───────────────────────
++
++// Postgres numeric columns can arrive as strings.
++const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
++
++/** Builds the public place object field by field: an unexpected column on
++ * the row can never reach a client. */
++export function toPlace(row) {
++  const place = {
++    id: row.id,
++    name: row.name,
++    description: row.description ?? null,
++    type: row.type ?? null,
++    area: row.area ?? null,
++    lat: num(row.lat),
++    lng: num(row.lng),
++    rating: num(row.rating),
++    review_count: num(row.review_count) ?? 0,
++    image_count: num(row.image_count) ?? 0,
++  };
++  if (row.distance_m !== undefined && row.distance_m !== null) {
++    place.distance_m = Math.round(Number(row.distance_m));
++  }
++  return place;
++}
++
++export function toCategory(row) {
++  const words = String(row.type).replace(/_/g, ' ');
++  return {
++    id: row.type,
++    label: words.charAt(0).toUpperCase() + words.slice(1),
++    place_count: num(row.place_count) ?? 0,
++  };
++}
++
++/** Public URLs for one stored photo, or null if it isn't a place photo. */
++export function imageUrls(storagePath, { imageProxyUrl, supabaseUrl }) {
++  const clean = String(storagePath || '').replace(/^\/+/, '');
++  if (!IMAGE_PATH.test(clean) || clean.includes('..')) return null;
++  // Per segment, so a stored "?" or "#" can't become part of the URL's query.
++  const path = clean.split('/').map(encodeURIComponent).join('/');
++  const proxy = (imageProxyUrl || '').trim().replace(/\/+$/, '');
++  if (proxy) {
++    return { url: `${proxy}/${path}?${IMAGE_TRANSFORM}`, full_url: `${proxy}/${path}?${IMAGE_FULL_TRANSFORM}` };
++  }
++  const base = (supabaseUrl || '').trim().replace(/\/+$/, '');
++  const url = `${base}/storage/v1/object/public/${IMAGE_BUCKET}/${path}`;
++  return { url, full_url: url };
++}
++
++export function toImage(row, urlConfig) {
++  const urls = imageUrls(row.storage_path, urlConfig);
++  if (!urls) return null;
++  return { position: num(row.position) ?? 0, url: urls.url, full_url: urls.full_url };
++}
++
++export function toUsageCall(row) {
++  return {
++    endpoint: row.endpoint,
++    status: num(row.status_code),
++    credits_charged: num(row.credits_charged) ?? 0,
++    response_ms: num(row.response_ms),
++    at: row.created_at,
++  };
++}
++
++// ── Responses ────────────────────────────────────────────────────────────
++
++export const ERRORS = {
++  missing_api_key: [401, 'Send your API key in the x-api-key header.'],
++  invalid_api_key: [401, 'This API key is not valid.'],
++  out_of_credits: [402, 'This key has no credits left. Top up or wait for the monthly reset.'],
++  key_revoked: [403, 'This API key has been revoked.'],
++  not_found: [404, 'Not found.'],
++  method_not_allowed: [405, 'This API is read-only. Use GET.'],
++  rate_limited: [429, 'Too many requests. Slow down and retry shortly.'],
++  bad_request: [400, 'Bad request.'],
++  server_error: [500, 'Something went wrong on our side. You were not charged.'],
++};
++
++export function envelope(data, { creditsCharged = 0, creditsRemaining = null, rateLimitRemaining = null, extra } = {}) {
++  return {
++    data,
++    meta: {
++      credits_charged: creditsCharged,
++      credits_remaining: creditsRemaining,
++      rate_limit_remaining: rateLimitRemaining,
++      ...extra,
++    },
++  };
++}
++
++export function errorBody(code, message) {
++  const [status, fallback] = ERRORS[code] || ERRORS.server_error;
++  return { status, body: { error: { code, message: message || fallback } } };
++}
++
++export function rateHeaders({ limit, remaining, retryAfter } = {}) {
++  const headers = {};
++  if (Number.isFinite(limit)) headers['X-RateLimit-Limit'] = String(limit);
++  if (Number.isFinite(remaining)) headers['X-RateLimit-Remaining'] = String(Math.max(0, remaining));
++  if (Number.isFinite(retryAfter)) headers['Retry-After'] = String(Math.max(1, Math.ceil(retryAfter)));
++  return headers;
++}
++
++/** The caller's IP as the proxy in front of the function reports it. */
++export function clientIp(headers) {
++  const forwarded = (headers.get('x-forwarded-for') || '').split(',')[0].trim();
++  return forwarded || (headers.get('cf-connecting-ip') || '').trim() || 'unknown';
++}
+diff --git a/supabase/functions/public-api/handler.ts b/supabase/functions/public-api/handler.ts
+new file mode 100644
+index 0000000..4209a27
+--- /dev/null
++++ b/supabase/functions/public-api/handler.ts
+@@ -0,0 +1,219 @@
++// ── supabase/functions/public-api/handler.ts ─────────────────────────────
++//
++// The Public API's request logic: check the key, apply the rate limit,
++// fetch, charge, log. It talks to the database only through `store`
++// (store.ts), so scripts/publicApi.test.mjs can run it in Node against a
++// fake one. Plain JavaScript on purpose: the test copies it to .mjs.
++//
++// Order matters for billing (docs/public-api.md, "What counts as a charged
++// request"): credits are taken only after the data was fetched, and the
++// data is dropped if they can't be taken.
++
++import {
++  clientIp,
++  costFor,
++  envelope,
++  errorBody,
++  isKeyFormat,
++  isPlaceId,
++  maskKey,
++  matchRoute,
++  parseListParams,
++  parseNearbyParams,
++  rateHeaders,
++  sha256Hex,
++  shouldCharge,
++  toCategory,
++  toImage,
++  toPlace,
++  toUsageCall,
++} from '../_shared/publicApi.ts';
++
++const CORS_HEADERS = {
++  'Access-Control-Allow-Origin': '*',
++  'Access-Control-Allow-Headers': 'x-api-key, content-type',
++  'Access-Control-Allow-Methods': 'GET, OPTIONS',
++  'Access-Control-Expose-Headers': 'X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After',
++  'Access-Control-Max-Age': '86400',
++};
++
++/**
++ * @param store   see store.ts for the shape
++ * @param config  { imageProxyUrl, supabaseUrl } for building photo URLs
++ */
++export function createHandler({ store, config = {}, now = () => Date.now(), log = console }) {
++  return async function handle(req) {
++    // Preflight: never authenticated, counted, charged or logged.
++    if (req.method === 'OPTIONS') {
++      return new Response(null, { status: 204, headers: CORS_HEADERS });
++    }
++
++    const started = now();
++    const url = new URL(req.url);
++    const route = matchRoute(url.pathname);
++    const endpoint = route ? `${req.method} ${route.pattern.slice(4)}` : `${req.method} (unknown)`;
++    const apiKey = (req.headers.get('x-api-key') || '').trim();
++
++    let auth = null;
++    let rate = {};
++
++    const send = async (status, body, { charged = 0, logIt = true } = {}) => {
++      if (logIt) {
++        try {
++          await store.logUsage({
++            key_id: auth?.key_id ?? null,
++            endpoint,
++            status_code: status,
++            credits_charged: charged,
++            response_ms: Math.max(0, Math.round(now() - started)),
++          });
++        } catch (err) {
++          // A lost log line must not fail a request the caller paid for.
++          log.error('[public-api] usage log failed:', err?.message || err);
++        }
++      }
++      return new Response(JSON.stringify(body), {
++        status,
++        headers: {
++          ...CORS_HEADERS,
++          ...rateHeaders(rate),
++          'Content-Type': 'application/json; charset=utf-8',
++          // Paid, per-key answers: no proxy in between may store or replay one.
++          'Cache-Control': 'no-store',
++        },
++      });
++    };
++    const fail = (code, message, opts) => {
++      const { status, body } = errorBody(code, message);
++      return send(status, body, opts);
++    };
++
++    // ── 1. Key + rate limit (one database call) ──────────────────────────
++    // A missing or malformed key can't match a stored hash, so it is sent
++    // as '' and counted against the caller's IP like any wrong key.
++    // The IP comes from x-forwarded-for, which a caller could fake, so
++    // nothing unbounded may hang off it: see the logging rules below.
++    try {
++      const keyHash = isKeyFormat(apiKey) ? await sha256Hex(apiKey) : '';
++      const ipHash = await sha256Hex(clientIp(req.headers));
++      auth = await store.authorize(keyHash, ipHash);
++      if (!auth || !auth.status) throw new Error('empty authorize result');
++    } catch (err) {
++      log.error('[public-api] authorize failed:', maskKey(apiKey), err?.message || err);
++      auth = null;
++      return fail('server_error', null, { logIt: false });
++    }
++    rate = { limit: auth.rate_limit, remaining: auth.rate_remaining };
++
++    // Requests without a working key are counted (per IP) but only a revoked
++    // key's first few per minute are logged. Strangers must not be able to
++    // fill api_usage, and there is no key to file an unknown one under.
++    if (auth.status === 'ip_rate_limited') {
++      rate.retryAfter = auth.retry_after;
++      return fail('rate_limited', 'Too many requests without a valid API key. Try again in a minute.', { logIt: false });
++    }
++    if (auth.status === 'invalid') {
++      return fail(apiKey ? 'invalid_api_key' : 'missing_api_key', null, { logIt: false });
++    }
++    if (auth.status === 'revoked') return fail('key_revoked');
++    if (auth.status === 'rate_limited') {
++      rate.retryAfter = auth.retry_after;
++      return fail('rate_limited');
++    }
++    if (auth.status !== 'ok') return fail('server_error');
++
++    // ── 2. Route + params (nothing below runs for a bad request) ─────────
++    if (!route) return fail('not_found', 'No such endpoint. See the docs for the list.');
++    if (req.method !== 'GET') return fail('method_not_allowed');
++
++    let params = null;
++    if (route.name === 'places.list' || route.name === 'places.nearby') {
++      const parsed = route.name === 'places.list' ? parseListParams(url.searchParams) : parseNearbyParams(url.searchParams);
++      if (parsed.error) return fail('bad_request', parsed.error);
++      params = parsed.value;
++    }
++    if ((route.name === 'places.detail' || route.name === 'places.images') && !isPlaceId(route.id)) {
++      return fail('bad_request', 'That is not a valid place id.');
++    }
++
++    // ── 3. Enough credits to start? (saves the work; step 5 is the real check)
++    const cost = costFor(route.pattern, auth.costs);
++    let creditsRemaining = auth.credits_remaining;
++    if (cost > creditsRemaining) return fail('out_of_credits');
++
++    // ── 4. Fetch ─────────────────────────────────────────────────────────
++    let data;
++    let extra;
++    try {
++      if (route.name === 'places.list') {
++        const { rows, total } = await store.listPlaces(params);
++        data = rows.map(toPlace);
++        const next = params.offset + rows.length;
++        extra = {
++          pagination: {
++            limit: params.limit,
++            offset: params.offset,
++            total,
++            next_offset: next < total ? next : null,
++          },
++        };
++      } else if (route.name === 'places.nearby') {
++        data = (await store.nearbyPlaces(params)).map(toPlace);
++      } else if (route.name === 'places.detail') {
++        const row = await store.getPlace(route.id);
++        if (!row) return fail('not_found', 'No place with that id.');
++        data = toPlace(row);
++      } else if (route.name === 'places.images') {
++        const row = await store.getPlace(route.id);
++        if (!row) return fail('not_found', 'No place with that id.');
++        data = (await store.placeImages(route.id)).map((img) => toImage(img, config)).filter(Boolean);
++      } else if (route.name === 'categories') {
++        data = (await store.categories()).map(toCategory);
++      } else if (route.name === 'usage') {
++        const calls = await store.recentUsage(auth.key_id);
++        data = {
++          key: auth.key_prefix,
++          plan: {
++            id: auth.plan_id,
++            name: auth.plan_name,
++            monthly_credits: auth.monthly_credits,
++            rate_limit_per_minute: auth.rate_limit,
++          },
++          credits: {
++            plan: auth.plan_credits_remaining,
++            topup: auth.topup_credits_remaining,
++            total: auth.credits_remaining,
++          },
++          resets_at: auth.period_reset_at,
++          recent_calls: calls.map(toUsageCall),
++        };
++      }
++    } catch (err) {
++      log.error('[public-api] fetch failed:', endpoint, err?.message || err);
++      return fail('server_error');
++    }
++
++    // ── 5. Charge, then answer ───────────────────────────────────────────
++    let charged = 0;
++    if (shouldCharge(200, cost)) {
++      try {
++        const result = await store.consumeCredits(auth.key_id, cost);
++        // Another request spent the last credits first: no data goes out.
++        if (result.insufficient) return fail('out_of_credits');
++        // Revoked in the moment between the key check and the charge.
++        if (result.revoked) return fail('key_revoked');
++        charged = cost;
++        creditsRemaining = result.credits_remaining;
++      } catch (err) {
++        log.error('[public-api] charge failed:', endpoint, err?.message || err);
++        return fail('server_error');
++      }
++    }
++
++    return send(
++      200,
++      envelope(data, { creditsCharged: charged, creditsRemaining, rateLimitRemaining: auth.rate_remaining, extra }),
++      { charged }
++    );
++  };
++}
+diff --git a/supabase/functions/public-api/index.ts b/supabase/functions/public-api/index.ts
+new file mode 100644
+index 0000000..d817a95
+--- /dev/null
++++ b/supabase/functions/public-api/index.ts
+@@ -0,0 +1,32 @@
++// ── supabase/functions/public-api/index.ts ───────────────────────────────
++//
++// The paid, read-only Public API (docs/public-api.md). Other developers'
++// servers call this with an `x-api-key` header; it is the only thing they
++// ever talk to. They never get the Supabase URL's data API or the anon key.
++//
++// Deploy: `supabase functions deploy public-api --no-verify-jwt`
++// `--no-verify-jwt` is required: callers have an API key, not a Supabase
++// JWT. The function does its own auth (handler.ts), like bachs-webhook.
++//
++// Database: run supabase/public_api.sql first.
++// Secrets:  IMAGE_PROXY_URL (optional; the same ImageKit address the app
++//           uses, so photo URLs don't point at Supabase Storage).
++//           SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by
++//           Supabase. The service role key stays inside this function.
++
++import { createClient } from 'npm:@supabase/supabase-js@2';
++import { createHandler } from './handler.ts';
++import { createStore } from './store.ts';
++
++const supabaseUrl = Deno.env.get('SUPABASE_URL');
++
++const client = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'), {
++  auth: { persistSession: false, autoRefreshToken: false },
++});
++
++const handle = createHandler({
++  store: createStore(client),
++  config: { imageProxyUrl: Deno.env.get('IMAGE_PROXY_URL') ?? '', supabaseUrl },
++});
++
++Deno.serve(handle);
+diff --git a/supabase/functions/public-api/store.ts b/supabase/functions/public-api/store.ts
+new file mode 100644
+index 0000000..5199c61
+--- /dev/null
++++ b/supabase/functions/public-api/store.ts
+@@ -0,0 +1,113 @@
++// ── supabase/functions/public-api/store.ts ───────────────────────────────
++//
++// Every database call the Public API makes, in one place. It reads place
++// data ONLY from the api_public_* views and names every column it selects
++// (see _shared/publicApi.ts). Do not add a query on any other table here:
++// users, reviews, analytics, events and promotions are off limits to this API.
++
++import {
++  CATEGORY_COLUMNS,
++  IMAGE_COLUMNS,
++  PLACE_COLUMNS,
++  USAGE_COLUMNS,
++  likePattern,
++} from '../_shared/publicApi.ts';
++
++function check(error, what) {
++  if (error) throw new Error(`${what}: ${error.message || error.code || 'unknown error'}`);
++}
++
++export function createStore(client) {
++  return {
++    async authorize(keyHash, ipHash) {
++      const { data, error } = await client.rpc('api_authorize', { p_key_hash: keyHash, p_ip_hash: ipHash });
++      check(error, 'api_authorize');
++      return data;
++    },
++
++    async listPlaces({ type, q, limit, offset }) {
++      const filtered = (query) => {
++        if (type) query = query.eq('type', type);
++        if (q) query = query.ilike('search_text', likePattern(q));
++        return query;
++      };
++      const { data, error, count } = await filtered(
++        client.from('api_public_places').select(PLACE_COLUMNS, { count: 'exact' })
++      )
++        .order('name', { ascending: true })
++        .order('id', { ascending: true })
++        .range(offset, offset + limit - 1);
++      // Asking for a page past the end is an empty page, not a failure.
++      // PostgREST gives no total with that error, so count separately.
++      if (error && error.code === 'PGRST103') {
++        const counted = await filtered(client.from('api_public_places').select('id', { count: 'exact', head: true }));
++        check(counted.error, 'count places');
++        return { rows: [], total: counted.count ?? 0 };
++      }
++      check(error, 'list places');
++      return { rows: data || [], total: count ?? (data || []).length };
++    },
++
++    async getPlace(id) {
++      const { data, error } = await client.from('api_public_places').select(PLACE_COLUMNS).eq('id', id).maybeSingle();
++      check(error, 'get place');
++      return data;
++    },
++
++    async nearbyPlaces({ lat, lng, radius_m, type, limit }) {
++      const { data, error } = await client.rpc('api_places_nearby', {
++        p_lat: lat,
++        p_lng: lng,
++        p_radius_m: radius_m,
++        p_type: type,
++        p_limit: limit,
++      });
++      check(error, 'nearby places');
++      return data || [];
++    },
++
++    async categories() {
++      const { data, error } = await client
++        .from('api_public_categories')
++        .select(CATEGORY_COLUMNS)
++        .order('type', { ascending: true });
++      check(error, 'categories');
++      return data || [];
++    },
++
++    async placeImages(placeId) {
++      const { data, error } = await client
++        .from('api_public_place_images')
++        .select(IMAGE_COLUMNS)
++        .eq('place_id', placeId)
++        .order('position', { ascending: true })
++        .order('id', { ascending: true });
++      check(error, 'place images');
++      return data || [];
++    },
++
++    async consumeCredits(keyId, cost) {
++      const { data, error } = await client.rpc('consume_credits', { p_key_id: keyId, p_cost: cost });
++      if (error && /insufficient_credits/.test(error.message || '')) return { insufficient: true };
++      if (error && /key_revoked/.test(error.message || '')) return { revoked: true };
++      check(error, 'consume_credits');
++      return data;
++    },
++
++    async logUsage(row) {
++      const { error } = await client.from('api_usage').insert(row);
++      check(error, 'log usage');
++    },
++
++    async recentUsage(keyId) {
++      const { data, error } = await client
++        .from('api_usage')
++        .select(USAGE_COLUMNS)
++        .eq('key_id', keyId)
++        .order('created_at', { ascending: false })
++        .limit(20);
++      check(error, 'recent usage');
++      return data || [];
++    },
++  };
++}
+diff --git a/supabase/public_api.sql b/supabase/public_api.sql
+new file mode 100644
+index 0000000..41c6a09
+--- /dev/null
++++ b/supabase/public_api.sql
+@@ -0,0 +1,553 @@
++-- ════════════════════════════════════════════════════════════════════════
++-- Public API — keys, credits, rate limits, and the only data it may read
++-- ════════════════════════════════════════════════════════════════════════
++--
++-- MUST BE RUN MANUALLY in the Supabase SQL Editor. Safe to re-run.
++--
++-- Backs the Edge Function supabase/functions/public-api (docs/public-api.md).
++-- Adds new objects only; no existing table, policy or function is changed.
++--
++-- Security shape:
++--   * The function reads place data ONLY through the api_public_* views
++--     below. They name every column, so nothing private (submitted_by,
++--     status, promotion fields, people/channel rows) can leak through code.
++--   * Every api_* table has RLS on and no policy: only the service role
++--     (the Edge Function) can touch them.
++--   * Full API keys are never stored. Only their SHA-256 hash is.
++--
++-- Sections: 1 tables · 2 seeds · 3 public data views · 4 functions ·
++--           5 admin helpers · 6 permissions · 7 verification
++
++-- ── 1. Tables ────────────────────────────────────────────────────────────
++
++create table if not exists api_plans (
++  id                    text primary key,            -- slug, e.g. 'starter'
++  name                  text not null,
++  monthly_price_ngn     integer not null default 0 check (monthly_price_ngn >= 0),
++  monthly_credits       integer not null check (monthly_credits >= 0),
++  rate_limit_per_minute integer not null check (rate_limit_per_minute > 0),
++  active                boolean not null default true -- false = not offered to new keys
++);
++
++create table if not exists api_keys (
++  id                      uuid primary key default gen_random_uuid(),
++  owner_name              text not null,
++  owner_email             text not null,
++  key_prefix              text not null,             -- 'fk_live_' + 4 chars, display only
++  key_hash                text not null unique,      -- SHA-256 hex of the full key
++  plan_id                 text not null references api_plans(id),
++  plan_credits_remaining  integer not null default 0 check (plan_credits_remaining >= 0),
++  topup_credits_remaining integer not null default 0 check (topup_credits_remaining >= 0),
++  period_reset_at         timestamptz not null default (now() + interval '1 month'),
++  status                  text not null default 'active' check (status in ('active', 'revoked')),
++  created_at              timestamptz not null default now(),
++  last_used_at            timestamptz
++);
++
++-- key_id is null for requests that arrived with an unknown key.
++create table if not exists api_usage (
++  id              bigint generated always as identity primary key,
++  key_id          uuid references api_keys(id) on delete cascade,
++  endpoint        text not null,
++  status_code     integer not null,
++  credits_charged integer not null default 0,
++  response_ms     integer,
++  created_at      timestamptz not null default now()
++);
++create index if not exists api_usage_key_created_idx on api_usage (key_id, created_at desc);
++
++-- Edit a row here to change a price. No redeploy needed.
++create table if not exists api_credit_costs (
++  endpoint_pattern text primary key,
++  credits          integer not null check (credits >= 0)
++);
++
++-- One row per key per minute.
++create table if not exists api_rate_windows (
++  key_id       uuid not null references api_keys(id) on delete cascade,
++  window_start timestamptz not null,
++  count        integer not null default 0,
++  primary key (key_id, window_start)
++);
++
++-- Same, per caller IP, for unknown and revoked keys (blocks key guessing).
++-- The IP is stored hashed.
++create table if not exists api_ip_rate_windows (
++  ip_hash      text not null,
++  window_start timestamptz not null,
++  count        integer not null default 0,
++  primary key (ip_hash, window_start)
++);
++create index if not exists api_ip_rate_windows_start_idx on api_ip_rate_windows (window_start);
++
++-- Every credit grant. `reference` is unique so a payment webhook
++-- (Paystack/BACHS, later) can grant once per payment and never twice.
++create table if not exists api_credit_grants (
++  id         bigint generated always as identity primary key,
++  key_id     uuid not null references api_keys(id) on delete cascade,
++  kind       text not null check (kind in ('plan', 'topup')),
++  amount     integer not null check (amount > 0),
++  reference  text unique,
++  note       text,
++  created_at timestamptz not null default now()
++);
++create index if not exists api_credit_grants_key_idx on api_credit_grants (key_id, created_at desc);
++
++alter table api_plans           enable row level security;
++alter table api_keys            enable row level security;
++alter table api_usage           enable row level security;
++alter table api_credit_costs    enable row level security;
++alter table api_rate_windows    enable row level security;
++alter table api_ip_rate_windows enable row level security;
++alter table api_credit_grants   enable row level security;
++
++-- ── 2. Seeds (kept as-is if you have already edited them) ────────────────
++
++insert into api_plans (id, name, monthly_price_ngn, monthly_credits, rate_limit_per_minute) values
++  ('free',    'Free',        0,  1000,  20),
++  ('starter', 'Starter',  3000,  5000,  60),
++  ('growth',  'Growth',  10000, 25000, 120)   -- placeholder numbers
++on conflict (id) do nothing;
++
++insert into api_credit_costs (endpoint_pattern, credits) values
++  ('GET /v1/places',            1),
++  ('GET /v1/places/:id',        1),
++  ('GET /v1/places/nearby',     1),
++  ('GET /v1/categories',        1),
++  ('GET /v1/places/:id/images', 5),
++  ('GET /v1/usage',             0)
++on conflict (endpoint_pattern) do nothing;
++
++-- ── 3. Public data views (the API's whole view of the app) ───────────────
++-- Dropped and rebuilt so a re-run can change their columns. Only these new
++-- views are dropped.
++
++drop view if exists api_public_categories;
++drop view if exists api_public_place_images;
++drop view if exists api_public_places;
++
++-- Approved, real places with a location. People, channels and online
++-- businesses are waypoints rows too and are excluded here.
++create view api_public_places as
++select
++  w.id,
++  w.name,
++  w.description,
++  w.type,
++  w.area,
++  w.lat,
++  w.lng,
++  w.avg_rating as rating,
++  w.review_count,
++  (select count(*)
++     from waypoint_images i
++    where i.waypoint_id = w.id
++      and i.storage_path ~ '^(waypoint|waypoints|waypoint_images)/'
++      and position('..' in i.storage_path) = 0)::integer as image_count,
++  -- For ?q= search only; the function never returns it.
++  lower(concat_ws(' ', w.name, w.area, w.type)) as search_text
++from waypoints w
++where w.status = 'approved'
++  and not w.is_person
++  and not w.is_channel
++  and not w.is_business
++  and w.lat is not null
++  and w.lng is not null;
++
++-- Photos of those places only. The place-images bucket also holds
++-- promotion and event uploads; the prefix check keeps those out.
++create view api_public_place_images as
++select
++  i.id,
++  i.waypoint_id as place_id,
++  i.storage_path,
++  coalesce(i.position, 0) as position
++from waypoint_images i
++join api_public_places p on p.id = i.waypoint_id
++where i.storage_path ~ '^(waypoint|waypoints|waypoint_images)/'
++  and position('..' in i.storage_path) = 0;
++
++create view api_public_categories as
++select type, count(*)::integer as place_count
++from api_public_places
++where type is not null
++group by type;
++
++-- ── 4. Functions ─────────────────────────────────────────────────────────
++
++-- Starts a new month for any key whose period has ended: plan credits go
++-- back to the plan's allowance, top-up credits are left alone. Called on
++-- every request for that key; pass null to sweep all keys.
++create or replace function reset_plan_credits(p_key_id uuid default null)
++returns integer
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++declare
++  v_rows integer;
++begin
++  update api_keys k
++     set plan_credits_remaining = p.monthly_credits,
++         -- The first monthly step that lands in the future, so one request
++         -- can never refill twice. (A 29th-31st reset day settles on the
++         -- last day of a shorter month.)
++         period_reset_at = coalesce((
++           select k.period_reset_at + make_interval(months => n)
++             from generate_series(1, 1200) as n
++            where k.period_reset_at + make_interval(months => n) > now()
++            order by n
++            limit 1), now() + interval '1 month')
++    from api_plans p
++   where p.id = k.plan_id
++     and k.period_reset_at <= now()
++     and (p_key_id is null or k.id = p_key_id);
++  get diagnostics v_rows = row_count;
++  return v_rows;
++end;
++$$;
++
++-- Takes p_cost credits, plan credits first, then top-up. The row lock makes
++-- two requests racing for the last credit run one after the other, so only
++-- one can win. Raises 'insufficient_credits' and takes nothing if short.
++create or replace function consume_credits(p_key_id uuid, p_cost integer)
++returns jsonb
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++declare
++  k           api_keys%rowtype;
++  v_from_plan integer;
++begin
++  if p_cost is null or p_cost < 0 then
++    raise exception 'invalid_cost';
++  end if;
++
++  select * into k from api_keys where id = p_key_id for update;
++  if not found then
++    raise exception 'key_not_found';
++  end if;
++  if k.status <> 'active' then
++    raise exception 'key_revoked';
++  end if;
++  if k.plan_credits_remaining + k.topup_credits_remaining < p_cost then
++    raise exception 'insufficient_credits';
++  end if;
++
++  v_from_plan := least(k.plan_credits_remaining, p_cost);
++  update api_keys
++     set plan_credits_remaining  = plan_credits_remaining - v_from_plan,
++         topup_credits_remaining = topup_credits_remaining - (p_cost - v_from_plan)
++   where id = p_key_id
++   returning * into k;
++
++  return jsonb_build_object(
++    'plan_credits_remaining',  k.plan_credits_remaining,
++    'topup_credits_remaining', k.topup_credits_remaining,
++    'credits_remaining',       k.plan_credits_remaining + k.topup_credits_remaining
++  );
++end;
++$$;
++
++-- Adds credits. kind 'topup' rolls over month to month; 'plan' is wiped at
++-- the next monthly reset. A repeated p_reference is ignored (granted: false).
++create or replace function grant_credits(
++  p_key_id    uuid,
++  p_amount    integer,
++  p_kind      text default 'topup',
++  p_reference text default null,
++  p_note      text default null
++)
++returns jsonb
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++declare
++  k         api_keys%rowtype;
++  v_granted boolean := true;
++begin
++  if p_amount is null or p_amount <= 0 then
++    raise exception 'amount must be greater than 0';
++  end if;
++  if p_kind is null or p_kind not in ('plan', 'topup') then
++    raise exception 'kind must be plan or topup';
++  end if;
++
++  select * into k from api_keys where id = p_key_id for update;
++  if not found then
++    raise exception 'key_not_found';
++  end if;
++
++  begin
++    insert into api_credit_grants (key_id, kind, amount, reference, note)
++    values (p_key_id, p_kind, p_amount, nullif(btrim(p_reference), ''), p_note);
++  exception when unique_violation then
++    v_granted := false;
++  end;
++
++  if v_granted then
++    update api_keys
++       set plan_credits_remaining  = plan_credits_remaining  + case when p_kind = 'plan'  then p_amount else 0 end,
++           topup_credits_remaining = topup_credits_remaining + case when p_kind = 'topup' then p_amount else 0 end
++     where id = p_key_id
++     returning * into k;
++  end if;
++
++  return jsonb_build_object(
++    'granted',                 v_granted,
++    'plan_credits_remaining',  k.plan_credits_remaining,
++    'topup_credits_remaining', k.topup_credits_remaining,
++    'credits_remaining',       k.plan_credits_remaining + k.topup_credits_remaining
++  );
++end;
++$$;
++
++-- One call per request: finds the key by its hash, starts a new month if
++-- due, and counts the request against the per-minute limit. Unknown and
++-- revoked keys are counted per IP instead. Each count is one atomic
++-- upsert, so it holds across Edge Function instances.
++-- status: ok | invalid | revoked | ip_rate_limited | rate_limited
++create or replace function api_authorize(p_key_hash text, p_ip_hash text)
++returns jsonb
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++declare
++  -- Unknown- or revoked-key attempts allowed per IP per minute.
++  c_ip_limit constant integer := 10;
++  k          api_keys%rowtype;
++  p          api_plans%rowtype;
++  v_window   timestamptz := date_trunc('minute', now());
++  v_retry    integer := greatest(1, ceil(extract(epoch from (v_window + interval '1 minute' - now())))::integer);
++  v_count    integer;
++begin
++  select * into k from api_keys where key_hash = p_key_hash;
++
++  -- Unknown and revoked keys share the per-IP counter: neither has a plan
++  -- limit, and neither may hammer the API (or its log) for free.
++  if not found or k.status <> 'active' then
++    insert into api_ip_rate_windows as r (ip_hash, window_start, count)
++    values (coalesce(nullif(p_ip_hash, ''), 'unknown'), v_window, 1)
++    on conflict (ip_hash, window_start) do update set count = r.count + 1
++    returning r.count into v_count;
++    delete from api_ip_rate_windows where window_start < now() - interval '1 hour';
++    return jsonb_build_object(
++      'status',         case when v_count > c_ip_limit then 'ip_rate_limited'
++                             when k.id is null then 'invalid'
++                             else 'revoked' end,
++      'key_id',         k.id,
++      'rate_limit',     c_ip_limit,
++      'rate_remaining', greatest(c_ip_limit - v_count, 0),
++      'retry_after',    v_retry
++    );
++  end if;
++
++  if k.period_reset_at <= now() then
++    perform reset_plan_credits(k.id);
++    select * into k from api_keys where id = k.id;
++  end if;
++  select * into p from api_plans where id = k.plan_id;
++
++  insert into api_rate_windows as r (key_id, window_start, count)
++  values (k.id, v_window, 1)
++  on conflict (key_id, window_start) do update set count = r.count + 1
++  returning r.count into v_count;
++  delete from api_rate_windows where key_id = k.id and window_start < now() - interval '1 hour';
++
++  update api_keys set last_used_at = now() where id = k.id;
++
++  return jsonb_build_object(
++    'status',                  case when v_count > p.rate_limit_per_minute then 'rate_limited' else 'ok' end,
++    'key_id',                  k.id,
++    'key_prefix',              k.key_prefix,
++    'plan_id',                 p.id,
++    'plan_name',               p.name,
++    'monthly_credits',         p.monthly_credits,
++    'rate_limit',              p.rate_limit_per_minute,
++    'rate_remaining',          greatest(p.rate_limit_per_minute - v_count, 0),
++    'retry_after',             v_retry,
++    'plan_credits_remaining',  k.plan_credits_remaining,
++    'topup_credits_remaining', k.topup_credits_remaining,
++    'credits_remaining',       k.plan_credits_remaining + k.topup_credits_remaining,
++    'period_reset_at',         k.period_reset_at,
++    'costs',                   (select coalesce(jsonb_object_agg(endpoint_pattern, credits), '{}'::jsonb)
++                                  from api_credit_costs)
++  );
++end;
++$$;
++
++-- Places within p_radius_m metres, nearest first (haversine; PostGIS is
++-- not installed and the table is small).
++create or replace function api_places_nearby(
++  p_lat      double precision,
++  p_lng      double precision,
++  p_radius_m integer,
++  p_type     text default null,
++  p_limit    integer default 20
++)
++returns table (
++  id text, name text, description text, type text, area text,
++  lat numeric, lng numeric, rating numeric, review_count integer,
++  image_count integer, distance_m double precision
++)
++language sql stable security definer set search_path = public, pg_temp
++as $$
++  select * from (
++    select
++      p.id, p.name, p.description, p.type, p.area,
++      p.lat, p.lng, p.rating, p.review_count, p.image_count,
++      2 * 6371000 * asin(least(1, sqrt(
++        power(sin(radians(p.lat::double precision - p_lat) / 2), 2) +
++        cos(radians(p_lat)) * cos(radians(p.lat::double precision)) *
++        power(sin(radians(p.lng::double precision - p_lng) / 2), 2)
++      ))) as distance_m
++    from api_public_places p
++    where p_type is null or p.type = p_type
++  ) d
++  where d.distance_m <= p_radius_m
++  order by d.distance_m, d.id
++  limit least(greatest(coalesce(p_limit, 20), 1), 50);
++$$;
++
++-- ── 5. Admin helpers (run from the SQL Editor; see docs/public-api.md) ────
++
++-- Creates a key and returns it ONCE. Only its hash is saved, so copy the
++-- api_key value from the result straight away.
++--   select * from api_create_key('Acme Delivery', 'dev@acme.com', 'starter');
++create or replace function api_create_key(
++  p_owner_name  text,
++  p_owner_email text,
++  p_plan_id     text default 'free'
++)
++returns table (api_key text, key_id uuid, key_prefix text, plan_id text, credits integer)
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++declare
++  v_plan api_plans%rowtype;
++  -- 48 random hex chars cut from two v4 UUIDs (about 180 random bits).
++  v_key  text := 'fk_live_' || substr(
++    replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''), 9, 48);
++  v_id   uuid;
++begin
++  if coalesce(btrim(p_owner_name), '') = '' or coalesce(btrim(p_owner_email), '') = '' then
++    raise exception 'owner name and email are required';
++  end if;
++  select * into v_plan from api_plans p where p.id = p_plan_id and p.active;
++  if not found then
++    raise exception 'unknown or inactive plan: %', p_plan_id;
++  end if;
++
++  insert into api_keys (owner_name, owner_email, key_prefix, key_hash, plan_id, plan_credits_remaining)
++  values (
++    btrim(p_owner_name),
++    lower(btrim(p_owner_email)),
++    substr(v_key, 1, 12),
++    encode(sha256(convert_to(v_key, 'UTF8')), 'hex'),
++    v_plan.id,
++    v_plan.monthly_credits
++  )
++  returning id into v_id;
++
++  return query select v_key, v_id, substr(v_key, 1, 12), v_plan.id, v_plan.monthly_credits;
++end;
++$$;
++
++--   select api_revoke_key('<key id>');
++create or replace function api_revoke_key(p_key_id uuid)
++returns text
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++begin
++  update api_keys set status = 'revoked' where id = p_key_id;
++  if not found then
++    raise exception 'key_not_found';
++  end if;
++  return 'revoked';
++end;
++$$;
++
++-- Moves a key to another plan. With p_refill (default) the key gets the new
++-- plan's full allowance now and a fresh month; top-up credits are kept.
++--   select api_set_plan('<key id>', 'growth');
++create or replace function api_set_plan(p_key_id uuid, p_plan_id text, p_refill boolean default true)
++returns jsonb
++language plpgsql security definer set search_path = public, pg_temp
++as $$
++declare
++  v_plan api_plans%rowtype;
++  k      api_keys%rowtype;
++begin
++  select * into v_plan from api_plans p where p.id = p_plan_id;
++  if not found then
++    raise exception 'unknown plan: %', p_plan_id;
++  end if;
++
++  update api_keys
++     set plan_id                = v_plan.id,
++         plan_credits_remaining = case when p_refill then v_plan.monthly_credits else plan_credits_remaining end,
++         period_reset_at        = case when p_refill then now() + interval '1 month' else period_reset_at end
++   where id = p_key_id
++   returning * into k;
++  if not found then
++    raise exception 'key_not_found';
++  end if;
++
++  return jsonb_build_object(
++    'plan_id',                 k.plan_id,
++    'plan_credits_remaining',  k.plan_credits_remaining,
++    'topup_credits_remaining', k.topup_credits_remaining,
++    'period_reset_at',         k.period_reset_at
++  );
++end;
++$$;
++
++-- ── 6. Permissions: service role only ────────────────────────────────────
++-- Supabase gives anon/authenticated access to new public objects by
++-- default. Take it back, so the browser's anon key can reach none of this.
++
++revoke all on
++  api_plans, api_keys, api_usage, api_credit_costs, api_rate_windows,
++  api_ip_rate_windows, api_credit_grants,
++  api_public_places, api_public_place_images, api_public_categories
++from public, anon, authenticated;
++
++grant select, insert, update, delete on
++  api_plans, api_keys, api_usage, api_credit_costs, api_rate_windows,
++  api_ip_rate_windows, api_credit_grants
++to service_role;
++
++grant select on api_public_places, api_public_place_images, api_public_categories to service_role;
++
++revoke all on sequence api_usage_id_seq, api_credit_grants_id_seq from public, anon, authenticated;
++grant usage, select on sequence api_usage_id_seq, api_credit_grants_id_seq to service_role;
++
++revoke all on function reset_plan_credits(uuid)                                    from public, anon, authenticated;
++revoke all on function consume_credits(uuid, integer)                              from public, anon, authenticated;
++revoke all on function grant_credits(uuid, integer, text, text, text)              from public, anon, authenticated;
++revoke all on function api_authorize(text, text)                                   from public, anon, authenticated;
++revoke all on function api_places_nearby(double precision, double precision, integer, text, integer)
++                                                                                   from public, anon, authenticated;
++revoke all on function api_create_key(text, text, text)                            from public, anon, authenticated;
++revoke all on function api_revoke_key(uuid)                                        from public, anon, authenticated;
++revoke all on function api_set_plan(uuid, text, boolean)                           from public, anon, authenticated;
++
++grant execute on function reset_plan_credits(uuid)                                 to service_role;
++grant execute on function consume_credits(uuid, integer)                           to service_role;
++grant execute on function grant_credits(uuid, integer, text, text, text)           to service_role;
++grant execute on function api_authorize(text, text)                                to service_role;
++grant execute on function api_places_nearby(double precision, double precision, integer, text, integer)
++                                                                                   to service_role;
++grant execute on function api_create_key(text, text, text)                         to service_role;
++grant execute on function api_revoke_key(uuid)                                     to service_role;
++grant execute on function api_set_plan(uuid, text, boolean)                        to service_role;
++
++-- Let the API see the new objects straight away.
++notify pgrst, 'reload schema';
++
++-- ── 7. Verification ──────────────────────────────────────────────────────
++-- 1. RLS on, no policies (expect 7 rows, all true / 0):
++--      select c.relname, c.relrowsecurity,
++--             (select count(*) from pg_policies p where p.tablename = c.relname) as policies
++--        from pg_class c where c.relname like 'api\_%' and c.relkind = 'r';
++-- 2. The anon key can reach nothing (expect 0 rows):
++--      select table_name, grantee, privilege_type from information_schema.role_table_grants
++--       where table_name like 'api\_%' and grantee in ('anon', 'authenticated', 'PUBLIC');
++-- 3. Only public columns (expect id, name, description, type, area, lat,
++--    lng, rating, review_count, image_count, search_text):
++--      select column_name from information_schema.columns where table_name = 'api_public_places';
++-- 4. Places exposed (about 648):  select count(*) from api_public_places;
+diff --git a/vercel.json b/vercel.json
+index 549efbc..81c47ba 100644
+--- a/vercel.json
++++ b/vercel.json
+@@ -8,6 +8,10 @@
+     }
+   ],
+   "rewrites": [
++    {
++      "source": "/api/v1/:path*",
++      "destination": "https://vzjlarvtssybglwzfrhi.supabase.co/functions/v1/public-api/v1/:path*"
++    },
+     { "source": "/", "destination": "/index.html" },
+     { "source": "/((?!assets/).*)", "destination": "/app.html" }
+   ],

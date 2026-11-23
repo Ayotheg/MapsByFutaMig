@@ -1,0 +1,54 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npm test)",
+      "Bash(npx --no-install oxlint *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr status*)"
+    ],
+    "ask": [
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__deploy_edge_function",
+      "Bash(git push*)"
+    ],
+    "deny": [
+      "Edit(.env*)",
+      "Write(.env*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/design-check.mjs\"" },
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/lint-file.mjs\"" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*[Ss]upabase.*__execute_sql",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-sql.mjs\"" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/test-on-stop.mjs\"" }
+        ]
+      }
+    ]
+  }
+}

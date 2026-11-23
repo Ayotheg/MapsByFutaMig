@@ -1,0 +1,129 @@
+.page {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--v2-hud-upnext-bg, #f2f3ff);
+  font-family: var(--font-ui);
+}
+
+.card {
+  width: min(440px, 100%);
+  background: #fff;
+  border: 1px solid var(--v2-divider);
+  border-radius: 28px;
+  padding: 36px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 24px 60px -24px rgba(15, 23, 42, 0.18);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+.brandName {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+
+.title {
+  margin: 6px 0 0;
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+.field input {
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--v2-divider);
+  background: var(--v2-hud-upnext-bg, #f2f3ff);
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 400;
+  /* 16px stops iPad Safari zooming the page on focus */
+  font-size: 16px;
+  color: var(--v2-neutral);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.field input:focus-visible {
+  background: #fff;
+  border-color: var(--v2-primary);
+  box-shadow: 0 0 0 3px var(--v2-primary-glow);
+}
+
+.submit {
+  margin-top: 6px;
+  height: 56px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--v2-neutral);
+  color: var(--v2-on-neutral);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.14px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.submit:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.submit:active:not(:disabled) {
+  transform: scale(0.99);
+}
+.submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.submit:focus-visible {
+  outline: 3px solid var(--v2-primary-glow-strong);
+  outline-offset: 2px;
+}
+
+.error {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--v2-error-tint);
+  border: 1px solid rgba(186, 26, 26, 0.25);
+  color: var(--v2-error-text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.status {
+  margin: 0;
+  font-size: 15px;
+  color: var(--v2-text-muted);
+}
+.help {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--v2-text);
+}

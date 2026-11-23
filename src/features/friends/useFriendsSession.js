@@ -1,0 +1,1206 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import { subscribeGps, getLastFix } from '../navigation/gpsWatch';
+import { readPersistentState, writePersistentState, removePersistentState } from '../../lib/persistentState';
+import { displayName } from '../auth/useAuth';
+import { track } from '../../lib/analytics';
+import {
+  CAPACITY,
+  COUNTDOWN_MS,
+  DROP_AFTER_MS,
+  HOST_GONE_LOBBY_MS,
+  HOST_GONE_MS,
+  LOBBY_TTL_MS,
+  RACE_FINISH_M,
+  RACE_LIMIT_MS,
+  SEND_EVERY_MS,
+  TYPING_THROTTLE_MS,
+  TYPING_TTL_MS,
+  admitLateJoiner,
+  appendChatMessage,
+  canLateJoin,
+  createCode,
+  createGuestId,
+  distanceM,
+  meetArrivedCheck,
+  nextHost,
+  normalizeIncomingChat,
+  normalizeIncomingPos,
+  normalizeIncomingTyping,
+  raceDone,
+  roomOccupancy,
+  sanitizeChatText,
+  sanitizeUsername,
+} from './friendsSession';
+
+const STORE_KEY = 'friends-session';
+const GUEST_ID_KEY = 'friends-guest-id';
+const GUEST_NAME_KEY = 'friends-guest-name';
+// Codes aren't stored anywhere: an invite is only answered by the host's
+// phone, which pauses while they're in another app (sharing the code, say).
+// So keep asking, and only after this long say we can't reach them. A late
+// answer still opens the invite.
+const PEEK_TIMEOUT_MS = 60 * 1000;
+const PEEK_ASK_EVERY_MS = 3000;
+const JOIN_ASK_EVERY_MS = 2000;
+// A channel the server closed is reopened after this.
+const RECONNECT_AFTER_MS = 3000;
+// A finished meetup closes on its own after this.
+const MEET_CLOSE_AFTER_MS = 60 * 1000;
+
+// supabase.channel() hands back an existing channel with the same topic,
+// and removeChannel() only finishes once the server confirms. Opening the
+// same topic again before then would get the dying channel, which never
+// subscribes. So a reopen waits for the previous close.
+const closing = new Map();
+function openChannel(topic, config, setup) {
+  let cancelled = false;
+  let channel = null;
+  (closing.get(topic) || Promise.resolve()).then(() => {
+    if (cancelled) return;
+    channel = supabase.channel(topic, { config });
+    setup(channel);
+  });
+  return () => {
+    cancelled = true;
+    if (!channel) return;
+    const done = supabase.removeChannel(channel).catch(() => {});
+    closing.set(topic, done);
+    done.finally(() => {
+      if (closing.get(topic) === done) closing.delete(topic);
+    });
+  };
+}
+
+const union = (list, ids) => Array.from(new Set([...(list || []), ...ids]));
+function sanitizeNames(map) {
+  if (!map || typeof map !== 'object') return {};
+  const out = {};
+  Object.entries(map).forEach(([k, v]) => {
+    if (!k) return;
+    const clean = sanitizeUsername(v);
+    if (clean) out[String(k)] = clean;
+  });
+  return out;
+}
+
+/**
+ * One "Meet me" or "Race to a place" session over a Supabase Realtime
+ * channel (`friends:<code>`). Nothing is written to the database: presence
+ * says who's in, broadcasts carry positions and the race events.
+ *
+ * One phone referees (`session.hostId`): it times every finish on its own
+ * clock and sends the order out, so a phone with a wrong clock can't win.
+ * In a race the role passes on: a leaving host hands it to the next player,
+ * and if the host just vanishes the next player takes it after
+ * HOST_GONE_MS (longer in the lobby, where the host is likely just away
+ * sharing the code). `hostTerm` counts handovers, so a returning old host's
+ * stale messages are ignored and it steps down. A race shares only each
+ * player's distance to the finish; a meetup shares coordinates.
+ *
+ * `session.phase`: 'invite' (looking at a link, not joined yet), 'lobby',
+ * 'countdown', 'live', 'ended'. `peek`: what the invite screen knows
+ * ('loading' | 'ready' | 'closed' | 'unreachable' | 'full').
+ */
+export function useFriendsSession(user) {
+  const [guestId] = useState(() => {
+    const saved = readPersistentState(GUEST_ID_KEY, null);
+    if (saved) return saved;
+    const fresh = createGuestId();
+    writePersistentState(GUEST_ID_KEY, fresh);
+    return fresh;
+  });
+  const [guestName, setGuestNameState] = useState(() => sanitizeUsername(readPersistentState(GUEST_NAME_KEY, '')) || '');
+
+  const [session, setSessionState] = useState(() => readPersistentState(STORE_KEY, null));
+  const sessionRef = useRef(session);
+  const setSession = useCallback((next) => {
+    const value = typeof next === 'function' ? next(sessionRef.current) : next;
+    sessionRef.current = value;
+    setSessionState(value);
+    if (value) writePersistentState(STORE_KEY, value);
+    else removePersistentState(STORE_KEY);
+  }, []);
+  const patch = useCallback((fields) => setSession((s) => (s ? { ...s, ...fields } : s)), [setSession]);
+
+  const [members, setMembers] = useState([]);
+  const membersRef = useRef(members);
+  membersRef.current = members;
+  const [progress, setProgress] = useState({});
+  const [messages, setMessages] = useState([]);
+  const [typingBy, setTypingBy] = useState({});
+  const lastTypingSentRef = useRef({ active: false, at: 0 });
+  const [peek, setPeek] = useState('loading');
+  const [joining, setJoining] = useState(false);
+  const pendingJoinRef = useRef(null);
+  const [connected, setConnected] = useState(false);
+  // Has this session's channel ever been up ("Connecting…" vs "Reconnecting…").
+  const [everConnected, setEverConnected] = useState(false);
+  const connectedRef = useRef(false);
+  connectedRef.current = connected;
+  const [reopenKey, setReopenKey] = useState(0);
+  const channelRef = useRef(null);
+  // Asks the host for the invite's details, once a channel is up.
+  const askHostRef = useRef(null);
+  // My latest position, sent as soon as a connection is (back) up.
+  const lastPosRef = useRef(null);
+  // Pin participantId once joined so auth.loading on reload or signing in mid-session
+  // never changes identity and kicks the user out of an active meetup/race.
+  const myId = session?.participantId || user?.id || guestId;
+  const accountName = user ? displayName(user) : '';
+  const myName = guestName || accountName;
+  const myIdRef = useRef(myId);
+  myIdRef.current = myId;
+  const myNameRef = useRef(myName);
+  myNameRef.current = myName;
+
+  const setUsername = useCallback(
+    (raw) => {
+      const clean = sanitizeUsername(raw) || '';
+      if (accountName && clean === accountName) {
+        setGuestNameState('');
+        myNameRef.current = accountName;
+        removePersistentState(GUEST_NAME_KEY);
+        return accountName;
+      }
+      setGuestNameState(clean);
+      myNameRef.current = clean || accountName;
+      if (clean) writePersistentState(GUEST_NAME_KEY, clean);
+      else removePersistentState(GUEST_NAME_KEY);
+      return myNameRef.current;
+    },
+    [accountName]
+  );
+
+  const code = session?.code || null;
+  const joined = !!session?.joined;
+  const isHost = !!myId && session?.hostId === myId;
+  const phase = session?.phase;
+  const mode = session?.mode;
+
+  const amHost = useCallback(() => {
+    const s = sessionRef.current;
+    return !!s && !!myIdRef.current && s.hostId === myIdRef.current;
+  }, []);
+  const send = useCallback((event, payload) => {
+    channelRef.current?.send({ type: 'broadcast', event, payload });
+  }, []);
+  const presentIds = useCallback(() => new Set(membersRef.current.map((m) => m.id)), []);
+  const clearPendingJoin = useCallback(() => {
+    pendingJoinRef.current = null;
+    setJoining(false);
+  }, []);
+  const requestLiveJoin = useCallback(
+    (id, name) => {
+      if (!id) return;
+      pendingJoinRef.current = { id, name };
+      setJoining(true);
+      if (connectedRef.current) send('join-live', { id, name });
+    },
+    [send]
+  );
+
+  // ── Host: the state a newcomer or a reconnecting phone needs ──────────
+  const stateFor = useCallback(() => {
+    const s = sessionRef.current;
+    const now = Date.now();
+    const lj = s.lastJoined;
+    return {
+      mode: s.mode,
+      phase: s.phase,
+      place: s.place || null,
+      hostId: s.hostId,
+      hostName: s.hostName,
+      hostTerm: s.hostTerm || 0,
+      createdAt: s.createdAt,
+      roster: s.roster || null,
+      names: s.names || {},
+      finishers: s.finishers || [],
+      dropped: s.dropped || [],
+      handover: s.handover || null,
+      endReason: s.endReason || null,
+      elapsedMs: s.goAt ? now - s.goAt : null,
+      count: roomOccupancy(s, membersRef.current.length),
+      lastJoined: lj?.id && now - lj.at < 10000 ? { id: lj.id, name: lj.name, seq: lj.seq, agoMs: now - lj.at } : null,
+    };
+  }, []);
+
+  const endSession = useCallback(
+    (reason, by = null) => {
+      const s = sessionRef.current;
+      if (!s || s.phase === 'ended') return;
+      patch({ phase: 'ended', endReason: reason, endedBy: by, endedAt: Date.now() });
+      send('end', { reason, by, finishers: s.finishers || [], dropped: s.dropped || [], names: s.names || {}, hostTerm: s.hostTerm || 0 });
+      track('friends_ended', { mode: s.mode, reason, finishers: (s.finishers || []).length });
+    },
+    [patch, send]
+  );
+
+  // Host: publish the standings/dropped list, ending a race when everyone is
+  // done or a group meetup when fewer than two people remain.
+  const publishStandings = useCallback(
+    (finishers, dropped, lastDroppedId = null) => {
+      const s = sessionRef.current;
+      patch({ finishers, dropped });
+      send('standings', { finishers, dropped, hostTerm: s.hostTerm || 0 });
+      if (s.phase === 'live') {
+        if (s.mode === 'race' && raceDone(s.roster, finishers, dropped)) endSession('done');
+        else if (s.mode === 'meet') {
+          const active = (s.roster || []).filter((id) => !dropped.includes(id));
+          if (active.length < 2) endSession('left', lastDroppedId ? s.names?.[lastDroppedId] || null : null);
+        }
+      }
+    },
+    [patch, send, endSession]
+  );
+
+  const recordFinish = useCallback(
+    (id) => {
+      const s = sessionRef.current;
+      if (!s || s.phase !== 'live' || !s.goAt) return;
+      if ((s.finishers || []).some((f) => f.id === id)) return;
+      if (s.roster && !s.roster.includes(id)) return;
+      // Someone dropped for being offline who comes back and finishes counts.
+      const finishers = [...(s.finishers || []), { id, ms: Date.now() - s.goAt }];
+      publishStandings(finishers, (s.dropped || []).filter((x) => x !== id));
+    },
+    [publishStandings]
+  );
+
+  const dropPlayers = useCallback(
+    (ids) => {
+      const s = sessionRef.current;
+      if (!s || (s.phase !== 'live' && s.phase !== 'countdown')) return;
+      if (s.mode !== 'race' && s.mode !== 'meet') return;
+      const fresh = ids.filter(
+        (id) =>
+          (!s.roster || s.roster.includes(id)) &&
+          !(s.finishers || []).some((f) => f.id === id) &&
+          !(s.dropped || []).includes(id)
+      );
+      if (!fresh.length) return;
+      publishStandings(s.finishers || [], union(s.dropped, fresh), fresh[fresh.length - 1]);
+    },
+    [publishStandings]
+  );
+
+  // A racer who reached the finish while the host was away tells it again.
+  const resendArrival = useCallback(() => {
+    const s = sessionRef.current;
+    const me = myIdRef.current;
+    if (!s?.arrivedAt || s.mode !== 'race' || s.phase !== 'live' || amHost()) return;
+    if ((s.finishers || []).some((f) => f.id === me)) return;
+    send('arrived', { id: me });
+  }, [amHost, send]);
+
+  // A guest takes in the host's state: the invite's details, or (rejoining
+  // after a reload, or a new host taking over) wherever the session is now.
+  const applyState = useCallback(
+    (payload) => {
+      const s = sessionRef.current;
+      if (!s) return;
+      const me = myIdRef.current;
+      const term = payload.hostTerm || 0;
+      const mine = s.hostTerm || 0;
+      if (term < mine || (term === mine && amHost() && payload.hostId !== me && payload.hostId > me)) {
+        // A stale host (or a tie we win): remind it who referees now.
+        if (amHost()) send('state', stateFor());
+        return;
+      }
+      const fields = {
+        mode: payload.mode,
+        hostPhase: payload.phase,
+        place: payload.place,
+        hostId: payload.hostId,
+        hostName: sanitizeUsername(payload.hostName) || 'Friend',
+        hostTerm: term,
+        createdAt: payload.createdAt,
+        roster: payload.roster,
+        names: { ...(s.names || {}), ...sanitizeNames(payload.names) },
+        finishers: payload.finishers,
+        dropped: payload.dropped || [],
+        handover: payload.handover || s.handover || null,
+        endReason: payload.endReason,
+        playerCount: payload.count ?? null,
+      };
+      if (payload.elapsedMs != null) fields.goAt = Date.now() - payload.elapsedMs;
+      if (payload.lastJoined?.id && (payload.lastJoined.agoMs ?? 0) < 10000) {
+        const sameLast = s.lastJoined?.seq === payload.lastJoined.seq && s.lastJoined?.id === payload.lastJoined.id;
+        fields.lastJoined = sameLast
+          ? s.lastJoined
+          : {
+              id: payload.lastJoined.id,
+              name: sanitizeUsername(payload.lastJoined.name) || 'Friend',
+              seq: payload.lastJoined.seq || 1,
+              at: Date.now() - Math.max(0, payload.lastJoined.agoMs || 0),
+            };
+      }
+      const isLive = payload.phase === 'live' || payload.phase === 'countdown';
+      const activeInRoster = Boolean(
+        !payload.roster || (payload.roster.includes(me) && !(payload.mode === 'meet' && (payload.dropped || []).includes(me)))
+      );
+      let shouldRequestLiveJoin = null;
+      if (s.joined || pendingJoinRef.current) {
+        if (payload.phase === 'ended') {
+          clearPendingJoin();
+          if (s.joined) fields.phase = 'ended';
+          else setPeek('closed');
+        } else if (isLive) {
+          if (activeInRoster) {
+            clearPendingJoin();
+            fields.joined = true;
+            fields.joinedAt = s.joinedAt || Date.now();
+            fields.phase = payload.elapsedMs != null && payload.elapsedMs < 0 ? 'countdown' : 'live';
+          } else if (canLateJoin(payload, me)) {
+            if (!pendingJoinRef.current) {
+              // Joined a moment too late or re-entering a meet with room: auto-request live admission.
+              fields.joined = false;
+              fields.phase = 'invite';
+              setPeek('ready');
+              shouldRequestLiveJoin = myNameRef.current || s.names?.[me] || 'Friend';
+            }
+          } else {
+            clearPendingJoin();
+            fields.joined = false;
+            fields.phase = 'invite';
+            setPeek('full');
+          }
+        } else if (s.joined) {
+          fields.phase = payload.phase;
+        } else if (pendingJoinRef.current) {
+          clearPendingJoin();
+          fields.joined = true;
+          fields.phase = payload.phase;
+        }
+      } else if (payload.phase === 'ended') setPeek('closed');
+      else if (isLive) setPeek(canLateJoin(payload, me) ? 'ready' : 'full');
+      else setPeek((payload.count ?? 0) >= CAPACITY[payload.mode] ? 'full' : 'ready');
+      patch(fields);
+      if (shouldRequestLiveJoin) requestLiveJoin(me, shouldRequestLiveJoin);
+      resendArrival();
+    },
+    [amHost, patch, send, stateFor, resendArrival, clearPendingJoin, requestLiveJoin]
+  );
+
+  // Take over refereeing (the host left or vanished). Everyone is told,
+  // and the old host, if it was racing, counts as out unless it comes back.
+  const becomeHost = useCallback(
+    (fromId) => {
+      const s = sessionRef.current;
+      const me = myIdRef.current;
+      const term = (s.hostTerm || 0) + 1;
+      const racing = s.phase === 'live' || s.phase === 'countdown';
+      const finished = (s.finishers || []).some((f) => f.id === fromId);
+      const dropped = racing && fromId && !finished ? union(s.dropped, [fromId]) : s.dropped || [];
+      const handover = { from: s.names?.[fromId] || s.hostName, to: myNameRef.current, at: Date.now() };
+      patch({ hostId: me, hostName: myNameRef.current, hostTerm: term, dropped, handover });
+      send('handover', { hostId: me, hostName: myNameRef.current, hostTerm: term, from: handover.from, dropped });
+      send('state', stateFor());
+      track('friends_handover', { reason: 'host_gone' });
+      if (s.phase === 'live') {
+        if (s.mode === 'race' && raceDone(s.roster, s.finishers, dropped)) endSession('done');
+        else if (s.mode === 'meet') {
+          const active = (s.roster || []).filter((id) => !dropped.includes(id));
+          if (active.length < 2) endSession('host-left');
+        }
+      }
+    },
+    [patch, send, stateFor, endSession]
+  );
+
+  // ── The channel ─────────────────────────────────────────────────────
+  // One per code (and per participant, the presence key). Joining or
+  // leaving the lobby only tracks/untracks presence on it — see below.
+  useEffect(() => {
+    if (!code) return undefined;
+    const key = myId || `peek-${Math.random().toString(36).slice(2)}`;
+    let retry = null;
+    const close = openChannel(
+      `friends:${code}`,
+      { broadcast: { self: false }, presence: { key } },
+      (channel) => {
+        channelRef.current = channel;
+
+        channel.on('presence', { event: 'sync' }, () => {
+          const list = Object.values(channel.presenceState())
+            .map((entries) => entries[0])
+            .filter((m) => m?.id)
+            .map((m) => ({ ...m, name: sanitizeUsername(m.name) || 'Friend' }))
+            .sort((a, b) => a.joinedAt - b.joinedAt);
+          setMembers(list);
+          const s = sessionRef.current;
+          if (s && list.length) {
+            const names = { ...(s.names || {}) };
+            let changed = false;
+            list.forEach((m) => {
+              if (names[m.id] !== m.name) {
+                names[m.id] = m.name;
+                changed = true;
+              }
+            });
+            if (changed) patch({ names });
+          }
+        });
+        channel.on('presence', { event: 'join' }, ({ key: joinedKey }) => {
+          if (amHost()) send('state', stateFor());
+          const s = sessionRef.current;
+          if (joinedKey !== myIdRef.current && s?.joined && (s.phase === 'live' || s.phase === 'countdown') && lastPosRef.current) {
+            send('pos', lastPosRef.current);
+          }
+        });
+
+        channel.on('broadcast', { event: 'hello' }, () => {
+          if (amHost()) send('state', stateFor());
+        });
+
+        channel.on('broadcast', { event: 'state' }, ({ payload }) => applyState(payload));
+
+        channel.on('broadcast', { event: 'join-live' }, ({ payload }) => {
+          if (!amHost() || !payload?.id) return;
+          const res = admitLateJoiner(sessionRef.current, payload.id, payload.name);
+          if (res.accepted) {
+            delete absentSinceRef.current[payload.id];
+            const s = sessionRef.current;
+            const isNew = !(s.roster || []).includes(payload.id) || (s.dropped || []).includes(payload.id);
+            patch({
+              roster: res.roster,
+              names: res.names,
+              dropped: res.dropped,
+              ...(isNew
+                ? { lastJoined: { id: payload.id, name: res.name, seq: (s.lastJoined?.seq || 0) + 1, at: Date.now() } }
+                : {}),
+            });
+            send('state', stateFor());
+            if (lastPosRef.current) send('pos', lastPosRef.current);
+          } else {
+            if (res.reason === 'full' || res.reason === 'closed') {
+              send('join-denied', { id: payload.id, reason: res.reason, hostTerm: sessionRef.current?.hostTerm || 0 });
+            }
+            send('state', stateFor());
+          }
+        });
+
+        channel.on('broadcast', { event: 'join-denied' }, ({ payload }) => {
+          if (!payload || payload.id !== myIdRef.current) return;
+          if ((payload.hostTerm || 0) < (sessionRef.current?.hostTerm || 0)) return;
+          clearPendingJoin();
+          patch({ joined: false, phase: 'invite' });
+          setPeek(payload.reason === 'closed' ? 'closed' : 'full');
+        });
+
+        channel.on('broadcast', { event: 'start' }, ({ payload }) => {
+          const s = sessionRef.current;
+          if (!s) return;
+          const me = myIdRef.current;
+          const now = Date.now();
+          const nextPhase = payload.mode === 'race' ? 'countdown' : 'live';
+          const nextMeta = {
+            mode: payload.mode,
+            hostPhase: nextPhase,
+            roster: payload.roster,
+            names: { ...(s.names || {}), ...sanitizeNames(payload.names) },
+            finishers: [],
+            dropped: [],
+            handover: null,
+            playerCount: payload.roster?.length ?? null,
+          };
+          if (!s.joined || (payload.roster && !payload.roster.includes(me))) {
+            const roomOpen = canLateJoin({ mode: payload.mode, phase: nextPhase, roster: payload.roster, dropped: [] }, me);
+            if (s.joined) {
+              patch({ ...nextMeta, joined: false, phase: 'invite' });
+              if (roomOpen) {
+                setPeek('ready');
+                requestLiveJoin(me, myNameRef.current || s.names?.[me] || 'Friend');
+              } else {
+                clearPendingJoin();
+                setPeek('full');
+              }
+            } else {
+              patch(nextMeta);
+              setPeek(roomOpen ? 'ready' : 'full');
+            }
+            return;
+          }
+          const goAt = payload.mode === 'race' ? now + payload.countdownMs : now;
+          patch({ ...nextMeta, phase: nextPhase, goAt });
+        });
+
+        channel.on('broadcast', { event: 'pos' }, ({ payload }) => {
+          const pos = normalizeIncomingPos(payload, sessionRef.current, presentIds());
+          if (!pos) return;
+          setProgress((p) => ({ ...p, [pos.id]: pos }));
+        });
+
+        channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
+          const msg = normalizeIncomingChat(payload, sessionRef.current, myIdRef.current, presentIds());
+          if (!msg) return;
+          setMessages((prev) => appendChatMessage(prev, msg));
+          setTypingBy((prev) => {
+            if (!prev[msg.senderId]) return prev;
+            const next = { ...prev };
+            delete next[msg.senderId];
+            return next;
+          });
+        });
+
+        channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
+          const ev = normalizeIncomingTyping(payload, sessionRef.current, myIdRef.current, presentIds());
+          if (!ev) return;
+          if (ev.active) {
+            setTypingBy((prev) => ({ ...prev, [ev.id]: { id: ev.id, name: ev.name, at: ev.at } }));
+          } else {
+            setTypingBy((prev) => {
+              if (!prev[ev.id]) return prev;
+              const next = { ...prev };
+              delete next[ev.id];
+              return next;
+            });
+          }
+        });
+
+        channel.on('broadcast', { event: 'arrived' }, ({ payload }) => {
+          if (amHost() && payload?.id) recordFinish(payload.id);
+        });
+
+        // A participant tapped Leave.
+        channel.on('broadcast', { event: 'left' }, ({ payload }) => {
+          if (amHost() && payload?.id && payload.id !== myIdRef.current) dropPlayers([payload.id]);
+        });
+
+        channel.on('broadcast', { event: 'standings' }, ({ payload }) => {
+          const s = sessionRef.current;
+          if (!s || amHost() || (payload.hostTerm || 0) < (s.hostTerm || 0)) return;
+          const finishers = payload.finishers || [];
+          const dropped = payload.dropped || [];
+          patch({ finishers, dropped });
+          if (!s.joined && s.mode === 'meet' && (s.hostPhase === 'live' || s.hostPhase === 'countdown')) {
+            setPeek(canLateJoin({ ...s, phase: s.hostPhase, finishers, dropped }, myIdRef.current) ? 'ready' : 'full');
+          }
+          resendArrival();
+        });
+
+        channel.on('broadcast', { event: 'handover' }, ({ payload }) => {
+          const s = sessionRef.current;
+          if (!s || (payload.hostTerm || 0) <= (s.hostTerm || 0)) return;
+          const nextHostName = sanitizeUsername(payload.hostName) || 'Player';
+          const fromName = sanitizeUsername(payload.from) || 'Player';
+          patch({
+            hostId: payload.hostId,
+            hostName: nextHostName,
+            hostTerm: payload.hostTerm,
+            dropped: payload.dropped ?? s.dropped ?? [],
+            handover: { from: fromName, to: nextHostName, at: Date.now() },
+          });
+          if (!amHost()) {
+            resendArrival();
+            return;
+          }
+          // It's us now: bring everyone up to date and pick up the timers.
+          send('state', stateFor());
+          const now = sessionRef.current;
+          if (now.phase === 'live') {
+            if (now.mode === 'race' && raceDone(now.roster, now.finishers, now.dropped)) endSession('done');
+            else if (now.mode === 'meet') {
+              const active = (now.roster || []).filter((id) => !(now.dropped || []).includes(id));
+              if (active.length < 2) endSession('host-left');
+            }
+          }
+        });
+
+        channel.on('broadcast', { event: 'end' }, ({ payload }) => {
+          const s = sessionRef.current;
+          if (!s || s.phase === 'ended') return;
+          if ((payload.hostTerm || 0) < (s.hostTerm || 0)) return;
+          // The host ends everything else itself; a non-host 'left' broadcast
+          // can only end a 2-person meetup (3+ person meetups drop individually).
+          if (amHost()) {
+            if (payload.reason !== 'left' || s.mode !== 'meet') return;
+            const active = (s.roster || []).filter((id) => !(s.dropped || []).includes(id));
+            if (active.length > 2) return;
+          }
+          if (!s.joined) {
+            setPeek('closed');
+            return;
+          }
+          patch({
+            phase: 'ended',
+            endReason: payload.reason,
+            endedBy: sanitizeUsername(payload.by) || null,
+            finishers: payload.finishers || s.finishers,
+            dropped: payload.dropped || s.dropped,
+            names: { ...(s.names || {}), ...sanitizeNames(payload.names) },
+            endedAt: Date.now(),
+          });
+        });
+
+        // Fires again after every automatic rejoin, so a phone coming back
+        // re-announces itself here.
+        channel.subscribe((status) => {
+          // A late message from a channel we've since replaced.
+          if (channelRef.current !== channel) return;
+          if (status === 'SUBSCRIBED') {
+            setConnected(true);
+            setEverConnected(true);
+            askHostRef.current = () => send('hello', {});
+            askHostRef.current();
+            const s = sessionRef.current;
+            if (s?.joined && myIdRef.current) {
+              const name = myNameRef.current || s.names?.[myIdRef.current] || 'Friend';
+              channel.track({ id: myIdRef.current, name, joinedAt: s.joinedAt || Date.now() });
+            }
+            if (amHost()) send('state', stateFor());
+            if (lastPosRef.current) send('pos', lastPosRef.current);
+            if (pendingJoinRef.current) send('join-live', pendingJoinRef.current);
+            resendArrival();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            setConnected(false);
+            askHostRef.current = null;
+            // The library retries errors and timeouts itself, but a channel
+            // the server closed stays closed.
+            if (status === 'CLOSED') retry = setTimeout(() => setReopenKey((k) => k + 1), RECONNECT_AFTER_MS);
+          }
+        });
+      }
+    );
+    return () => {
+      clearTimeout(retry);
+      // First, so the close this triggers counts as a replaced channel's.
+      channelRef.current = null;
+      askHostRef.current = null;
+      close();
+      setConnected(false);
+      setMembers([]);
+    };
+  }, [code, myId, reopenKey, patch, send, amHost, stateFor, applyState, recordFinish, dropPlayers, resendArrival, endSession, presentIds, clearPendingJoin, requestLiveJoin]);
+
+  // Kept across reconnects of the same session; a stationary phone has no
+  // new fix to send when it comes back.
+  useEffect(() => {
+    lastPosRef.current = null;
+    setEverConnected(false);
+    clearPendingJoin();
+  }, [code, myId, clearPendingJoin]);
+
+  // Back in the app (or back online): get the connection up now rather than
+  // whenever its retry timer next fires, and answer anyone waiting.
+  useEffect(() => {
+    if (!code) return undefined;
+    const wake = () => {
+      if (document.visibilityState === 'hidden') return;
+      supabase.realtime.connect();
+      const channel = channelRef.current;
+      if (!channel) return;
+      if (channel.state === 'joined') {
+        send('hello', {});
+        if (amHost()) send('state', stateFor());
+        if (lastPosRef.current) send('pos', lastPosRef.current);
+        if (pendingJoinRef.current) send('join-live', pendingJoinRef.current);
+      } else if (channel.state !== 'joining') {
+        setReopenKey((k) => k + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('pageshow', wake);
+    window.addEventListener('online', wake);
+    return () => {
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('pageshow', wake);
+      window.removeEventListener('online', wake);
+    };
+  }, [code, send, amHost, stateFor]);
+
+  // In the lobby (or racing) = in presence. Done on the open channel, so
+  // joining never reconnects.
+  useEffect(() => {
+    const channel = channelRef.current;
+    if (!connected || !channel || !myId) return;
+    if (joined) {
+      const name = myNameRef.current || sessionRef.current?.names?.[myId] || 'Friend';
+      channel.track({ id: myId, name, joinedAt: sessionRef.current?.joinedAt || Date.now() });
+    } else channel.untrack();
+  }, [connected, joined, myId, myName]);
+
+  // Waiting on an invite: keep asking, since the host may be back any moment.
+  const waitingForHost = !!code && !joined && !isHost && (peek === 'loading' || peek === 'unreachable');
+  useEffect(() => {
+    if (!waitingForHost) return undefined;
+    const t = setInterval(() => askHostRef.current?.(), PEEK_ASK_EVERY_MS);
+    return () => clearInterval(t);
+  }, [waitingForHost]);
+  useEffect(() => {
+    if (!code || joined || isHost || peek !== 'loading') return undefined;
+    const t = setTimeout(() => setPeek('unreachable'), PEEK_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [code, joined, isHost, peek]);
+
+  // Joining an already-started session: retry until the host admits or turns us away.
+  useEffect(() => {
+    if (!joining || !connected || !pendingJoinRef.current) return undefined;
+    const t = setInterval(() => {
+      if (pendingJoinRef.current) send('join-live', pendingJoinRef.current);
+    }, JOIN_ASK_EVERY_MS);
+    return () => clearInterval(t);
+  }, [joining, connected, send]);
+
+  // Over capacity: the last to join is turned away.
+  useEffect(() => {
+    const s = sessionRef.current;
+    if (!s?.joined || s.hostId === myId || s.phase !== 'lobby' || !myId) return;
+    const index = members.findIndex((m) => m.id === myId);
+    if (index >= CAPACITY[s.mode]) {
+      setPeek('full');
+      setSession({ ...s, joined: false, phase: 'invite' });
+    }
+  }, [members, myId, setSession]);
+
+  // Counted once they're really in the room, not when they tap Join: someone
+  // turned away above never counts, however many times they retry.
+  const rosterLength = session?.roster?.length || 0;
+  const droppedLength = session?.dropped?.length || 0;
+  useEffect(() => {
+    const s = sessionRef.current;
+    if (!s?.joined || s.joinCounted || s.hostId === myId || !myId) return;
+    const inLobby = s.phase === 'lobby';
+    const isLive = s.phase === 'live' || s.phase === 'countdown';
+    if (inLobby) {
+      const index = members.findIndex((m) => m.id === myId);
+      if (index < 0 || index >= CAPACITY[s.mode]) return;
+    } else if (isLive) {
+      const activeInRoster = Boolean(s.roster?.includes(myId) && !(s.mode === 'meet' && (s.dropped || []).includes(myId)));
+      if (!activeInRoster) return;
+    } else {
+      return;
+    }
+    patch({ joinCounted: true });
+    track('friends_joined', { mode: s.mode, via: s.fromCode ? 'code' : 'link' });
+  }, [members, myId, phase, rosterLength, droppedLength, patch]);
+
+  // Host timers: the invite expires, a race has a time limit. A new host
+  // picks these up from the same createdAt / goAt.
+  useEffect(() => {
+    if (!isHost) return undefined;
+    const s = sessionRef.current;
+    let at = null;
+    let reason = null;
+    if (phase === 'lobby') {
+      at = s.createdAt + LOBBY_TTL_MS;
+      reason = 'expired';
+    } else if (phase === 'live' && s.mode === 'race' && s.goAt) {
+      at = s.goAt + RACE_LIMIT_MS;
+      reason = 'timeout';
+    }
+    if (!at) return undefined;
+    const t = setTimeout(() => endSession(reason), Math.max(0, at - Date.now()));
+    return () => clearTimeout(t);
+  }, [isHost, phase, endSession]);
+
+  // Countdown ends on every phone at the same moment it was told to.
+  useEffect(() => {
+    if (phase !== 'countdown') return undefined;
+    const wait = Math.max(0, (sessionRef.current.goAt || 0) - Date.now());
+    const t = setTimeout(() => patch({ phase: 'live' }), wait);
+    return () => clearTimeout(t);
+  }, [phase, patch]);
+
+  // ── Host vanished (network drop / phone died): next person takes over ─
+  const hostPresent = members.some((m) => m.id === session?.hostId);
+  const meInPresence = members.some((m) => m.id === myId);
+  const groupMeet = mode === 'meet' && (session?.roster?.length || members.length) >= 3;
+  const takeoverOpen = (mode === 'race' || groupMeet) && joined && (phase === 'lobby' || phase === 'countdown' || phase === 'live');
+  useEffect(() => {
+    // Our own presence entry means the list is in sync, so a missing host
+    // really is missing (not just "not loaded yet").
+    if (!takeoverOpen || isHost || !connected || !meInPresence || hostPresent) return undefined;
+    const t = setTimeout(() => {
+      const s = sessionRef.current;
+      const present = presentIds();
+      if (!s || present.has(s.hostId)) return;
+      const order = s.roster || membersRef.current.map((m) => m.id);
+      if (nextHost(order, present, s.hostId) === myIdRef.current) becomeHost(s.hostId);
+    }, phase === 'lobby' ? HOST_GONE_LOBBY_MS : HOST_GONE_MS);
+    return () => clearTimeout(t);
+  }, [takeoverOpen, phase, isHost, connected, meInPresence, hostPresent, becomeHost, presentIds]);
+
+  // ── Drop participants who have been offline a while (races & 3+ meetups) ─
+  const absentSinceRef = useRef({});
+  const dropAbsentEnabled = isHost && phase === 'live' && (mode === 'race' || (mode === 'meet' && (session?.roster?.length || 0) >= 3));
+  useEffect(() => {
+    if (!dropAbsentEnabled) return undefined;
+    const t = setInterval(() => {
+      // Our own connection is down, so the list says nothing about them.
+      if (!connectedRef.current) {
+        absentSinceRef.current = {};
+        return;
+      }
+      const s = sessionRef.current;
+      const present = presentIds();
+      const now = Date.now();
+      const gone = [];
+      (s.roster || []).forEach((id) => {
+        const out = (s.finishers || []).some((f) => f.id === id) || (s.dropped || []).includes(id);
+        if (id === myIdRef.current || present.has(id) || out) {
+          delete absentSinceRef.current[id];
+          return;
+        }
+        absentSinceRef.current[id] ??= now;
+        if (now - absentSinceRef.current[id] >= DROP_AFTER_MS) gone.push(id);
+      });
+      if (gone.length) dropPlayers(gone);
+    }, 10 * 1000);
+    return () => clearInterval(t);
+  }, [dropAbsentEnabled, dropPlayers, presentIds]);
+
+  // ── My own position ─────────────────────────────────────────────────
+  const [myFix, setMyFix] = useState(null);
+  const lastSentRef = useRef(0);
+  // Meet coordinates are never broadcast in lobby — only once live sharing starts.
+  const sharing = joined && (phase === 'live' || phase === 'countdown' || (phase === 'lobby' && mode === 'race'));
+  useEffect(() => {
+    if (!sharing || !myId) return undefined;
+    const onFix = (pos) => {
+      const s = sessionRef.current;
+      if (!s) return;
+      const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setMyFix(here);
+      const payload = { id: myId };
+      if (s.mode === 'race') payload.dist = distanceM(here, s.place);
+      else Object.assign(payload, here);
+      setProgress((p) => ({ ...p, [myId]: { ...payload, at: Date.now() } }));
+
+      const finished = (s.finishers || []).some((f) => f.id === myId);
+      const arrived = s.mode === 'race' && s.phase === 'live' && !finished && payload.dist != null && payload.dist <= RACE_FINISH_M;
+      if (arrived) {
+        if (amHost()) recordFinish(myId);
+        else {
+          // Remembered, so it's sent again if the host was away just now.
+          if (!s.arrivedAt) patch({ arrivedAt: Date.now() });
+          send('arrived', { id: myId });
+        }
+      }
+      lastPosRef.current = payload;
+      // Not while the connection is down: each would go over HTTP instead,
+      // and the latest one goes out as soon as it's back.
+      if (!connectedRef.current) return;
+      const now = Date.now();
+      if (now - lastSentRef.current < SEND_EVERY_MS && !arrived) return;
+      lastSentRef.current = now;
+      send('pos', payload);
+    };
+    const last = getLastFix();
+    if (last) onFix(last);
+    return subscribeGps(onFix, () => {});
+  }, [sharing, myId, send, amHost, recordFinish, patch]);
+
+  // ── Meetup: who's here (2+ people) ──────────────────────────────────
+  const meetPeerIds = useMemo(() => {
+    if (session?.mode !== 'meet') return [];
+    const dropped = new Set(session.dropped || []);
+    const source = session.roster?.length ? session.roster : members.map((m) => m.id);
+    return source.filter((id) => id !== myId && !dropped.has(id));
+  }, [session?.mode, session?.roster, session?.dropped, members, myId]);
+  const otherId = meetPeerIds[0] || null;
+  const { meetDistance, meetMaxDistance } = useMemo(() => {
+    if (session?.mode !== 'meet' || !myFix || !meetPeerIds.length) {
+      return { meetDistance: null, meetMaxDistance: null };
+    }
+    let min = Infinity;
+    let max = -1;
+    meetPeerIds.forEach((id) => {
+      const d = distanceM(myFix, progress[id]);
+      if (d == null) return;
+      if (d < min) min = d;
+      if (d > max) max = d;
+    });
+    return {
+      meetDistance: Number.isFinite(min) ? min : null,
+      meetMaxDistance: max >= 0 ? max : null,
+    };
+  }, [session?.mode, myFix, meetPeerIds, progress]);
+  const meetArrived = useMemo(() => {
+    if (session?.mode !== 'meet' || phase !== 'live' || !meetPeerIds.length) return false;
+    return meetArrivedCheck(
+      myFix,
+      meetPeerIds.map((id) => progress[id] || null),
+      session.place
+    );
+  }, [session?.mode, session?.place, phase, myFix, meetPeerIds, progress]);
+  useEffect(() => {
+    if (!isHost || !meetArrived) return undefined;
+    const t = setTimeout(() => endSession('met'), MEET_CLOSE_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [isHost, meetArrived, endSession]);
+
+  // ── Ephemeral chat: clears automatically once a meetup or race ends ─
+  useEffect(() => {
+    setMessages([]);
+    setTypingBy({});
+    lastTypingSentRef.current = { active: false, at: 0 };
+  }, [code]);
+
+  useEffect(() => {
+    if (!code || !joined || phase === 'ended') {
+      setMessages([]);
+      setTypingBy({});
+      lastTypingSentRef.current = { active: false, at: 0 };
+    }
+  }, [code, joined, phase]);
+
+  // Prune typing indicators if someone locks their phone mid-sentence.
+  const hasTypers = Object.keys(typingBy).length > 0;
+  useEffect(() => {
+    if (!hasTypers) return undefined;
+    const t = setInterval(() => {
+      const cutoff = Date.now() - TYPING_TTL_MS;
+      setTypingBy((prev) => {
+        let changed = false;
+        const next = {};
+        Object.entries(prev).forEach(([id, entry]) => {
+          if (entry.at >= cutoff) next[id] = entry;
+          else changed = true;
+        });
+        return changed ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [hasTypers]);
+
+  const typingUsers = useMemo(() => Object.values(typingBy), [typingBy]);
+
+  // ── Actions ─────────────────────────────────────────────────────────
+  const notifyTyping = useCallback(
+    (active) => {
+      const s = sessionRef.current;
+      const me = myIdRef.current;
+      if (!s?.joined || s.phase === 'ended' || !me || !connectedRef.current || !channelRef.current) return;
+      const now = Date.now();
+      const prev = lastTypingSentRef.current;
+      if (active) {
+        if (prev.active && now - prev.at < TYPING_THROTTLE_MS) return;
+        lastTypingSentRef.current = { active: true, at: now };
+        send('typing', { id: me, name: myNameRef.current || 'Friend', active: true });
+      } else if (prev.active) {
+        lastTypingSentRef.current = { active: false, at: now };
+        send('typing', { id: me, name: myNameRef.current || 'Friend', active: false });
+      }
+    },
+    [send]
+  );
+
+  const sendMessage = useCallback(
+    (rawText, { quick = false } = {}) => {
+      const s = sessionRef.current;
+      const me = myIdRef.current;
+      if (!s?.joined || s.phase === 'ended' || !me || !connectedRef.current || !channelRef.current) return false;
+      const text = sanitizeChatText(rawText);
+      if (!text) return false;
+      const now = Date.now();
+      const msg = {
+        id: `${me}-${now}-${Math.random().toString(36).slice(2, 6)}`,
+        senderId: me,
+        senderName: myNameRef.current || 'You',
+        text,
+        at: now,
+      };
+      setMessages((prev) => appendChatMessage(prev, msg));
+      send('chat', msg);
+      notifyTyping(false);
+      track('friends_chat_sent', { mode: s.mode, quick });
+      return true;
+    },
+    [send, notifyTyping]
+  );
+
+  const create = useCallback(
+    (newMode, place, chosenName) => {
+      const id = user?.id || guestId;
+      if (!id) return;
+      const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
+      const now = Date.now();
+      clearPendingJoin();
+      setProgress({});
+      setMessages([]);
+      setTypingBy({});
+      lastTypingSentRef.current = { active: false, at: 0 };
+      setSession({
+        mode: newMode,
+        code: createCode(),
+        participantId: id,
+        joined: true,
+        joinedAt: now,
+        phase: 'lobby',
+        place: place || null,
+        hostId: id,
+        hostName: resolvedName,
+        hostTerm: 0,
+        createdAt: now,
+        names: { [id]: resolvedName },
+        finishers: [],
+        dropped: [],
+      });
+      track('friends_created', { mode: newMode, place: place?.name || null });
+    },
+    [user?.id, guestId, setUsername, setSession, clearPendingJoin]
+  );
+
+  // `fromCode`: typed into the code box, so "can't reach" also says to check it.
+  const openInvite = useCallback(
+    (invite, { fromCode = false } = {}) => {
+      const s = sessionRef.current;
+      if (s?.code === invite.code) return;
+      clearPendingJoin();
+      setPeek('loading');
+      setProgress({});
+      setMessages([]);
+      setTypingBy({});
+      lastTypingSentRef.current = { active: false, at: 0 };
+      setSession({ mode: invite.mode, code: invite.code, joined: false, phase: 'invite', names: {}, fromCode });
+    },
+    [setSession, clearPendingJoin]
+  );
+
+  const join = useCallback(
+    (chosenName) => {
+      const s = sessionRef.current;
+      if (!s || !myId) return;
+      const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
+      const hostLive = s.hostPhase === 'live' || s.hostPhase === 'countdown';
+      if (hostLive) {
+        const alreadyActive = Boolean(s.roster?.includes(myId) && !(s.mode === 'meet' && (s.dropped || []).includes(myId)));
+        if (alreadyActive) {
+          patch({
+            participantId: s.participantId || myId,
+            joined: true,
+            joinedAt: s.joinedAt || Date.now(),
+            phase: s.hostPhase === 'countdown' && (s.goAt || 0) > Date.now() ? 'countdown' : 'live',
+            names: { ...(s.names || {}), [myId]: resolvedName },
+          });
+          send('join-live', { id: myId, name: resolvedName });
+        } else {
+          patch({
+            participantId: s.participantId || myId,
+            names: { ...(s.names || {}), [myId]: resolvedName },
+          });
+          requestLiveJoin(myId, resolvedName);
+        }
+        return;
+      }
+      const phaseNow = s.roster?.includes(myId) ? 'live' : 'lobby';
+      patch({
+        participantId: s.participantId || myId,
+        joined: true,
+        joinedAt: Date.now(),
+        phase: phaseNow,
+        names: { ...(s.names || {}), [myId]: resolvedName },
+      });
+    },
+    [myId, setUsername, patch, send, requestLiveJoin]
+  );
+
+  const start = useCallback(() => {
+    const s = sessionRef.current;
+    if (!s || !amHost() || s.phase !== 'lobby') return;
+    const roster = [myId, ...members.map((m) => m.id).filter((id) => id !== myId)].slice(0, CAPACITY[s.mode]);
+    const names = { ...(s.names || {}) };
+    const nextPhase = s.mode === 'race' ? 'countdown' : 'live';
+    const common = { roster, names, finishers: [], dropped: [], handover: null, hostPhase: nextPhase, lastJoined: null };
+    if (s.mode === 'race') {
+      patch({ ...common, phase: 'countdown', goAt: Date.now() + COUNTDOWN_MS });
+      send('start', { mode: 'race', roster, names, countdownMs: COUNTDOWN_MS });
+    } else {
+      patch({ ...common, phase: 'live', goAt: Date.now() });
+      send('start', { mode: 'meet', roster, names });
+    }
+    track('friends_started', { mode: s.mode, players: roster.length });
+  }, [members, myId, amHost, patch, send]);
+
+  // A meetup's lobby: meet at a place, or (null) just find each other.
+  const setMeetPlace = useCallback(
+    (place) => {
+      const s = sessionRef.current;
+      if (!s || !amHost() || s.mode !== 'meet' || s.phase !== 'lobby') return;
+      patch({ place });
+      send('state', stateFor());
+    },
+    [amHost, patch, send, stateFor]
+  );
+
+  // Meet me: where the route to the friend currently ends (kept across a
+  // reload so the route keeps following them).
+  const setFollow = useCallback((follow) => patch({ follow }), [patch]);
+
+  // Leaving:
+  //  - a 2-person meetup: either side ends it once going; the host cancels a lobby.
+  //  - a 3+ person group meetup or race: a leaving host hands over to the next
+  //    connected person (or ends if nobody else is left); a guest drops out.
+  const leave = useCallback(() => {
+    const s = sessionRef.current;
+    const me = myIdRef.current;
+    if (s?.joined && s.phase !== 'ended') {
+      const active = s.phase === 'live' || s.phase === 'countdown';
+      const activePeers = (s.roster || membersRef.current.map((m) => m.id)).filter(
+        (id) => id !== me && !(s.dropped || []).includes(id)
+      );
+      const twoPersonMeet = s.mode === 'meet' && activePeers.length <= 1;
+      if (s.phase === 'lobby' && amHost()) {
+        endSession('cancelled');
+      } else if (twoPersonMeet) {
+        if (s.phase === 'live') {
+          send('end', { reason: 'left', by: myNameRef.current, hostTerm: s.hostTerm || 0 });
+          track('friends_ended', { mode: 'meet', reason: 'left', finishers: 0 });
+        }
+      } else if (amHost()) {
+        const next = nextHost(activePeers, presentIds(), me);
+        if (next) {
+          const finished = (s.finishers || []).some((f) => f.id === me);
+          const dropped = active && !finished ? union(s.dropped, [me]) : s.dropped || [];
+          send('handover', {
+            hostId: next,
+            hostName: s.names?.[next] || 'Player',
+            hostTerm: (s.hostTerm || 0) + 1,
+            from: myNameRef.current,
+            dropped,
+          });
+          track('friends_handover', { reason: 'host_left' });
+        } else endSession(s.phase === 'lobby' ? 'cancelled' : 'host-left');
+      } else if (active) send('left', { id: me });
+    }
+    clearPendingJoin();
+    setSession(null);
+    setProgress({});
+    setMessages([]);
+    setTypingBy({});
+    lastTypingSentRef.current = { active: false, at: 0 };
+    setMyFix(null);
+  }, [amHost, endSession, setSession, send, presentIds, clearPendingJoin]);
+
+  return {
+    session,
+    members,
+    progress,
+    messages,
+    typingUsers,
+    peek,
+    joining,
+    connected,
+    everConnected,
+    myId,
+    myName,
+    myFix,
+    isHost,
+    otherId,
+    meetPeerIds,
+    meetDistance,
+    meetMaxDistance,
+    meetArrived,
+    setUsername,
+    create,
+    openInvite,
+    join,
+    start,
+    leave,
+    setMeetPlace,
+    setFollow,
+    sendMessage,
+    notifyTyping,
+  };
+}

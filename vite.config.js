@@ -1,0 +1,78 @@
+import { defineConfig, loadEnv } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+
+
+// https://vite.dev/config/
+//
+// Slice 9: CLAUDE.md's bundle-size policy says to add vendor-chunk
+// stability here "once Slice 9's lazy boundary lands," plus revert
+// `chunkSizeWarningLimit` from a claimed 1000 back to the default 500.
+//
+// Real, flagged mismatches found while doing this:
+//  1. There was no `chunkSizeWarningLimit` override anywhere in this file
+//     before this edit — confirmed by reading it directly, and consistent
+//     with every prior slice's own tracker note ("vite.config.js
+//     untouched"). Nothing has ever set it to 1000 in this repo, so
+//     there's nothing to revert; the default (500) already applies and
+//     stays that way.
+//  2. CLAUDE.md's copy-pasted `manualChunks` snippet uses the plain
+//     object-map form (`{ leaflet: [...], supabase: [...] }`). This repo
+//     is on Vite 8, which bundles with Rolldown by default (hence
+//     `rolldownOptions` instead of `rollupOptions` — real, this project
+//     really is on Rolldown, not classic Rollup+esbuild) — confirmed by
+//     `npm run build` actually failing with
+//     `TypeError: manualChunks is not a function` when the object form
+//     was tried verbatim. Rolldown's `manualChunks` only accepts the
+//     function form, unlike classic Rollup which accepts either. Ported
+//     the same intent (group leaflet / supabase / react+router into
+//     stable long-term-cacheable vendor chunks) as a function instead.
+export default defineConfig(({ mode }) => {
+  // The ImageKit address (lib/supabase.js) may be set as IMAGE_PROXY_URL or
+  // VITE_IMAGE_PROXY_URL. Only that one value is passed to the app — not a
+  // whole IMAGE_PROXY_ prefix, so a future ImageKit secret can't leak in.
+  const env = loadEnv(mode, process.cwd(), '')
+  const imageProxyUrl = env.IMAGE_PROXY_URL || env.VITE_IMAGE_PROXY_URL || ''
+  // Push: only the PUBLIC VAPID key reaches the app (VAPID_PUBLIC_KEY or
+  // VITE_VAPID_PUBLIC_KEY). VAPID_PRIVATE_KEY is never read here.
+  const vapidPublicKey = env.VITE_VAPID_PUBLIC_KEY || env.VAPID_PUBLIC_KEY || ''
+  return {
+  plugins: [react(),
+    tailwindcss()],
+  // POSTHOG_* are public (project token + host), read by lib/sessionReplay.js.
+  envPrefix: ['VITE_', 'POSTHOG_'],
+  define: {
+    'import.meta.env.IMAGE_PROXY_URL': JSON.stringify(imageProxyUrl),
+    'import.meta.env.VITE_VAPID_PUBLIC_KEY': JSON.stringify(vapidPublicKey),
+  },
+  build: {
+    rolldownOptions: {
+      output: {
+        // CSS keeps a fixed name (no hash). Clarity recordings link to the CSS
+        // file and fetch it at playback; a hashed name is gone after the next
+        // deploy, so replays played unstyled. vercel.json revalidates *.css.
+        assetFileNames(info) {
+          const name = info.names?.[0] ?? info.name ?? ''
+          return name.endsWith('.css') ? 'assets/[name][extname]' : 'assets/[name]-[hash][extname]'
+        },
+        manualChunks(id) {
+          // leaflet-rotate (in the leaflet chunk) reads the global `L` as
+          // soon as it runs, so the file that sets `window.L` must sit in
+          // that same chunk — in an app chunk it would run too late.
+          if (id.includes('leafletGlobal')) return 'leaflet';
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('leaflet')) return 'leaflet';
+          if (id.includes('@supabase')) return 'supabase';
+          // Slice 14: recharts gets its own key, per CLAUDE.md's bundle-size
+          // policy — kept out of `vendor` so it doesn't bleed into the
+          // react/react-dom/react-router-dom group; only the lazy-loaded
+          // Insights tab pulls it in.
+          if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor')) return 'charts';
+          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('react-router-dom') || id.includes('scheduler')) return 'vendor';
+          return undefined;
+        },
+      },
+    },
+  },
+  }
+})

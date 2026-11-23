@@ -1,0 +1,1109 @@
+import { useEffect, useState } from 'react';
+import {
+  Camera,
+  Cloud,
+  CheckCircle2,
+  CircleX,
+  X,
+  MapPin,
+  Pencil,
+  ChevronDown,
+  Copy,
+  Move,
+  Star,
+  Trash2,
+  Check,
+  ImagePlus,
+  ImageOff,
+  User,
+  Rss,
+  Store,
+  Link as LinkIcon,
+} from 'lucide-react';
+import styles from './AdminEditModal.module.css';
+import PlaceImage from '../../components/ui/PlaceImage';
+import { WP_ALL_TYPES } from './adminTypeOptions';
+import { resolveWaypointType } from '../waypoints/wpTypeMeta';
+import { getPlaceImageUrl } from '../../lib/supabase';
+import { CHANNEL_PLATFORMS, BUSINESS_PLATFORMS, channelPlatformMeta, businessPlatformMeta } from '../../lib/channelMeta';
+import {
+  fetchImageRows,
+  uploadImage,
+  insertImageRows,
+  removeStorageFiles,
+  deleteImageRows,
+  insertWaypoint,
+  updateWaypoint,
+  deleteWaypoint,
+  updateSegment,
+  deleteSegment,
+} from './adminSave';
+import { track } from '../../lib/analytics';
+import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
+import { formatLatLng, parseLatLng } from './coordInput';
+
+const SEGMENT_CATEGORIES = ['footpath', 'road', 'shortcut', 'indoor', 'other'];
+
+// `URL.createObjectURL(file)` was being called fresh inside `.map()` on
+// every render — a new blob URL (and a small permanent memory leak) each
+// time. Cached per File object instead; nothing here ever needs a File
+// twice removed-and-re-added, so a plain WeakMap is enough (no manual
+// eviction needed — entries die with their File).
+const previewUrlCache = new WeakMap();
+function previewUrlFor(file) {
+  let url = previewUrlCache.get(file);
+  if (!url) {
+    url = URL.createObjectURL(file);
+    previewUrlCache.set(file, url);
+  }
+  return url;
+}
+
+/**
+ * Shared edit/delete form for a waypoint, segment, or session-only admin
+ * KML feature — ported from legacy's `openEditWaypoint`/`openEditSegment`/
+ * `openEditKml` (app.js ~3921–4016) + `adminSaveBtn`/`adminDeleteBtn`
+ * (~4099–4320) + `buildImageField`/image-upload handlers (~3852–3919).
+ *
+ * `#adminEditModal` genuinely has `.modal-header`/`.modal-body`/
+ * `.modal-footer` in legacy's own markup (index.html ~945–959), the same
+ * shape DetailModal/SaveModal/ReviewModal already share. No backdrop-click
+ * dismiss (legacy never wires one for this modal — the overlay below has
+ * no onClick, matching the old shared Modal's `closeOnBackdrop=false`
+ * default).
+ *
+ * No longer reuses the shared `components/ui/Modal.jsx` shell — renders
+ * its own overlay/header/close/footer below instead, restored to the
+ * exact pre-v2 styling. See AdminEditModal.module.css's header comment
+ * for why (short version: the Waypoint-suggestion session redesigned the
+ * *shared* Modal shell to v2 for `SuggestWaypointModal`, which this
+ * still-"Not started" admin screen inherited as an unintended
+ * side-effect; reverted here, same "opt out of the shared file" move
+ * `ReviewModal` already made for the same reason).
+ *
+ * Image handling deviates from legacy — see adminSave.js's header comment
+ * for why (normalized image tables here vs. a single resaved array in
+ * legacy). `type: 'kml'` images are the one exception: since a
+ * not-yet-imported KML feature has no DB row to attach an image row to,
+ * those photos stay as `File`s in `useAdminKml`'s own registry state
+ * (`adminKml.addImageFile`/`removeImageFile`) and only actually upload
+ * once "Import to Supabase" runs (`useAdminKml.importFeature`).
+ */
+/*
+ * `onMovePin(start)` (optional): hides this form while the admin drags the
+ * pin on the map; resolves to the new { lat, lng }, or null if cancelled.
+ * `hidden` keeps the form mounted (and its unsaved edits) meanwhile.
+ */
+export default function AdminEditModal({ editContext, onClose, onWaypointChanged, onSegmentChanged, adminKml, onMovePin, hidden }) {
+  const { type, isNew } = editContext;
+
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  // Place area, e.g. "South Gate" (supabase/waypoint_area.sql). A Person
+  // has no location, so the same column holds their title instead
+  // ("300L · Electrical & Electronics"), shown under their name in Explore.
+  const [area, setArea] = useState('');
+  const [wpType, setWpType] = useState('landmark');
+  const [category, setCategory] = useState('other');
+  // People entries (supabase/people_entries.sql) — same edit form as a
+  // Place, minus coordinates. Set once from `wp.isPerson` on open; never
+  // toggled from here (a row's Place/Person status is decided at creation
+  // in PointsTab, not editable after the fact).
+  const [isPerson, setIsPerson] = useState(false);
+
+  // Channel entries (supabase/channel_entries.sql) — same "no
+  // coordinates" shape as isPerson above, set once on open and never
+  // toggled from here for the same reason.
+  const [isChannel, setIsChannel] = useState(false);
+  const [channelLink, setChannelLink] = useState('');
+  const [channelPlatform, setChannelPlatform] = useState('');
+
+  // Business entries (supabase/business_entries.sql) — same "no
+  // coordinates, set once on open, never toggled here" shape again. Kept
+  // as its own boolean/pair of fields rather than reusing isChannel's —
+  // see business_entries.sql's header comment for why a row is one or
+  // the other, never both.
+  const [isBusiness, setIsBusiness] = useState(false);
+  const [businessLink, setBusinessLink] = useState('');
+  const [businessPlatform, setBusinessPlatform] = useState('');
+
+  // Explore panel fields (supabase/explore_fields.sql) — this IS the
+  // "pick a name on the map and feature it" flow: no separate admin
+  // tab/table, just a few more fields on the same waypoint edit form
+  // already used for name/description/type.
+  const [isExplore, setIsExplore] = useState(false);
+  const [exploreTagsText, setExploreTagsText] = useState('');
+  const [explorePriority, setExplorePriority] = useState(0);
+  const [isPromoted, setIsPromoted] = useState(false);
+  const [sponsorName, setSponsorName] = useState('');
+  const [promoLabel, setPromoLabel] = useState('Promoted');
+
+  const [existingImages, setExistingImages] = useState([]); // {id, storagePath, url}
+  const [newFiles, setNewFiles] = useState([]); // File[]
+  const [removedImages, setRemovedImages] = useState([]); // {id, storagePath}[]
+  const [imagesLoading, setImagesLoading] = useState(false);
+
+  const [status, setStatus] = useState(null); // { text, error }
+  const [busy, setBusy] = useState(false);
+  // A place's position as "lat, lng" text; only saved when it changed, as
+  // the loaded position may be nudged apart from a pin at the same spot.
+  const [coordText, setCoordText] = useState('');
+  const [coordStart, setCoordStart] = useState('');
+
+  useEffect(() => {
+    setStatus(null);
+    setNewFiles([]);
+    setRemovedImages([]);
+
+    if (type === 'waypoint') {
+      const wp = editContext.data;
+      setName(wp.name || '');
+      setDescription(wp.description || '');
+      setArea(wp.area || '');
+      // Was `wp.type || 'landmark'` — if the stored type wasn't one of
+      // this dropdown's real options (a lot of imported data isn't:
+      // "yes", "off_campus_lodge", "arts_centre"…), the <select> silently
+      // showed its first option instead, disagreeing with the badge in
+      // the points list. resolveWaypointType() guesses the right option
+      // from name+type so this always matches the badge. See its comment
+      // in wpTypeMeta.js.
+      setWpType(resolveWaypointType(wp));
+      setIsPerson(!!wp.isPerson);
+      setIsChannel(!!wp.isChannel);
+      setChannelLink(wp.channelLink || '');
+      setChannelPlatform(wp.channelPlatform || '');
+      setIsBusiness(!!wp.isBusiness);
+      setBusinessLink(wp.businessLink || '');
+      setBusinessPlatform(wp.businessPlatform || '');
+      setIsExplore(!!wp.isExplore);
+      setExploreTagsText((wp.exploreTags || []).join(', '));
+      setExplorePriority(wp.explorePriority ?? 0);
+      setIsPromoted(!!wp.isPromoted);
+      setSponsorName(wp.sponsorName || '');
+      setPromoLabel(wp.promoLabel || 'Promoted');
+      const coords = wp.lat != null && wp.lng != null ? formatLatLng(wp.lat, wp.lng) : '';
+      setCoordText(coords);
+      setCoordStart(coords);
+      if (editContext.id) {
+        setImagesLoading(true);
+        fetchImageRows('waypoint_images', 'waypoint_id', editContext.id)
+          .then((rows) => {
+            setExistingImages(rows.map((r) => ({ id: r.id, storagePath: r.storage_path, url: resolveUrl(r.storage_path) })));
+          })
+          .finally(() => setImagesLoading(false));
+      } else {
+        setExistingImages([]);
+        setImagesLoading(false);
+      }
+    } else if (type === 'segment') {
+      const seg = editContext.data;
+      setName(seg.name || '');
+      setDescription(seg.description || '');
+      setCategory(seg.category || 'other');
+      setImagesLoading(true);
+      fetchImageRows('segment_images', 'segment_id', editContext.id)
+        .then((rows) => {
+          setExistingImages(rows.map((r) => ({ id: r.id, storagePath: r.storage_path, url: resolveUrl(r.storage_path) })));
+        })
+        .finally(() => setImagesLoading(false));
+    } else if (type === 'kml') {
+      const f = editContext.data;
+      setName(f.name || '');
+      setDescription(f.description || '');
+      setWpType(f.waypointType || 'landmark');
+      setExistingImages([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editContext]);
+
+  function resolveUrl(storagePath) {
+    return getPlaceImageUrl(storagePath);
+  }
+
+  function handleCopyCoords() {
+    if (type !== 'waypoint') return;
+    navigator.clipboard?.writeText(coordText.trim()).catch(() => {});
+  }
+
+  async function handleMovePin() {
+    const start = parseLatLng(coordText) || parseLatLng(coordStart);
+    if (!start) return;
+    const moved = await onMovePin(start);
+    if (moved) setCoordText(formatLatLng(moved.lat, moved.lng));
+  }
+
+  const coordsChanged = coordText.trim() !== coordStart;
+  const parsedCoords = parseLatLng(coordText);
+  const coordHint = !parsedCoords
+    ? { warn: true, text: 'Enter latitude, longitude, e.g. 7.301230, 5.134560' }
+    : !CAMPUS_BOUNDS.contains([parsedCoords.lat, parsedCoords.lng])
+      ? { warn: true, text: 'Outside the FUTA campus area. Check the numbers if this place is on campus.' }
+      : { warn: false, text: coordsChanged ? 'New position, saved when you press Save.' : 'Paste from Google Maps, type, or move the pin on the map.' };
+
+  function handleFilesChosen(e) {
+    const files = Array.from(e.target.files || []);
+    if (type === 'kml') {
+      files.forEach((f) => adminKml.addImageFile(editContext.path, editContext.idx, f));
+    } else {
+      setNewFiles((prev) => [...prev, ...files]);
+    }
+    e.target.value = '';
+  }
+
+  function removeExisting(id) {
+    setExistingImages((imgs) => {
+      const removed = imgs.find((i) => i.id === id);
+      if (removed) setRemovedImages((r) => [...r, removed]);
+      return imgs.filter((i) => i.id !== id);
+    });
+  }
+
+  function removeNew(idx) {
+    setNewFiles((files) => files.filter((_, i) => i !== idx));
+  }
+
+  async function handleSave() {
+    if (!name.trim()) {
+      setStatus({ text: 'Name is required.', error: true });
+      return;
+    }
+    if (type === 'waypoint' && isChannel && !channelLink.trim()) {
+      setStatus({ text: 'Channel link is required.', error: true });
+      return;
+    }
+    if (type === 'waypoint' && isBusiness && !businessLink.trim()) {
+      setStatus({ text: 'Business link is required.', error: true });
+      return;
+    }
+    const placeEdit = type === 'waypoint' && !isNew && !isPerson && !isChannel && !isBusiness;
+    if (placeEdit && coordsChanged && !parsedCoords) {
+      setStatus({ text: 'Coordinates must be latitude, longitude, e.g. 7.301230, 5.134560', error: true });
+      return;
+    }
+    setBusy(true);
+    setStatus(null);
+    try {
+      if (type === 'waypoint') {
+        const exploreFields = {
+          isExplore,
+          exploreTags: exploreTagsText.split(',').map((s) => s.trim()).filter(Boolean),
+          explorePriority: Number(explorePriority) || 0,
+          isPromoted,
+          sponsorName,
+          promoLabel,
+        };
+        const channelFields = isChannel
+          ? { isChannel: true, channelLink: channelLink.trim(), channelPlatform }
+          : {};
+        const businessFields = isBusiness
+          ? { isBusiness: true, businessLink: businessLink.trim(), businessPlatform }
+          : {};
+        const isPlace = !isPerson && !isChannel && !isBusiness;
+        const moved = placeEdit && coordsChanged ? parsedCoords : null;
+        // Saved, but one field (the area) needs a migration — shown instead
+        // of the success message once photos and refresh have run.
+        let warning = null;
+        if (isNew) {
+          const newId = await insertWaypoint(
+            {
+              name: name.trim(),
+              description: description.trim(),
+              lat: null,
+              lng: null,
+              isPerson,
+              ...channelFields,
+              ...businessFields,
+              ...exploreFields,
+              ...(isPlace && { type: wpType, area }),
+              ...(isPerson && { area }),
+            },
+            { onWarning: (w) => (warning = w) }
+          );
+          await reconcileImages('waypoint_images', 'waypoint_id', newId, 'waypoints');
+          setStatus({
+            text: warning || (isPerson ? 'Person added!' : isChannel ? 'Channel added!' : isBusiness ? 'Business added!' : 'Waypoint added!'),
+            error: Boolean(warning),
+            icon: true,
+          });
+        } else {
+          const result = await updateWaypoint(editContext.id, {
+            name: name.trim(),
+            description: description.trim(),
+            ...(isPlace && { type: wpType, area }),
+            ...(isPerson && { area }),
+            ...(moved && { lat: moved.lat, lng: moved.lng }),
+            ...channelFields,
+            ...businessFields,
+            ...exploreFields,
+          });
+          warning = result?.warning || null;
+          if (moved) {
+            const saved = formatLatLng(moved.lat, moved.lng);
+            setCoordText(saved);
+            setCoordStart(saved);
+          }
+          await reconcileImages('waypoint_images', 'waypoint_id', editContext.id, 'waypoints');
+          setStatus({
+            text: warning || (isPerson ? 'Person updated!' : isChannel ? 'Channel updated!' : isBusiness ? 'Business updated!' : 'Waypoint updated!'),
+            error: Boolean(warning),
+            icon: true,
+          });
+        }
+        onWaypointChanged?.();
+      } else if (type === 'segment') {
+        await updateSegment(editContext.id, { name: name.trim(), description: description.trim(), category });
+        await reconcileImages('segment_images', 'segment_id', editContext.id, 'segments');
+        setStatus({ text: 'Segment updated!', error: false, icon: true });
+        onSegmentChanged?.();
+      } else if (type === 'kml') {
+        // Legacy: kml edits never write to Firebase directly on Save —
+        // only the separate "Import to Supabase" button does (app.js
+        // ~4270–4271, "Updated in memory. (KML file not modified)").
+        adminKml.renameFeature(editContext.path, editContext.idx, name.trim(), description.trim(), wpType);
+        setStatus({ text: 'Updated in memory. (KML file not modified)', error: false, icon: true });
+      }
+    } catch (e) {
+      setStatus({ text: e.message, error: true, icon: true });
+      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
+      track('error_occurred', { context: `admin_update_${type}`, message: e?.message || String(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reconcileImages(table, idColumn, entityId, kind) {
+    if (removedImages.length > 0) {
+      await deleteImageRows(table, removedImages.map((i) => i.id));
+      // Best-effort Storage cleanup — DB cascade doesn't reach Storage.
+      await removeStorageFiles(removedImages.map((i) => i.storagePath)).catch(() => {});
+    }
+    if (newFiles.length > 0) {
+      const startPos = existingImages.length;
+      const paths = [];
+      for (let i = 0; i < newFiles.length; i++) {
+        paths.push(await uploadImage(kind, entityId, newFiles[i], startPos + i));
+      }
+      await insertImageRows(table, idColumn, entityId, paths, startPos);
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      if (type === 'waypoint') {
+        await deleteWaypoint(editContext.id);
+        if (existingImages.length) {
+          await removeStorageFiles(existingImages.map((i) => i.storagePath)).catch(() => {});
+        }
+        onWaypointChanged?.();
+        onClose();
+      } else if (type === 'segment') {
+        await deleteSegment(editContext.id);
+        if (existingImages.length) {
+          await removeStorageFiles(existingImages.map((i) => i.storagePath)).catch(() => {});
+        }
+        onSegmentChanged?.();
+        onClose();
+      }
+      // Legacy: no delete affordance for `kml` type (`adminDeleteBtn.style
+      // .display = 'none'` when opening a kml feature, app.js ~4014) —
+      // matched by AdminPanel not rendering a footer delete button for it.
+    } catch (e) {
+      setStatus({ text: e.message, error: true, icon: true });
+      track('error_occurred', { context: `admin_delete_${type}`, message: e?.message || String(e) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const title = type === 'segment' ? 'EDIT SEGMENT' : 'EDIT KML FEATURE';
+  const showDelete = type === 'waypoint' || type === 'segment';
+
+  const kmlImageFiles = type === 'kml' ? adminKml.registry[editContext.path]?.features?.[editContext.idx]?.imageFiles || [] : [];
+
+  // ── Waypoint editor: redesigned desktop layout (Figma: MAPSBYFUTA /
+  // WAYPOINT, node 96:1928). Segment/KML editing below keeps the
+  // original console-style shell untouched.
+  if (type === 'waypoint') {
+    const shortId = editContext.id != null ? String(editContext.id).slice(0, 8) : '';
+    return (
+      <div className={styles.overlay} style={hidden ? { display: 'none' } : undefined}>
+        <div className={`${styles.modal} ${styles.modalWaypoint}`}>
+          <div className={styles.headerWaypoint}>
+            <div className={styles.headerWpLeft}>
+              <div className={styles.headerWpIcon}>
+                {isPerson ? <User size={20} /> : isChannel ? <Rss size={20} /> : isBusiness ? <Store size={20} /> : <MapPin size={20} />}
+              </div>
+              <div>
+                <div className={styles.headerWpTitleRow}>
+                  <span className={styles.headerWpTitle}>
+                    {isPerson ? 'Edit Person' : isChannel ? 'Edit Channel' : isBusiness ? 'Edit Business' : 'Edit Waypoint'}
+                  </span>
+                  {shortId && (
+                    <span className={styles.headerWpBadge}>
+                      <span className={styles.headerWpBadgeDot} />
+                      {isPerson ? 'Person' : isChannel ? 'Channel' : isBusiness ? 'Business' : 'Waypoint'} #{shortId}
+                    </span>
+                  )}
+                </div>
+                <div className={styles.headerWpSubtitle}>
+                  {isPerson
+                    ? 'Manage details and public visibility for this person'
+                    : isChannel
+                    ? 'Manage details and public visibility for this channel'
+                    : isBusiness
+                    ? 'Manage details and public visibility for this business — searchable, but never shown on the map'
+                    : 'Manage details, coordinates, and public visibility for this campus spot'}
+                </div>
+              </div>
+            </div>
+            <button type="button" className={styles.closeWp} onClick={onClose}>
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className={`${styles.body} ${styles.bodyWaypoint}`}>
+            <div className={styles.wpField}>
+              <div className={styles.wpFieldHead}>
+                <span className={styles.wpLabel}>
+                  {isPerson ? 'Name' : isChannel ? 'Channel Name' : isBusiness ? 'Business Name' : 'Place Name'} <span className={styles.wpLabelRequired}>*</span>
+                </span>
+                <span className={styles.wpHint}>Displayed to all users</span>
+              </div>
+              <div className={styles.wpInputWrap}>
+                <input
+                  className={styles.wpInput}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={isPerson ? 'Person name' : isChannel ? 'e.g. FUTA Announcements' : isBusiness ? 'e.g. Debby\'s Fragrances' : 'Waypoint name'}
+                />
+                <span className={`${styles.wpInputIcon} ${styles.wpInputIconRight}`}>
+                  <Pencil size={14} />
+                </span>
+              </div>
+            </div>
+
+            {/* Area (supabase/waypoint_area.sql): shown on the place card
+                as "… · Shop · South Gate". Places only — people, channels
+                and online businesses have no location. */}
+            {!isPerson && !isChannel && !isBusiness && (
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Area</span>
+                  <span className={styles.wpHint}>Optional · e.g. South Gate</span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <input
+                    className={styles.wpInput}
+                    value={area}
+                    maxLength={60}
+                    onChange={(e) => setArea(e.target.value)}
+                    placeholder="e.g. South Gate, West Gate, SUB"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Person title — stored in the same `area` column (a person
+                has no location). Shown under their name on the Explore
+                card; each comma-separated part becomes a chip in the list. */}
+            {isPerson && (
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Title</span>
+                  <span className={styles.wpHint}>Optional · separate parts with a comma</span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <input
+                    className={styles.wpInput}
+                    value={area}
+                    maxLength={60}
+                    onChange={(e) => setArea(e.target.value)}
+                    placeholder="e.g. 300L, Electrical & Electronics"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Channel entries (supabase/channel_entries.sql) keep the
+                edit form to exactly what the admin needs to fill in: name,
+                platform + link, photo, Feature toggle — no free-text
+                description field to leave blank. Business entries
+                (supabase/business_entries.sql) DO keep the description
+                field — an Online Store benefits from "what we sell" text
+                the way a channel doesn't. */}
+            {!isChannel && (
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Description / Note</span>
+                  <span className={styles.wpHint}>Optional</span>
+                </div>
+                <textarea
+                  className={styles.wpTextarea}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={isBusiness ? 'Brief details about your product' : 'Optional note'}
+                />
+              </div>
+            )}
+
+            {isChannel ? (
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Platform</span>
+                  <span className={styles.wpHint}>Sets the link prefix &amp; icon</span>
+                </div>
+                <div className={styles.wpPlatformRow}>
+                  {CHANNEL_PLATFORMS.map((p) => {
+                    const PlatformIcon = p.icon;
+                    const active = channelPlatform === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        className={`${styles.wpPlatformBtn} ${active ? styles.wpPlatformBtnActive : ''}`}
+                        onClick={() => {
+                          setChannelPlatform(p.key);
+                          // Only prefill when the field is empty or still
+                          // holds another platform's un-edited prefix —
+                          // never stomp a link the admin already pasted.
+                          const stillAPrefill = CHANNEL_PLATFORMS.some((pp) => pp.prefill === channelLink);
+                          if (!channelLink.trim() || stillAPrefill) setChannelLink(p.prefill);
+                        }}
+                      >
+                        <PlatformIcon size={14} />
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className={styles.wpFieldHead} style={{ marginTop: 12 }}>
+                  <span className={styles.wpLabel}>
+                    Channel Link <span className={styles.wpLabelRequired}>*</span>
+                  </span>
+                  <span className={styles.wpHint}>Where "Join the Channel" opens</span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <input
+                    className={styles.wpInput}
+                    value={channelLink}
+                    onChange={(e) => setChannelLink(e.target.value)}
+                    placeholder={channelPlatformMeta(channelPlatform).prefill}
+                  />
+                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                    <LinkIcon size={16} />
+                  </span>
+                </div>
+              </div>
+            ) : isBusiness ? (
+              // Same Platform-pills + Link shape as Channel above (shared
+              // CHANNEL_PLATFORMS list, see channelMeta.js) — this is the
+              // "COORDINATES replaced with LINK" swap: a Business gets
+              // this section in the exact slot a Place would otherwise
+              // have Category Type + Coordinates.
+              <div className={styles.wpField}>
+                <div className={styles.wpFieldHead}>
+                  <span className={styles.wpLabel}>Platform</span>
+                  <span className={styles.wpHint}>Sets the link prefix &amp; icon</span>
+                </div>
+                <div className={styles.wpPlatformRow}>
+                  {BUSINESS_PLATFORMS.map((p) => {
+                    const PlatformIcon = p.icon;
+                    const active = businessPlatform === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        className={`${styles.wpPlatformBtn} ${active ? styles.wpPlatformBtnActive : ''}`}
+                        onClick={() => {
+                          setBusinessPlatform(p.key);
+                          const stillAPrefill = BUSINESS_PLATFORMS.some((pp) => pp.prefill === businessLink);
+                          if (!businessLink.trim() || stillAPrefill) setBusinessLink(p.prefill);
+                        }}
+                      >
+                        <PlatformIcon size={14} />
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className={styles.wpFieldHead} style={{ marginTop: 12 }}>
+                  <span className={styles.wpLabel}>
+                    {businessPlatform && businessPlatform !== 'other'
+                      ? `${businessPlatformMeta(businessPlatform).label} Link/Number`
+                      : 'Link'}{' '}
+                    <span className={styles.wpLabelRequired}>*</span>
+                  </span>
+                  <span className={styles.wpHint}>
+                    {businessPlatform === 'whatsapp'
+                      ? 'Customers message this number directly — got a WhatsApp Channel instead? Use "Other link" for that.'
+                      : 'How customers reach you'}
+                  </span>
+                </div>
+                <div className={styles.wpInputWrap}>
+                  <input
+                    className={styles.wpInput}
+                    value={businessLink}
+                    onChange={(e) => setBusinessLink(e.target.value)}
+                    placeholder={businessPlatformMeta(businessPlatform).prefill}
+                  />
+                  <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                    <LinkIcon size={16} />
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className={styles.wpField}>
+                  <div className={styles.wpFieldHead}>
+                    {!isPerson && (
+                      <span className={styles.wpLabel}>
+                        Category Type <span className={styles.wpLabelRequired}>*</span>
+                      </span>
+                    )}
+                  </div>
+                  {!isPerson && (
+                    <div className={styles.wpInputWrap}>
+                      <select className={styles.wpSelect} value={wpType} onChange={(e) => setWpType(e.target.value)}>
+                        {WP_ALL_TYPES.map(([t, label]) => (
+                          <option key={t} value={t}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                        <MapPin size={16} />
+                      </span>
+                      <span className={styles.wpSelectChevron}>
+                        <ChevronDown size={16} />
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {/* People, Channel and Business entries have no map
+                    location — coordinates are Places-only. */}
+                {!isPerson && !isChannel && !isBusiness && !isNew && (
+                  <div className={styles.wpField}>
+                    <div className={styles.wpFieldHead}>
+                      <label className={styles.wpLabel} htmlFor="ae-coords">
+                        Coordinates
+                      </label>
+                      <div className={styles.wpCoordActions}>
+                        {onMovePin && (
+                          <button type="button" className={styles.wpCopyBtn} onClick={handleMovePin}>
+                            <Move size={12} /> Move on map
+                          </button>
+                        )}
+                        <button type="button" className={styles.wpCopyBtn} onClick={handleCopyCoords}>
+                          <Copy size={12} /> Copy
+                        </button>
+                      </div>
+                    </div>
+                    <div className={styles.wpInputWrap}>
+                      <input
+                        id="ae-coords"
+                        type="text"
+                        className={`${styles.wpInput} ${styles.wpCoordField}`}
+                        value={coordText}
+                        onChange={(e) => setCoordText(e.target.value)}
+                        placeholder="7.301230, 5.134560"
+                        spellCheck={false}
+                        autoComplete="off"
+                      />
+                      <span className={`${styles.wpInputIcon} ${styles.wpInputIconLeft}`}>
+                        <MapPin size={16} />
+                      </span>
+                    </div>
+                    <span className={coordHint.warn ? styles.wpCoordWarn : styles.wpHint}>{coordHint.text}</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* "Feature in Explore" — the whole ask was "just me picking a
+                name on the map and featuring it", so this lives right in
+                the same edit form as everything else, no separate tab. */}
+            <div className={styles.wpExploreCard}>
+              <div className={styles.wpExploreLeft}>
+                <div className={styles.wpExploreIcon}>
+                  <Star size={16} />
+                </div>
+                <div>
+                  <div className={styles.wpExploreTitle}>
+                    {isChannel ? 'Feature this channel in Explore' : isBusiness ? 'Feature this business in Explore' : 'Feature this place in Explore'}
+                  </div>
+                  <div className={styles.wpExploreSubtitle}>
+                    Spotlight this waypoint on the main campus discovery carousel
+                  </div>
+                </div>
+              </div>
+              <label className={styles.wpSwitch}>
+                <input type="checkbox" checked={isExplore} onChange={(e) => setIsExplore(e.target.checked)} />
+                <span className={styles.wpSwitchTrack} />
+                <span className={styles.wpSwitchThumb} />
+              </label>
+            </div>
+
+            {isExplore && (
+              <div className={styles.wpExploreExtra}>
+                <div className={styles.wpField}>
+                  <div className={styles.wpFieldHead}>
+                    <span className={styles.wpLabel}>Tags shown on the Explore card</span>
+                    <span className={styles.wpHint}>Comma separated</span>
+                  </div>
+                  <input
+                    className={styles.wpInput}
+                    style={{ paddingRight: 17 }}
+                    value={exploreTagsText}
+                    onChange={(e) => setExploreTagsText(e.target.value)}
+                    placeholder="e.g. Quick bite, Open late"
+                  />
+                </div>
+                <div className={styles.wpField}>
+                  <div className={styles.wpFieldHead}>
+                    <span className={styles.wpLabel}>Priority</span>
+                    <span className={styles.wpHint}>Higher shows first / more often</span>
+                  </div>
+                  <input
+                    className={styles.wpInput}
+                    style={{ paddingRight: 17 }}
+                    type="number"
+                    value={explorePriority}
+                    onChange={(e) => setExplorePriority(e.target.value)}
+                  />
+                </div>
+
+                <div className={styles.wpExploreCard}>
+                  <div className={styles.wpExploreLeft}>
+                    <div>
+                      <div className={styles.wpExploreTitle}>Promoted</div>
+                      <div className={styles.wpExploreSubtitle}>Shows an ad badge, pinned first</div>
+                    </div>
+                  </div>
+                  <label className={styles.wpSwitch}>
+                    <input type="checkbox" checked={isPromoted} onChange={(e) => setIsPromoted(e.target.checked)} />
+                    <span className={styles.wpSwitchTrack} />
+                    <span className={styles.wpSwitchThumb} />
+                  </label>
+                </div>
+
+                {isPromoted && (
+                  <div className={styles.wpRow}>
+                    <div className={styles.wpField}>
+                      <div className={styles.wpFieldHead}>
+                        <span className={styles.wpLabel}>Sponsor name</span>
+                      </div>
+                      <input
+                        className={styles.wpInput}
+                        style={{ paddingRight: 17 }}
+                        value={sponsorName}
+                        onChange={(e) => setSponsorName(e.target.value)}
+                        placeholder="e.g. Chicken Republic"
+                      />
+                    </div>
+                    <div className={styles.wpField}>
+                      <div className={styles.wpFieldHead}>
+                        <span className={styles.wpLabel}>Badge label</span>
+                      </div>
+                      <input
+                        className={styles.wpInput}
+                        style={{ paddingRight: 17 }}
+                        value={promoLabel}
+                        onChange={(e) => setPromoLabel(e.target.value)}
+                        placeholder="Promoted / Ad / Sponsored"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className={styles.wpField}>
+              <div className={styles.wpFieldHead}>
+                <span className={styles.wpLabel}>{isPerson || isChannel || isBusiness ? 'Photos' : 'Place Photos'}</span>
+                <span className={styles.wpHint}>JPEG, PNG up to 10MB</span>
+              </div>
+              <div className={styles.wpPhotoGrid}>
+                {existingImages.map((img) => (
+                  <Thumb key={img.id} url={img.url} onRemove={() => removeExisting(img.id)} variant="grid" cover={img === existingImages[0]} />
+                ))}
+                {newFiles.map((f, i) => (
+                  <Thumb key={`new-${i}`} url={previewUrlFor(f)} onRemove={() => removeNew(i)} variant="grid" />
+                ))}
+                <div className={styles.wpDropzone} onClick={() => document.getElementById('adminImgInput')?.click()}>
+                  <div className={styles.wpDropzoneIcon}>
+                    <ImagePlus size={16} />
+                  </div>
+                  <div className={styles.wpDropzoneLabel}>
+                    Click to upload <span>or drag and drop</span>
+                  </div>
+                  <div className={styles.wpDropzoneNote}>
+                    {imagesLoading ? 'Loading…' : 'Add exterior or front-entrance photos'}
+                  </div>
+                </div>
+              </div>
+              <input id="adminImgInput" type="file" accept="image/*" multiple hidden onChange={handleFilesChosen} />
+            </div>
+
+            {status && (
+              <div className={`${styles.wpStatus} ${status.error ? styles.wpStatusError : styles.wpStatusSuccess}`}>
+                {status.icon && (status.error ? <CircleX size={13} /> : <CheckCircle2 size={13} />)} {status.text}
+              </div>
+            )}
+          </div>
+
+          <div className={styles.footerWaypoint}>
+            <button type="button" className={styles.wpDeleteBtn} onClick={handleDelete} disabled={busy}>
+              <Trash2 size={16} /> {isPerson ? 'Delete Person' : isChannel ? 'Delete Channel' : isBusiness ? 'Delete Business' : 'Delete Waypoint'}
+            </button>
+            <div className={styles.wpFooterActions}>
+              <button type="button" className={styles.wpCancelBtn} onClick={onClose}>
+                Cancel
+              </button>
+              <button type="button" className={styles.wpSaveBtn} onClick={handleSave} disabled={busy}>
+                <Check size={16} /> Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.overlay}>
+      <div className={styles.modal}>
+        <div className={styles.header}>
+          <div className={styles.title}>{title}</div>
+          <button type="button" className={styles.close} onClick={onClose}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className={styles.body}>
+        {type === 'segment' && (
+          <>
+            <Field label="Segment Name *">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Segment name" />
+            </Field>
+            <Field label="Description">
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+            </Field>
+            <Field label="Category">
+              <select value={category} onChange={(e) => setCategory(e.target.value)}>
+                {SEGMENT_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Stats">
+              <div className={styles.coordDisplay}>
+                {((editContext.data.distance || 0) / 1000).toFixed(2)} km · {(editContext.data.points || []).length} GPS
+                points · {(editContext.data.waypoints || []).length} waypoints
+              </div>
+            </Field>
+          </>
+        )}
+
+        {type === 'kml' && (
+          <>
+            <Field label="Feature Name">
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Feature name" />
+            </Field>
+            <Field label="Description / Note">
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+            </Field>
+            <Field label="Waypoint Type">
+              <select value={wpType} onChange={(e) => setWpType(e.target.value)}>
+                {WP_ALL_TYPES.map(([t, label]) => (
+                  <option key={t} value={t}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Source File">
+              <div className={styles.coordDisplay}>
+                {editContext.path} <span className={styles.sourceTag}>{editContext.data.type || 'feature'}</span>
+              </div>
+            </Field>
+            <Field label="Coordinates">
+              <div className={styles.coordDisplay}>
+                {Number(editContext.data.lat).toFixed(6)}, {Number(editContext.data.lng).toFixed(6)}
+              </div>
+            </Field>
+          </>
+        )}
+
+        {/* ── Photos ─────────────────────────────────────────────────── */}
+        <div className={styles.fieldGroup}>
+          <label>{type === 'segment' ? 'Photos (shown in route popup)' : type === 'kml' ? 'Photos for this KML feature' : 'Photos'}</label>
+          <div className={styles.imgZone} onClick={() => document.getElementById('adminImgInput')?.click()}>
+            <div className={styles.imgZoneLabel}>
+              <Camera size={13} /> Click to add photos (JPEG/PNG)
+            </div>
+            <div className={styles.imgThumbs}>
+              {imagesLoading && <span className={styles.loadingNote}>Loading…</span>}
+              {type !== 'kml' &&
+                existingImages.map((img) => (
+                  <Thumb key={img.id} url={img.url} onRemove={() => removeExisting(img.id)} />
+                ))}
+              {type !== 'kml' &&
+                newFiles.map((f, i) => (
+                  <Thumb key={`new-${i}`} url={previewUrlFor(f)} onRemove={() => removeNew(i)} />
+                ))}
+              {type === 'kml' &&
+                kmlImageFiles.map((f, i) => (
+                  <Thumb
+                    key={`kml-${i}`}
+                    url={previewUrlFor(f)}
+                    onRemove={() => adminKml.removeImageFile(editContext.path, editContext.idx, i)}
+                  />
+                ))}
+            </div>
+          </div>
+          <input id="adminImgInput" type="file" accept="image/*" multiple hidden onChange={handleFilesChosen} />
+        </div>
+
+        {type === 'kml' && (
+          <button
+            type="button"
+            className={styles.importBtn}
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setStatus(null);
+              try {
+                await adminKml.importFeature(editContext.path, editContext.idx, {
+                  waypointType: wpType,
+                  onImported: () => {
+                    onWaypointChanged?.();
+                    onSegmentChanged?.();
+                  },
+                });
+                setStatus({ text: 'Imported to Supabase successfully!', error: false, icon: true });
+                onClose();
+              } catch (e) {
+                setStatus({ text: `Import failed: ${e.message}`, error: true, icon: true });
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <Cloud size={13} /> IMPORT TO SUPABASE
+          </button>
+        )}
+
+        {status && (
+          <div className={`${styles.saveStatus} ${status.error ? styles.saveStatusError : styles.saveStatusSuccess}`}>
+            {status.icon && (status.error ? <CircleX size={13} /> : <CheckCircle2 size={13} />)} {status.text}
+          </div>
+        )}
+        </div>
+
+        <div className={styles.footer}>
+          {showDelete && (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnDanger}`}
+              onClick={handleDelete}
+              disabled={busy}
+            >
+              DELETE
+            </button>
+          )}
+          <button type="button" className={`${styles.btn} ${styles.btnSecondary}`} onClick={onClose}>
+            CANCEL
+          </button>
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            onClick={handleSave}
+            disabled={busy}
+          >
+            SAVE CHANGES
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div className={styles.fieldGroup}>
+      <label>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function Thumb({ url, onRemove, variant, cover }) {
+  if (variant === 'grid') {
+    return (
+      <div className={styles.wpThumbGridItem}>
+        <PlaceImage
+          src={url}
+          onClick={(e) => {
+            e.stopPropagation();
+            window.open(url, '_blank');
+          }}
+          alt=""
+          fallback={
+            <span className={styles.thumbFallbackGrid} title="Photo unavailable">
+              <ImageOff size={24} />
+            </span>
+          }
+        />
+        {cover && <span className={styles.wpThumbCoverTag}>Cover</span>}
+        <button
+          type="button"
+          className={styles.wpThumbRemove}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          title="Remove"
+        >
+          <X size={12} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.imgThumbWrap}>
+      <PlaceImage
+        className={styles.imgThumb}
+        src={url}
+        onClick={(e) => {
+          e.stopPropagation();
+          window.open(url, '_blank');
+        }}
+        alt=""
+        fallback={
+          <span className={styles.thumbFallbackSmall} title="Photo unavailable">
+            <ImageOff size={20} />
+          </span>
+        }
+      />
+      <button
+        type="button"
+        className={styles.imgRemove}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        title="Remove"
+      >
+        <X size={11} />
+      </button>
+    </div>
+  );
+}

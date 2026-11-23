@@ -1,0 +1,222 @@
+/* Full-screen photo viewer for PlaceCard (see PhotoLightbox.jsx).
+   Sits above every other layer in the app (highest existing z-index is
+   10001 — the Modal-based admin flows), so it can never be hidden behind
+   the place card, nav HUD or a modal. Dark chrome regardless of theme:
+   photos are judged against a dark, neutral backdrop. */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10100;
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 10, 20, 0.96);
+  color: #fff;
+  font-family: var(--font-ui);
+  animation: fadeIn var(--v2-duration-standard) var(--v2-ease-standard);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.topBar,
+.bottomBar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  position: relative;
+  z-index: 2;
+}
+.topBar {
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+.bottomBar {
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.counter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.count {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.iconBtn {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard),
+    opacity var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.iconBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.24);
+}
+.iconBtn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.iconBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.iconBtn:focus-visible,
+.navBtn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* ── stage ─────────────────────────────────────────────────────────── */
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* We handle every gesture ourselves — stop the browser from panning,
+     pinch-zooming the page, or pulling-to-refresh underneath. */
+  touch-action: none;
+  cursor: zoom-in;
+}
+.stage.zoomed {
+  cursor: grab;
+}
+.stage.zoomed:active {
+  cursor: grabbing;
+}
+
+.img {
+  flex-shrink: 0;
+  max-width: none;
+  display: block;
+  pointer-events: none;
+  transform-origin: center center;
+  will-change: transform;
+  transition: opacity 0.2s;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+.img.smooth {
+  transition: opacity 0.2s, transform 0.22s var(--v2-ease-standard);
+}
+
+.spinner {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+.error {
+  position: absolute;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.navBtn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.navBtn:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.prev {
+  left: 10px;
+}
+.next {
+  right: 10px;
+}
+
+/* ── zoom tool ─────────────────────────────────────────────────────── */
+.zoomTool {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 420px;
+  padding: 6px 8px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.08);
+}
+.zoomTool .iconBtn {
+  width: 36px;
+  height: 36px;
+}
+.pct {
+  flex-shrink: 0;
+  min-width: 42px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+.help {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.slider {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--v2-primary);
+  touch-action: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay { animation: none; }
+  .img.smooth { transition: opacity 0.2s; }
+}

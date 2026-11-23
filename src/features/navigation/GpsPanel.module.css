@@ -1,0 +1,534 @@
+/* GPS Signal panel — Oct 2026 redesign (public/Maps By FUTA —
+   signal-Redesign-png.zip). Brand tokens only (DESIGN_SYSTEM.md): violet
+   button, teal signal + switch, white cards with a `border` edge. The one
+   exception is `fair`, which keeps --v2-tertiary amber — the brand palette
+   has no middle state between teal and error. Headings, button and the
+   big score use Plus Jakarta Sans, the same as the Explore title. */
+
+.body {
+  container: gps / inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--v2-on-primary);
+  font-family: var(--font-ui);
+}
+/* Desktop floating card (Sidebar's .gpsCard): tighter spacing and lighter
+   type than the mobile sheet, per the V2 desktop screen. */
+.bodyDesktop {
+  gap: 12px;
+  padding: 20px;
+}
+.bodyDesktop .title {
+  font-size: 19px;
+  font-weight: 700;
+}
+.bodyDesktop .subtitle {
+  font-size: 13px;
+  color: var(--v2-text-muted);
+}
+.bodyDesktop .badge {
+  font-size: 11px;
+  padding: 5px 10px;
+}
+.bodyDesktop .iconBtn {
+  width: 32px;
+  height: 32px;
+}
+.bodyDesktop .visCard {
+  padding: 18px 16px 14px;
+  border-radius: 16px;
+}
+.bodyDesktop .bars {
+  height: 84px;
+  gap: 8px;
+}
+.bodyDesktop .bar {
+  flex-basis: 28px;
+  border-radius: 4px;
+}
+.bodyDesktop .visReadout {
+  margin-top: 10px;
+}
+.bodyDesktop .visNumber {
+  font-size: 26px;
+  font-weight: 700;
+}
+.bodyDesktop .visCaption {
+  font-size: 14px;
+  font-weight: 500;
+}
+.bodyDesktop .gpsBtn {
+  min-height: 46px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 8px 18px -8px var(--v2-primary-glow-strong);
+}
+.bodyDesktop .stop {
+  box-shadow: none;
+}
+.bodyDesktop .stat {
+  padding: 9px 11px;
+  gap: 4px;
+}
+.bodyDesktop .statLabel {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--v2-text-muted);
+}
+.bodyDesktop .statValue {
+  font-size: 14px;
+  font-weight: 500;
+}
+.bodyDesktop .liveTitle {
+  font-size: 13px;
+  font-weight: 600;
+}
+.bodyDesktop .switch {
+  width: 42px;
+  height: 24px;
+}
+.bodyDesktop .switchThumb {
+  width: 18px;
+  height: 18px;
+}
+.bodyDesktop .switchOn .switchThumb {
+  transform: translateX(18px);
+}
+/* MobileSheet's .body already adds the safe-area inset at the bottom. */
+.bodyEmbedded {
+  padding: 0 16px 4px;
+}
+
+.grabber {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  margin: -4px 0 2px;
+  border-radius: var(--r-full);
+  background: var(--v2-divider);
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-family: var(--v2-font-jakarta);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--v2-neutral);
+}
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--v2-text);
+}
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  border-radius: var(--r-full);
+  background: var(--v2-hud-upnext-bg);
+  color: var(--v2-text-muted);
+  transition: background var(--v2-duration-standard) var(--v2-ease-standard),
+    color var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.badgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: currentColor;
+  flex-shrink: 0;
+}
+.badge.tracking {
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+}
+.badge.good {
+  background: var(--v2-secondary-tint);
+  color: var(--v2-secondary);
+}
+.badge.fair {
+  background: var(--v2-tertiary-container);
+  color: var(--v2-tertiary);
+}
+.badge.poor {
+  background: var(--v2-error-tint);
+  color: var(--v2-error-text);
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary);
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.iconBtnClose {
+  background: var(--v2-hud-upnext-bg);
+  color: var(--v2-neutral);
+}
+.iconBtn:hover {
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+}
+
+/* ── Signal card ─────────────────────────────────────────────────── */
+.visCard {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 22px 20px 18px;
+  border: 1px solid var(--v2-divider);
+  border-radius: 20px;
+  background: linear-gradient(180deg, var(--v2-on-primary) 0%, var(--v2-hud-upnext-bg) 100%);
+}
+.visOrb {
+  position: absolute;
+  top: -50px;
+  right: -40px;
+  width: 140px;
+  height: 140px;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-tint);
+  filter: blur(28px);
+  pointer-events: none;
+}
+
+.bars {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 10px;
+  height: 112px;
+  width: 100%;
+}
+.bar {
+  flex: 0 1 34px;
+  border-radius: 5px;
+  background: var(--v2-divider);
+  transition: background var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.miniBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.miniBar {
+  width: 5px;
+  border-radius: 1.5px;
+  background: var(--v2-divider);
+}
+.activegood {
+  background: var(--v2-secondary);
+}
+.activefair {
+  background: var(--v2-tertiary);
+}
+.activepoor {
+  background: var(--v2-error-text);
+}
+
+.visReadout {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 12px;
+}
+.visNumber {
+  font-family: var(--v2-font-jakarta);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--v2-text-muted);
+}
+.textgood {
+  color: var(--v2-secondary);
+}
+.textfair {
+  color: var(--v2-tertiary);
+}
+.textpoor {
+  color: var(--v2-error-text);
+}
+.visCaption {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+}
+
+/* ── Primary button ──────────────────────────────────────────────── */
+.gpsBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 20px;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  font-family: var(--v2-font-jakarta);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: 0 10px 24px -6px var(--v2-primary-glow-strong);
+  cursor: pointer;
+  transition: transform var(--v2-duration-quick) var(--v2-ease-standard),
+    background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.gpsBtn:hover {
+  background: var(--v2-primary-hover);
+}
+.gpsBtn:focus-visible,
+.iconBtn:focus-visible,
+.detailsBtn:focus-visible,
+.switch:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+/* Stop tracking — outlined destructive, per DESIGN_SYSTEM.md's outlined
+   button with error text. */
+.stop {
+  background: var(--v2-on-primary);
+  color: var(--v2-error-text);
+  border: 1px solid var(--v2-divider);
+  box-shadow: none;
+}
+.stop:hover {
+  background: var(--v2-error-tint);
+}
+.acquiring {
+  cursor: progress;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .gpsBtn:active {
+    transform: scale(0.98);
+  }
+  .acquiring svg {
+    animation: locatePulse 1.2s var(--v2-ease-standard) infinite;
+  }
+}
+@keyframes locatePulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ── Compact signal row (mobile half sheet) ──────────────────────── */
+.signalRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--v2-divider);
+  border-radius: 14px;
+  background: var(--v2-hud-upnext-bg);
+}
+.signalRowText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.signalRowTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+.signalRowScore {
+  font-weight: 500;
+  color: var(--v2-text);
+}
+.signalRowSub {
+  font-size: 12px;
+  color: var(--v2-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.detailsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Stats ───────────────────────────────────────────────────────── */
+/* Narrow containers: Accuracy on its own row, then Speed and Heading.
+   300px and up (the mobile sheet and the 400px desktop card): three
+   across, as in the design. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.statWide {
+  grid-column: 1 / -1;
+}
+@container gps (min-width: 300px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .statWide {
+    grid-column: auto;
+  }
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--v2-divider);
+  border-radius: 12px;
+  background: var(--v2-on-primary);
+}
+.statHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.statIcon {
+  color: var(--v2-primary);
+  flex-shrink: 0;
+}
+.statLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--v2-text);
+}
+.statValue {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Live tracking switch ────────────────────────────────────────── */
+.liveRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+}
+.liveText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.liveTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--v2-neutral);
+}
+.liveSub {
+  font-size: 12px;
+  color: var(--v2-text);
+}
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 48px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: var(--v2-divider);
+  cursor: pointer;
+  transition: background var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.switchOn {
+  background: var(--v2-secondary);
+}
+.switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.switchThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+  transition: transform var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.switchOn .switchThumb {
+  transform: translateX(20px);
+}
+
+/* ── Warning ─────────────────────────────────────────────────────── */
+.warning {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--v2-tertiary-container);
+  color: var(--v2-on-tertiary-container);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.poorWarn {
+  background: var(--v2-error-tint);
+  color: var(--v2-error-text);
+}

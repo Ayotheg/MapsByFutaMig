@@ -1,0 +1,53 @@
+/* ── SEGMENT POPUP — ported verbatim from legacy style.css ~2668–2684 ─────
+   Deliberately a plain global .css file, not a CSS Module — same reason as
+   waypointMarkers.css: this HTML is injected directly by Leaflet's
+   L.popup().setContent(), not rendered by React, so CSS-Module class-name
+   hashing would never match it.
+
+   Font-mapping note (same situation Slice 2 flagged for PlaceCard's
+   `.name`): legacy's literal CSS was `font-family:'Geist',sans-serif` for
+   `.seg-popup` and `'JetBrains Mono',monospace` for the meta/button —
+   neither family is ever imported/self-hosted anywhere in the legacy app,
+   so both were dead literals falling back to the browser default. Mapped
+   to the closest documented token instead: `--font-ui` (the dominant UI
+   font, same choice made for PlaceCard's name) and `--font-mono`
+   respectively.
+   ────────────────────────────────────────────────────────────────────── */
+
+.seg-popup {
+  font-family: var(--font-ui);
+  min-width: 160px;
+}
+
+.seg-popup-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.seg-popup-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.seg-popup-btn {
+  width: 100%;
+  background: rgba(183, 109, 255, 0.12);
+  border: 1px solid rgba(183, 109, 255, 0.35);
+  border-radius: var(--r-sm);
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 7px;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 0.2s;
+}
+.seg-popup-btn:hover {
+  background: rgba(183, 109, 255, 0.25);
+}

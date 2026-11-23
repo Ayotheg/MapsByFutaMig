@@ -1,0 +1,110 @@
+/*
+ * Trip-resume cover — see NavResumeOverlay.jsx. Same dim layer and card
+ * as ZoomHint.module.css, one step above it (ZoomHint is 750) and still
+ * below Leaflet's controls (800).
+ */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 760;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.55);
+  pointer-events: none;
+  animation: overlayIn var(--v2-duration-quick) var(--v2-ease-standard);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 320px;
+  text-align: center;
+  color: #fff;
+  font-family: var(--font-ui);
+}
+
+.pulseWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+  height: 148px;
+  margin-bottom: 18px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.icon {
+  position: relative;
+  color: #fff;
+  animation: iconBreathe 1.8s var(--v2-ease-standard) infinite;
+}
+
+/* Two rings ripple out from the locate icon, half a beat apart. */
+.ring {
+  position: absolute;
+  inset: 34px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  opacity: 0;
+  animation: ripple 1.8s var(--v2-ease-standard) infinite;
+}
+.ringLate {
+  animation-delay: 0.9s;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  opacity: 0.9;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+@keyframes iconBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.88); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay, .icon, .ring { animation: none; }
+}
+
+@media (max-width: 768px) {
+  /* Lift the content clear of the mobile navbar. */
+  .overlay {
+    padding-bottom: 140px;
+  }
+  .pulseWrap {
+    width: 132px;
+    height: 132px;
+  }
+  .ring {
+    inset: 28px;
+  }
+  .title {
+    font-size: 20px;
+  }
+}

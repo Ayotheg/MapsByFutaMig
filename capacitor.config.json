@@ -1,0 +1,16 @@
+{
+  "appId": "xyz.mapsbyfuta.app",
+  "appName": "Maps By FUTA",
+  "webDir": "dist-app",
+  "backgroundColor": "#faf8ff",
+  "server": {
+    "androidScheme": "https",
+    "appStartPath": "/map"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "LIGHT"
+    }
+  }
+}

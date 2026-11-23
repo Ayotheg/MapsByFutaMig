@@ -1,0 +1,28 @@
+/*
+ * Scrim behind the sign-in flow (AuthModal.jsx). The flow's own styles
+ * live in AuthFlow.module.css; the signed-in profile is ProfilePage.
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9100;
+  background: var(--v2-scrim);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: overlayIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    animation: none;
+  }
+}

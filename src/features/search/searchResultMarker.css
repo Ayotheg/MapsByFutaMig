@@ -1,0 +1,48 @@
+/* ── Search result map pin ────────────────────────────────────────────
+   Bug fix (reported directly): `useSelectResult.js` used to build this
+   marker with a fully inline-styled `L.divIcon` — flat #60a5fa blue box,
+   black text, DM Mono — none of it drawn from tokens-v2.css, so it read
+   as an unstyled placeholder against every other on-brand surface in the
+   app.
+
+   Follow-up (reported directly): the first pass kept the old marker's
+   "dot + text label" shape, but with no explicit `zIndexOffset` it
+   layered into the DOM in whatever order Leaflet happened to add
+   markers, so it could end up sitting *under* the campus's existing
+   waypoint pins instead of clearly marking the selected result. Now a
+   plain icon-only teardrop pin (the name is already shown in the place
+   card `onSelect` opens right after — see useSelectResult.js — so the
+   map pin itself doesn't need to repeat it), and `useSelectResult.js`
+   gives it a `zIndexOffset` above `buildWaypointMarker`'s (100,
+   waypointMarkers.js) so it always draws on top of the pins already on
+   the map. Shape mirrors `.nav-dest-pin-wrap` (navMapLayers.css) — same
+   teardrop, same anchor-at-the-tip convention — just in the app's violet
+   primary instead of the error/red used for an active nav destination,
+   so the two read as related but distinct map states.
+
+   Plain global .css, not a CSS Module, for the same reason as
+   waypointMarkers.css/navMapLayers.css: Leaflet injects this HTML
+   directly via divIcon, so a CSS-Module hashed class name would never
+   match it.
+   ────────────────────────────────────────────────────────────────────── */
+
+.search-hit-pin-wrap {
+  width: 34px;
+  height: 34px;
+  background: var(--v2-primary, #7c3aed);
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.5), 0 2px 6px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.search-hit-pin-icon {
+  transform: rotate(45deg);
+  color: var(--v2-on-primary, #fff);
+  display: flex;
+}
+.search-hit-pin-icon svg {
+  display: block;
+}

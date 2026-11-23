@@ -1,0 +1,62 @@
+/* Same fixed-top slot/shape as OfflineBanner.module.css — this and that
+   are the only two banners that float above the map itself, so they
+   share the construction (position, z-index, animation) even though
+   they live in different feature folders. */
+.banner {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  padding: 8px 10px 8px 14px;
+  border-radius: var(--r-lg);
+  box-shadow: 0px 10px 15px -3px rgba(15, 23, 42, 0.12);
+  max-width: min(90vw, 380px);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-primary);
+  color: var(--v2-neutral);
+  animation: bannerIn var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.icon {
+  flex-shrink: 0;
+  color: var(--v2-primary);
+}
+.cancelButton {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--v2-primary-glow);
+  border: none;
+  border-radius: var(--r-md);
+  padding: 5px 9px;
+  color: var(--v2-primary);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 11px;
+  cursor: pointer;
+}
+.cancelButton:hover {
+  background: var(--v2-primary-outline);
+}
+
+@keyframes bannerIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}
