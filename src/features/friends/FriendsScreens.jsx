@@ -251,7 +251,7 @@ function shareText(session) {
   return `${intro}: ${url}\nOr open Nav › Join with a code: ${session.code}`;
 }
 
-export function Lobby({ isMobile, session, members, progress, myId, isHost, now, notice, connected, everConnected, searchIndex, unreadCount = 0, onOpenChat, onMeetPlaceChange, onHaveCode, onStart, onLeave }) {
+export function Lobby({ isMobile, session, members, progress, myId, isHost, now, notice, connected, everConnected, searchIndex, unreadCount = 0, hasMessages = false, onOpenChat, onMeetPlaceChange, onHaveCode, onStart, onLeave }) {
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [pickingPlace, setPickingPlace] = useState(false);
@@ -455,7 +455,7 @@ export function Lobby({ isMobile, session, members, progress, myId, isHost, now,
         <span className={cx(styles.overline, styles.overlineViolet)}>{race ? 'Race to a place' : 'Meet a friend'}</span>
         <h2 className={styles.title}>{title}</h2>
       </div>
-      {canStart && onOpenChat && (
+      {(canStart || hasMessages || unreadCount > 0) && onOpenChat && (
         <button type="button" className={cx(styles.btn, styles.btnSecondary, styles.btnSmall)} onClick={onOpenChat}>
           <MessageCircle size={16} />
           Chat

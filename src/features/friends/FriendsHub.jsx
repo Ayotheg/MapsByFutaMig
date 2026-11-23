@@ -3,7 +3,7 @@ import L from 'leaflet';
 import { useFriendsSession } from './useFriendsSession';
 import { Countdown, Ended, Finished, Invite, JoinCode, Lobby, MeetBoard, RaceBoard, RaceSetup, Results } from './FriendsScreens';
 import FriendsChat from './FriendsChat';
-import { PAUSED_AFTER_MS, distanceM, firstName } from './friendsSession';
+import { PAUSED_AFTER_MS, countUnreadMessages, distanceM, firstName } from './friendsSession';
 import { getLastFix } from '../navigation/gpsWatch';
 
 function useNow(active, everyMs = 1000) {
@@ -170,7 +170,15 @@ export default function FriendsHub({
   const toastTimerRef = useRef(null);
 
   useEffect(() => {
-    if (!session?.code || !joined || phase === 'ended') {
+    setChatOpen(false);
+    setLastReadId(null);
+    setToastMsg(null);
+    lastSeenIdRef.current = null;
+    clearTimeout(toastTimerRef.current);
+  }, [session?.code]);
+
+  useEffect(() => {
+    if (!joined || phase === 'ended') {
       setChatOpen(false);
       setLastReadId(null);
       setToastMsg(null);
@@ -179,7 +187,14 @@ export default function FriendsHub({
     } else if (phase === 'countdown') {
       setChatOpen(false);
     }
-  }, [session?.code, joined, phase]);
+  }, [joined, phase]);
+
+  // Let the "You finished" celebration take focus instead of hiding behind chat.
+  const prevFinishedRef = useRef(meFinished);
+  useEffect(() => {
+    if (meFinished && !prevFinishedRef.current) setChatOpen(false);
+    prevFinishedRef.current = meFinished;
+  }, [meFinished]);
 
   // Mark messages read while chat is open, or pop a brief toast on new incoming ones.
   useEffect(() => {
@@ -208,12 +223,10 @@ export default function FriendsHub({
 
   useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
-  const unreadCount = useMemo(() => {
-    if (chatOpen || !messages.length) return 0;
-    const idx = lastReadId ? messages.findIndex((m) => m.id === lastReadId) : -1;
-    const unseen = idx >= 0 ? messages.slice(idx + 1) : messages;
-    return unseen.filter((m) => m.senderId !== myId).length;
-  }, [chatOpen, messages, lastReadId, myId]);
+  const unreadCount = useMemo(
+    () => (chatOpen ? 0 : countUnreadMessages(messages, lastReadId, myId)),
+    [chatOpen, messages, lastReadId, myId]
+  );
 
   const lastMessage = messages.length ? messages[messages.length - 1] : null;
   function openChat() {
@@ -326,6 +339,9 @@ export default function FriendsHub({
   const tripShowing = navOpen && !navActive;
   // A place card, the mobile sheet or search covering the bottom takes over.
   const boardVisible = (phase === 'live' && joined && !tripShowing && !covered && (meetLive || race)) || false;
+  useEffect(() => {
+    if (phase === 'live' && (covered || tripShowing)) setChatOpen(false);
+  }, [phase, covered, tripShowing]);
   // The race's finish screen / the meetup's "You've met" replace the trip's
   // own arrival banner.
   const quietArrival = joined && (race ? phase === 'live' || phase === 'countdown' : phase === 'live');
@@ -427,7 +443,7 @@ export default function FriendsHub({
       place={session.place}
       placeDistance={placeDistance}
       arrived={f.meetArrived}
-      paused={phase === 'live' && !f.meetArrived && otherPaused}
+      paused={phase === 'live' && !f.meetArrived && Boolean(other?.at) && otherPaused}
       playerCount={session.roster?.length || members.length || 2}
       connected={f.connected}
       messages={messages}
@@ -439,32 +455,31 @@ export default function FriendsHub({
   );
 
   if (phase === 'lobby') {
+    if (chatOpen) return chatDrawer;
     return (
-      <>
-        <Lobby
-          isMobile={isMobile}
-          session={session}
-          members={members}
-          progress={progress}
-          myId={myId}
-          isHost={isHost}
-          now={now}
-          searchIndex={searchIndex}
-          notice={notice}
-          connected={f.connected}
-          everConnected={f.everConnected}
-          unreadCount={unreadCount}
-          onOpenChat={openChat}
-          onMeetPlaceChange={f.setMeetPlace}
-          onHaveCode={() => {
-            f.leave();
-            onStartModeChange('code');
-          }}
-          onStart={f.start}
-          onLeave={f.leave}
-        />
-        {chatDrawer}
-      </>
+      <Lobby
+        isMobile={isMobile}
+        session={session}
+        members={members}
+        progress={progress}
+        myId={myId}
+        isHost={isHost}
+        now={now}
+        searchIndex={searchIndex}
+        notice={notice}
+        connected={f.connected}
+        everConnected={f.everConnected}
+        unreadCount={unreadCount}
+        hasMessages={messages.length > 0}
+        onOpenChat={openChat}
+        onMeetPlaceChange={f.setMeetPlace}
+        onHaveCode={() => {
+          f.leave();
+          onStartModeChange('code');
+        }}
+        onStart={f.start}
+        onLeave={f.leave}
+      />
     );
   }
 
@@ -495,23 +510,21 @@ export default function FriendsHub({
   // phase === 'live'
   if (race) {
     if (meFinished && watchingCode !== session.code) {
+      if (chatOpen) return chatDrawer;
       return (
-        <>
-          <Finished
-            isMobile={isMobile}
-            session={session}
-            rows={rows}
-            unreadCount={unreadCount}
-            onOpenChat={openChat}
-            onWatch={() => setWatchingCode(session.code)}
-            onLeave={f.leave}
-          />
-          {chatDrawer}
-        </>
+        <Finished
+          isMobile={isMobile}
+          session={session}
+          rows={rows}
+          unreadCount={unreadCount}
+          onOpenChat={openChat}
+          onWatch={() => setWatchingCode(session.code)}
+          onLeave={f.leave}
+        />
       );
     }
-    if (chatOpen) return chatDrawer;
     if (!boardVisible) return null;
+    if (chatOpen) return chatDrawer;
     return (
       <RaceBoard
         session={session}
@@ -535,8 +548,8 @@ export default function FriendsHub({
     );
   }
 
-  if (chatOpen) return chatDrawer;
   if (!boardVisible) return null;
+  if (chatOpen) return chatDrawer;
   return (
     <MeetBoard
       otherName={resolvedOtherName}

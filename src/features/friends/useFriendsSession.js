@@ -22,6 +22,8 @@ import {
   createCode,
   distanceM,
   nextHost,
+  normalizeIncomingChat,
+  normalizeIncomingTyping,
   raceDone,
   sanitizeChatText,
 } from './friendsSession';
@@ -361,17 +363,8 @@ export function useFriendsSession(user) {
         });
 
         channel.on('broadcast', { event: 'chat' }, ({ payload }) => {
-          const s = sessionRef.current;
-          if (!s?.joined || s.phase === 'ended' || !payload?.id || !payload?.senderId) return;
-          const text = sanitizeChatText(payload.text);
-          if (!text) return;
-          const msg = {
-            id: String(payload.id),
-            senderId: String(payload.senderId),
-            senderName: String(payload.senderName || s.names?.[payload.senderId] || 'Friend'),
-            text,
-            at: Number.isFinite(payload.at) ? payload.at : Date.now(),
-          };
+          const msg = normalizeIncomingChat(payload, sessionRef.current, myIdRef.current, presentIds());
+          if (!msg) return;
           setMessages((prev) => appendChatMessage(prev, msg));
           setTypingBy((prev) => {
             if (!prev[msg.senderId]) return prev;
@@ -382,17 +375,15 @@ export function useFriendsSession(user) {
         });
 
         channel.on('broadcast', { event: 'typing' }, ({ payload }) => {
-          const s = sessionRef.current;
-          if (!s?.joined || s.phase === 'ended' || !payload?.id || payload.id === myIdRef.current) return;
-          const id = String(payload.id);
-          if (payload.active) {
-            const name = String(payload.name || s.names?.[id] || 'Friend');
-            setTypingBy((prev) => ({ ...prev, [id]: { id, name, at: Date.now() } }));
+          const ev = normalizeIncomingTyping(payload, sessionRef.current, myIdRef.current, presentIds());
+          if (!ev) return;
+          if (ev.active) {
+            setTypingBy((prev) => ({ ...prev, [ev.id]: { id: ev.id, name: ev.name, at: ev.at } }));
           } else {
             setTypingBy((prev) => {
-              if (!prev[id]) return prev;
+              if (!prev[ev.id]) return prev;
               const next = { ...prev };
-              delete next[id];
+              delete next[ev.id];
               return next;
             });
           }
@@ -491,7 +482,7 @@ export function useFriendsSession(user) {
       setConnected(false);
       setMembers([]);
     };
-  }, [code, myId, reopenKey, patch, send, amHost, stateFor, applyState, recordFinish, dropPlayers, resendArrival, endSession]);
+  }, [code, myId, reopenKey, patch, send, amHost, stateFor, applyState, recordFinish, dropPlayers, resendArrival, endSession, presentIds]);
 
   // Kept across reconnects of the same session; a stationary phone has no
   // new fix to send when it comes back.
@@ -753,6 +744,12 @@ export function useFriendsSession(user) {
 
   // ── Ephemeral chat: clears automatically once a meetup or race ends ─
   useEffect(() => {
+    setMessages([]);
+    setTypingBy({});
+    lastTypingSentRef.current = { active: false, at: 0 };
+  }, [code]);
+
+  useEffect(() => {
     if (!code || !joined || phase === 'ended') {
       setMessages([]);
       setTypingBy({});
@@ -786,7 +783,7 @@ export function useFriendsSession(user) {
     (active) => {
       const s = sessionRef.current;
       const me = myIdRef.current;
-      if (!s?.joined || s.phase === 'ended' || !me || !connectedRef.current) return;
+      if (!s?.joined || s.phase === 'ended' || !me || !connectedRef.current || !channelRef.current) return;
       const now = Date.now();
       const prev = lastTypingSentRef.current;
       if (active) {
@@ -805,7 +802,7 @@ export function useFriendsSession(user) {
     (rawText, { quick = false } = {}) => {
       const s = sessionRef.current;
       const me = myIdRef.current;
-      if (!s?.joined || s.phase === 'ended' || !me || !connectedRef.current) return false;
+      if (!s?.joined || s.phase === 'ended' || !me || !connectedRef.current || !channelRef.current) return false;
       const text = sanitizeChatText(rawText);
       if (!text) return false;
       const now = Date.now();
@@ -832,6 +829,7 @@ export function useFriendsSession(user) {
       setProgress({});
       setMessages([]);
       setTypingBy({});
+      lastTypingSentRef.current = { active: false, at: 0 };
       setSession({
         mode: newMode,
         code: createCode(),
@@ -865,6 +863,7 @@ export function useFriendsSession(user) {
       setProgress({});
       setMessages([]);
       setTypingBy({});
+      lastTypingSentRef.current = { active: false, at: 0 };
       setSession({ mode: invite.mode, code: invite.code, joined: false, phase: 'invite', names: {}, fromCode });
     },
     [setSession]
@@ -944,6 +943,7 @@ export function useFriendsSession(user) {
     setProgress({});
     setMessages([]);
     setTypingBy({});
+    lastTypingSentRef.current = { active: false, at: 0 };
     setMyFix(null);
   }, [amHost, endSession, setSession, send, presentIds]);
 

@@ -123,6 +123,8 @@ export function firstName(name) {
 // Ephemeral in-session chat (Meet and Race). Nothing is persisted to the DB.
 export const CHAT_MAX_LENGTH = 240;
 export const CHAT_MAX_MESSAGES = 100;
+export const CHAT_NAME_MAX_LENGTH = 60;
+export const CHAT_ID_MAX_LENGTH = 96;
 export const TYPING_TTL_MS = 3500;
 export const TYPING_THROTTLE_MS = 2000;
 
@@ -131,10 +133,11 @@ export const CHAT_QUICK_REPLIES = {
   race: ['On my way', 'Almost there!', 'Wait up!', 'Where are you?', 'Let’s go!'],
 };
 
-export function sanitizeChatText(input) {
-  const text = String(input || '').replace(/\s+/g, ' ').trim();
+export function sanitizeChatText(input, maxLen = CHAT_MAX_LENGTH) {
+  const text = String(input ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return null;
-  return text.slice(0, CHAT_MAX_LENGTH);
+  const chars = Array.from(text);
+  return chars.length > maxLen ? chars.slice(0, maxLen).join('') : text;
 }
 
 export function appendChatMessage(list, message) {
@@ -142,6 +145,46 @@ export function appendChatMessage(list, message) {
   if (list.some((m) => m.id === message.id)) return list;
   const next = [...list, message];
   return next.length > CHAT_MAX_MESSAGES ? next.slice(next.length - CHAT_MAX_MESSAGES) : next;
+}
+
+function isAllowedChatSender(senderId, session, presentIds) {
+  if (session.roster?.length) return session.roster.includes(senderId);
+  return Boolean(presentIds?.has(senderId) || session.names?.[senderId]);
+}
+
+export function normalizeIncomingChat(payload, session, myId, presentIds, now = Date.now()) {
+  if (!session?.joined || session.phase === 'ended' || !payload?.id || !payload?.senderId) return null;
+  const senderId = String(payload.senderId).slice(0, CHAT_ID_MAX_LENGTH);
+  if (!senderId || senderId === myId) return null;
+  if (!isAllowedChatSender(senderId, session, presentIds)) return null;
+  const id = String(payload.id).trim().slice(0, CHAT_ID_MAX_LENGTH);
+  if (!id) return null;
+  const text = sanitizeChatText(payload.text);
+  if (!text) return null;
+  const senderName =
+    sanitizeChatText(session.names?.[senderId], CHAT_NAME_MAX_LENGTH) ||
+    sanitizeChatText(payload.senderName, CHAT_NAME_MAX_LENGTH) ||
+    'Friend';
+  return { id, senderId, senderName, text, at: now };
+}
+
+export function normalizeIncomingTyping(payload, session, myId, presentIds, now = Date.now()) {
+  if (!session?.joined || session.phase === 'ended' || !payload?.id) return null;
+  const id = String(payload.id).slice(0, CHAT_ID_MAX_LENGTH);
+  if (!id || id === myId) return null;
+  if (!isAllowedChatSender(id, session, presentIds)) return null;
+  const name =
+    sanitizeChatText(session.names?.[id], CHAT_NAME_MAX_LENGTH) ||
+    sanitizeChatText(payload.name, CHAT_NAME_MAX_LENGTH) ||
+    'Friend';
+  return { id, name, active: Boolean(payload.active), at: now };
+}
+
+export function countUnreadMessages(messages, lastReadId, myId) {
+  if (!messages?.length) return 0;
+  const idx = lastReadId ? messages.findIndex((m) => m.id === lastReadId) : -1;
+  const unseen = idx >= 0 ? messages.slice(idx + 1) : messages;
+  return unseen.filter((m) => m.senderId !== myId).length;
 }
 
 export function formatMessageTime(ts) {

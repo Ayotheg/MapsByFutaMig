@@ -44,7 +44,7 @@ export function ChatToast({ message, onOpen }) {
   if (!message) return null;
   const sender = firstName(message.senderName);
   return (
-    <button type="button" className={styles.chatToast} onClick={onOpen} aria-label={`New message from ${sender}`}>
+    <button type="button" className={styles.chatToast} onClick={onOpen}>
       <ChatAvatar name={message.senderName} size="avatarSm" />
       <span className={styles.chatToastBody}>
         <span className={styles.chatToastTop}>
@@ -103,24 +103,65 @@ export default function FriendsChat({
   onClose,
 }) {
   const [draft, setDraft] = useState('');
+  const [kbInset, setKbInset] = useState({ bottom: 0, tight: false });
+  const dialogRef = useRef(null);
+  const inputRef = useRef(null);
   const listRef = useRef(null);
+  const nearBottomRef = useRef(true);
   const typingTimerRef = useRef(null);
 
   const race = mode === 'race';
   const friendFirst = firstName(otherName);
   const quickReplies = CHAT_QUICK_REPLIES[race ? 'race' : 'meet'];
   const canSend = connected && draft.trim().length > 0;
+  const lastMsg = messages.length ? messages[messages.length - 1] : null;
+  const lastMsgId = lastMsg?.id || null;
 
-  // Scroll to the newest message or typing indicator.
+  // Move focus into the dialog on mount and restore it when closed.
+  useEffect(() => {
+    const prev = document.activeElement;
+    if (isMobile) dialogRef.current?.focus({ preventScroll: true });
+    else inputRef.current?.focus({ preventScroll: true });
+    return () => {
+      if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+        prev.focus({ preventScroll: true });
+      }
+    };
+  }, [isMobile]);
+
+  // Adapt mobile sheet height/bottom offset when the virtual keyboard opens.
+  useEffect(() => {
+    if (!isMobile || typeof window === 'undefined' || !window.visualViewport) return undefined;
+    const vv = window.visualViewport;
+    const update = () => {
+      const bottom = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setKbInset({ bottom, tight: vv.height < 420 });
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [isMobile]);
+
+  // Auto-scroll to newest message (works past CHAT_MAX_MESSAGES cap) when near bottom or sending.
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, typingUsers.length]);
+    if (!el) return;
+    if (nearBottomRef.current || lastMsg?.senderId === myId) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [lastMsgId, lastMsg?.senderId, myId, typingUsers.length]);
 
-  // Escape closes chat back to the map.
+  // Escape closes chat back to the map without dismissing anything underneath.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -135,6 +176,12 @@ export default function FriendsChat({
     [onTyping]
   );
 
+  function handleListScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+  }
+
   function handleInputChange(value) {
     setDraft(value);
     clearTimeout(typingTimerRef.current);
@@ -146,9 +193,15 @@ export default function FriendsChat({
     }
   }
 
+  function handleInputBlur() {
+    clearTimeout(typingTimerRef.current);
+    onTyping(false);
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     if (!canSend) return;
+    nearBottomRef.current = true;
     if (onSend(draft, { quick: false })) {
       setDraft('');
       clearTimeout(typingTimerRef.current);
@@ -157,6 +210,7 @@ export default function FriendsChat({
 
   function handleQuick(text) {
     if (!connected) return;
+    nearBottomRef.current = true;
     onSend(text, { quick: true });
   }
 
@@ -212,12 +266,24 @@ export default function FriendsChat({
     ? 'Coordinate with your group right here so everyone’s live race tracking stays active. Messages clear when the race ends.'
     : 'Coordinate right here so your live GPS pin stays active. Messages disappear automatically when the meetup ends.';
 
+  const mobileSheetStyle =
+    isMobile && (kbInset.bottom > 0 || kbInset.tight)
+      ? {
+          bottom: kbInset.bottom,
+          height: kbInset.tight ? '100dvh' : `min(74dvh, calc(100dvh - ${kbInset.bottom}px - 48px))`,
+          maxHeight: `calc(100dvh - ${kbInset.bottom}px)`,
+        }
+      : undefined;
+
   const content = (
     <section
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal={isMobile ? 'true' : undefined}
       aria-label={race ? 'Race chat' : `Chat with ${friendFirst}`}
       className={isMobile ? styles.chatSheet : styles.chatPanel}
+      style={mobileSheetStyle}
     >
       {isMobile && (
         <div className={styles.chatHandleWrap}>
@@ -252,19 +318,19 @@ export default function FriendsChat({
       {!connected ? (
         <div className={styles.chatBanner} role="status">
           <WifiOff size={15} />
-          <span>Reconnecting… messages will send once you’re back online.</span>
+          <span>Reconnecting… you can send messages once you’re back online.</span>
         </div>
       ) : (
         !race &&
         paused && (
           <div className={styles.chatBanner} role="status">
             <Clock size={15} />
-            <span>{friendFirst}’s app is paused — they’ll see new messages once they return.</span>
+            <span>{friendFirst}’s app is paused — they may miss messages sent until they return.</span>
           </div>
         )
       )}
 
-      <div ref={listRef} className={styles.chatBody} aria-live="polite">
+      <div ref={listRef} className={styles.chatBody} onScroll={handleListScroll}>
         {messages.length === 0 ? (
           <div className={styles.chatEmpty}>
             <span className={styles.chatEmptyIcon} aria-hidden="true">
@@ -272,13 +338,6 @@ export default function FriendsChat({
             </span>
             <h3 className={styles.chatEmptyTitle}>{race ? 'Race group chat' : `Chat with ${friendFirst}`}</h3>
             <p className={styles.chatEmptySub}>{emptySub}</p>
-            <div className={styles.chatEmptyChips}>
-              {quickReplies.slice(0, 3).map((q) => (
-                <button key={q} type="button" className={styles.chatChip} disabled={!connected} onClick={() => handleQuick(q)}>
-                  {q}
-                </button>
-              ))}
-            </div>
           </div>
         ) : (
           <>
@@ -287,46 +346,51 @@ export default function FriendsChat({
               <span>Temporary chat · clears when {race ? 'race' : 'meetup'} ends</span>
             </div>
 
-            {messages.map((m, i) => {
-              const isMe = m.senderId === myId;
-              const prev = i > 0 ? messages[i - 1] : null;
-              const showSender = race && !isMe && prev?.senderId !== m.senderId;
-              return (
-                <div key={m.id} className={cx(styles.chatMsg, isMe && styles.chatMsgMe)}>
-                  {showSender && <span className={styles.chatSender}>{firstName(m.senderName)}</span>}
-                  <div className={cx(styles.chatBubble, isMe && styles.chatBubbleMe)}>{m.text}</div>
-                  <span className={styles.chatMeta}>
-                    {formatMessageTime(m.at)}
-                    {isMe && <Check size={12} strokeWidth={2.5} />}
-                  </span>
-                </div>
-              );
-            })}
-
-            {typingUsers.length > 0 && (
-              <div className={styles.chatTyping} role="status" aria-label={typingText}>
-                <span className={styles.chatTypingDots} aria-hidden="true">
-                  <span className={styles.chatTypingDot} />
-                  <span className={styles.chatTypingDot} />
-                  <span className={styles.chatTypingDot} />
-                </span>
-                <span className={styles.chatTypingLabel}>{typingText}</span>
-              </div>
-            )}
+            <div className={styles.chatList} role="log" aria-live="polite" aria-relevant="additions">
+              {messages.map((m, i) => {
+                const isMe = m.senderId === myId;
+                const prev = i > 0 ? messages[i - 1] : null;
+                const showSender = race && !isMe && prev?.senderId !== m.senderId;
+                return (
+                  <div key={m.id} className={cx(styles.chatMsg, isMe && styles.chatMsgMe)}>
+                    {showSender && <span className={styles.chatSender}>{firstName(m.senderName)}</span>}
+                    <div className={cx(styles.chatBubble, isMe && styles.chatBubbleMe)}>{m.text}</div>
+                    <span className={styles.chatMeta}>
+                      {formatMessageTime(m.at)}
+                      {isMe && <Check size={12} strokeWidth={2.5} />}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </>
+        )}
+
+        {typingUsers.length > 0 && (
+          <div className={styles.chatTyping} role="status" aria-label={typingText}>
+            <span className={styles.chatTypingDots} aria-hidden="true">
+              <span className={styles.chatTypingDot} />
+              <span className={styles.chatTypingDot} />
+              <span className={styles.chatTypingDot} />
+            </span>
+            <span className={styles.chatTypingLabel}>{typingText}</span>
+          </div>
         )}
       </div>
 
-      <div className={styles.chatQuick} aria-label="Quick replies">
-        {quickReplies.map((q) => (
-          <button key={q} type="button" className={styles.chatChip} disabled={!connected} onClick={() => handleQuick(q)}>
-            {q}
-          </button>
-        ))}
-      </div>
+      {!kbInset.tight && (
+        <div className={styles.chatQuick} aria-label="Quick replies">
+          {quickReplies.map((q) => (
+            <button key={q} type="button" className={styles.chatChip} disabled={!connected} onClick={() => handleQuick(q)}>
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form className={styles.chatComposer} onSubmit={handleSubmit}>
         <input
+          ref={inputRef}
           type="text"
           className={styles.chatInput}
           value={draft}
@@ -335,7 +399,7 @@ export default function FriendsChat({
           aria-label={race ? 'Message group' : `Message ${friendFirst}`}
           autoComplete="off"
           onChange={(e) => handleInputChange(e.target.value)}
-          onBlur={() => onTyping(false)}
+          onBlur={handleInputBlur}
         />
         <button
           type="submit"
