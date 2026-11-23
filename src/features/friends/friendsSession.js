@@ -1,7 +1,7 @@
 import { haversine } from '../../lib/geoUtils.js';
 
-// Meet me is two people (host + one friend); a race is 2–4.
-export const CAPACITY = { meet: 2, race: 4 };
+// Meet me supports 2–8 people; a race supports 2–4.
+export const CAPACITY = { meet: 8, race: 4 };
 // Inside this distance of the finish counts as arrived.
 export const RACE_FINISH_M = 25;
 // Inside this distance of each other, a meetup is done.
@@ -36,6 +36,22 @@ export function raceDone(roster, finishers, dropped) {
   if (!roster?.length) return false;
   const done = new Set([...(finishers || []).map((f) => f.id), ...(dropped || [])]);
   return roster.every((id) => done.has(id));
+}
+
+// Meetup arrived: you and every active peer have a fix and either everyone
+// is within MEET_ARRIVED_M of the chosen meeting point, or every pair in
+// the group is within MEET_ARRIVED_M of each other (so all phones agree).
+export function meetArrivedCheck(myFix, peerPositions, place) {
+  if (!myFix || !peerPositions?.length) return false;
+  if (peerPositions.some((p) => !p)) return false;
+  const all = [myFix, ...peerPositions];
+  if (place && all.every((p) => distanceM(p, place) <= MEET_ARRIVED_M)) return true;
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      if (distanceM(all[i], all[j]) > MEET_ARRIVED_M) return false;
+    }
+  }
+  return true;
 }
 
 // No 0/O/1/I so a code read aloud can't be misheard.
@@ -155,6 +171,7 @@ export function appendChatMessage(list, message) {
 }
 
 function isAllowedChatSender(senderId, session, presentIds) {
+  if (session.mode === 'meet' && session.dropped?.includes(senderId)) return false;
   if (session.roster?.length) return session.roster.includes(senderId);
   return Boolean(presentIds?.has(senderId) || session.names?.[senderId]);
 }

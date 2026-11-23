@@ -11,7 +11,6 @@ import {
   HOST_GONE_LOBBY_MS,
   HOST_GONE_MS,
   LOBBY_TTL_MS,
-  MEET_ARRIVED_M,
   RACE_FINISH_M,
   RACE_LIMIT_MS,
   SEND_EVERY_MS,
@@ -21,6 +20,7 @@ import {
   createCode,
   createGuestId,
   distanceM,
+  meetArrivedCheck,
   nextHost,
   normalizeIncomingChat,
   normalizeIncomingPos,
@@ -204,23 +204,30 @@ export function useFriendsSession(user) {
   }, []);
 
   const endSession = useCallback(
-    (reason) => {
+    (reason, by = null) => {
       const s = sessionRef.current;
       if (!s || s.phase === 'ended') return;
-      patch({ phase: 'ended', endReason: reason, endedAt: Date.now() });
-      send('end', { reason, finishers: s.finishers || [], dropped: s.dropped || [], names: s.names || {}, hostTerm: s.hostTerm || 0 });
+      patch({ phase: 'ended', endReason: reason, endedBy: by, endedAt: Date.now() });
+      send('end', { reason, by, finishers: s.finishers || [], dropped: s.dropped || [], names: s.names || {}, hostTerm: s.hostTerm || 0 });
       track('friends_ended', { mode: s.mode, reason, finishers: (s.finishers || []).length });
     },
     [patch, send]
   );
 
-  // Host: publish the standings, and end the race once nobody is left racing.
+  // Host: publish the standings/dropped list, ending a race when everyone is
+  // done or a group meetup when fewer than two people remain.
   const publishStandings = useCallback(
-    (finishers, dropped) => {
+    (finishers, dropped, lastDroppedId = null) => {
       const s = sessionRef.current;
       patch({ finishers, dropped });
       send('standings', { finishers, dropped, hostTerm: s.hostTerm || 0 });
-      if (s.phase === 'live' && raceDone(s.roster, finishers, dropped)) endSession('done');
+      if (s.phase === 'live') {
+        if (s.mode === 'race' && raceDone(s.roster, finishers, dropped)) endSession('done');
+        else if (s.mode === 'meet') {
+          const active = (s.roster || []).filter((id) => !dropped.includes(id));
+          if (active.length < 2) endSession('left', lastDroppedId ? s.names?.[lastDroppedId] || null : null);
+        }
+      }
     },
     [patch, send, endSession]
   );
@@ -241,10 +248,16 @@ export function useFriendsSession(user) {
   const dropPlayers = useCallback(
     (ids) => {
       const s = sessionRef.current;
-      if (!s || s.mode !== 'race' || (s.phase !== 'live' && s.phase !== 'countdown')) return;
-      const fresh = ids.filter((id) => !(s.finishers || []).some((f) => f.id === id));
+      if (!s || (s.phase !== 'live' && s.phase !== 'countdown')) return;
+      if (s.mode !== 'race' && s.mode !== 'meet') return;
+      const fresh = ids.filter(
+        (id) =>
+          (!s.roster || s.roster.includes(id)) &&
+          !(s.finishers || []).some((f) => f.id === id) &&
+          !(s.dropped || []).includes(id)
+      );
       if (!fresh.length) return;
-      publishStandings(s.finishers || [], union(s.dropped, fresh));
+      publishStandings(s.finishers || [], union(s.dropped, fresh), fresh[fresh.length - 1]);
     },
     [publishStandings]
   );
@@ -325,7 +338,13 @@ export function useFriendsSession(user) {
       send('handover', { hostId: me, hostName: myNameRef.current, hostTerm: term, from: handover.from, dropped });
       send('state', stateFor());
       track('friends_handover', { reason: 'host_gone' });
-      if (s.phase === 'live' && raceDone(s.roster, s.finishers, dropped)) endSession('done');
+      if (s.phase === 'live') {
+        if (s.mode === 'race' && raceDone(s.roster, s.finishers, dropped)) endSession('done');
+        else if (s.mode === 'meet') {
+          const active = (s.roster || []).filter((id) => !dropped.includes(id));
+          if (active.length < 2) endSession('host-left');
+        }
+      }
     },
     [patch, send, stateFor, endSession]
   );
@@ -433,9 +452,9 @@ export function useFriendsSession(user) {
           if (amHost() && payload?.id) recordFinish(payload.id);
         });
 
-        // A racer tapped Leave.
+        // A participant tapped Leave.
         channel.on('broadcast', { event: 'left' }, ({ payload }) => {
-          if (amHost() && payload?.id) dropPlayers([payload.id]);
+          if (amHost() && payload?.id && payload.id !== myIdRef.current) dropPlayers([payload.id]);
         });
 
         channel.on('broadcast', { event: 'standings' }, ({ payload }) => {
@@ -464,15 +483,26 @@ export function useFriendsSession(user) {
           // It's us now: bring everyone up to date and pick up the timers.
           send('state', stateFor());
           const now = sessionRef.current;
-          if (now.phase === 'live' && raceDone(now.roster, now.finishers, now.dropped)) endSession('done');
+          if (now.phase === 'live') {
+            if (now.mode === 'race' && raceDone(now.roster, now.finishers, now.dropped)) endSession('done');
+            else if (now.mode === 'meet') {
+              const active = (now.roster || []).filter((id) => !(now.dropped || []).includes(id));
+              if (active.length < 2) endSession('host-left');
+            }
+          }
         });
 
         channel.on('broadcast', { event: 'end' }, ({ payload }) => {
           const s = sessionRef.current;
           if (!s || s.phase === 'ended') return;
           if ((payload.hostTerm || 0) < (s.hostTerm || 0)) return;
-          // The host ends everything else itself; a meetup either side can end.
-          if (amHost() && payload.reason !== 'left') return;
+          // The host ends everything else itself; a non-host 'left' broadcast
+          // can only end a 2-person meetup (3+ person meetups drop individually).
+          if (amHost()) {
+            if (payload.reason !== 'left' || s.mode !== 'meet') return;
+            const active = (s.roster || []).filter((id) => !(s.dropped || []).includes(id));
+            if (active.length > 2) return;
+          }
           if (!s.joined) {
             setPeek('closed');
             return;
@@ -634,14 +664,15 @@ export function useFriendsSession(user) {
     return () => clearTimeout(t);
   }, [phase, patch]);
 
-  // ── Race: a host who vanished is replaced ───────────────────────────
+  // ── Host vanished (network drop / phone died): next person takes over ─
   const hostPresent = members.some((m) => m.id === session?.hostId);
   const meInPresence = members.some((m) => m.id === myId);
-  const raceOpen = mode === 'race' && joined && (phase === 'lobby' || phase === 'countdown' || phase === 'live');
+  const groupMeet = mode === 'meet' && (session?.roster?.length || members.length) >= 3;
+  const takeoverOpen = (mode === 'race' || groupMeet) && joined && (phase === 'lobby' || phase === 'countdown' || phase === 'live');
   useEffect(() => {
     // Our own presence entry means the list is in sync, so a missing host
     // really is missing (not just "not loaded yet").
-    if (!raceOpen || isHost || !connected || !meInPresence || hostPresent) return undefined;
+    if (!takeoverOpen || isHost || !connected || !meInPresence || hostPresent) return undefined;
     const t = setTimeout(() => {
       const s = sessionRef.current;
       const present = presentIds();
@@ -650,12 +681,13 @@ export function useFriendsSession(user) {
       if (nextHost(order, present, s.hostId) === myIdRef.current) becomeHost(s.hostId);
     }, phase === 'lobby' ? HOST_GONE_LOBBY_MS : HOST_GONE_MS);
     return () => clearTimeout(t);
-  }, [raceOpen, phase, isHost, connected, meInPresence, hostPresent, becomeHost, presentIds]);
+  }, [takeoverOpen, phase, isHost, connected, meInPresence, hostPresent, becomeHost, presentIds]);
 
-  // ── Race: the host drops racers who have been gone a while ──────────
+  // ── Drop participants who have been offline a while (races & 3+ meetups) ─
   const absentSinceRef = useRef({});
+  const dropAbsentEnabled = isHost && phase === 'live' && (mode === 'race' || (mode === 'meet' && (session?.roster?.length || 0) >= 3));
   useEffect(() => {
-    if (!isHost || mode !== 'race' || phase !== 'live') return undefined;
+    if (!dropAbsentEnabled) return undefined;
     const t = setInterval(() => {
       // Our own connection is down, so the list says nothing about them.
       if (!connectedRef.current) {
@@ -678,7 +710,7 @@ export function useFriendsSession(user) {
       if (gone.length) dropPlayers(gone);
     }, 10 * 1000);
     return () => clearInterval(t);
-  }, [isHost, mode, phase, dropPlayers, presentIds]);
+  }, [dropAbsentEnabled, dropPlayers, presentIds]);
 
   // ── My own position ─────────────────────────────────────────────────
   const [myFix, setMyFix] = useState(null);
@@ -721,13 +753,39 @@ export function useFriendsSession(user) {
     return subscribeGps(onFix, () => {});
   }, [sharing, myId, send, amHost, recordFinish, patch]);
 
-  // ── Meetup: who's here ──────────────────────────────────────────────
-  const otherId = useMemo(() => {
-    if (session?.mode !== 'meet') return null;
-    return members.find((m) => m.id !== myId)?.id || (session.roster || []).find((id) => id !== myId) || null;
-  }, [session?.mode, session?.roster, members, myId]);
-  const meetDistance = session?.mode === 'meet' && otherId ? distanceM(myFix, progress[otherId]) : null;
-  const meetArrived = phase === 'live' && meetDistance != null && meetDistance <= MEET_ARRIVED_M;
+  // ── Meetup: who's here (2+ people) ──────────────────────────────────
+  const meetPeerIds = useMemo(() => {
+    if (session?.mode !== 'meet') return [];
+    const dropped = new Set(session.dropped || []);
+    const source = session.roster?.length ? session.roster : members.map((m) => m.id);
+    return source.filter((id) => id !== myId && !dropped.has(id));
+  }, [session?.mode, session?.roster, session?.dropped, members, myId]);
+  const otherId = meetPeerIds[0] || null;
+  const { meetDistance, meetMaxDistance } = useMemo(() => {
+    if (session?.mode !== 'meet' || !myFix || !meetPeerIds.length) {
+      return { meetDistance: null, meetMaxDistance: null };
+    }
+    let min = Infinity;
+    let max = -1;
+    meetPeerIds.forEach((id) => {
+      const d = distanceM(myFix, progress[id]);
+      if (d == null) return;
+      if (d < min) min = d;
+      if (d > max) max = d;
+    });
+    return {
+      meetDistance: Number.isFinite(min) ? min : null,
+      meetMaxDistance: max >= 0 ? max : null,
+    };
+  }, [session?.mode, myFix, meetPeerIds, progress]);
+  const meetArrived = useMemo(() => {
+    if (session?.mode !== 'meet' || phase !== 'live' || !meetPeerIds.length) return false;
+    return meetArrivedCheck(
+      myFix,
+      meetPeerIds.map((id) => progress[id] || null),
+      session.place
+    );
+  }, [session?.mode, session?.place, phase, myFix, meetPeerIds, progress]);
   useEffect(() => {
     if (!isHost || !meetArrived) return undefined;
     const t = setTimeout(() => endSession('met'), MEET_CLOSE_AFTER_MS);
@@ -910,25 +968,30 @@ export function useFriendsSession(user) {
   const setFollow = useCallback((follow) => patch({ follow }), [patch]);
 
   // Leaving:
-  //  - a meetup: either side ends it once going; the host cancels a lobby.
-  //  - a race host hands refereeing to the next player still here; with
-  //    nobody left it ends.
-  //  - a racer drops out (counts as not finished).
+  //  - a 2-person meetup: either side ends it once going; the host cancels a lobby.
+  //  - a 3+ person group meetup or race: a leaving host hands over to the next
+  //    connected person (or ends if nobody else is left); a guest drops out.
   const leave = useCallback(() => {
     const s = sessionRef.current;
     const me = myIdRef.current;
     if (s?.joined && s.phase !== 'ended') {
-      const racing = s.phase === 'live' || s.phase === 'countdown';
-      if (s.mode === 'meet') {
+      const active = s.phase === 'live' || s.phase === 'countdown';
+      const activePeers = (s.roster || membersRef.current.map((m) => m.id)).filter(
+        (id) => id !== me && !(s.dropped || []).includes(id)
+      );
+      const twoPersonMeet = s.mode === 'meet' && activePeers.length <= 1;
+      if (s.phase === 'lobby' && amHost()) {
+        endSession('cancelled');
+      } else if (twoPersonMeet) {
         if (s.phase === 'live') {
           send('end', { reason: 'left', by: myNameRef.current, hostTerm: s.hostTerm || 0 });
           track('friends_ended', { mode: 'meet', reason: 'left', finishers: 0 });
-        } else if (amHost()) endSession('cancelled');
+        }
       } else if (amHost()) {
-        const next = nextHost(s.roster || membersRef.current.map((m) => m.id), presentIds(), me);
+        const next = nextHost(activePeers, presentIds(), me);
         if (next) {
           const finished = (s.finishers || []).some((f) => f.id === me);
-          const dropped = racing && !finished ? union(s.dropped, [me]) : s.dropped || [];
+          const dropped = active && !finished ? union(s.dropped, [me]) : s.dropped || [];
           send('handover', {
             hostId: next,
             hostName: s.names?.[next] || 'Player',
@@ -938,7 +1001,7 @@ export function useFriendsSession(user) {
           });
           track('friends_handover', { reason: 'host_left' });
         } else endSession(s.phase === 'lobby' ? 'cancelled' : 'host-left');
-      } else if (racing) send('left', { id: me });
+      } else if (active) send('left', { id: me });
     }
     setSession(null);
     setProgress({});
@@ -962,7 +1025,9 @@ export function useFriendsSession(user) {
     myFix,
     isHost,
     otherId,
+    meetPeerIds,
     meetDistance,
+    meetMaxDistance,
     meetArrived,
     setUsername,
     create,
