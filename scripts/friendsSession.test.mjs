@@ -14,6 +14,9 @@ import {
   nextHost,
   raceDone,
   CAPACITY,
+  roomOccupancy,
+  canLateJoin,
+  admitLateJoiner,
   meetArrivedCheck,
   CHAT_MAX_LENGTH,
   CHAT_MAX_MESSAGES,
@@ -237,3 +240,64 @@ assert.equal(normalizeIncomingChat({ id: 'd1', senderId: 'guest-2', text: 'Hi' }
 assert.equal(normalizeIncomingPos({ id: 'guest-2', lat: 7.3, lng: 5.13 }, droppedMeetSession, new Set(['guest-1']), 1000), null, 'rejects pos from dropped meet peer');
 assert.equal(normalizeIncomingTyping({ id: 'guest-2', active: true }, droppedMeetSession, 'guest-1', new Set(['guest-1']), 1000), null, 'rejects typing from dropped meet peer');
 console.log('ok: group meetup');
+
+assert.equal(roomOccupancy({ mode: 'meet', phase: 'lobby', roster: null }, 3), 3, 'lobby uses presentCount');
+assert.equal(roomOccupancy({ mode: 'race', phase: 'live', roster: ['u1', 'u2'], dropped: ['u2'] }), 2, 'race counts full roster incl. dropped');
+assert.equal(roomOccupancy({ mode: 'meet', phase: 'live', roster: ['u1', 'u2', 'u3'], dropped: ['u2'] }), 2, 'meet counts active non-dropped only');
+
+const liveRace2 = { mode: 'race', phase: 'live', roster: ['u1', 'u2'], names: { u1: 'Ayo', u2: 'Tolu' }, dropped: [] };
+assert.equal(canLateJoin(liveRace2, 'u3'), true, 'live race under capacity accepts newcomer');
+assert.equal(canLateJoin({ ...liveRace2, phase: 'countdown' }, 'u3'), true, 'countdown race accepts newcomer');
+assert.equal(canLateJoin({ ...liveRace2, phase: 'lobby' }, 'u3'), false, 'lobby uses normal join, not late join');
+assert.equal(canLateJoin({ ...liveRace2, phase: 'ended' }, 'u3'), false, 'ended race rejects late join');
+
+const fullRace = { mode: 'race', phase: 'live', roster: ['u1', 'u2', 'u3', 'u4'], dropped: ['u4'] };
+assert.equal(canLateJoin(fullRace, 'u5'), false, 'full race rejects newcomer even if a racer dropped');
+assert.equal(canLateJoin(fullRace, 'u4'), true, 'dropped racer can rejoin full race');
+
+const fullMeetWithDrop = { mode: 'meet', phase: 'live', roster: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8'], dropped: ['m8'] };
+assert.equal(canLateJoin(fullMeetWithDrop, 'm9'), true, 'dropped meet peer frees a slot for newcomer');
+assert.equal(canLateJoin({ ...fullMeetWithDrop, dropped: [] }, 'm9'), false, 'full meet with no drops rejects newcomer');
+
+const admittedRace = admitLateJoiner(liveRace2, 'u3', '  Chidi  ');
+assert.deepEqual(admittedRace, {
+  accepted: true,
+  roster: ['u1', 'u2', 'u3'],
+  names: { u1: 'Ayo', u2: 'Tolu', u3: 'Chidi' },
+  dropped: [],
+  name: 'Chidi',
+});
+assert.deepEqual(admitLateJoiner(fullRace, 'u5', 'Late'), { accepted: false, reason: 'full' });
+assert.deepEqual(admitLateJoiner({ ...liveRace2, phase: 'ended' }, 'u3', 'Late'), { accepted: false, reason: 'closed' });
+assert.deepEqual(admitLateJoiner({ ...liveRace2, phase: 'lobby' }, 'u3', 'Late'), { accepted: false, reason: 'not-live' });
+
+const rejoinedMeet = admitLateJoiner(
+  { mode: 'meet', phase: 'live', roster: ['m1', 'm2', 'm3'], names: { m1: 'Ayo', m2: 'Tolu', m3: 'Dami' }, dropped: ['m2'] },
+  'm2',
+  'Tolu B'
+);
+assert.equal(rejoinedMeet.accepted, true);
+assert.deepEqual(rejoinedMeet.roster, ['m1', 'm2', 'm3'], 'rejoin does not duplicate roster entry');
+assert.deepEqual(rejoinedMeet.dropped, [], 'rejoin clears dropped state');
+assert.equal(rejoinedMeet.names.m2, 'Tolu B');
+
+const updatedRaceSession = {
+  ...liveRace2,
+  joined: true,
+  roster: admittedRace.roster,
+  names: admittedRace.names,
+  dropped: admittedRace.dropped,
+};
+assert.deepEqual(
+  normalizeIncomingChat({ id: 'late-c1', senderId: 'u3', text: 'Coming!' }, updatedRaceSession, 'u1', new Set(['u1', 'u2', 'u3']), 9000),
+  { id: 'late-c1', senderId: 'u3', senderName: 'Chidi', text: 'Coming!', at: 9000 }
+);
+assert.deepEqual(
+  normalizeIncomingPos({ id: 'u3', dist: 320 }, updatedRaceSession, new Set(['u1', 'u2', 'u3']), 9100),
+  { id: 'u3', dist: 320, at: 9100 }
+);
+assert.deepEqual(
+  normalizeIncomingTyping({ id: 'u3', active: true }, updatedRaceSession, 'u1', new Set(['u1', 'u2', 'u3']), 9200),
+  { id: 'u3', name: 'Chidi', active: true, at: 9200 }
+);
+console.log('ok: late join');

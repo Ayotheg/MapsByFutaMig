@@ -16,7 +16,9 @@ import {
   SEND_EVERY_MS,
   TYPING_THROTTLE_MS,
   TYPING_TTL_MS,
+  admitLateJoiner,
   appendChatMessage,
+  canLateJoin,
   createCode,
   createGuestId,
   distanceM,
@@ -26,6 +28,7 @@ import {
   normalizeIncomingPos,
   normalizeIncomingTyping,
   raceDone,
+  roomOccupancy,
   sanitizeChatText,
   sanitizeUsername,
 } from './friendsSession';
@@ -39,6 +42,7 @@ const GUEST_NAME_KEY = 'friends-guest-name';
 // answer still opens the invite.
 const PEEK_TIMEOUT_MS = 60 * 1000;
 const PEEK_ASK_EVERY_MS = 3000;
+const JOIN_ASK_EVERY_MS = 2000;
 // A channel the server closed is reopened after this.
 const RECONNECT_AFTER_MS = 3000;
 // A finished meetup closes on its own after this.
@@ -96,7 +100,7 @@ function sanitizeNames(map) {
  *
  * `session.phase`: 'invite' (looking at a link, not joined yet), 'lobby',
  * 'countdown', 'live', 'ended'. `peek`: what the invite screen knows
- * ('loading' | 'ready' | 'closed' | 'unreachable' | 'full' | 'started').
+ * ('loading' | 'ready' | 'closed' | 'unreachable' | 'full').
  */
 export function useFriendsSession(user) {
   const [guestId] = useState(() => {
@@ -127,6 +131,8 @@ export function useFriendsSession(user) {
   const [typingBy, setTypingBy] = useState({});
   const lastTypingSentRef = useRef({ active: false, at: 0 });
   const [peek, setPeek] = useState('loading');
+  const [joining, setJoining] = useState(false);
+  const pendingJoinRef = useRef(null);
   const [connected, setConnected] = useState(false);
   // Has this session's channel ever been up ("Connecting…" vs "Reconnecting…").
   const [everConnected, setEverConnected] = useState(false);
@@ -180,10 +186,25 @@ export function useFriendsSession(user) {
     channelRef.current?.send({ type: 'broadcast', event, payload });
   }, []);
   const presentIds = useCallback(() => new Set(membersRef.current.map((m) => m.id)), []);
+  const clearPendingJoin = useCallback(() => {
+    pendingJoinRef.current = null;
+    setJoining(false);
+  }, []);
+  const requestLiveJoin = useCallback(
+    (id, name) => {
+      if (!id) return;
+      pendingJoinRef.current = { id, name };
+      setJoining(true);
+      if (connectedRef.current) send('join-live', { id, name });
+    },
+    [send]
+  );
 
   // ── Host: the state a newcomer or a reconnecting phone needs ──────────
   const stateFor = useCallback(() => {
     const s = sessionRef.current;
+    const now = Date.now();
+    const lj = s.lastJoined;
     return {
       mode: s.mode,
       phase: s.phase,
@@ -198,8 +219,9 @@ export function useFriendsSession(user) {
       dropped: s.dropped || [],
       handover: s.handover || null,
       endReason: s.endReason || null,
-      elapsedMs: s.goAt ? Date.now() - s.goAt : null,
-      count: membersRef.current.length,
+      elapsedMs: s.goAt ? now - s.goAt : null,
+      count: roomOccupancy(s, membersRef.current.length),
+      lastJoined: lj?.id && now - lj.at < 10000 ? { id: lj.id, name: lj.name, seq: lj.seq, agoMs: now - lj.at } : null,
     };
   }, []);
 
@@ -287,6 +309,7 @@ export function useFriendsSession(user) {
       }
       const fields = {
         mode: payload.mode,
+        hostPhase: payload.phase,
         place: payload.place,
         hostId: payload.hostId,
         hostName: sanitizeUsername(payload.hostName) || 'Friend',
@@ -301,26 +324,62 @@ export function useFriendsSession(user) {
         playerCount: payload.count ?? null,
       };
       if (payload.elapsedMs != null) fields.goAt = Date.now() - payload.elapsedMs;
-      const inRoster = !payload.roster || payload.roster.includes(me);
-      if (s.joined) {
-        if (payload.phase === 'ended') fields.phase = 'ended';
-        else if (payload.phase === 'live' || payload.phase === 'countdown') {
-          if (inRoster) fields.phase = payload.elapsedMs >= 0 ? 'live' : 'countdown';
-          else {
-            // Joined a moment too late: the host started without us.
+      if (payload.lastJoined?.id && (payload.lastJoined.agoMs ?? 0) < 10000) {
+        const sameLast = s.lastJoined?.seq === payload.lastJoined.seq && s.lastJoined?.id === payload.lastJoined.id;
+        fields.lastJoined = sameLast
+          ? s.lastJoined
+          : {
+              id: payload.lastJoined.id,
+              name: sanitizeUsername(payload.lastJoined.name) || 'Friend',
+              seq: payload.lastJoined.seq || 1,
+              at: Date.now() - Math.max(0, payload.lastJoined.agoMs || 0),
+            };
+      }
+      const isLive = payload.phase === 'live' || payload.phase === 'countdown';
+      const activeInRoster = Boolean(
+        !payload.roster || (payload.roster.includes(me) && !(payload.mode === 'meet' && (payload.dropped || []).includes(me)))
+      );
+      let shouldRequestLiveJoin = null;
+      if (s.joined || pendingJoinRef.current) {
+        if (payload.phase === 'ended') {
+          clearPendingJoin();
+          if (s.joined) fields.phase = 'ended';
+          else setPeek('closed');
+        } else if (isLive) {
+          if (activeInRoster) {
+            clearPendingJoin();
+            fields.joined = true;
+            fields.joinedAt = s.joinedAt || Date.now();
+            fields.phase = payload.elapsedMs != null && payload.elapsedMs < 0 ? 'countdown' : 'live';
+          } else if (canLateJoin(payload, me)) {
+            if (!pendingJoinRef.current) {
+              // Joined a moment too late or re-entering a meet with room: auto-request live admission.
+              fields.joined = false;
+              fields.phase = 'invite';
+              setPeek('ready');
+              shouldRequestLiveJoin = myNameRef.current || s.names?.[me] || 'Friend';
+            }
+          } else {
+            clearPendingJoin();
             fields.joined = false;
             fields.phase = 'invite';
-            setPeek('started');
+            setPeek('full');
           }
-        } else fields.phase = payload.phase;
+        } else if (s.joined) {
+          fields.phase = payload.phase;
+        } else if (pendingJoinRef.current) {
+          clearPendingJoin();
+          fields.joined = true;
+          fields.phase = payload.phase;
+        }
       } else if (payload.phase === 'ended') setPeek('closed');
-      else if (payload.phase !== 'lobby' && !inRoster) setPeek('started');
-      // Turned away for being over capacity: stays so until a spot opens.
-      else setPeek((prev) => (prev === 'full' && (payload.count ?? 0) >= CAPACITY[payload.mode] ? 'full' : 'ready'));
+      else if (isLive) setPeek(canLateJoin(payload, me) ? 'ready' : 'full');
+      else setPeek((payload.count ?? 0) >= CAPACITY[payload.mode] ? 'full' : 'ready');
       patch(fields);
+      if (shouldRequestLiveJoin) requestLiveJoin(me, shouldRequestLiveJoin);
       resendArrival();
     },
-    [amHost, patch, send, stateFor, resendArrival]
+    [amHost, patch, send, stateFor, resendArrival, clearPendingJoin, requestLiveJoin]
   );
 
   // Take over refereeing (the host left or vanished). Everyone is told,
@@ -382,8 +441,12 @@ export function useFriendsSession(user) {
             if (changed) patch({ names });
           }
         });
-        channel.on('presence', { event: 'join' }, () => {
+        channel.on('presence', { event: 'join' }, ({ key: joinedKey }) => {
           if (amHost()) send('state', stateFor());
+          const s = sessionRef.current;
+          if (joinedKey !== myIdRef.current && s?.joined && (s.phase === 'live' || s.phase === 'countdown') && lastPosRef.current) {
+            send('pos', lastPosRef.current);
+          }
         });
 
         channel.on('broadcast', { event: 'hello' }, () => {
@@ -392,27 +455,74 @@ export function useFriendsSession(user) {
 
         channel.on('broadcast', { event: 'state' }, ({ payload }) => applyState(payload));
 
+        channel.on('broadcast', { event: 'join-live' }, ({ payload }) => {
+          if (!amHost() || !payload?.id) return;
+          const res = admitLateJoiner(sessionRef.current, payload.id, payload.name);
+          if (res.accepted) {
+            delete absentSinceRef.current[payload.id];
+            const s = sessionRef.current;
+            const isNew = !(s.roster || []).includes(payload.id) || (s.dropped || []).includes(payload.id);
+            patch({
+              roster: res.roster,
+              names: res.names,
+              dropped: res.dropped,
+              ...(isNew
+                ? { lastJoined: { id: payload.id, name: res.name, seq: (s.lastJoined?.seq || 0) + 1, at: Date.now() } }
+                : {}),
+            });
+            send('state', stateFor());
+            if (lastPosRef.current) send('pos', lastPosRef.current);
+          } else {
+            if (res.reason === 'full' || res.reason === 'closed') {
+              send('join-denied', { id: payload.id, reason: res.reason, hostTerm: sessionRef.current?.hostTerm || 0 });
+            }
+            send('state', stateFor());
+          }
+        });
+
+        channel.on('broadcast', { event: 'join-denied' }, ({ payload }) => {
+          if (!payload || payload.id !== myIdRef.current) return;
+          if ((payload.hostTerm || 0) < (sessionRef.current?.hostTerm || 0)) return;
+          clearPendingJoin();
+          patch({ joined: false, phase: 'invite' });
+          setPeek(payload.reason === 'closed' ? 'closed' : 'full');
+        });
+
         channel.on('broadcast', { event: 'start' }, ({ payload }) => {
           const s = sessionRef.current;
           if (!s) return;
           const me = myIdRef.current;
-          if (!s.joined || (payload.roster && !payload.roster.includes(me))) {
-            // Not in it (yet): the invite is closed to us now.
-            patch({ mode: payload.mode, joined: false, phase: 'invite' });
-            setPeek('started');
-            return;
-          }
           const now = Date.now();
-          const common = {
+          const nextPhase = payload.mode === 'race' ? 'countdown' : 'live';
+          const nextMeta = {
             mode: payload.mode,
+            hostPhase: nextPhase,
             roster: payload.roster,
-            names: sanitizeNames(payload.names),
+            names: { ...(s.names || {}), ...sanitizeNames(payload.names) },
             finishers: [],
             dropped: [],
             handover: null,
+            playerCount: payload.roster?.length ?? null,
           };
-          if (payload.mode === 'race') patch({ ...common, phase: 'countdown', goAt: now + payload.countdownMs });
-          else patch({ ...common, phase: 'live', goAt: now });
+          if (!s.joined || (payload.roster && !payload.roster.includes(me))) {
+            const roomOpen = canLateJoin({ mode: payload.mode, phase: nextPhase, roster: payload.roster, dropped: [] }, me);
+            if (s.joined) {
+              patch({ ...nextMeta, joined: false, phase: 'invite' });
+              if (roomOpen) {
+                setPeek('ready');
+                requestLiveJoin(me, myNameRef.current || s.names?.[me] || 'Friend');
+              } else {
+                clearPendingJoin();
+                setPeek('full');
+              }
+            } else {
+              patch(nextMeta);
+              setPeek(roomOpen ? 'ready' : 'full');
+            }
+            return;
+          }
+          const goAt = payload.mode === 'race' ? now + payload.countdownMs : now;
+          patch({ ...nextMeta, phase: nextPhase, goAt });
         });
 
         channel.on('broadcast', { event: 'pos' }, ({ payload }) => {
@@ -460,7 +570,12 @@ export function useFriendsSession(user) {
         channel.on('broadcast', { event: 'standings' }, ({ payload }) => {
           const s = sessionRef.current;
           if (!s || amHost() || (payload.hostTerm || 0) < (s.hostTerm || 0)) return;
-          patch({ finishers: payload.finishers || [], dropped: payload.dropped || [] });
+          const finishers = payload.finishers || [];
+          const dropped = payload.dropped || [];
+          patch({ finishers, dropped });
+          if (!s.joined && s.mode === 'meet' && (s.hostPhase === 'live' || s.hostPhase === 'countdown')) {
+            setPeek(canLateJoin({ ...s, phase: s.hostPhase, finishers, dropped }, myIdRef.current) ? 'ready' : 'full');
+          }
           resendArrival();
         });
 
@@ -535,6 +650,7 @@ export function useFriendsSession(user) {
             }
             if (amHost()) send('state', stateFor());
             if (lastPosRef.current) send('pos', lastPosRef.current);
+            if (pendingJoinRef.current) send('join-live', pendingJoinRef.current);
             resendArrival();
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             setConnected(false);
@@ -555,14 +671,15 @@ export function useFriendsSession(user) {
       setConnected(false);
       setMembers([]);
     };
-  }, [code, myId, reopenKey, patch, send, amHost, stateFor, applyState, recordFinish, dropPlayers, resendArrival, endSession, presentIds]);
+  }, [code, myId, reopenKey, patch, send, amHost, stateFor, applyState, recordFinish, dropPlayers, resendArrival, endSession, presentIds, clearPendingJoin, requestLiveJoin]);
 
   // Kept across reconnects of the same session; a stationary phone has no
   // new fix to send when it comes back.
   useEffect(() => {
     lastPosRef.current = null;
     setEverConnected(false);
-  }, [code, myId]);
+    clearPendingJoin();
+  }, [code, myId, clearPendingJoin]);
 
   // Back in the app (or back online): get the connection up now rather than
   // whenever its retry timer next fires, and answer anyone waiting.
@@ -577,6 +694,7 @@ export function useFriendsSession(user) {
         send('hello', {});
         if (amHost()) send('state', stateFor());
         if (lastPosRef.current) send('pos', lastPosRef.current);
+        if (pendingJoinRef.current) send('join-live', pendingJoinRef.current);
       } else if (channel.state !== 'joining') {
         setReopenKey((k) => k + 1);
       }
@@ -615,6 +733,15 @@ export function useFriendsSession(user) {
     return () => clearTimeout(t);
   }, [code, joined, isHost, peek]);
 
+  // Joining an already-started session: retry until the host admits or turns us away.
+  useEffect(() => {
+    if (!joining || !connected || !pendingJoinRef.current) return undefined;
+    const t = setInterval(() => {
+      if (pendingJoinRef.current) send('join-live', pendingJoinRef.current);
+    }, JOIN_ASK_EVERY_MS);
+    return () => clearInterval(t);
+  }, [joining, connected, send]);
+
   // Over capacity: the last to join is turned away.
   useEffect(() => {
     const s = sessionRef.current;
@@ -628,14 +755,25 @@ export function useFriendsSession(user) {
 
   // Counted once they're really in the room, not when they tap Join: someone
   // turned away above never counts, however many times they retry.
+  const rosterLength = session?.roster?.length || 0;
+  const droppedLength = session?.dropped?.length || 0;
   useEffect(() => {
     const s = sessionRef.current;
     if (!s?.joined || s.joinCounted || s.hostId === myId || !myId) return;
-    const index = members.findIndex((m) => m.id === myId);
-    if (index < 0 || index >= CAPACITY[s.mode]) return;
+    const inLobby = s.phase === 'lobby';
+    const isLive = s.phase === 'live' || s.phase === 'countdown';
+    if (inLobby) {
+      const index = members.findIndex((m) => m.id === myId);
+      if (index < 0 || index >= CAPACITY[s.mode]) return;
+    } else if (isLive) {
+      const activeInRoster = Boolean(s.roster?.includes(myId) && !(s.mode === 'meet' && (s.dropped || []).includes(myId)));
+      if (!activeInRoster) return;
+    } else {
+      return;
+    }
     patch({ joinCounted: true });
     track('friends_joined', { mode: s.mode, via: s.fromCode ? 'code' : 'link' });
-  }, [members, myId, patch]);
+  }, [members, myId, phase, rosterLength, droppedLength, patch]);
 
   // Host timers: the invite expires, a race has a time limit. A new host
   // picks these up from the same createdAt / goAt.
@@ -878,6 +1016,7 @@ export function useFriendsSession(user) {
       if (!id) return;
       const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
       const now = Date.now();
+      clearPendingJoin();
       setProgress({});
       setMessages([]);
       setTypingBy({});
@@ -900,7 +1039,7 @@ export function useFriendsSession(user) {
       });
       track('friends_created', { mode: newMode, place: place?.name || null });
     },
-    [user?.id, guestId, setUsername, setSession]
+    [user?.id, guestId, setUsername, setSession, clearPendingJoin]
   );
 
   // `fromCode`: typed into the code box, so "can't reach" also says to check it.
@@ -908,6 +1047,7 @@ export function useFriendsSession(user) {
     (invite, { fromCode = false } = {}) => {
       const s = sessionRef.current;
       if (s?.code === invite.code) return;
+      clearPendingJoin();
       setPeek('loading');
       setProgress({});
       setMessages([]);
@@ -915,7 +1055,7 @@ export function useFriendsSession(user) {
       lastTypingSentRef.current = { active: false, at: 0 };
       setSession({ mode: invite.mode, code: invite.code, joined: false, phase: 'invite', names: {}, fromCode });
     },
-    [setSession]
+    [setSession, clearPendingJoin]
   );
 
   const join = useCallback(
@@ -923,6 +1063,27 @@ export function useFriendsSession(user) {
       const s = sessionRef.current;
       if (!s || !myId) return;
       const resolvedName = (chosenName ? setUsername(chosenName) : myNameRef.current) || 'Friend';
+      const hostLive = s.hostPhase === 'live' || s.hostPhase === 'countdown';
+      if (hostLive) {
+        const alreadyActive = Boolean(s.roster?.includes(myId) && !(s.mode === 'meet' && (s.dropped || []).includes(myId)));
+        if (alreadyActive) {
+          patch({
+            participantId: s.participantId || myId,
+            joined: true,
+            joinedAt: s.joinedAt || Date.now(),
+            phase: s.hostPhase === 'countdown' && (s.goAt || 0) > Date.now() ? 'countdown' : 'live',
+            names: { ...(s.names || {}), [myId]: resolvedName },
+          });
+          send('join-live', { id: myId, name: resolvedName });
+        } else {
+          patch({
+            participantId: s.participantId || myId,
+            names: { ...(s.names || {}), [myId]: resolvedName },
+          });
+          requestLiveJoin(myId, resolvedName);
+        }
+        return;
+      }
       const phaseNow = s.roster?.includes(myId) ? 'live' : 'lobby';
       patch({
         participantId: s.participantId || myId,
@@ -932,16 +1093,16 @@ export function useFriendsSession(user) {
         names: { ...(s.names || {}), [myId]: resolvedName },
       });
     },
-    [myId, setUsername, patch]
+    [myId, setUsername, patch, send, requestLiveJoin]
   );
 
   const start = useCallback(() => {
     const s = sessionRef.current;
     if (!s || !amHost() || s.phase !== 'lobby') return;
-    const roster = members.map((m) => m.id).slice(0, CAPACITY[s.mode]);
-    if (!roster.includes(myId)) roster.unshift(myId);
+    const roster = [myId, ...members.map((m) => m.id).filter((id) => id !== myId)].slice(0, CAPACITY[s.mode]);
     const names = { ...(s.names || {}) };
-    const common = { roster, names, finishers: [], dropped: [], handover: null };
+    const nextPhase = s.mode === 'race' ? 'countdown' : 'live';
+    const common = { roster, names, finishers: [], dropped: [], handover: null, hostPhase: nextPhase, lastJoined: null };
     if (s.mode === 'race') {
       patch({ ...common, phase: 'countdown', goAt: Date.now() + COUNTDOWN_MS });
       send('start', { mode: 'race', roster, names, countdownMs: COUNTDOWN_MS });
@@ -1003,13 +1164,14 @@ export function useFriendsSession(user) {
         } else endSession(s.phase === 'lobby' ? 'cancelled' : 'host-left');
       } else if (active) send('left', { id: me });
     }
+    clearPendingJoin();
     setSession(null);
     setProgress({});
     setMessages([]);
     setTypingBy({});
     lastTypingSentRef.current = { active: false, at: 0 };
     setMyFix(null);
-  }, [amHost, endSession, setSession, send, presentIds]);
+  }, [amHost, endSession, setSession, send, presentIds, clearPendingJoin]);
 
   return {
     session,
@@ -1018,6 +1180,7 @@ export function useFriendsSession(user) {
     messages,
     typingUsers,
     peek,
+    joining,
     connected,
     everConnected,
     myId,

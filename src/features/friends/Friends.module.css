@@ -1465,5 +1465,81 @@
 :global(.friends-pin-c2) { background: var(--v2-primary-hover); color: var(--v2-on-primary); }
 :global(.friends-pin-c3) { background: var(--v2-neutral); color: var(--v2-on-primary); }
 
+/* Compact invite bar inside live RaceBoard / MeetBoard when spots remain */
+.liveInvite {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px 9px 12px;
+  border-radius: var(--r-xl);
+  background: var(--v2-hud-upnext-bg);
+  border: 1px solid var(--v2-divider);
+}
+.liveInviteIcon {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.liveInviteText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.liveInviteLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--v2-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.liveInviteCode {
+  font-family: var(--v2-font-manrope);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--v2-neutral);
+  font-variant-numeric: tabular-nums;
+}
+.liveInviteActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.liveInviteBtn {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--v2-divider);
+  border-radius: var(--r-full);
+  background: var(--v2-on-primary);
+  color: var(--v2-neutral);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: border-color var(--v2-duration-quick) var(--v2-ease-standard), background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.liveInviteBtn:hover {
+  border-color: var(--v2-primary-outline);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+}
+.liveInviteBtn:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+
 
 

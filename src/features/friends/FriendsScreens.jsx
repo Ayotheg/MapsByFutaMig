@@ -632,13 +632,15 @@ export function Lobby({
 }
 
 // ── 3/4 · Friend opens the link (no sign-in required) ────────────────
-export function Invite({ isMobile, session, peek, initialName = '', members, myDistance, onJoin, onDecline }) {
+export function Invite({ isMobile, session, peek, joining = false, initialName = '', members, myDistance, onJoin, onDecline }) {
   const [name, setName] = useState(initialName);
   const editedRef = useRef(false);
   const cleanName = sanitizeUsername(name);
   const race = session.mode === 'race';
   const hostFirst = firstName(session.hostName);
   const maxKm = Math.round(MEET_MAX_DISTANCE_M / 1000);
+  const inProgress = session.hostPhase === 'live' || session.hostPhase === 'countdown';
+  const cap = CAPACITY[session.mode];
 
   // Sync initialName only before the user has typed or cleared the field.
   useEffect(() => {
@@ -656,7 +658,6 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
         `${session.fromCode ? 'Check the code, and ask' : 'Ask'} your friend to open Maps By FUTA. We’ll keep trying while this screen is open.`,
       ],
       full: [what ? `This ${what} is full` : 'This is full', race ? `A race takes up to ${CAPACITY.race} people.` : `Meet me takes up to ${CAPACITY.meet} people.`],
-      started: [what ? `This ${what} already started` : 'This already started', 'Ask your friend to send a new link or code next time.'],
     }[peek] || ['Opening invite…', ''];
     return (
       <Panel isMobile={isMobile} centered label={copy[0]} onScrim={peek === 'loading' ? undefined : onDecline}>
@@ -671,7 +672,19 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
     );
   }
 
-  const players = members.map((m) => firstName(m.name)).join(', ');
+  const dropped = new Set(session.dropped || []);
+  const activeIds =
+    inProgress && session.roster?.length
+      ? race
+        ? session.roster
+        : session.roster.filter((id) => !dropped.has(id))
+      : null;
+  const activeNames = activeIds
+    ? activeIds.map((id) => firstName(session.names?.[id] || members.find((m) => m.id === id)?.name || 'Friend'))
+    : members.map((m) => firstName(m.name));
+  const activeCount = activeNames.length || session.playerCount || 1;
+  const players = activeNames.join(', ');
+
   return (
     <Panel isMobile={isMobile} centered label={race ? `Join ${hostFirst}'s race` : `Meet ${hostFirst}`}>
       <div className={styles.person} style={{ gap: 14 }}>
@@ -681,7 +694,13 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
             {race ? `Join ${hostFirst}’s race` : `Meet ${hostFirst}`}
           </h2>
           <p className={styles.sub}>
-            {race ? `Starts when ${hostFirst} taps Start` : `Short distance (within ${maxKm} km) · ${hostFirst} is waiting`}
+            {inProgress
+              ? race
+                ? 'Race in progress · Join now'
+                : `Short distance (within ${maxKm} km) · Live now`
+              : race
+                ? `Starts when ${hostFirst} taps Start`
+                : `Short distance (within ${maxKm} km) · ${hostFirst} is waiting`}
           </p>
         </div>
       </div>
@@ -697,7 +716,10 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
           </div>
         )}
         <div className={styles.tableRow}>
-          <span className={styles.tableMeta} style={{ flex: 1 }}>{race ? 'Players' : 'People'}</span>
+          <span className={styles.tableMeta} style={{ flex: 1 }}>
+            {race ? 'Players' : 'People'}
+            {cap ? ` (${activeCount}/${cap})` : ''}
+          </span>
           <span className={styles.personName}>{`${players || hostFirst} + you`}</span>
         </div>
       </div>
@@ -705,7 +727,7 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
         className={styles.col}
         onSubmit={(e) => {
           e.preventDefault();
-          if (cleanName) onJoin(cleanName);
+          if (cleanName && !joining) onJoin(cleanName);
         }}
       >
         <UsernameField
@@ -721,7 +743,7 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
           <MapPin size={18} />
           {race
             ? 'The group sees how far you are from the finish, not where you are. We will ask for your location next.'
-            : members.length > 1
+            : activeCount > 1
               ? `Everyone in this meetup sees each other’s live location until it ends. Works best within ${maxKm} km.`
               : `You and ${hostFirst} see each other’s live location until the meetup ends. Works best within ${maxKm} km.`}
         </div>
@@ -729,8 +751,8 @@ export function Invite({ isMobile, session, peek, initialName = '', members, myD
           <button type="button" className={cx(styles.btn, styles.btnOutline, styles.grow)} onClick={onDecline}>
             Decline
           </button>
-          <button type="submit" className={cx(styles.btn, styles.btnPrimary, styles.grow2)} disabled={!cleanName}>
-            {race ? 'Join race' : 'Share my location'}
+          <button type="submit" className={cx(styles.btn, styles.btnPrimary, styles.grow2)} disabled={!cleanName || joining}>
+            {joining ? 'Joining…' : race ? 'Join race' : 'Share my location'}
           </button>
         </div>
       </form>
@@ -805,6 +827,67 @@ function DetailsBtn({ onClick }) {
       Details
       <ChevronUp size={16} />
     </button>
+  );
+}
+
+function LiveInviteStrip({ session, count }) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef(null);
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const cap = session?.mode ? CAPACITY[session.mode] : null;
+  if (!session?.code || !cap || count >= cap) return null;
+  const spotsLeft = cap - count;
+
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(session.code);
+      setCopied(true);
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked; the code stays visible in the strip.
+    }
+  }
+
+  async function share() {
+    const url = inviteUrl(session.mode, session.code);
+    if (navigator.share) {
+      navigator.share({ title: 'Maps By FUTA', text: shareText(session) }).catch(() => {});
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked; the code stays visible in the strip.
+    }
+  }
+
+  return (
+    <div className={styles.liveInvite}>
+      <span className={styles.liveInviteIcon} aria-hidden="true">
+        <UserPlus size={15} />
+      </span>
+      <span className={styles.liveInviteText}>
+        <span className={styles.liveInviteLabel}>
+          Invite · {count}/{cap} ({spotsLeft} {spotsLeft === 1 ? 'spot' : 'spots'} left)
+        </span>
+        <span className={styles.liveInviteCode}>{session.code}</span>
+      </span>
+      <span className={styles.liveInviteActions}>
+        <button type="button" className={styles.liveInviteBtn} onClick={copyCode} aria-label="Copy invite code">
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+        <button type="button" className={styles.liveInviteBtn} onClick={share} aria-label="Share invite">
+          <Share2 size={13} />
+          Share
+        </button>
+      </span>
+    </div>
   );
 }
 
@@ -908,6 +991,7 @@ export function RaceBoard({
           ))}
         </div>
         {onOpenChat && <ChatStrip title="Race chat" lastMessage={lastMessage} unread={unreadCount} onOpen={onOpenChat} />}
+        <LiveInviteStrip session={session} count={rows.length} />
         <div className={styles.row}>
           <button type="button" className={cx(styles.btn, styles.btnDanger, styles.btnSmall, styles.grow)} onClick={onLeave}>
             Leave
@@ -1056,6 +1140,7 @@ export function Results({ isMobile, session, rows, isHost, onDone, onRaceAgain }
 
 // ── 9/10 · Meet me, live (the same card on both phones) ──────────────
 export function MeetBoard({
+  session,
   otherName,
   peers = [],
   distance,
@@ -1267,6 +1352,7 @@ export function MeetBoard({
         {onOpenChat && (
           <ChatStrip title={isGroup ? 'Group chat' : `Message ${name}`} lastMessage={lastMessage} unread={unreadCount} onOpen={onOpenChat} />
         )}
+        {!arrived && <LiveInviteStrip session={session} count={totalPeople} />}
         {!isGroup && paused && updatedAt && (
           <div className={styles.notice}>
             <Clock size={18} />

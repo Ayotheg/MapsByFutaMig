@@ -385,14 +385,18 @@ export default function FriendsHub({
     meetDirectionsTo(nearest);
   }
 
-  // "Tolu left. Dami is now the host." for a few seconds after a handover.
+  // "Tolu left. Dami is now the host." for a few seconds after a handover,
+  // or "Tolu joined the race/meetup." briefly after a late join.
   const handover = session?.handover;
+  const lastJoined = session?.lastJoined;
   const notice =
     handover && now - handover.at < 10 * 1000
       ? isHost
         ? `${firstName(handover.from)} left. You’re now the host.`
         : `${firstName(handover.from)} left. ${firstName(handover.to)} is now the host.`
-      : null;
+      : lastJoined && lastJoined.id !== myId && now - lastJoined.at < 8 * 1000
+        ? `${firstName(lastJoined.name)} joined the ${race ? 'race' : 'meetup'}.`
+        : null;
 
   function showAll() {
     if (!map) return;
@@ -504,6 +508,7 @@ export default function FriendsHub({
         isMobile={isMobile}
         session={session}
         peek={peek}
+        joining={f.joining}
         initialName={f.myName}
         members={members}
         myDistance={myDistance}
@@ -648,6 +653,7 @@ export default function FriendsHub({
   const isGroupMeet = meetPeers.length > 1;
   return (
     <MeetBoard
+      session={session}
       otherName={resolvedOtherName}
       peers={meetPeers}
       distance={f.meetDistance}

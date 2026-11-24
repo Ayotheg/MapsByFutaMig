@@ -38,6 +38,45 @@ export function raceDone(roster, finishers, dropped) {
   return roster.every((id) => done.has(id));
 }
 
+// How many spots are currently taken in a lobby or active session.
+// Dropped meet peers free their spot; dropped racers stay on the roster so they can still finish.
+export function roomOccupancy(session, presentCount = 0) {
+  if (!session) return 0;
+  if (session.roster?.length) {
+    if (session.mode === 'meet') {
+      const dropped = new Set(session.dropped || []);
+      return session.roster.filter((id) => !dropped.has(id)).length;
+    }
+    return session.roster.length;
+  }
+  return presentCount;
+}
+
+// Whether `userId` can join (or rejoin) a race or meetup that is already live/counting down.
+export function canLateJoin(session, userId) {
+  if (!session || !userId) return false;
+  if (session.phase !== 'live' && session.phase !== 'countdown') return false;
+  const cap = CAPACITY[session.mode];
+  if (!cap) return false;
+  const roster = session.roster || [];
+  const dropped = session.dropped || [];
+  if (roster.includes(userId) && !(session.mode === 'meet' && dropped.includes(userId))) return true;
+  return roomOccupancy(session) < cap;
+}
+
+// Host-side admission for a late joiner (or returning participant).
+export function admitLateJoiner(session, joinerId, joinerName) {
+  if (!session || !joinerId || session.phase === 'ended') return { accepted: false, reason: 'closed' };
+  if (session.phase !== 'live' && session.phase !== 'countdown') return { accepted: false, reason: 'not-live' };
+  if (!canLateJoin(session, joinerId)) return { accepted: false, reason: 'full' };
+  const cleanName = sanitizeUsername(joinerName) || sanitizeUsername(session.names?.[joinerId]) || 'Friend';
+  const existing = session.roster || [];
+  const roster = existing.includes(joinerId) ? [...existing] : [...existing, joinerId];
+  const names = { ...(session.names || {}), [joinerId]: cleanName };
+  const dropped = (session.dropped || []).filter((id) => id !== joinerId);
+  return { accepted: true, roster, names, dropped, name: cleanName };
+}
+
 // Meetup arrived: you and every active peer have a fix and either everyone
 // is within MEET_ARRIVED_M of the chosen meeting point, or every pair in
 // the group is within MEET_ARRIVED_M of each other (so all phones agree).
