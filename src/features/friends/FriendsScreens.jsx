@@ -54,9 +54,42 @@ export function Avatar({ name, index = 0, size }) {
   );
 }
 
+// Track mobile visualViewport inset so bottom sheets and modals lift above the
+// on-screen keyboard instead of hiding inputs beneath it.
+function useKeyboardInset(active) {
+  const [vp, setVp] = useState({ inset: 0, height: null, top: 0 });
+  useEffect(() => {
+    if (!active || typeof window === 'undefined' || !window.visualViewport) {
+      setVp({ inset: 0, height: null, top: 0 });
+      return undefined;
+    }
+    const vv = window.visualViewport;
+    const update = () => {
+      const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setVp({ inset, height: Math.round(vv.height), top: Math.round(vv.offsetTop) });
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [active]);
+  return vp;
+}
+
 // Mobile: bottom sheet. Desktop, or `centered`: a modal card.
 function Panel({ isMobile, centered, wide, label, onScrim, children }) {
   const asSheet = isMobile && !centered;
+  const kb = useKeyboardInset(isMobile);
+  const kbOpen = isMobile && kb.inset > 0;
+  const scrollTimerRef = useRef(null);
+
+  useEffect(() => () => clearTimeout(scrollTimerRef.current), []);
+
   useEffect(() => {
     if (!onScrim) return undefined;
     const onKey = (e) => {
@@ -65,6 +98,17 @@ function Panel({ isMobile, centered, wide, label, onScrim, children }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onScrim]);
+
+  function handleFocusCapture(e) {
+    if (!isMobile) return;
+    const target = e.target;
+    if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return;
+    clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => {
+      target.scrollIntoView?.({ block: 'nearest' });
+    }, 120);
+  }
+
   return (
     <>
       <div className={styles.scrim} onClick={onScrim} aria-hidden="true" />
@@ -72,6 +116,17 @@ function Panel({ isMobile, centered, wide, label, onScrim, children }) {
         role="dialog"
         aria-modal="true"
         aria-label={label}
+        data-kb={kbOpen ? 'open' : undefined}
+        style={
+          isMobile
+            ? {
+                '--kb-inset': `${kb.inset}px`,
+                '--vv-top': `${kb.top}px`,
+                ...(kb.height ? { '--vv-h': `${kb.height}px` } : {}),
+              }
+            : undefined
+        }
+        onFocusCapture={handleFocusCapture}
         className={asSheet ? styles.sheet : cx(styles.modal, wide && !isMobile && styles.modalWide)}
       >
         {asSheet && <div className={styles.handle} />}
