@@ -1,4 +1,4 @@
-import { CATEGORY_KEYWORDS, nameOrTypeMatches } from '../shared/placeCategories.js';
+import { CATEGORY_KEYWORDS } from '../shared/placeCategories.js';
 import { WP_TYPE_LABELS } from '../waypoints/wpTypeMeta.js';
 import { haversine } from '../../lib/geoUtils.js';
 
@@ -36,6 +36,8 @@ export function isInCampusBounds(lat, lng) {
 
 export function normalizeText(s) {
   return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/['’]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
@@ -44,6 +46,8 @@ export function normalizeText(s) {
 
 export function compactText(s) {
   return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
 }
@@ -359,9 +363,24 @@ function buildInitials(nameNorm) {
   return [...set];
 }
 
+const NOISY_CATEGORY_ENRICHMENTS = new Set(['futa bread', 'spot']);
+
+function matchesCategoryWordBoundary(namePadded, typePadded, subtypePadded, keywords) {
+  for (const kw of keywords) {
+    const kwNorm = normalizeText(kw);
+    if (!kwNorm || NOISY_CATEGORY_ENRICHMENTS.has(kwNorm)) continue;
+    const needle = ` ${kwNorm} `;
+    if (namePadded.includes(needle) || typePadded.includes(needle) || subtypePadded.includes(needle)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function prepareEntry(entry) {
   const nameNorm = normalizeText(entry.name);
   const nameCompact = compactText(entry.name);
+  const namePadded = nameNorm ? ` ${nameNorm} ` : '';
   const nameWordSet = new Set();
   addWordsAndStems(nameWordSet, entry.name);
 
@@ -373,6 +392,11 @@ export function prepareEntry(entry) {
   const descNorm = normalizeText(entry.desc || entry.description);
   const descWordSet = new Set();
   addWordsAndStems(descWordSet, entry.desc || entry.description);
+
+  const typeNorm = normalizeText(entry.type);
+  const subtypeNorm = normalizeText(entry.subtype);
+  const typePadded = typeNorm ? ` ${typeNorm} ` : '';
+  const subtypePadded = subtypeNorm ? ` ${subtypeNorm} ` : '';
 
   const typeLabel = WP_TYPE_LABELS[entry.type] || WP_TYPE_LABELS[entry.subtype] || '';
   const catWordSet = new Set();
@@ -388,9 +412,14 @@ export function prepareEntry(entry) {
   }
 
   for (const [key, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (nameOrTypeMatches(entry.name, entry.type || entry.subtype, keywords)) {
+    if (matchesCategoryWordBoundary(namePadded, typePadded, subtypePadded, [key, ...keywords])) {
       addWordsAndStems(catWordSet, key);
-      for (const kw of keywords) addWordsAndStems(catWordSet, kw);
+      for (const kw of keywords) {
+        const kwNorm = normalizeText(kw);
+        if (kwNorm && !NOISY_CATEGORY_ENRICHMENTS.has(kwNorm)) {
+          addWordsAndStems(catWordSet, kw);
+        }
+      }
     }
   }
 
@@ -401,7 +430,7 @@ export function prepareEntry(entry) {
   const _search = {
     nameNorm,
     nameCompact,
-    namePadded: nameNorm ? ` ${nameNorm} ` : '',
+    namePadded,
     nameWords: [...nameWordSet],
     nameWordSet,
     initials: buildInitials(nameNorm),
@@ -467,8 +496,9 @@ export function buildQueryContext(rawQuery) {
   const uniqueTokens = [...new Set(tokens)];
 
   const phraseAliases = [];
-  if (FUTA_ALIASES[norm]) {
-    for (const phrase of FUTA_ALIASES[norm]) {
+  const phraseAliasTerms = FUTA_ALIASES[norm] || FUTA_ALIASES[stemWord(norm)];
+  if (phraseAliasTerms) {
+    for (const phrase of phraseAliasTerms) {
       const np = normalizeText(phrase);
       if (np) phraseAliases.push(np);
     }
@@ -495,7 +525,7 @@ function bestWordPrefixMatch(words, tok) {
 function matchAliasExpansion(s, expansion) {
   if (s.namePadded.includes(` ${expansion} `)) return 28;
   const expWords = expansion.split(' ').filter(Boolean);
-  if (expWords.length > 1 && expWords.every((ew) => s.nameWordSet.has(ew) || s.nameWordSet.has(stemWord(ew)))) {
+  if (expWords.every((ew) => s.nameWordSet.has(ew) || s.nameWordSet.has(stemWord(ew)))) {
     return 28;
   }
   if (expWords.every((ew) => s.areaWordSet.has(ew) || s.areaWordSet.has(stemWord(ew)))) {
@@ -539,20 +569,15 @@ export function scoreEntry(entry, queryCtx, options = {}) {
 
   let phraseScore = 0;
   if (s.nameNorm === norm || (compact.length >= 2 && s.nameCompact === compact)) {
-    phraseScore += 180;
+    phraseScore = 180;
   } else if (s.nameNorm.startsWith(norm) || (compact.length >= 3 && s.nameCompact.startsWith(compact))) {
-    phraseScore += 110;
-  }
-
-  if (compact.length >= 2 && s.initials.includes(compact)) {
-    phraseScore += 105;
-  }
-
-  if (s.nameNorm !== norm) {
-    if (s.namePadded.includes(` ${norm} `)) phraseScore += 80;
-    else if (s.nameNorm.includes(norm) || (compact.length >= 4 && s.nameCompact.includes(compact))) {
-      phraseScore += 55;
-    }
+    phraseScore = 110;
+  } else if (compact.length >= 2 && s.initials.includes(compact)) {
+    phraseScore = 105;
+  } else if (s.namePadded.includes(` ${norm} `)) {
+    phraseScore = 80;
+  } else if (s.nameNorm.includes(norm) || (compact.length >= 4 && s.nameCompact.includes(compact))) {
+    phraseScore = 55;
   }
 
   if (s.areaNorm && (s.areaNorm === norm || s.areaNorm.includes(norm))) {
@@ -684,8 +709,15 @@ function stripInternal(entry, score, dist) {
 
 export function searchEntries(entries, rawQuery, { limit = 8, user = null } = {}) {
   const coordResult = parseSearchCoord(rawQuery);
-  const queryCtx = buildQueryContext(rawQuery);
+  if (coordResult) {
+    let coordDist = null;
+    if (user && Number.isFinite(user.lat) && Number.isFinite(user.lng)) {
+      coordDist = haversine(user.lat, user.lng, coordResult.lat, coordResult.lng);
+    }
+    return [{ ...coordResult, _score: 999, _dist: coordDist }];
+  }
 
+  const queryCtx = buildQueryContext(rawQuery);
   const scored = [];
   if (queryCtx.norm) {
     for (const entry of entries || []) {
@@ -697,15 +729,6 @@ export function searchEntries(entries, rawQuery, { limit = 8, user = null } = {}
       if (a._dist != null && b._dist != null && a._dist !== b._dist) return a._dist - b._dist;
       return (a.name || '').localeCompare(b.name || '');
     });
-  }
-
-  if (coordResult) {
-    let coordDist = null;
-    if (user && Number.isFinite(user.lat) && Number.isFinite(user.lng)) {
-      coordDist = haversine(user.lat, user.lng, coordResult.lat, coordResult.lng);
-    }
-    const coordHit = { ...coordResult, _score: 999, _dist: coordDist };
-    return [coordHit, ...scored].slice(0, limit);
   }
 
   return scored.slice(0, limit);
@@ -748,10 +771,9 @@ function chipSearchProfile(chip) {
 }
 
 function tokenMatchesChip(tok, stem, aliases, profile, singleToken) {
+  if (singleToken && (CHIP_GENERIC_TAILS.has(tok) || CHIP_GENERIC_TAILS.has(stem))) return 0;
   if (profile.primaryWords.has(tok) || profile.primaryWords.has(stem)) return 4;
-  if (!singleToken || !CHIP_GENERIC_TAILS.has(tok)) {
-    if (profile.allWords.has(tok) || profile.allWords.has(stem)) return 3;
-  }
+  if (profile.allWords.has(tok) || profile.allWords.has(stem)) return 3;
   for (const w of profile.primaryWords) {
     if (tok.length >= 3 && w.startsWith(tok)) return 2;
   }
@@ -786,6 +808,9 @@ export function matchCategoryChip(rawQuery, chips) {
   const nonStop = rawTokens.filter((t) => !STOPWORDS.has(t));
   if (!nonStop.length || nonStop.length > 3) return null;
   const tokens = nonStop;
+  if (tokens.length === 1 && (CHIP_GENERIC_TAILS.has(tokens[0]) || CHIP_GENERIC_TAILS.has(stemWord(tokens[0])))) {
+    return null;
+  }
 
   let bestChip = null;
   let bestScore = 0;
@@ -829,7 +854,7 @@ export function shouldQueryNominatim(localResults, rawQuery) {
   if (!rawQuery || rawQuery.trim().length < 3) return false;
   if (parseSearchCoord(rawQuery)) return false;
   if (!localResults || localResults.length === 0) return true;
-  if (localResults[0]._score >= 165) return false;
+  if (localResults[0]._score >= 180) return false;
   if (localResults.length >= 4 && localResults[0]._score >= 95) return false;
   return true;
 }

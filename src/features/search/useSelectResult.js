@@ -14,6 +14,10 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
       const trackedQuery = query || entry.query || null;
 
       if (entry.source === 'business' || entry.isBusiness) {
+        if (markerRef.current) {
+          map.removeLayer(markerRef.current);
+          markerRef.current = null;
+        }
         track('search_result_selected', { query: trackedQuery, place_name: entry.name });
         onSelect?.({
           name: entry.name,

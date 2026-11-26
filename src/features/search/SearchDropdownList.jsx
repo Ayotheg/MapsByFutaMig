@@ -25,8 +25,8 @@ function CategoryJumpRow({ chip, active, onSelect }) {
         <Icon size={18} />
       </span>
       <span className={styles.body}>
-        <div className={styles.categoryTitle}>See all {chip.label}</div>
-        <div className={styles.categorySub}>Sorted by distance</div>
+        <span className={styles.categoryTitle}>See all {chip.label}</span>
+        <span className={styles.categorySub}>Sorted by distance</span>
       </span>
       <ChevronRight size={16} className={styles.categoryArrow} />
     </button>

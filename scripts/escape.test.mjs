@@ -66,4 +66,12 @@ for (const p of payloads) {
     assert.ok(onlyMarkTags(out), `unsafe multi-word output for ${JSON.stringify(p)} / q=${JSON.stringify(q)}: ${out}`);
   }
 }
+assert.equal(highlight('250 LT', 250), '<mark>250</mark> LT', 'coerces non-string truthy query');
+assert.equal(highlight('Senate Building', '   '), 'Senate Building', 'whitespace-only query does not mark spaces');
+assert.equal(highlight('Senate Building', '  senate  '), '<mark>Senate</mark> Building', 'trimmed query fallback');
+assert.equal(
+  highlight('Southgate / South', 'south southgate'),
+  '<mark>Southgate</mark> / <mark>South</mark>',
+  'overlapping tokens highlight longest-first cleanly'
+);
 console.log('ok: multi-word highlight and XSS safety');

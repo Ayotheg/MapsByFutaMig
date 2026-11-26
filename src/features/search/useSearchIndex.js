@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { TYPE_ICON_KEYS } from '../../lib/typeIcons';
 import { highlight } from './highlight';
 import { compactText, parseSearchCoord, prepareEntry, searchEntries } from './searchEngine';
@@ -28,58 +28,43 @@ function icon(entry) {
   );
 }
 
+function entryKeys(entry) {
+  const idKey = entry.id || '';
+  const normName = compactText(entry.name);
+  const ncKey = normName + '|' + (Number(entry.lat) || 0).toFixed(5) + '|' + (Number(entry.lng) || 0).toFixed(5);
+  return { idKey, normName, ncKey };
+}
+
 /**
  * In-memory search index fed by waypoints, businesses, segments, KML, live
  * Overpass POIs (`osmItems`), and ephemeral Nominatim results.
  */
 export function useSearchIndex({ waypoints, segments, kmlAnnotations, osmItems = [] }) {
+  const osmEntriesRef = useRef([]);
   const indexRef = useRef([]);
-  const idSetRef = useRef(new Set());
-  const nameCoordSetRef = useRef(new Set());
 
-  const register = useCallback((entry) => {
-    const idKey = entry.id || '';
-    const normName = compactText(entry.name);
-    const ncKey = normName + '|' + (Number(entry.lat) || 0).toFixed(5) + '|' + (Number(entry.lng) || 0).toFixed(5);
+  const { staticEntries, staticIds, staticNcKeys, staticNames } = useMemo(() => {
+    const list = [];
+    const ids = new Set();
+    const ncKeys = new Set();
+    const names = new Set();
 
-    if (idKey && idSetRef.current.has(idKey)) return;
-    if (nameCoordSetRef.current.has(ncKey)) return;
-    if (
-      normName &&
-      !entry.lat &&
-      !entry.lng &&
-      indexRef.current.some((e) => compactText(e.name) === normName)
-    ) {
-      return;
-    }
+    const pushStatic = (entry) => {
+      const { idKey, normName, ncKey } = entryKeys(entry);
+      if (idKey && ids.has(idKey)) return;
+      if (ncKeys.has(ncKey)) return;
+      if (normName && !entry.lat && !entry.lng && names.has(normName)) return;
 
-    if (idKey) idSetRef.current.add(idKey);
-    nameCoordSetRef.current.add(ncKey);
-    indexRef.current.push(prepareEntry(entry));
-  }, []);
-
-  // ── Resync the static (waypoint/business/segment/kml/osm_annotation) portion on data change ──
-  useEffect(() => {
-    indexRef.current = indexRef.current.filter(
-      (e) =>
-        e.source !== 'waypoint' &&
-        e.source !== 'business' &&
-        e.source !== 'segment' &&
-        e.source !== 'kml' &&
-        e.source !== 'osm_annotation'
-    );
-    idSetRef.current.clear();
-    nameCoordSetRef.current.clear();
-    indexRef.current.forEach((e) => {
-      if (e.id) idSetRef.current.add(e.id);
-      const normName = compactText(e.name);
-      nameCoordSetRef.current.add(normName + '|' + (Number(e.lat) || 0).toFixed(5) + '|' + (Number(e.lng) || 0).toFixed(5));
-    });
+      if (idKey) ids.add(idKey);
+      ncKeys.add(ncKey);
+      if (normName) names.add(normName);
+      list.push(prepareEntry(entry));
+    };
 
     (waypoints || []).forEach((wp) => {
       if (wp.isPerson || wp.isChannel) return;
       if (wp.isBusiness && wp.promoPaidAt) return;
-      register({
+      pushStatic({
         id: wp.id,
         lat: wp.lat,
         lng: wp.lng,
@@ -103,7 +88,7 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations, osmItems =
     (segments || []).forEach((seg) => {
       if (!seg.points || seg.points.length === 0) return;
       const mid = seg.points[Math.floor(seg.points.length / 2)];
-      register({
+      pushStatic({
         id: seg.id,
         lat: mid.lat,
         lng: mid.lng,
@@ -117,7 +102,7 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations, osmItems =
     });
 
     (kmlAnnotations || []).forEach((a) => {
-      register({
+      pushStatic({
         id: a.id,
         lat: a.lat,
         lng: a.lng,
@@ -131,7 +116,7 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations, osmItems =
     });
 
     (osmItems || []).forEach((item) => {
-      register({
+      pushStatic({
         id: item.id,
         lat: item.lat,
         lng: item.lng,
@@ -143,12 +128,53 @@ export function useSearchIndex({ waypoints, segments, kmlAnnotations, osmItems =
         source: 'osm_annotation',
       });
     });
-  }, [waypoints, segments, kmlAnnotations, osmItems, register]);
 
-  const query = useCallback((q, limit = 8, options = {}) => {
-    if (!q || !q.trim()) return [];
-    return searchEntries(indexRef.current, q, { limit, user: options?.user || null });
-  }, []);
+    return { staticEntries: list, staticIds: ids, staticNcKeys: ncKeys, staticNames: names };
+  }, [waypoints, segments, kmlAnnotations, osmItems]);
+
+  // Keep indexRef synced synchronously so queries see late-arriving static data
+  // (osmItems, phase-2 waypoints) on the very same render.
+  indexRef.current = useMemo(() => {
+    const liveOsm = osmEntriesRef.current.filter((e) => {
+      const { idKey, normName, ncKey } = entryKeys(e);
+      if (idKey && staticIds.has(idKey)) return false;
+      if (staticNcKeys.has(ncKey)) return false;
+      if (normName && !e.lat && !e.lng && staticNames.has(normName)) return false;
+      return true;
+    });
+    return [...staticEntries, ...liveOsm];
+  }, [staticEntries, staticIds, staticNcKeys, staticNames]);
+
+  const register = useCallback(
+    (entry) => {
+      const { idKey, normName, ncKey } = entryKeys(entry);
+      if (idKey && staticIds.has(idKey)) return;
+      if (staticNcKeys.has(ncKey)) return;
+      if (normName && !entry.lat && !entry.lng && staticNames.has(normName)) return;
+
+      for (const e of osmEntriesRef.current) {
+        const k = entryKeys(e);
+        if (idKey && k.idKey === idKey) return;
+        if (k.ncKey === ncKey) return;
+        if (normName && !entry.lat && !entry.lng && k.normName === normName) return;
+      }
+
+      const prepared = prepareEntry(entry);
+      osmEntriesRef.current.push(prepared);
+      indexRef.current = [...indexRef.current, prepared];
+    },
+    [staticIds, staticNcKeys, staticNames]
+  );
+
+  const query = useCallback(
+    (q, limit = 8, options = {}) => {
+      if (!q || !q.trim()) return [];
+      return searchEntries(indexRef.current, q, { limit, user: options?.user || null });
+    },
+    // Re-create when staticEntries changes so consumers re-evaluate open lists.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [staticEntries]
+  );
 
   const resolve = useCallback(
     (input, options = {}) => {

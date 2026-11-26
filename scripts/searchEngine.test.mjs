@@ -1,12 +1,19 @@
 // Run: node scripts/searchEngine.test.mjs (Node 18+).
 import assert from 'node:assert/strict';
 import {
+  damerauLevenshtein,
   matchCategoryChip,
   parseSearchCoord,
   prepareEntry,
   searchEntries,
   shouldQueryNominatim,
 } from '../src/features/search/searchEngine.js';
+import {
+  CATEGORY_KEYWORDS,
+  CATEGORY_LABELS,
+  CATEGORY_SHORT_LABELS,
+  CHIP_DISPLAY_ORDER,
+} from '../src/features/shared/placeCategories.js';
 
 const SAMPLE_ENTRIES = [
   {
@@ -333,4 +340,98 @@ assert.equal(
   false,
   'exact local hit skips Nominatim'
 );
+const singlePrefixHit = searchEntries(
+  [prepareEntry({ id: 'wp-uni', name: 'Unity Clinic', desc: '', area: '', lat: 7.299, lng: 5.138, type: 'clinic', source: 'waypoint' })],
+  'uni'
+);
+assert.equal(
+  shouldQueryNominatim(singlePrefixHit, 'uni'),
+  true,
+  '3-char prefix match does not suppress Nominatim'
+);
+const fourStrong = [
+  { _score: 120 },
+  { _score: 110 },
+  { _score: 100 },
+  { _score: 95 },
+];
+assert.equal(shouldQueryNominatim(fourStrong, 'cafe'), false, '4+ strong matches skip Nominatim');
 console.log('ok: shouldQueryNominatim');
+
+// 13. Exact vs prefix ranking (no double-counting inversion)
+const rankFixture = [
+  { id: 'senate-exact', name: 'Senate', desc: '', area: '', lat: 7.3, lng: 5.138, type: 'admin', source: 'waypoint' },
+  { id: 'senate-bldg', name: 'Senate Building', desc: '', area: '', lat: 7.301, lng: 5.138, type: 'admin', source: 'waypoint' },
+  { id: 'bank-exact', name: 'Bank', desc: '', area: '', lat: 7.299, lng: 5.139, type: 'bank', source: 'waypoint' },
+  { id: 'bank-road', name: 'Bank Road', desc: '', area: '', lat: 7.299, lng: 5.14, type: 'segment', source: 'segment' },
+].map(prepareEntry);
+assert.equal(searchEntries(rankFixture, 'senate')[0].id, 'senate-exact', 'exact "Senate" beats "Senate Building"');
+assert.equal(searchEntries(rankFixture, 'bank')[0].id, 'bank-exact', 'exact "Bank" beats segment "Bank Road"');
+console.log('ok: exact match outranks prefix match');
+
+// 14. Word-boundary category matching prevents false substring leaks
+const leakFixture = [
+  ...SAMPLE_ENTRIES,
+  prepareEntry({ id: 'wp-pg', name: 'Postgraduate School', desc: 'PG admin', area: 'Obanla', lat: 7.302, lng: 5.136, type: 'admin', source: 'waypoint' }),
+  prepareEntry({ id: 'wp-sec', name: 'Security Post', desc: 'Campus security', area: 'North Gate', lat: 7.308, lng: 5.126, type: 'infrastructure', source: 'waypoint' }),
+  prepareEntry({ id: 'wp-po', name: 'Post Office', desc: 'Mail service', area: 'Obanla', lat: 7.297, lng: 5.136, type: 'admin', source: 'waypoint' }),
+];
+for (const q of ['atm', 'bank']) {
+  const hits = searchEntries(leakFixture, q, { limit: 15 });
+  assert.ok(!hits.some((r) => ['wp-pg', 'wp-sec', 'wp-po'].includes(r.id)), `"${q}" must not match Postgraduate/Post`);
+}
+assert.equal(searchEntries(leakFixture, 'bread').some((r) => r.id === 'wp-shawarma'), false, '"bread" must not match Ace Shawarma Spot');
+console.log('ok: word-boundary category enrichment prevents pos/spot leaks');
+
+// 15. CHIP_GENERIC_TAILS rejected on all 25 real chips
+const ALL_REAL_CHIPS = CHIP_DISPLAY_ORDER.map((key) => ({
+  id: key,
+  label: CATEGORY_LABELS[key],
+  shortLabel: CATEGORY_SHORT_LABELS[key] || null,
+  keywords: CATEGORY_KEYWORDS[key],
+}));
+for (const tail of ['shop', 'shops', 'hall', 'station', 'center', 'centre', 'complex', 'press', 'residence', 'building']) {
+  assert.equal(matchCategoryChip(tail, ALL_REAL_CHIPS), null, `generic word "${tail}" must not trigger a chip`);
+}
+assert.equal(matchCategoryChip('lecture hall', ALL_REAL_CHIPS)?.id, 'lecture_hall');
+assert.equal(matchCategoryChip('printing press', ALL_REAL_CHIPS)?.id, 'printing_shop');
+console.log('ok: CHIP_GENERIC_TAILS rejected across real 25 chips');
+
+// 16. Plural aliases, pluralized names & diacritic folding
+const pluralAccentFixture = [
+  prepareEntry({ id: 'wp-hostels', name: 'Student Hostels', desc: '', area: '', lat: 7.29, lng: 5.14, type: 'hostel', source: 'waypoint' }),
+  prepareEntry({ id: 'wp-cafe', name: 'Café', desc: 'Coffee and snacks', area: 'South Gate', lat: 7.289, lng: 5.148, type: 'food', source: 'waypoint' }),
+  prepareEntry({ id: 'wp-cafe-royale', name: 'Café Royale', desc: 'Coffee and snacks', area: 'South Gate', lat: 7.2891, lng: 5.1481, type: 'food', source: 'waypoint' }),
+  prepareEntry({ id: 'wp-wc', name: 'Main Toilet', desc: '', area: 'Obanla', lat: 7.3, lng: 5.138, type: 'toilet', source: 'waypoint' }),
+];
+assert.equal(searchEntries(pluralAccentFixture, 'sleep')[0].id, 'wp-hostels', 'single-word alias matches plural name');
+assert.equal(searchEntries(pluralAccentFixture, 'toilets')[0].id, 'wp-wc', 'plural query matches toilet');
+const cafeHits = searchEntries(pluralAccentFixture, 'cafe');
+assert.equal(cafeHits[0].id, 'wp-cafe', 'diacritic NFD folds Café to exact match');
+assert.ok(cafeHits[0]._score >= 220, 'exact folded match scores >= 220');
+assert.ok(cafeHits[1]._score >= 165, 'prefix word match on Café Royale scores >= 165 (not fuzzy 40)');
+console.log('ok: plural aliases, pluralized names, and diacritic folding');
+
+// 17. Coordinate short-circuit + negative/no-space coords
+const coordFixture = [
+  ...SAMPLE_ENTRIES,
+  prepareEntry({ id: 'wp-b7', name: 'Block 7', desc: 'Lecture block', area: 'Obanla', lat: 7.299, lng: 5.138, type: 'lecture_hall', source: 'waypoint' }),
+];
+const coordOnly = searchEntries(coordFixture, '7.2981, 5.1382');
+assert.equal(coordOnly.length, 1, 'coord query returns only coordinate hit, no digit noise');
+assert.equal(coordOnly[0].source, 'coord');
+assert.equal(parseSearchCoord('-7.2981,5.1382')?.lat, -7.2981, 'supports negative no-space coords');
+console.log('ok: coordinate short-circuit and negative/no-space coords');
+
+// 18. Online Store (null lat/lng) queried with user GPS coords
+const bizWithUser = searchEntries(SAMPLE_ENTRIES, 'Debby', { user: nearSouthGate });
+assert.equal(bizWithUser[0].id, 'biz-debby');
+assert.equal(bizWithUser[0]._dist, null, 'coordinate-less business keeps _dist: null safely');
+console.log('ok: Online Store handles user GPS query safely');
+
+// 19. damerauLevenshtein boundaries
+assert.equal(damerauLevenshtein('hostel', 'hostel', 2), 0);
+assert.equal(damerauLevenshtein('hostle', 'hostel', 1), 1, 'transposition');
+assert.equal(damerauLevenshtein('libary', 'library', 1), 1, 'insertion');
+assert.equal(damerauLevenshtein('abc', 'abcdef', 1), 2, 'length diff > maxDist returns maxDist + 1');
+console.log('ok: damerauLevenshtein boundaries');

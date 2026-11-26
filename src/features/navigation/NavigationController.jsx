@@ -431,6 +431,9 @@ const NavigationController = forwardRef(function NavigationController(
 
   // ── Set destination (from dropdown pick, map click, or "Navigate Here") ──
   const setNavDest = useCallback((entry) => {
+    clearTimeout(navDropDebounceRef.current);
+    navOsmAbortRef.current?.abort();
+    navDestInputRef.current = entry.name || '';
     const destination = {
       lat: parseFloat(entry.lat),
       lng: parseFloat(entry.lng),

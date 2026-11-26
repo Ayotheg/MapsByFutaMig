@@ -45,7 +45,7 @@ export default function DesktopSearchBar({
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
   const abortRef = useRef(null);
-  const lastOsmQRef = useRef('');
+  const osmForRef = useRef('');
   const latestQueryRef = useRef(query);
   latestQueryRef.current = query;
 
@@ -55,6 +55,52 @@ export default function DesktopSearchBar({
   const trimmed = query.trim();
   const localResults = trimmed ? searchIndex.query(trimmed, 8, { user }) : [];
   const matchedChip = trimmed ? matchCategoryChip(trimmed, chips) : null;
+
+  function cancelOsm() {
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+  }
+
+  function scheduleOsmLookup(qTrim, nextLocal) {
+    if (!qTrim || !shouldQueryNominatim(nextLocal, qTrim)) {
+      cancelOsm();
+      osmForRef.current = '';
+      setOsmResults(null);
+      setLoadingOsm(false);
+      return;
+    }
+
+    if (osmForRef.current === qTrim && osmResults !== null) {
+      setLoadingOsm(false);
+      return;
+    }
+
+    cancelOsm();
+    osmForRef.current = '';
+    setOsmResults(null);
+    setLoadingOsm(true);
+
+    debounceRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      try {
+        const raw = await fetchNominatim(qTrim, { limit: 4, signal: controller.signal });
+        if (latestQueryRef.current.trim() !== qTrim) return;
+        const filtered = raw.filter((r) => !findDuplicate(r.lat, r.lng, r.name, searchIndex.indexRef.current));
+        osmForRef.current = qTrim;
+        setOsmResults(filtered);
+      } catch (err) {
+        if (err?.name !== 'AbortError' && latestQueryRef.current.trim() === qTrim) {
+          osmForRef.current = '';
+          setOsmResults(null);
+        }
+      } finally {
+        if (latestQueryRef.current.trim() === qTrim) {
+          setLoadingOsm(false);
+        }
+      }
+    }, 420);
+  }
 
   useEffect(() => writePersistentState('desktop-search-query', query), [query]);
 
@@ -68,8 +114,13 @@ export default function DesktopSearchBar({
   // Chip click fills the input text without opening the dropdown or counting as manual typing.
   useEffect(() => {
     if (activeChipLabel != null) {
+      clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+      osmForRef.current = '';
       latestQueryRef.current = activeChipLabel;
       setQuery(activeChipLabel);
+      setOsmResults(null);
+      setLoadingOsm(false);
       setOpen(false);
       setActiveIdx(-1);
       setSearchError(null);
@@ -83,6 +134,9 @@ export default function DesktopSearchBar({
   }, [open]);
 
   useEffect(() => {
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+    setLoadingOsm(false);
     setOpen(false);
     setActiveIdx(-1);
   }, [dismissKey]);
@@ -91,6 +145,9 @@ export default function DesktopSearchBar({
   useEffect(() => {
     function onDocClick(e) {
       if (barRef.current && !barRef.current.contains(e.target)) {
+        clearTimeout(debounceRef.current);
+        abortRef.current?.abort();
+        setLoadingOsm(false);
         setOpen(false);
         setActiveIdx(-1);
       }
@@ -99,24 +156,29 @@ export default function DesktopSearchBar({
     return () => document.removeEventListener('click', onDocClick);
   }, []);
 
+  const validOsmResults = osmForRef.current === trimmed ? osmResults : null;
   const navigableItems = !trimmed
     ? recentSearches.map((entry) => ({ kind: 'result', entry }))
     : [
         ...(matchedChip ? [{ kind: 'chip', chip: matchedChip }] : []),
         ...localResults.map((entry) => ({ kind: 'result', entry })),
-        ...(osmResults || []).map((entry) => ({ kind: 'result', entry: { ...entry, type: 'osm', subtype: 'osm' } })),
+        ...(validOsmResults || []).map((entry) => ({ kind: 'result', entry: { ...entry, type: 'osm', subtype: 'osm' } })),
       ];
 
   function handleSelect(entry) {
     const isBusiness = entry.source === 'business' || entry.isBusiness;
     if (!isBusiness && (entry.lat == null || entry.lng == null)) return;
+    cancelOsm();
     const q = query.trim();
     selectResult(entry, q);
     if (entry.source !== 'coord' && entry.type !== 'coord') {
       setRecentSearches(addRecentSearch(entry));
     }
+    osmForRef.current = '';
     latestQueryRef.current = entry.name;
     setQuery(entry.name);
+    setOsmResults(null);
+    setLoadingOsm(false);
     setOpen(false);
     setActiveIdx(-1);
     setSearchError(null);
@@ -124,16 +186,20 @@ export default function DesktopSearchBar({
 
   function handlePick(entry) {
     const isBusiness = entry.source === 'business' || entry.isBusiness;
-    if ((isBusiness || (entry.lat != null && entry.lng != null)) && query.trim()) {
+    const qTrim = query.trim();
+    if ((isBusiness || (entry.lat != null && entry.lng != null)) && qTrim) {
+      const osmCount = osmForRef.current === qTrim && osmResults ? osmResults.length : 0;
       track('search_query', {
-        query: query.trim(),
-        result_count: localResults.length + (osmResults?.length || 0),
+        query: qTrim,
+        result_count: localResults.length + osmCount,
       });
     }
     handleSelect(entry);
   }
 
   function handleSelectChip(chip) {
+    cancelOsm();
+    setLoadingOsm(false);
     onChipClick?.(chip);
     setOpen(false);
     setActiveIdx(-1);
@@ -147,46 +213,16 @@ export default function DesktopSearchBar({
     setActiveIdx(-1);
     setSearchError(null);
 
-    clearTimeout(debounceRef.current);
-    abortRef.current?.abort();
-
     const qTrim = q.trim();
     if (!qTrim) {
-      setOsmResults(null);
-      setLoadingOsm(false);
-      lastOsmQRef.current = '';
+      scheduleOsmLookup('', []);
       setOpen(recentSearches.length > 0);
       return;
     }
     setOpen(true);
 
     const nextLocal = searchIndex.query(qTrim, 8, { user });
-    if (shouldQueryNominatim(nextLocal, qTrim) && qTrim !== lastOsmQRef.current) {
-      setLoadingOsm(true);
-      debounceRef.current = setTimeout(async () => {
-        const controller = new AbortController();
-        abortRef.current = controller;
-        lastOsmQRef.current = qTrim;
-        try {
-          const raw = await fetchNominatim(qTrim, { limit: 4, signal: controller.signal });
-          if (latestQueryRef.current.trim() !== qTrim) return;
-          const filtered = raw.filter((r) => !findDuplicate(r.lat, r.lng, r.name, searchIndex.indexRef.current));
-          setOsmResults(filtered);
-        } catch (err) {
-          if (err?.name !== 'AbortError' && latestQueryRef.current.trim() === qTrim) {
-            setOsmResults(null);
-          }
-        } finally {
-          if (latestQueryRef.current.trim() === qTrim) {
-            setLoadingOsm(false);
-          }
-        }
-      }, 420);
-    } else {
-      setOsmResults(null);
-      setLoadingOsm(false);
-      if (qTrim.length < 3) lastOsmQRef.current = '';
-    }
+    scheduleOsmLookup(qTrim, nextLocal);
   }
 
   async function doFullSearch() {
@@ -201,14 +237,20 @@ export default function DesktopSearchBar({
       return;
     }
 
-    clearTimeout(debounceRef.current);
-    abortRef.current?.abort();
+    if (osmForRef.current === q && osmResults?.length) {
+      track('search_query', { query: q, result_count: osmResults.length });
+      handleSelect(osmResults[0]);
+      return;
+    }
+
+    cancelOsm();
     const controller = new AbortController();
     abortRef.current = controller;
     setLoadingOsm(true);
     try {
       const raw = await fetchNominatim(q, { limit: 1, signal: controller.signal });
       if (latestQueryRef.current.trim() !== q) return;
+      osmForRef.current = q;
       track('search_query', { query: q, result_count: raw.length });
       if (raw.length) {
         handleSelect(raw[0]);
@@ -241,6 +283,8 @@ export default function DesktopSearchBar({
       else if (picked?.kind === 'result') handlePick(picked.entry);
       else if (trimmed) doFullSearch();
     } else if (e.key === 'Escape') {
+      cancelOsm();
+      setLoadingOsm(false);
       setOpen(false);
       setActiveIdx(-1);
       inputRef.current?.blur();
@@ -248,9 +292,8 @@ export default function DesktopSearchBar({
   }
 
   function handleClear() {
-    clearTimeout(debounceRef.current);
-    abortRef.current?.abort();
-    lastOsmQRef.current = '';
+    cancelOsm();
+    osmForRef.current = '';
     latestQueryRef.current = '';
     setQuery('');
     setOsmResults(null);
@@ -265,17 +308,22 @@ export default function DesktopSearchBar({
   function handleRemoveRecent(entry) {
     const next = removeRecentSearch(entry);
     setRecentSearches(next);
+    setActiveIdx((i) => (i >= next.length ? next.length - 1 : i));
     if (!next.length && !trimmed) setOpen(false);
   }
 
   function handleClearRecent() {
     clearRecentSearches();
     setRecentSearches([]);
+    setActiveIdx(-1);
     if (!trimmed) setOpen(false);
   }
 
   const emptyMessage =
-    osmResults !== null && osmResults.length === 0 && localResults.length === 0
+    osmForRef.current === trimmed &&
+    validOsmResults !== null &&
+    validOsmResults.length === 0 &&
+    localResults.length === 0
       ? `Nothing found for "${trimmed}". Try a more specific name.`
       : null;
 
@@ -303,8 +351,12 @@ export default function DesktopSearchBar({
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            setRecentSearches(getRecentSearches());
-            if (trimmed || getRecentSearches().length > 0) setOpen(true);
+            const recents = getRecentSearches();
+            setRecentSearches(recents);
+            if (trimmed || recents.length > 0) {
+              setOpen(true);
+              if (trimmed) scheduleOsmLookup(trimmed, localResults);
+            }
           }}
         />
         {query && (
@@ -321,7 +373,7 @@ export default function DesktopSearchBar({
         <div className={styles.dropdown}>
           <SearchDropdownList
             localResults={localResults}
-            osmResults={osmResults}
+            osmResults={validOsmResults}
             query={query}
             loading={loadingOsm}
             icon={searchIndex.icon}

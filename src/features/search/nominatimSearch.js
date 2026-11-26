@@ -1,6 +1,7 @@
 // Viewbox covering FUTA campus and Akure metro in Nominatim's left,top,right,bottom order.
 const AKURE_VIEWBOX = '5.05,7.38,5.30,7.18';
 const MAX_CACHE_ENTRIES = 60;
+const FALLBACK_DELAY_MS = 350;
 const nominatimCache = new Map();
 
 function mapNominatimResults(data) {
@@ -18,6 +19,23 @@ function mapNominatimResults(data) {
       };
     })
     .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && r.name);
+}
+
+function abortableDelay(ms, signal) {
+  if (signal?.aborted) {
+    return Promise.reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 async function runNominatimQuery(qStr, { limit, bounded, signal }) {
@@ -39,12 +57,14 @@ export async function fetchNominatim(query, { limit = 4, signal } = {}) {
   const q = String(query || '').trim();
   if (!q) return [];
 
-  const cacheKey = `${q.toLowerCase()}|${limit}`;
+  const cacheKey = q.toLowerCase();
   if (nominatimCache.has(cacheKey)) {
     const cached = nominatimCache.get(cacheKey);
-    nominatimCache.delete(cacheKey);
-    nominatimCache.set(cacheKey, cached);
-    return cached.slice();
+    if (cached.limit >= limit || cached.results.length < cached.limit) {
+      nominatimCache.delete(cacheKey);
+      nominatimCache.set(cacheKey, cached);
+      return cached.results.slice(0, limit);
+    }
   }
 
   const hasRegionHint = /\b(futa|akure|ondo|nigeria)\b/i.test(q);
@@ -54,6 +74,7 @@ export async function fetchNominatim(query, { limit = 4, signal } = {}) {
   } else {
     results = await runNominatimQuery(q, { limit, bounded: true, signal });
     if (results.length === 0) {
+      await abortableDelay(FALLBACK_DELAY_MS, signal);
       results = await runNominatimQuery(`${q} Akure`, { limit, bounded: false, signal });
     }
   }
@@ -62,8 +83,8 @@ export async function fetchNominatim(query, { limit = 4, signal } = {}) {
     const oldestKey = nominatimCache.keys().next().value;
     if (oldestKey !== undefined) nominatimCache.delete(oldestKey);
   }
-  nominatimCache.set(cacheKey, results);
-  return results.slice();
+  nominatimCache.set(cacheKey, { limit, results });
+  return results.slice(0, limit);
 }
 
 /**

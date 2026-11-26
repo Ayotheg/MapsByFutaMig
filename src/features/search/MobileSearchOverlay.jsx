@@ -29,7 +29,6 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
   const abortRef = useRef(null);
-  const lastOsmQRef = useRef('');
   const latestQueryRef = useRef(query);
   latestQueryRef.current = query;
   const typedRef = useRef(false);
@@ -39,9 +38,62 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   const user = useLiveLocation(open);
   const { selectResult } = useSelectResult({ map, searchIndex, onSelect });
 
+  const searchIndexRef = useRef(searchIndex);
+  searchIndexRef.current = searchIndex;
+  const userRef = useRef(user);
+  userRef.current = user;
+
   const trimmed = query.trim();
   const localResults = trimmed ? searchIndex.query(trimmed, 8, { user }) : [];
   const matchedChip = trimmed ? matchCategoryChip(trimmed, chips) : null;
+
+  function cancelOsm() {
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+  }
+
+  function scheduleOsmLookup(qTrim, nextLocal) {
+    if (!qTrim || !shouldQueryNominatim(nextLocal, qTrim)) {
+      cancelOsm();
+      osmForRef.current = '';
+      setOsmResults(null);
+      setLoadingOsm(false);
+      return;
+    }
+
+    if (osmForRef.current === qTrim && osmResults !== null) {
+      setLoadingOsm(false);
+      return;
+    }
+
+    cancelOsm();
+    osmForRef.current = '';
+    setOsmResults(null);
+    setLoadingOsm(true);
+
+    debounceRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+      try {
+        const raw = await fetchNominatim(qTrim, { limit: 4, signal: controller.signal });
+        if (latestQueryRef.current.trim() !== qTrim) return;
+        const idx = searchIndexRef.current.indexRef.current;
+        const filtered = raw.filter((r) => !findDuplicate(r.lat, r.lng, r.name, idx));
+        osmForRef.current = qTrim;
+        setOsmResults(filtered);
+      } catch (err) {
+        if (err?.name !== 'AbortError' && latestQueryRef.current.trim() === qTrim) {
+          osmFailedForRef.current = qTrim;
+          osmForRef.current = '';
+          setOsmResults(null);
+        }
+      } finally {
+        if (latestQueryRef.current.trim() === qTrim) {
+          setLoadingOsm(false);
+        }
+      }
+    }, 420);
+  }
 
   useEffect(() => {
     return () => {
@@ -53,7 +105,6 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   useEffect(() => {
     if (open) {
       typedRef.current = false;
-      lastOsmQRef.current = '';
       osmForRef.current = '';
       osmFailedForRef.current = '';
       setSearchError(null);
@@ -63,11 +114,43 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
       const restored = readPersistentState('mobile-search-query', '');
       latestQueryRef.current = restored;
       setQuery(restored);
+
+      const restoredTrim = restored.trim();
+      if (restoredTrim) {
+        const restoredLocal = searchIndexRef.current.query(restoredTrim, 8, { user: userRef.current });
+        if (shouldQueryNominatim(restoredLocal, restoredTrim)) {
+          setLoadingOsm(true);
+          debounceRef.current = setTimeout(async () => {
+            const controller = new AbortController();
+            abortRef.current = controller;
+            try {
+              const raw = await fetchNominatim(restoredTrim, { limit: 4, signal: controller.signal });
+              if (latestQueryRef.current.trim() !== restoredTrim) return;
+              const idx = searchIndexRef.current.indexRef.current;
+              const filtered = raw.filter((r) => !findDuplicate(r.lat, r.lng, r.name, idx));
+              osmForRef.current = restoredTrim;
+              setOsmResults(filtered);
+            } catch (err) {
+              if (err?.name !== 'AbortError' && latestQueryRef.current.trim() === restoredTrim) {
+                osmFailedForRef.current = restoredTrim;
+                osmForRef.current = '';
+                setOsmResults(null);
+              }
+            } finally {
+              if (latestQueryRef.current.trim() === restoredTrim) {
+                setLoadingOsm(false);
+              }
+            }
+          }, 420);
+        }
+      }
+
       const t = setTimeout(() => inputRef.current?.focus(), 80);
       return () => clearTimeout(t);
     }
     clearTimeout(debounceRef.current);
     abortRef.current?.abort();
+    osmForRef.current = '';
     latestQueryRef.current = '';
     setLoadingOsm(false);
     setQuery('');
@@ -86,6 +169,8 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   }
 
   function handleSelect(entry, overrideCount = null) {
+    cancelOsm();
+    setLoadingOsm(false);
     const qTrim = query.trim();
     if (qTrim) {
       track('search_query', { query: qTrim, result_count: overrideCount ?? resultCount() });
@@ -98,17 +183,21 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   }
 
   function handleSelectChip(chip) {
+    cancelOsm();
+    setLoadingOsm(false);
     onChipClick?.(chip);
     onClose();
   }
 
   // Leaving with a query that found nothing signals a content gap to Insights.
   function handleClose() {
+    cancelOsm();
     const q = query.trim();
     const osmSettled = !shouldQueryNominatim(localResults, q) || (osmForRef.current === q && !loadingOsm);
     if (q && typedRef.current && osmSettled && osmFailedForRef.current !== q && resultCount() === 0) {
       track('search_query', { query: q, result_count: 0 });
     }
+    setLoadingOsm(false);
     onClose();
   }
 
@@ -119,46 +208,14 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
     setQuery(q);
     setSearchError(null);
 
-    clearTimeout(debounceRef.current);
-    abortRef.current?.abort();
-
     const qTrim = q.trim();
     if (!qTrim) {
-      setOsmResults(null);
-      setLoadingOsm(false);
-      lastOsmQRef.current = '';
+      scheduleOsmLookup('', []);
       return;
     }
 
     const nextLocal = searchIndex.query(qTrim, 8, { user });
-    if (shouldQueryNominatim(nextLocal, qTrim) && qTrim !== lastOsmQRef.current) {
-      setLoadingOsm(true);
-      debounceRef.current = setTimeout(async () => {
-        const controller = new AbortController();
-        abortRef.current = controller;
-        lastOsmQRef.current = qTrim;
-        try {
-          const raw = await fetchNominatim(qTrim, { limit: 4, signal: controller.signal });
-          if (latestQueryRef.current.trim() !== qTrim) return;
-          const filtered = raw.filter((r) => !findDuplicate(r.lat, r.lng, r.name, searchIndex.indexRef.current));
-          osmForRef.current = qTrim;
-          setOsmResults(filtered);
-        } catch (err) {
-          if (err?.name !== 'AbortError' && latestQueryRef.current.trim() === qTrim) {
-            osmFailedForRef.current = qTrim;
-            setOsmResults(null);
-          }
-        } finally {
-          if (latestQueryRef.current.trim() === qTrim) {
-            setLoadingOsm(false);
-          }
-        }
-      }, 420);
-    } else {
-      setOsmResults(null);
-      setLoadingOsm(false);
-      if (qTrim.length < 3) lastOsmQRef.current = '';
-    }
+    scheduleOsmLookup(qTrim, nextLocal);
   }
 
   async function handleKeyDown(e) {
@@ -170,7 +227,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
         handleSelect(localResults[0]);
         return;
       }
-      if (osmResults && osmResults.length) {
+      if (osmForRef.current === q && osmResults && osmResults.length) {
         handleSelect(osmResults[0]);
         return;
       }
@@ -180,8 +237,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
         return;
       }
 
-      clearTimeout(debounceRef.current);
-      abortRef.current?.abort();
+      cancelOsm();
       const controller = new AbortController();
       abortRef.current = controller;
       setLoadingOsm(true);
@@ -210,9 +266,8 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
   }
 
   function handleClear() {
-    clearTimeout(debounceRef.current);
-    abortRef.current?.abort();
-    lastOsmQRef.current = '';
+    cancelOsm();
+    osmForRef.current = '';
     latestQueryRef.current = '';
     setQuery('');
     setOsmResults(null);
@@ -221,8 +276,12 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
     inputRef.current?.focus();
   }
 
+  const validOsmResults = osmForRef.current === trimmed ? osmResults : null;
   const emptyMessage =
-    osmResults !== null && osmResults.length === 0 && localResults.length === 0
+    osmForRef.current === trimmed &&
+    validOsmResults !== null &&
+    validOsmResults.length === 0 &&
+    localResults.length === 0
       ? `Nothing found for "${trimmed}". Try a more specific name.`
       : null;
 
@@ -251,7 +310,7 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
       <div className={styles.results}>
         <SearchDropdownList
           localResults={localResults}
-          osmResults={osmResults}
+          osmResults={validOsmResults}
           query={query}
           loading={loadingOsm}
           icon={searchIndex.icon}

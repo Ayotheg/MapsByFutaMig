@@ -22,13 +22,14 @@ function wrapMatches(s, re) {
 // are the <mark> tags added here.
 export function highlight(text, q) {
   const s = String(text ?? '');
-  if (!q) return escapeHtml(s);
+  const rawQ = String(q ?? '');
+  const trimmed = rawQ.trim();
+  if (!trimmed) return escapeHtml(s);
 
-  const exactRe = new RegExp(`(${escapeRegex(q)})`, 'gi');
+  const exactRe = new RegExp(`(${escapeRegex(rawQ)})`, 'gi');
   if (exactRe.test(s)) return wrapMatches(s, exactRe);
 
-  const trimmed = String(q).trim();
-  if (trimmed && trimmed !== q) {
+  if (trimmed !== rawQ) {
     const trimRe = new RegExp(`(${escapeRegex(trimmed)})`, 'gi');
     if (trimRe.test(s)) return wrapMatches(s, trimRe);
   }
