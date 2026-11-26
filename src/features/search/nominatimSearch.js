@@ -1,39 +1,90 @@
-import { CAMPUS_BOUNDS } from '../../lib/campusBounds';
+// Viewbox covering FUTA campus and Akure metro in Nominatim's left,top,right,bottom order.
+const AKURE_VIEWBOX = '5.05,7.38,5.30,7.18';
+const MAX_CACHE_ENTRIES = 60;
+const FALLBACK_DELAY_MS = 350;
+const nominatimCache = new Map();
+
+function mapNominatimResults(data) {
+  return (data || [])
+    .map((d) => {
+      const parts = String(d.display_name || '').split(',');
+      return {
+        lat: parseFloat(d.lat),
+        lng: parseFloat(d.lon),
+        name: (parts[0] || '').trim(),
+        desc: parts.slice(1, 3).join(',').trim(),
+        type: 'osm',
+        subtype: 'osm',
+        source: 'osm',
+      };
+    })
+    .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng) && r.name);
+}
+
+function abortableDelay(ms, signal) {
+  if (signal?.aborted) {
+    return Promise.reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+  }
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(Object.assign(new Error('Aborted'), { name: 'AbortError' }));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function runNominatimQuery(qStr, { limit, bounded, signal }) {
+  const url =
+    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(qStr)}` +
+    `&viewbox=${AKURE_VIEWBOX}&bounded=${bounded ? 1 : 0}&countrycodes=ng&limit=${limit}`;
+
+  const res = await fetch(url, { headers: { 'Accept-Language': 'en' }, signal });
+  if (!res.ok) throw new Error(`Nominatim responded ${res.status}`);
+  const data = await res.json();
+  return mapNominatimResults(data);
+}
 
 /**
- * Shared Nominatim (OpenStreetMap) geocoding helper.
- *
- * Legacy duplicates this exact fetch 4 times near-verbatim — once each in
- * the sidebar's `handleSearchInput`/`doSearch` (app.js ~781–889, dead code,
- * see DesktopSearchBar.jsx's header comment), the desktop floating bar's
- * `deskHandleInput`/`deskDoSearch` (~999–1111), the mobile full-screen
- * overlay (~5901–5936), and `bindRouteInput` (~1166–1186, also dead — see
- * same note). Since none of those are copy-pasted vanilla-JS IIFEs here,
- * this is a single shared pure function instead — same fetch, same query
- * shape, same result mapping, called from DesktopSearchBar.jsx and
- * MobileSearchOverlay.jsx.
- *
- * Result shape matches a `useSearchIndex` entry: { lat, lng, name, desc,
- * type: 'osm', subtype: 'osm', source: 'osm' }.
+ * Shared Nominatim (OpenStreetMap) geocoding helper with session caching,
+ * request cancellation (`signal`), and Akure-first regional bounding.
  */
-export async function fetchNominatim(query, { limit = 4 } = {}) {
-  const vb = `${CAMPUS_BOUNDS.getWest()},${CAMPUS_BOUNDS.getSouth()},${CAMPUS_BOUNDS.getEast()},${CAMPUS_BOUNDS.getNorth()}`;
-  const url =
-    `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' FUTA Akure Nigeria')}` +
-    `&viewbox=${vb}&bounded=0&limit=${limit}`;
+export async function fetchNominatim(query, { limit = 4, signal } = {}) {
+  const q = String(query || '').trim();
+  if (!q) return [];
 
-  const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
-  const data = await res.json();
+  const cacheKey = q.toLowerCase();
+  if (nominatimCache.has(cacheKey)) {
+    const cached = nominatimCache.get(cacheKey);
+    if (cached.limit >= limit || cached.results.length < cached.limit) {
+      nominatimCache.delete(cacheKey);
+      nominatimCache.set(cacheKey, cached);
+      return cached.results.slice(0, limit);
+    }
+  }
 
-  return (data || []).map((d) => ({
-    lat: parseFloat(d.lat),
-    lng: parseFloat(d.lon),
-    name: d.display_name.split(',')[0].trim(),
-    desc: d.display_name.split(',').slice(1, 3).join(',').trim(),
-    type: 'osm',
-    subtype: 'osm',
-    source: 'osm',
-  }));
+  const hasRegionHint = /\b(futa|akure|ondo|nigeria)\b/i.test(q);
+  let results;
+  if (hasRegionHint) {
+    results = await runNominatimQuery(q, { limit, bounded: false, signal });
+  } else {
+    results = await runNominatimQuery(q, { limit, bounded: true, signal });
+    if (results.length === 0) {
+      await abortableDelay(FALLBACK_DELAY_MS, signal);
+      results = await runNominatimQuery(`${q} Akure`, { limit, bounded: false, signal });
+    }
+  }
+
+  if (nominatimCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = nominatimCache.keys().next().value;
+    if (oldestKey !== undefined) nominatimCache.delete(oldestKey);
+  }
+  nominatimCache.set(cacheKey, { limit, results });
+  return results.slice(0, limit);
 }
 
 /**
@@ -44,16 +95,6 @@ export async function fetchNominatim(query, { limit = 4 } = {}) {
  * a road name + surrounding town/state, for students traveling in from
  * other states who need "which expressway/town am I on" more than a
  * coordinate pair.
- *
- * `zoom: 17` asks Nominatim for street-level detail (vs. the default
- * ~city-level) so `address.road` is populated whenever OSM has the
- * road/highway tagged, which is the specific detail the announcement
- * leads with.
- *
- * Returns `null` (not a throw) on a malformed/error response so the
- * caller's fallback logic doesn't need its own try/catch just to read
- * `.address` — same "never block on geolocation" posture as
- * `useOneShotLocation.js`/`chipConfig.js`.
  */
 export async function reverseGeocode(lat, lng) {
   const url =

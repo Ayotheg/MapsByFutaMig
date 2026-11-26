@@ -3,45 +3,27 @@ import L from 'leaflet';
 import { track } from '../../lib/analytics';
 import './searchResultMarker.css';
 
-// Raw Leaflet marker HTML can't hold a React icon — inline SVG matching
-// Lucide's own Search glyph, same approach as NavigationController's
-// SVG_FLAG for the same reason.
 const SVG_SEARCH = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>`;
 
-/**
- * Ports legacy's `selectResult()` (app.js ~729–777) — shared by the
- * (dead, unported) sidebar search, the desktop floating bar's
- * `deskSelect` (which just calls `selectResult` directly, app.js ~988),
- * and the mobile full-screen overlay's item click (~5872). Same here:
- * DesktopSearchBar.jsx and MobileSearchOverlay.jsx both call this one hook.
- *
- * Not ported: the two DOM writes at the end of legacy's `selectResult`
- * that sync the (dead, invisible) sidebar `#searchInput`/`#searchClear`
- * elements — those don't exist in this app. Each caller syncs its own
- * visible input instead.
- */
 export function useSelectResult({ map, searchIndex, onSelect }) {
   const markerRef = useRef(null);
 
   const selectResult = useCallback(
-    (entry) => {
-      if (!map) return;
+    (entry, query = null) => {
+      if (!map || !entry) return;
+      const trackedQuery = query || entry.query || null;
 
-      // Business entries (supabase/business_entries.sql, registered by
-      // useSearchIndex.js with source:'business') are the one search
-      // result type with no lat/lng by design — there's nothing to fly
-      // to and no pin to drop. Every other branch below assumes real
-      // coordinates, so this short-circuits straight to opening the
-      // place card (in its normal, non-navigable form — see
-      // PlaceCard.jsx's isBusiness branch) instead of falling through to
-      // the `!entry.lat || !entry.lng` guard, which used to just
-      // silently do nothing for a coordinate-less result.
       if (entry.source === 'business' || entry.isBusiness) {
-        track('search_result_selected', { query: entry.query || null, place_name: entry.name });
+        if (markerRef.current) {
+          map.removeLayer(markerRef.current);
+          markerRef.current = null;
+        }
+        track('search_result_selected', { query: trackedQuery, place_name: entry.name });
         onSelect?.({
           name: entry.name,
           badge: 'ONLINE STORE',
           description: entry.desc || '',
+          area: entry.area || '',
           lat: null,
           lng: null,
           imageUrls: entry.imageUrls || [],
@@ -56,25 +38,18 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
         return;
       }
 
-      if (!entry.lat || !entry.lng) return;
-      const ll = [parseFloat(entry.lat), parseFloat(entry.lng)];
+      const lat = parseFloat(entry.lat);
+      const lng = parseFloat(entry.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+      const ll = [lat, lng];
+      const isCoord = entry.source === 'coord' || entry.type === 'coord';
 
-      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — this one
-      // hook is the shared call site for every result-click surface
-      // (desktop bar, mobile overlay), so this covers all of them.
-      track('search_result_selected', { query: entry.query || null, place_name: entry.name });
+      track('search_result_selected', { query: trackedQuery, place_name: entry.name });
 
       if (markerRef.current) map.removeLayer(markerRef.current);
       markerRef.current = L.marker(ll, {
         icon: L.divIcon({
           className: '',
-          // On-brand icon-only pin (searchResultMarker.css) — bug fix
-          // (reported directly): the previous icon+label pill got lost
-          // under nearby waypoint pins, both visually (label text was
-          // easy to miss) and in stacking order. Dropping the label is
-          // safe since `onSelect` below already opens the place card
-          // with the name 400ms later; `zIndexOffset` is what actually
-          // forces this above waypoint/KML layers on the map.
           html: `<div class="search-hit-pin-wrap"><span class="search-hit-pin-icon">${SVG_SEARCH}</span></div>`,
           iconSize: [34, 34],
           iconAnchor: [17, 34],
@@ -84,10 +59,11 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
 
       const cardOpts = {
         name: entry.name,
-        badge: (entry.subtype || entry.type || 'result').toUpperCase(),
+        badge: isCoord ? 'COORDINATES' : (entry.subtype || entry.type || 'result').replace(/_/g, ' ').toUpperCase(),
         description: entry.desc || '',
-        lat: parseFloat(entry.lat),
-        lng: parseFloat(entry.lng),
+        area: entry.area || '',
+        lat,
+        lng,
         imageUrls: entry.imageUrls || [],
         id: entry.id,
         type: entry.subtype || entry.type,
@@ -97,24 +73,24 @@ export function useSelectResult({ map, searchIndex, onSelect }) {
       const marker = markerRef.current;
       marker.on('click', (ev) => {
         L.DomEvent.stopPropagation(ev);
-        // A later tap on this pin is a map tap, not another search (Insights).
         onSelect?.(cardOpts, { fromMarker: true });
       });
-      // Auto-open after the fly-to animation settles, matching legacy's
-      // 400ms setTimeout.
       setTimeout(() => onSelect?.(cardOpts), 400);
 
       map.flyTo(ll, 18, { duration: 1.2 });
 
-      searchIndex.register({
-        lat: parseFloat(entry.lat),
-        lng: parseFloat(entry.lng),
-        name: entry.name,
-        desc: entry.desc || '',
-        type: entry.type || 'poi',
-        subtype: entry.subtype || 'poi',
-        source: entry.source || 'osm',
-      });
+      if (!isCoord) {
+        searchIndex.register({
+          lat,
+          lng,
+          name: entry.name,
+          desc: entry.desc || '',
+          area: entry.area || '',
+          type: entry.type || 'poi',
+          subtype: entry.subtype || 'poi',
+          source: entry.source || 'osm',
+        });
+      }
     },
     [map, searchIndex, onSelect]
   );
