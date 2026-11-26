@@ -1,22 +1,16 @@
-/* v2 redesign: restyled to v2 light tokens
-   per Figma node 4:249 — this file is shared verbatim by
-   MobileSearchOverlay's list and DesktopSearchBar's `.dropdown`, so
-   redesigning it completes both flagged rows in Section 7 at once
-   (DesktopSearchBar's `.dropdown` container itself is repainted to
-   match in DesktopSearchBar.module.css, paired in this same session).
-   JSX/props/markup unchanged — only class declarations moved. */
+/* v2 redesign: restyled to v2 light tokens per Figma node 4:249,
+   shared by MobileSearchOverlay's list and DesktopSearchBar's .dropdown. */
 
 .item {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px;
+  padding: 14px 16px;
   cursor: pointer;
   transition: background var(--v2-duration-quick) var(--v2-ease-standard);
 }
 .item + .item {
   border-top: 1px solid var(--v2-divider);
-  padding-top: 17px;
 }
 .item:hover,
 .item.active {
@@ -45,7 +39,7 @@
   font-size: 15px;
   font-weight: 700;
   color: var(--v2-neutral);
-  line-height: 1.5;
+  line-height: 1.45;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -59,12 +53,19 @@
 .sub {
   font-family: var(--font-ui);
   font-size: 13px;
-  color: var(--v2-text-variant);
-  line-height: 1.5;
+  color: var(--v2-text-muted);
+  line-height: 1.45;
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.dist {
+  font-family: var(--v2-font-manrope);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--v2-primary-hover);
 }
 
 .badge {
@@ -73,22 +74,114 @@
   font-weight: 700;
   padding: 3px 8px;
   border-radius: var(--r-full);
-  background: var(--v2-primary-glow);
-  color: var(--v2-primary);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
   border: 1px solid var(--v2-primary-outline);
   flex-shrink: 0;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 .badgeOsm {
-  background: rgba(13, 148, 136, 0.12);
-  color: var(--v2-secondary);
-  border-color: rgba(13, 148, 136, 0.25);
+  background: var(--v2-secondary-tint);
+  color: var(--v2-neutral);
+  border-color: var(--v2-secondary);
 }
 .badgeSeg {
-  background: rgba(161, 81, 0, 0.12);
-  color: var(--v2-tertiary);
-  border-color: rgba(161, 81, 0, 0.25);
+  background: var(--v2-tertiary-container);
+  color: var(--v2-on-tertiary-container);
+  border-color: var(--v2-tertiary-container);
+}
+
+.categoryRow {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--v2-divider);
+  background: transparent;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.categoryRow:hover,
+.categoryRow.active {
+  background: var(--v2-primary-tint);
+}
+.categoryIcon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-md);
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.categoryTitle {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--v2-neutral);
+  line-height: 1.35;
+}
+.categorySub {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--v2-text-muted);
+  line-height: 1.35;
+}
+.categoryArrow {
+  flex-shrink: 0;
+  color: var(--v2-primary-hover);
+}
+
+.recentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 4px;
+}
+.recentHeader .sectionLabel {
+  padding: 0;
+}
+.clearRecentBtn {
+  border: none;
+  background: none;
+  padding: 2px 6px;
+  border-radius: var(--r-sm);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--v2-primary-hover);
+  cursor: pointer;
+  transition: background var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.clearRecentBtn:hover {
+  background: var(--v2-primary-tint);
+}
+
+.removeBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--v2-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background var(--v2-duration-quick) var(--v2-ease-standard),
+    color var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.removeBtn:hover {
+  background: var(--v2-primary-tint);
+  color: var(--v2-neutral);
 }
 
 .sectionLabel {
@@ -97,12 +190,22 @@
   gap: 8px;
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.6px;
-  color: var(--v2-text-variant);
-  padding: 16px 16px 0;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--v2-text-muted);
+  padding: 14px 16px 4px;
   text-transform: uppercase;
-  padding-bottom: 4px;
+}
+
+.errorBanner {
+  margin: 12px 16px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--v2-error-tint);
+  color: var(--v2-error-text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .spinner {
@@ -112,7 +215,7 @@
   gap: 6px;
   text-align: center;
   padding: 16px 14px;
-  color: var(--v2-text-variant);
+  color: var(--v2-text-muted);
   font-family: var(--font-ui);
   font-size: 12px;
 }
@@ -126,13 +229,24 @@
 .empty {
   text-align: center;
   padding: 20px 16px;
-  color: var(--v2-text-variant);
+  color: var(--v2-text-muted);
   font-family: var(--font-ui);
   font-size: 13px;
+}
+.emptyHint {
+  text-align: center;
+  padding: 20px 16px;
+  color: var(--v2-text-muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .item,
+  .categoryRow,
+  .clearRecentBtn,
+  .removeBtn,
   .spin {
     transition: none;
     animation: none;

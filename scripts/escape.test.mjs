@@ -48,3 +48,22 @@ assert.equal(highlight('Tom & Jerry', 'amp'), 'Tom &amp; Jerry', '"amp" must not
 assert.equal(highlight('Tom & Jerry', '&'), 'Tom <mark>&amp;</mark> Jerry');
 assert.equal(highlight('a<b', 'lt'), 'a&lt;b', '"lt" must not match inside &lt;');
 console.log('ok: matching happens on raw text, so entities are never split');
+
+// ── multi-word highlighting and XSS safety
+assert.equal(
+  highlight('South Gate Female Hostel', 'south hostel'),
+  '<mark>South</mark> Gate Female <mark>Hostel</mark>',
+  'highlights matched non-contiguous tokens'
+);
+assert.equal(
+  highlight('School of Engineering', 'school engineering'),
+  '<mark>School</mark> of <mark>Engineering</mark>',
+  'highlights multiple query words'
+);
+for (const p of payloads) {
+  for (const q of ['img alert', 'script cookie', 'svg onload', 'a href']) {
+    const out = highlight(p, q);
+    assert.ok(onlyMarkTags(out), `unsafe multi-word output for ${JSON.stringify(p)} / q=${JSON.stringify(q)}: ${out}`);
+  }
+}
+console.log('ok: multi-word highlight and XSS safety');

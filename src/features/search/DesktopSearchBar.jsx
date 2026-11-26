@@ -3,6 +3,14 @@ import { X, Navigation, Heart } from 'lucide-react';
 import { DONATE_URL } from '../../lib/donate';
 import { fetchNominatim } from './nominatimSearch';
 import { useSelectResult } from './useSelectResult';
+import { useLiveLocation } from './useLiveLocation';
+import { matchCategoryChip, shouldQueryNominatim } from './searchEngine';
+import {
+  addRecentSearch,
+  clearRecentSearches,
+  getRecentSearches,
+  removeRecentSearch,
+} from './recentSearches';
 import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
 import SearchDropdownList from './SearchDropdownList';
 import styles from './DesktopSearchBar.module.css';
@@ -10,45 +18,7 @@ import { track } from '../../lib/analytics';
 import { readPersistentState, writePersistentState } from '../../lib/persistentState';
 
 /**
- * Ported from legacy's `initDeskSearch` IIFE (app.js ~895–1131) — the
- * floating pill at the top-center of the map, the actual visible desktop
- * search UI.
- *
- * Not ported: the sidebar's `#panelSearch`/`#searchInput`/`#searchDropdown`
- * (app.js ~547–780, index.html ~566, `style="display:none"`). Traced every
- * call site: nothing in legacy ever removes that inline `display:none`, so
- * that panel — and the near-identical `handleSearchInput`/`doSearch`
- * functions built for it — are unreachable dead code, superseded by this
- * floating bar. `selectResult()` (app.js ~729–777), which both the dead
- * panel and this bar call, is real and shared — ported as `useSelectResult`.
- *
- * Also not ported here: `bindRouteInput`/`#routePlannerBar` (app.js
- * ~1135–1206, index.html ~580). Traced its only call site (~1193–1200):
- * it's invoked, but nothing anywhere ever removes `#routePlannerBar`'s
- * `hidden` class — no button, no rail item, nothing. It's real code for UI
- * legacy itself never surfaces, superseded by the actually-wired
- * `#navDestPanel` destination search (Slice 9's territory — `railNavigate`
- * → `panelNavigate`). Flagging rather than guessing a trigger or inventing
- * new UI not present in legacy; revisit if Slice 9 turns out to need it.
- *
- * v2 redesign (paired with MobileSearchBar): the collapsed pill (`.bar`/`.pill` and
- * its buttons/input) restyled to v2 light tokens, reusing the same
- * decisions just made for the mobile bar (glass pill, v2-primary nav
- * button, etc.) — no separate Figma frame was given for desktop, per
- * the pairing rule this reused the mobile session's fresh choices
- * rather than reinventing them.
- *
- * The pill's left button is the donate heart (Buy Me a Malt). It replaced the
- * old menu button, which only duplicated the sidebar rail's Explore item.
- * No search icon: it sat right next to the heart and the two clashed.
- *
- * Follow-up (this session, Figma node 4:249): the results `.dropdown`
- * and shared `SearchDropdownList`/`SearchResultItem` are now also v2 —
- * MobileSearchOverlay (which shares this list verbatim) got its own
- * pass this session, closing the reason `.dropdown` was left dark
- * before. `.dropdown`'s own shell (surface/border/radius/shadow) reuses
- * ChipResultsPanel's desktop panel treatment, since no separate desktop
- * Figma frame exists for it — same pairing-rule reuse as the pill above.
+ * Floating desktop search pill + dropdown at top-center of the map.
  */
 export default function DesktopSearchBar({
   map,
@@ -60,166 +30,253 @@ export default function DesktopSearchBar({
   onNavigateClick,
   dismissKey,
   onDropdownOpen,
+  chips,
+  onChipClick,
 }) {
   const [query, setQuery] = useState(() => readPersistentState('desktop-search-query', ''));
   const [open, setOpen] = useState(false);
   const [osmResults, setOsmResults] = useState(null);
   const [loadingOsm, setLoadingOsm] = useState(false);
+  const [searchError, setSearchError] = useState(null);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [recentSearches, setRecentSearches] = useState(() => getRecentSearches());
+
   const barRef = useRef(null);
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
+  const abortRef = useRef(null);
   const lastOsmQRef = useRef('');
+  const latestQueryRef = useRef(query);
+  latestQueryRef.current = query;
 
+  const user = useLiveLocation(open);
   const { selectResult, clearMarker } = useSelectResult({ map, searchIndex, onSelect });
-  const localResults = query.trim() ? searchIndex.query(query, 6) : [];
+
+  const trimmed = query.trim();
+  const localResults = trimmed ? searchIndex.query(trimmed, 8, { user }) : [];
+  const matchedChip = trimmed ? matchCategoryChip(trimmed, chips) : null;
 
   useEffect(() => writePersistentState('desktop-search-query', query), [query]);
 
-  // Chip click fills the input text (legacy: `deskInput.value = label`,
-  // app.js ~6879) without opening the dropdown or counting as manual typing.
+  useEffect(() => {
+    return () => {
+      clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  // Chip click fills the input text without opening the dropdown or counting as manual typing.
   useEffect(() => {
     if (activeChipLabel != null) {
+      latestQueryRef.current = activeChipLabel;
       setQuery(activeChipLabel);
       setOpen(false);
+      setActiveIdx(-1);
+      setSearchError(null);
     }
   }, [activeChipLabel]);
 
-  // Only one map surface open at a time: opening the dropdown tells MapPage
-  // to close the rest, and MapPage bumps `dismissKey` when something else
-  // opens.
+  // Only one map surface open at a time.
   useEffect(() => {
     if (open) onDropdownOpen?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
   useEffect(() => {
     setOpen(false);
+    setActiveIdx(-1);
   }, [dismissKey]);
 
-  // Close on outside click — matches legacy's document-level listener.
+  // Close on outside click.
   useEffect(() => {
     function onDocClick(e) {
-      if (barRef.current && !barRef.current.contains(e.target)) setOpen(false);
+      if (barRef.current && !barRef.current.contains(e.target)) {
+        setOpen(false);
+        setActiveIdx(-1);
+      }
     }
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);
   }, []);
 
+  const navigableItems = !trimmed
+    ? recentSearches.map((entry) => ({ kind: 'result', entry }))
+    : [
+        ...(matchedChip ? [{ kind: 'chip', chip: matchedChip }] : []),
+        ...localResults.map((entry) => ({ kind: 'result', entry })),
+        ...(osmResults || []).map((entry) => ({ kind: 'result', entry: { ...entry, type: 'osm', subtype: 'osm' } })),
+      ];
+
   function handleSelect(entry) {
-    if (!entry.lat || !entry.lng) return;
-    selectResult(entry);
+    const isBusiness = entry.source === 'business' || entry.isBusiness;
+    if (!isBusiness && (entry.lat == null || entry.lng == null)) return;
+    const q = query.trim();
+    selectResult(entry, q);
+    if (entry.source !== 'coord' && entry.type !== 'coord') {
+      setRecentSearches(addRecentSearch(entry));
+    }
+    latestQueryRef.current = entry.name;
     setQuery(entry.name);
     setOpen(false);
     setActiveIdx(-1);
+    setSearchError(null);
   }
 
-  // A pick from the dropdown (click or arrow keys + Enter) is a search
-  // too; Enter with nothing highlighted is tracked in doFullSearch below.
   function handlePick(entry) {
-    // Only when it actually opens something (handleSelect skips results
-    // with no position).
-    if (entry.lat && entry.lng && query.trim()) {
-      track('search_query', { query: query.trim(), result_count: flatResults.length });
+    const isBusiness = entry.source === 'business' || entry.isBusiness;
+    if ((isBusiness || (entry.lat != null && entry.lng != null)) && query.trim()) {
+      track('search_query', {
+        query: query.trim(),
+        result_count: localResults.length + (osmResults?.length || 0),
+      });
     }
     handleSelect(entry);
   }
 
+  function handleSelectChip(chip) {
+    onChipClick?.(chip);
+    setOpen(false);
+    setActiveIdx(-1);
+  }
+
   function handleInputChange(e) {
     const q = e.target.value;
+    latestQueryRef.current = q;
     onManualType?.();
     setQuery(q);
     setActiveIdx(-1);
-    if (!q.trim()) {
-      setOpen(false);
+    setSearchError(null);
+
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+
+    const qTrim = q.trim();
+    if (!qTrim) {
       setOsmResults(null);
+      setLoadingOsm(false);
+      lastOsmQRef.current = '';
+      setOpen(recentSearches.length > 0);
       return;
     }
     setOpen(true);
 
-    clearTimeout(debounceRef.current);
-    if (q.trim().length >= 3 && q !== lastOsmQRef.current) {
+    const nextLocal = searchIndex.query(qTrim, 8, { user });
+    if (shouldQueryNominatim(nextLocal, qTrim) && qTrim !== lastOsmQRef.current) {
       setLoadingOsm(true);
       debounceRef.current = setTimeout(async () => {
-        lastOsmQRef.current = q;
+        const controller = new AbortController();
+        abortRef.current = controller;
+        lastOsmQRef.current = qTrim;
         try {
-          const raw = await fetchNominatim(q, { limit: 4 });
+          const raw = await fetchNominatim(qTrim, { limit: 4, signal: controller.signal });
+          if (latestQueryRef.current.trim() !== qTrim) return;
           const filtered = raw.filter((r) => !findDuplicate(r.lat, r.lng, r.name, searchIndex.indexRef.current));
-          setOsmResults(filtered.length ? filtered : null);
-        } catch {
-          // matches legacy's silent .catch(() => {}) on the live-suggestion path
+          setOsmResults(filtered);
+        } catch (err) {
+          if (err?.name !== 'AbortError' && latestQueryRef.current.trim() === qTrim) {
+            setOsmResults(null);
+          }
         } finally {
-          setLoadingOsm(false);
+          if (latestQueryRef.current.trim() === qTrim) {
+            setLoadingOsm(false);
+          }
         }
       }, 420);
-    } else if (q.trim().length < 3) {
+    } else {
       setOsmResults(null);
       setLoadingOsm(false);
+      if (qTrim.length < 3) lastOsmQRef.current = '';
     }
   }
 
   async function doFullSearch() {
     const q = query.trim();
     if (!q) return;
-    const local = searchIndex.resolve(q);
+    setSearchError(null);
+
+    const local = searchIndex.resolve(q, { user });
     if (local) {
-      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9).
-      track('search_query', { query: q, result_count: 1 });
+      track('search_query', { query: q, result_count: Math.max(1, localResults.length) });
       handleSelect(local);
       return;
     }
+
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoadingOsm(true);
     try {
-      const raw = await fetchNominatim(q, { limit: 1 });
+      const raw = await fetchNominatim(q, { limit: 1, signal: controller.signal });
+      if (latestQueryRef.current.trim() !== q) return;
       track('search_query', { query: q, result_count: raw.length });
-      if (raw.length) handleSelect(raw[0]);
-      else setOsmResults([]); // triggers the "Nothing found" empty state below
+      if (raw.length) {
+        handleSelect(raw[0]);
+      } else {
+        setOsmResults([]);
+        setOpen(true);
+      }
     } catch (e) {
-      alert('Search failed — check your connection.');
-      // Slice 14 instrumentation (ANALYTICS_BUILD_PLAN.md §9) — only the
-      // full-search failure, not the live-suggestion catch above (that
-      // one's deliberately silent, matching legacy, and would fire on
-      // every debounce network hiccup rather than a meaningful error).
+      if (e?.name === 'AbortError') return;
+      setSearchError('Search failed — check your connection.');
+      setOpen(true);
       track('error_occurred', { context: 'search_query', message: e?.message || String(e) });
+    } finally {
+      if (latestQueryRef.current.trim() === q) setLoadingOsm(false);
     }
   }
-
-  const flatResults = [...localResults, ...(osmResults || [])];
 
   function handleKeyDown(e) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActiveIdx((i) => Math.min(i + 1, flatResults.length - 1));
+      if (!open && (trimmed || recentSearches.length > 0)) setOpen(true);
+      setActiveIdx((i) => Math.min(i + 1, navigableItems.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActiveIdx((i) => Math.max(i - 1, 0));
+      setActiveIdx((i) => (i <= 0 ? -1 : i - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (activeIdx >= 0 && flatResults[activeIdx]) handlePick(flatResults[activeIdx]);
-      else doFullSearch();
+      const picked = activeIdx >= 0 ? navigableItems[activeIdx] : null;
+      if (picked?.kind === 'chip') handleSelectChip(picked.chip);
+      else if (picked?.kind === 'result') handlePick(picked.entry);
+      else if (trimmed) doFullSearch();
     } else if (e.key === 'Escape') {
       setOpen(false);
+      setActiveIdx(-1);
       inputRef.current?.blur();
     }
   }
 
   function handleClear() {
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+    lastOsmQRef.current = '';
+    latestQueryRef.current = '';
     setQuery('');
-    setOpen(false);
     setOsmResults(null);
+    setLoadingOsm(false);
+    setSearchError(null);
+    setActiveIdx(-1);
+    setOpen(recentSearches.length > 0);
     clearMarker();
     inputRef.current?.focus();
   }
 
-  function handleNavClick() {
-    // Was a no-op stub left over from before Slice 9's navigation feature
-    // was built (comment said "inert until Slice 9" — Slice 9 is done now,
-    // this just never got wired up). Opens the same "Where to?" flow as
-    // the sidebar's Navigate rail item / mobile FAB.
-    onNavigateClick?.();
+  function handleRemoveRecent(entry) {
+    const next = removeRecentSearch(entry);
+    setRecentSearches(next);
+    if (!next.length && !trimmed) setOpen(false);
   }
 
-  const noResultsMsg =
+  function handleClearRecent() {
+    clearRecentSearches();
+    setRecentSearches([]);
+    if (!trimmed) setOpen(false);
+  }
+
+  const emptyMessage =
     osmResults !== null && osmResults.length === 0 && localResults.length === 0
-      ? `Nothing found for "${query}". Try a more specific name.`
+      ? `Nothing found for "${trimmed}". Try a more specific name.`
       : null;
 
   return (
@@ -245,34 +302,40 @@ export default function DesktopSearchBar({
           value={query}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => query.trim() && setOpen(true)}
+          onFocus={() => {
+            setRecentSearches(getRecentSearches());
+            if (trimmed || getRecentSearches().length > 0) setOpen(true);
+          }}
         />
         {query && (
           <button className={styles.clearBtn} onClick={handleClear} type="button" aria-label="Clear search">
             <X size={14} />
           </button>
         )}
-        <button className={styles.navBtn} onClick={handleNavClick} title="Navigate" type="button">
+        <button className={styles.navBtn} onClick={() => onNavigateClick?.()} title="Navigate" type="button">
           <Navigation size={15} />
         </button>
       </div>
 
       {open && (
         <div className={styles.dropdown}>
-          {noResultsMsg ? (
-            <div className={styles.noResults}>{noResultsMsg}</div>
-          ) : (
-            <SearchDropdownList
-              localResults={localResults}
-              osmResults={osmResults}
-              query={query}
-              loading={loadingOsm}
-              icon={searchIndex.icon}
-              highlight={searchIndex.highlight}
-              onSelect={handlePick}
-              activeIdx={activeIdx}
-            />
-          )}
+          <SearchDropdownList
+            localResults={localResults}
+            osmResults={osmResults}
+            query={query}
+            loading={loadingOsm}
+            icon={searchIndex.icon}
+            highlight={searchIndex.highlight}
+            onSelect={handlePick}
+            activeIdx={activeIdx}
+            matchedChip={matchedChip}
+            onSelectChip={handleSelectChip}
+            recentSearches={recentSearches}
+            onRemoveRecent={handleRemoveRecent}
+            onClearRecent={handleClearRecent}
+            searchError={searchError}
+            emptyMessage={emptyMessage}
+          />
         </div>
       )}
     </div>

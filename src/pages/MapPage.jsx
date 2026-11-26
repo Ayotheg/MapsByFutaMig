@@ -218,7 +218,7 @@ export default function MapPage({ onReadinessChange }) {
   // wanted back.
   const { viewMode, setViewMode } = useViewMode();
 
-  const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations });
+  const searchIndex = useSearchIndex({ waypoints, segments, kmlAnnotations, osmItems });
   const quickChips = useQuickChips();
   // Explore panel (mobile navbar "Explore" tab + desktop rail button):
   // derived straight from `waypoints` (no separate fetch/table — see
@@ -1130,6 +1130,8 @@ export default function MapPage({ onReadinessChange }) {
             searchIndex={searchIndex}
             onSelect={selectFromSearch}
             onClose={() => setMobileSearchOpen(false)}
+            chips={quickChips.chips}
+            onChipClick={handleChipClick}
           />
         </>
       ) : (
@@ -1143,6 +1145,8 @@ export default function MapPage({ onReadinessChange }) {
           onManualType={() => setActiveChip(null)}
           activeChipLabel={activeChip?.label}
           onNavigateClick={handleNavLaunch}
+          chips={quickChips.chips}
+          onChipClick={handleChipClick}
         />
       )}
       {!navActive && (

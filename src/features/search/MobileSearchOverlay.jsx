@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, X } from 'lucide-react';
 import { fetchNominatim } from './nominatimSearch';
 import { useSelectResult } from './useSelectResult';
+import { useLiveLocation } from './useLiveLocation';
+import { matchCategoryChip, shouldQueryNominatim } from './searchEngine';
+import {
+  addRecentSearch,
+  clearRecentSearches,
+  getRecentSearches,
+  removeRecentSearch,
+} from './recentSearches';
 import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
 import SearchDropdownList from './SearchDropdownList';
 import styles from './MobileSearchOverlay.module.css';
@@ -9,92 +17,96 @@ import { readPersistentState, writePersistentState } from '../../lib/persistentS
 import { track } from '../../lib/analytics';
 
 /**
- * Ported from legacy's dynamically-built `#mobSearchOverlay` (app.js
- * ~5808–5958) — a comment-flagged fix: "mobSearchTrig was captured but
- * never wired — this fixes it." Full-screen overlay opened by
- * MobileSearchBar, giving mobile the same live local+OSM suggestions as
- * desktop.
- *
- * Reuses SearchDropdownList/SearchResultItem (built for the desktop
- * dropdown) rather than re-implementing legacy's near-identical but
- * slightly-larger `.mob-ov-item` row style, and passes `showBadge={false}`
- * to match one real difference: legacy's mobile rows never render the
- * type badge desktop's `.sd-item` does. The row padding/font-size here
- * matches the desktop dropdown rather than legacy's separate (marginally
- * larger) mobile numbers — a minor, flagged simplification, not a
- * behavioral one.
- *
- * v2 redesign: restyled to v2 light tokens
- * per Figma node 4:249 ("Search Results Redesign") — see tokens-v2.css
- * for how this frame's colors/font map onto existing tokens. Structure,
- * props, handlers, and search behavior untouched; the show/close
- * mechanism (`open`/`active` class) is unchanged too, just animated (see
- * .module.css). Paired in the same session with DesktopSearchBar's
- * `.dropdown`, since both surfaces render this exact list content via
- * the shared SearchDropdownList/SearchResultItem components.
- *
- * Faithfully NOT ported: unlike the desktop bar's Enter-with-no-selection
- * behavior (`deskDoSearch`, which falls back to a full OSM search),
- * legacy's mobile overlay Enter handler (~5939–5948) only tries
- * `FUTA_SEARCH.resolve()` and does nothing if that comes up empty — no OSM
- * fallback. Reproduced exactly as-is.
+ * Full-screen mobile search overlay opened by MobileSearchBar.
  */
-export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, onClose }) {
+export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, onClose, chips, onChipClick }) {
   const [query, setQuery] = useState(() => readPersistentState('mobile-search-query', ''));
   const [osmResults, setOsmResults] = useState(null);
   const [loadingOsm, setLoadingOsm] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [recentSearches, setRecentSearches] = useState(() => getRecentSearches());
+
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
+  const abortRef = useRef(null);
   const lastOsmQRef = useRef('');
-  // For Insights' search tracking: whether this query was typed since the
-  // overlay opened (a restored one isn't a new search), which query the
-  // current OSM results belong to, and which query's OSM fetch failed.
+  const latestQueryRef = useRef(query);
+  latestQueryRef.current = query;
   const typedRef = useRef(false);
   const osmForRef = useRef('');
   const osmFailedForRef = useRef('');
 
+  const user = useLiveLocation(open);
   const { selectResult } = useSelectResult({ map, searchIndex, onSelect });
-  const localResults = query.trim() ? searchIndex.query(query, 6) : [];
+
+  const trimmed = query.trim();
+  const localResults = trimmed ? searchIndex.query(trimmed, 8, { user }) : [];
+  const matchedChip = trimmed ? matchCategoryChip(trimmed, chips) : null;
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     if (open) {
       typedRef.current = false;
-      // Results were cleared on close, so a retyped query must fetch again.
       lastOsmQRef.current = '';
       osmForRef.current = '';
       osmFailedForRef.current = '';
-      setQuery(readPersistentState('mobile-search-query', ''));
+      setSearchError(null);
+      setLoadingOsm(false);
+      setOsmResults(null);
+      setRecentSearches(getRecentSearches());
+      const restored = readPersistentState('mobile-search-query', '');
+      latestQueryRef.current = restored;
+      setQuery(restored);
       const t = setTimeout(() => inputRef.current?.focus(), 80);
       return () => clearTimeout(t);
     }
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+    latestQueryRef.current = '';
+    setLoadingOsm(false);
     setQuery('');
     setOsmResults(null);
+    setSearchError(null);
+    return undefined;
   }, [open]);
 
   useEffect(() => {
     if (open) writePersistentState('mobile-search-query', query);
   }, [open, query]);
 
-  // OSM results only count for the query they were fetched for.
   function resultCount() {
-    const osm = osmForRef.current === query && osmResults ? osmResults.length : 0;
+    const osm = osmForRef.current === query.trim() && osmResults ? osmResults.length : 0;
     return localResults.length + osm;
   }
 
-  function handleSelect(entry) {
-    if (query.trim()) track('search_query', { query: query.trim(), result_count: resultCount() });
-    selectResult(entry);
+  function handleSelect(entry, overrideCount = null) {
+    const qTrim = query.trim();
+    if (qTrim) {
+      track('search_query', { query: qTrim, result_count: overrideCount ?? resultCount() });
+    }
+    if (entry.source !== 'coord' && entry.type !== 'coord') {
+      setRecentSearches(addRecentSearch(entry));
+    }
+    selectResult(entry, qTrim);
     onClose();
   }
 
-  // Leaving with a query that found nothing is the "searched but found
-  // nothing" signal. Only on close, not while typing, so half-typed words
-  // aren't counted; and only for a query typed this time whose OSM search
-  // actually finished (not still loading, not failed).
+  function handleSelectChip(chip) {
+    onChipClick?.(chip);
+    onClose();
+  }
+
+  // Leaving with a query that found nothing signals a content gap to Insights.
   function handleClose() {
     const q = query.trim();
-    const osmSettled = q.length < 3 || (osmForRef.current === query && !loadingOsm);
-    if (q && typedRef.current && osmSettled && osmFailedForRef.current !== query && resultCount() === 0) {
+    const osmSettled = !shouldQueryNominatim(localResults, q) || (osmForRef.current === q && !loadingOsm);
+    if (q && typedRef.current && osmSettled && osmFailedForRef.current !== q && resultCount() === 0) {
       track('search_query', { query: q, result_count: 0 });
     }
     onClose();
@@ -102,48 +114,117 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
 
   function handleInputChange(e) {
     const q = e.target.value;
+    latestQueryRef.current = q;
     typedRef.current = true;
     setQuery(q);
-    if (!q.trim()) {
+    setSearchError(null);
+
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+
+    const qTrim = q.trim();
+    if (!qTrim) {
       setOsmResults(null);
+      setLoadingOsm(false);
+      lastOsmQRef.current = '';
       return;
     }
-    clearTimeout(debounceRef.current);
-    if (q.trim().length >= 3 && q !== lastOsmQRef.current) {
+
+    const nextLocal = searchIndex.query(qTrim, 8, { user });
+    if (shouldQueryNominatim(nextLocal, qTrim) && qTrim !== lastOsmQRef.current) {
       setLoadingOsm(true);
       debounceRef.current = setTimeout(async () => {
-        lastOsmQRef.current = q;
+        const controller = new AbortController();
+        abortRef.current = controller;
+        lastOsmQRef.current = qTrim;
         try {
-          const raw = await fetchNominatim(q, { limit: 4 });
+          const raw = await fetchNominatim(qTrim, { limit: 4, signal: controller.signal });
+          if (latestQueryRef.current.trim() !== qTrim) return;
           const filtered = raw.filter((r) => !findDuplicate(r.lat, r.lng, r.name, searchIndex.indexRef.current));
-          osmForRef.current = q;
-          setOsmResults(filtered.length ? filtered : null);
-        } catch {
-          // matches legacy's silent .catch(() => {})
-          osmFailedForRef.current = q;
+          osmForRef.current = qTrim;
+          setOsmResults(filtered);
+        } catch (err) {
+          if (err?.name !== 'AbortError' && latestQueryRef.current.trim() === qTrim) {
+            osmFailedForRef.current = qTrim;
+            setOsmResults(null);
+          }
         } finally {
-          setLoadingOsm(false);
+          if (latestQueryRef.current.trim() === qTrim) {
+            setLoadingOsm(false);
+          }
         }
       }, 420);
+    } else {
+      setOsmResults(null);
+      setLoadingOsm(false);
+      if (qTrim.length < 3) lastOsmQRef.current = '';
     }
   }
 
-  function handleKeyDown(e) {
+  async function handleKeyDown(e) {
     if (e.key === 'Enter') {
+      e.preventDefault();
       const q = query.trim();
       if (!q) return;
-      const local = searchIndex.resolve(q);
-      if (local) handleSelect(local);
+      if (localResults.length) {
+        handleSelect(localResults[0]);
+        return;
+      }
+      if (osmResults && osmResults.length) {
+        handleSelect(osmResults[0]);
+        return;
+      }
+      const resolved = searchIndex.resolve(q, { user });
+      if (resolved) {
+        handleSelect(resolved, 1);
+        return;
+      }
+
+      clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setLoadingOsm(true);
+      setSearchError(null);
+      try {
+        const raw = await fetchNominatim(q, { limit: 1, signal: controller.signal });
+        if (latestQueryRef.current.trim() !== q) return;
+        osmForRef.current = q;
+        if (raw.length) {
+          setOsmResults(raw);
+          handleSelect(raw[0], raw.length);
+        } else {
+          setOsmResults([]);
+        }
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+        osmFailedForRef.current = q;
+        setSearchError('Search failed — check your connection.');
+        track('error_occurred', { context: 'search_query', message: err?.message || String(err) });
+      } finally {
+        if (latestQueryRef.current.trim() === q) setLoadingOsm(false);
+      }
     } else if (e.key === 'Escape') {
       handleClose();
     }
   }
 
   function handleClear() {
+    clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+    lastOsmQRef.current = '';
+    latestQueryRef.current = '';
     setQuery('');
     setOsmResults(null);
+    setLoadingOsm(false);
+    setSearchError(null);
     inputRef.current?.focus();
   }
+
+  const emptyMessage =
+    osmResults !== null && osmResults.length === 0 && localResults.length === 0
+      ? `Nothing found for "${trimmed}". Try a more specific name.`
+      : null;
 
   return (
     <div className={`${styles.overlay} ${open ? styles.active : ''}`}>
@@ -177,6 +258,13 @@ export default function MobileSearchOverlay({ open, map, searchIndex, onSelect, 
           highlight={searchIndex.highlight}
           onSelect={handleSelect}
           showBadge={false}
+          matchedChip={matchedChip}
+          onSelectChip={handleSelectChip}
+          recentSearches={recentSearches}
+          onRemoveRecent={(entry) => setRecentSearches(removeRecentSearch(entry))}
+          onClearRecent={() => setRecentSearches(clearRecentSearches())}
+          searchError={searchError}
+          emptyMessage={emptyMessage}
         />
       </div>
     </div>

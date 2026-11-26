@@ -4,7 +4,7 @@
 // merge table and reasoning, and `waypoint_type_migration.sql` for the DB-side
 // migration this depends on. Every merged-in type below picks one of its
 // source colors/labels rather than inventing new ones, except where noted.
-import { classifyPlace } from '../shared/placeCategories';
+import { classifyPlace } from '../shared/placeCategories.js';
 
 // ── Place-type → pin colour map ─────────────────────────────────────────────
 // Previously several real dropdown types (printing_shop, cafe, restaurant,

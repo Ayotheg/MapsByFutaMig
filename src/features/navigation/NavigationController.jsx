@@ -3,6 +3,8 @@ import L from 'leaflet';
 import { haversine, routePosition } from '../../lib/geoUtils';
 import { isRateablePOI } from '../waypoints/wpTypeMeta';
 import { fetchNominatim } from '../search/nominatimSearch';
+import { shouldQueryNominatim } from '../search/searchEngine';
+import { findDuplicate } from '../osm-annotations/osmAnnotationUtils';
 import { fetchRoute } from './osrmRoute';
 import { isOnPathTowards, walkablePaths } from './shortcutRoute';
 import { alightPrompt, alightStop, createRideDetector, routeProfile, speedBetween } from './busStops';
@@ -142,6 +144,8 @@ const NavigationController = forwardRef(function NavigationController(
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      clearTimeout(navDropDebounceRef.current);
+      navOsmAbortRef.current?.abort();
     };
   }, []);
   const persistedNavigationRef = useRef(readPersistentState('navigation-session', null));
@@ -342,6 +346,8 @@ const NavigationController = forwardRef(function NavigationController(
   const spokenTurnNowRef = useRef(false);
   const nearArrivalSpokenRef = useRef(false);
   const navDropDebounceRef = useRef(null);
+  const navOsmAbortRef = useRef(null);
+  const navDestInputRef = useRef('');
   const navClickAbortRef = useRef(null);
   const lastDrawFracRef = useRef(-1);
 
@@ -451,6 +457,9 @@ const NavigationController = forwardRef(function NavigationController(
 
   // Desktop's "Where to?" clear button.
   const clearNavDest = useCallback(() => {
+    clearTimeout(navDropDebounceRef.current);
+    navOsmAbortRef.current?.abort();
+    navDestInputRef.current = '';
     navDestRef.current = null;
     setNavDestState(null);
     removePersistentState('navigation-destination');
@@ -463,6 +472,7 @@ const NavigationController = forwardRef(function NavigationController(
   // ── Destination search — local index first, then debounced Nominatim ──
   const onDestInputChange = useCallback(
     (val) => {
+      navDestInputRef.current = val;
       setDestInputValue(val);
       // Editing the name means a new search: the old pick no longer applies.
       if (navDestRef.current && val !== navDestRef.current.name) {
@@ -471,28 +481,46 @@ const NavigationController = forwardRef(function NavigationController(
         removePersistentState('navigation-destination');
         setGoDisabled(true);
       }
+      clearTimeout(navDropDebounceRef.current);
+      navOsmAbortRef.current?.abort();
+
       const q = val.trim();
       if (!q) {
         setDropdownResults([]);
         return;
       }
-      const local = searchIndex.query(q, 7);
+
+      const pos = gps?.lastKnownPosRef?.current;
+      const user = pos?.coords
+        ? { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        : pos?.lat != null && pos?.lng != null
+          ? { lat: pos.lat, lng: pos.lng }
+          : null;
+
+      const local = searchIndex
+        .query(q, 10, { user })
+        .filter((r) => r.lat != null && r.lng != null)
+        .slice(0, 7);
       setDropdownResults(local);
 
-      clearTimeout(navDropDebounceRef.current);
-      if (q.length >= 3) {
+      if (shouldQueryNominatim(local, q)) {
         navDropDebounceRef.current = setTimeout(async () => {
+          const controller = new AbortController();
+          navOsmAbortRef.current = controller;
           try {
-            const osm = await fetchNominatim(q, { limit: 4 });
-            osm.forEach((r) => searchIndex.register(r));
-            setDropdownResults([...searchIndex.query(q, 5), ...osm].slice(0, 7));
+            const osm = await fetchNominatim(q, { limit: 4, signal: controller.signal });
+            if (navDestInputRef.current.trim() !== q) return;
+            const filteredOsm = osm.filter(
+              (r) => !findDuplicate(r.lat, r.lng, r.name, searchIndex.indexRef.current)
+            );
+            setDropdownResults([...local, ...filteredOsm].slice(0, 7));
           } catch {
             /* silent — matches legacy */
           }
         }, 400);
       }
     },
-    [searchIndex]
+    [searchIndex, gps]
   );
 
   // ── Map click → set destination while the "Where to?" panel is open ──
