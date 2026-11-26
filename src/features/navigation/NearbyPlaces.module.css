@@ -214,6 +214,16 @@
   color: var(--v2-text-muted);
 }
 
+@media (min-width: 769px) {
+  .stack {
+    right: 20px;
+    bottom: 32px;
+  }
+  .panel {
+    max-height: calc(100dvh - 180px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pulse { animation: none; }
   .panel { animation: none; }

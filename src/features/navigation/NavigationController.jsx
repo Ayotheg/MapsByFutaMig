@@ -16,6 +16,7 @@ import { useOneShotLocation } from '../explore/useOneShotLocation';
 import NavDestPanel from './NavDestPanel';
 import NavDestDesktop from './NavDestDesktop';
 import NavHud from './NavHud';
+import NavHudDesktop from './NavHudDesktop';
 import NavArrivedBanner from './NavArrivedBanner';
 import './navMapLayers.css';
 import { track } from '../../lib/analytics';
@@ -1572,33 +1573,35 @@ const NavigationController = forwardRef(function NavigationController(
             <NavDestDesktop {...panelProps} popularPlaces={popularPlaces} hasDest={!!navDest} onClearDest={clearNavDest} />
           );
         })()}
-      {navActive && (
-        <NavHud
-          arriving={hud.arriving}
-          arrived={hud.arrived}
-          turnIcon={hud.turnIcon}
-          turnInstruction={hud.turnInstruction}
-          turnDist={hud.turnDist}
-          nextPreview={hud.nextPreview}
-          distRemain={hud.distRemain}
-          destName={hud.destName}
-          voiceEnabled={voiceEnabled}
-          onToggleVoice={() => {
-            setVoiceEnabled((v) => {
-              const next = !v;
-              // Turning voice back on is also a real tap — use it to prime
-              // speechSynthesis in case the Go-button priming never landed
-              // (e.g. voice was off when navigation started).
-              if (next) unlockSpeech();
-              if (!next && 'speechSynthesis' in window) window.speechSynthesis.cancel();
-              return next;
-            });
-          }}
-          onClose={handleHudClose}
-          // A race's ranking card takes the distance card's slot too.
-          hideDistance={placeCardOpen || bottomTaken}
-        />
-      )}
+      {navActive &&
+        (() => {
+          const hudProps = {
+            arriving: hud.arriving,
+            arrived: hud.arrived,
+            turnIcon: hud.turnIcon,
+            turnInstruction: hud.turnInstruction,
+            turnDist: hud.turnDist,
+            nextPreview: hud.nextPreview,
+            distRemain: hud.distRemain,
+            destName: hud.destName,
+            voiceEnabled,
+            onToggleVoice: () => {
+              setVoiceEnabled((v) => {
+                const next = !v;
+                // Turning voice back on is also a real tap — use it to prime
+                // speechSynthesis in case the Go-button priming never landed
+                // (e.g. voice was off when navigation started).
+                if (next) unlockSpeech();
+                if (!next && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+                return next;
+              });
+            },
+            onClose: handleHudClose,
+            // A race's ranking card takes the distance card's slot too.
+            hideDistance: placeCardOpen || bottomTaken,
+          };
+          return isMobile ? <NavHud {...hudProps} /> : <NavHudDesktop {...hudProps} />;
+        })()}
       {navActive && (
         <NearbyPlaces
           items={nearby}

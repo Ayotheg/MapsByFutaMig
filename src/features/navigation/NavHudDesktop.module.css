@@ -1,0 +1,259 @@
+/* Desktop turn-by-turn navigation HUD — floating capsule pill centered at top
+   that drops down to reveal UP NEXT inside the same card. */
+
+.card {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2200;
+  width: min(760px, calc(100vw - 128px));
+  box-sizing: border-box;
+  background: var(--v2-on-primary);
+  border: 1px solid var(--v2-divider);
+  border-radius: 32px;
+  box-shadow:
+    0 12px 28px -6px color-mix(in srgb, var(--v2-neutral) 12%, transparent),
+    0 4px 10px -4px color-mix(in srgb, var(--v2-neutral) 6%, transparent);
+  overflow: hidden;
+  isolation: isolate;
+  animation: navDesktopHudIn var(--v2-duration-standard) var(--v2-ease-standard);
+  transition: border-color var(--v2-duration-standard) var(--v2-ease-standard);
+}
+
+@keyframes navDesktopHudIn {
+  from {
+    transform: translate(-50%, -12px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.card.arriving {
+  border-color: color-mix(in srgb, var(--v2-primary) 35%, transparent);
+}
+.card.arrived {
+  border-color: color-mix(in srgb, var(--v2-secondary) 40%, transparent);
+}
+
+.main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px 12px 12px;
+}
+
+.turnIcon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 16px;
+  background: var(--v2-primary);
+  color: var(--v2-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px -2px color-mix(in srgb, var(--v2-primary) 35%, transparent);
+  transition:
+    background var(--v2-duration-standard) var(--v2-ease-standard),
+    box-shadow var(--v2-duration-standard) var(--v2-ease-standard);
+}
+.card.arriving .turnIcon {
+  background: var(--v2-primary-hover);
+}
+.card.arrived .turnIcon {
+  background: var(--v2-secondary);
+  box-shadow: 0 4px 10px -2px color-mix(in srgb, var(--v2-secondary) 35%, transparent);
+}
+
+.turnInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.eyebrow {
+  font-family: var(--v2-font-manrope);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: var(--v2-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card.arrived .eyebrow {
+  color: var(--v2-secondary);
+}
+.turnInstruction {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--v2-neutral);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tripMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.distRemain {
+  font-family: var(--v2-font-manrope);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--v2-neutral);
+  white-space: nowrap;
+}
+.destName {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--v2-text-muted);
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.divider {
+  width: 1px;
+  height: 28px;
+  background: var(--v2-divider);
+  flex-shrink: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.voiceBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-full);
+  border: none;
+  background: var(--v2-primary-tint);
+  color: var(--v2-primary-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.voiceBtn:hover {
+  background: color-mix(in srgb, var(--v2-primary) 16%, var(--v2-primary-tint));
+}
+.voiceBtn:active {
+  transform: scale(0.95);
+}
+.voiceBtn:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}
+.voiceMuted {
+  background: var(--v2-hud-upnext-bg);
+  color: var(--v2-text-muted);
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 14px;
+  border-radius: var(--r-full);
+  border: 1px solid color-mix(in srgb, var(--v2-error-text) 22%, transparent);
+  background: var(--v2-error-tint);
+  color: var(--v2-error-text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--v2-duration-quick) var(--v2-ease-standard),
+    transform var(--v2-duration-quick) var(--v2-ease-standard);
+}
+.closeBtn:hover {
+  background: color-mix(in srgb, var(--v2-error-text) 10%, var(--v2-error-tint));
+}
+.closeBtn:active {
+  transform: scale(0.96);
+}
+.closeBtn:focus-visible {
+  outline: 2px solid var(--v2-error-text);
+  outline-offset: 2px;
+}
+
+.nextPreview {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 24px 11px;
+  background: var(--v2-hud-upnext-bg);
+  border-top: 1px solid var(--v2-divider);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--v2-text);
+  white-space: nowrap;
+  overflow: hidden;
+  animation: nextDropIn var(--v2-duration-quick) var(--v2-ease-standard);
+}
+
+@keyframes nextDropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nextLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--v2-primary-hover);
+  flex-shrink: 0;
+}
+.nextText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .nextPreview {
+    animation: none;
+  }
+  .card,
+  .turnIcon,
+  .voiceBtn,
+  .closeBtn {
+    transition: none;
+  }
+}
